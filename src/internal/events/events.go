@@ -1,0 +1,139 @@
+// Package events — общая шина событий между ядром туннеля и интерфейсом
+// (консольным или графическим). Ядро ничего не знает про то, кто и как будет
+// показывать события: оно просто публикует их сюда, а CLI/GUI подписываются.
+package events
+
+import (
+	"fmt"
+	"sync"
+	"time"
+)
+
+type Kind string
+
+const (
+	KindState Kind = "state" // сменилось состояние туннеля
+	KindConn  Kind = "conn"  // приложение открыло соединение через туннель
+	KindLog   Kind = "log"   // произвольное сообщение (ошибка, предупреждение)
+	KindStats Kind = "stats" // периодическая статистика трафика
+)
+
+// Состояния туннеля.
+const (
+	StateStopped      = "stopped"
+	StateConnecting   = "connecting"
+	StateConnected    = "connected"
+	StateReconnecting = "reconnecting"
+	StateError        = "error"
+)
+
+// Stats — сводка по трафику. Скорости считаются интерфейсом из разницы
+// счётчиков между двумя событиями, поэтому здесь только абсолютные значения.
+type Stats struct {
+	BytesUp   int64 `json:"bytesUp"`
+	BytesDown int64 `json:"bytesDown"`
+	Active    int64 `json:"active"`  // сейчас открыто соединений
+	Total     int64 `json:"total"`   // всего обслужено с момента старта
+	Links     int   `json:"links"`   // размер пула SSH-соединений
+	Healthy   int   `json:"healthy"` // сколько из них живы
+}
+
+type Event struct {
+	Kind Kind      `json:"kind"`
+	Time time.Time `json:"time"`
+
+	// KindState
+	State  string `json:"state,omitempty"`
+	Detail string `json:"detail,omitempty"`
+
+	// KindConn
+	Process string `json:"process,omitempty"`
+	PID     int    `json:"pid,omitempty"`
+	Target  string `json:"target,omitempty"`
+	Proto   string `json:"proto,omitempty"` // socks4 / socks4a / socks5 / http
+	// DNSLeak=true означает, что приложение прислало нам уже готовый IP-адрес,
+	// то есть DNS-запрос оно сделало само — в обход туннеля, через провайдера.
+	DNSLeak bool   `json:"dnsLeak,omitempty"`
+	Failed  bool   `json:"failed,omitempty"`
+	Error   string `json:"error,omitempty"`
+
+	// KindLog
+	Level string `json:"level,omitempty"` // info / warn / error
+	Text  string `json:"text,omitempty"`
+
+	// KindStats
+	Stats *Stats `json:"stats,omitempty"`
+}
+
+// Bus раздаёт события подписчикам. Публикация никогда не блокируется: если
+// подписчик не успевает читать, его события просто теряются — лог важен, но не
+// настолько, чтобы из-за него вставал проброс трафика.
+type Bus struct {
+	mu      sync.RWMutex
+	subs    map[chan Event]struct{}
+	history []Event
+	maxHist int
+}
+
+func NewBus() *Bus {
+	return &Bus{subs: make(map[chan Event]struct{}), maxHist: 300}
+}
+
+// Subscribe возвращает канал событий и функцию отписки. Канал буферизованный;
+// переполнение означает потерю событий, а не остановку публикующего.
+func (b *Bus) Subscribe() (<-chan Event, func()) {
+	ch := make(chan Event, 256)
+	b.mu.Lock()
+	b.subs[ch] = struct{}{}
+	b.mu.Unlock()
+	return ch, func() {
+		b.mu.Lock()
+		if _, ok := b.subs[ch]; ok {
+			delete(b.subs, ch)
+			close(ch)
+		}
+		b.mu.Unlock()
+	}
+}
+
+// History отдаёт последние события — нужно, чтобы окно, открытое позже старта,
+// не показывало пустой лог.
+func (b *Bus) History() []Event {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	out := make([]Event, len(b.history))
+	copy(out, b.history)
+	return out
+}
+
+func (b *Bus) Publish(e Event) {
+	if e.Time.IsZero() {
+		e.Time = time.Now()
+	}
+	b.mu.Lock()
+	if e.Kind != KindStats { // статистика идёт часто и в историю не нужна
+		b.history = append(b.history, e)
+		if len(b.history) > b.maxHist {
+			b.history = b.history[len(b.history)-b.maxHist:]
+		}
+	}
+	for ch := range b.subs {
+		select {
+		case ch <- e:
+		default:
+		}
+	}
+	b.mu.Unlock()
+}
+
+func (b *Bus) State(state, detail string) {
+	b.Publish(Event{Kind: KindState, State: state, Detail: detail})
+}
+
+func (b *Bus) Infof(format string, args ...any) { b.logf("info", format, args...) }
+func (b *Bus) Warnf(format string, args ...any) { b.logf("warn", format, args...) }
+func (b *Bus) Errorf(format string, args ...any) { b.logf("error", format, args...) }
+
+func (b *Bus) logf(level, format string, args ...any) {
+	b.Publish(Event{Kind: KindLog, Level: level, Text: fmt.Sprintf(format, args...)})
+}

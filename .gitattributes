@@ -1,2 +1,9 @@
-# Auto detect text files and perform LF normalization
+# Нормализация переводов строк для текста
 * text=auto
+
+# Бинарники и картинки не трогать
+*.exe binary
+*.png binary
+
+# Скрипты сборки — только LF, иначе не выполнятся
+*.sh text eol=lf

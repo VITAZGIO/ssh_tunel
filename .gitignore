@@ -1,0 +1,10 @@
+# Сборочный мусор — готовые бинарники лежат в releases/ и коммитятся намеренно
+src/*.exe
+src/vpstunnel
+src/vpstunnel-cli
+*.test
+*.out
+
+# Личное: сюда попадают адрес сервера и путь к ключу
+config.json
+known_hosts

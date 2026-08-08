@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vpstunnel</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e222b; --line:#272c37;
+    --text:#e6e9ef; --dim:#8b93a5; --accent:#4c8dff; --ok:#38c172;
+    --warn:#e8b339; --err:#e5484d;
+    --mono:ui-monospace,"Cascadia Mono",Consolas,"SF Mono",monospace;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#f4f6fa; --panel:#fff; --panel2:#f0f2f7; --line:#dfe3ec;
+           --text:#171a21; --dim:#5f6879; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:14px/1.5 -apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:940px;margin:0 auto;padding:18px 20px 40px}
+
+  header{display:flex;align-items:center;gap:14px;margin-bottom:16px}
+  h1{font-size:17px;margin:0;font-weight:650;letter-spacing:.2px}
+  .pill{display:inline-flex;align-items:center;gap:7px;padding:4px 11px;
+        border-radius:999px;background:var(--panel2);border:1px solid var(--line);
+        font-size:12.5px;color:var(--dim)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--dim)}
+  .dot.on{background:var(--ok);box-shadow:0 0 0 3px rgba(56,193,114,.18)}
+  .dot.busy{background:var(--warn);animation:pulse 1.1s infinite}
+  .dot.err{background:var(--err)}
+  @keyframes pulse{50%{opacity:.35}}
+  .spacer{flex:1}
+
+  button{font:inherit;color:var(--text);background:var(--panel2);
+         border:1px solid var(--line);border-radius:8px;padding:7px 14px;
+         cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  button:disabled{opacity:.5;cursor:default;border-color:var(--line)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  button.danger{background:transparent;border-color:var(--err);color:var(--err)}
+  button.sm{padding:4px 9px;font-size:12.5px}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+         padding:14px 16px;margin-bottom:14px}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+  .stat{background:var(--panel2);border-radius:9px;padding:9px 11px}
+  .stat .k{font-size:11.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.4px}
+  .stat .v{font-size:17px;font-weight:600;font-family:var(--mono);margin-top:2px}
+
+  details summary{cursor:pointer;font-weight:600;padding:2px 0;user-select:none}
+  .grid{display:grid;grid-template-columns:180px 1fr;gap:9px 12px;
+        align-items:center;margin-top:12px}
+  input[type=text],input[type=number]{width:100%;background:var(--panel2);
+       border:1px solid var(--line);border-radius:7px;padding:6px 9px;
+       color:var(--text);font:inherit}
+  input:focus{outline:none;border-color:var(--accent)}
+  label.chk{display:flex;gap:8px;align-items:flex-start;cursor:pointer}
+  label.chk input{margin-top:3px}
+  .hint{font-size:12.5px;color:var(--dim);margin-top:3px}
+  .full{grid-column:1/-1}
+
+  #log{font-family:var(--mono);font-size:12.5px;background:var(--panel2);
+       border-radius:9px;height:360px;overflow-y:auto;padding:7px 0}
+  .l{display:flex;gap:10px;padding:2px 11px;white-space:nowrap}
+  .l:hover{background:var(--line)}
+  .l .t{color:var(--dim);flex:none}
+  .l .p{flex:none;width:150px;overflow:hidden;text-overflow:ellipsis}
+  .l .a{color:var(--dim);flex:none}
+  .l .h{overflow:hidden;text-overflow:ellipsis}
+  .l .n{flex:none;color:var(--dim)}
+  .l.fail .a,.l.fail .h{color:var(--err)}
+  .l.leak .flag{color:var(--warn);flex:none}
+  .l.msg{color:var(--dim);white-space:normal}
+  .l.msg.warn{color:var(--warn)} .l.msg.err{color:var(--err)}
+
+  .err-box{background:rgba(229,72,77,.12);border:1px solid var(--err);
+           color:var(--err);border-radius:9px;padding:9px 12px;margin-bottom:12px;
+           white-space:pre-wrap}
+  code{font-family:var(--mono);background:var(--panel2);padding:1px 5px;border-radius:5px}
+  pre{font-family:var(--mono);font-size:12.5px;background:var(--panel2);
+      padding:9px 11px;border-radius:8px;overflow-x:auto;margin:8px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>vpstunnel</h1>
+  <span class="pill"><span class="dot" id="dot"></span><span id="state">остановлен</span></span>
+  <span class="spacer"></span>
+  <button id="toggle" class="primary">Подключить</button>
+</header>
+
+<div id="error" class="err-box" hidden></div>
+
+<div class="panel">
+  <div class="stats">
+    <div class="stat"><div class="k">Приём</div><div class="v" id="dn">—</div></div>
+    <div class="stat"><div class="k">Отдача</div><div class="v" id="up">—</div></div>
+    <div class="stat"><div class="k">Соединений</div><div class="v" id="act">—</div></div>
+    <div class="stat"><div class="k">Каналов SSH</div><div class="v" id="links">—</div></div>
+    <div class="stat"><div class="k">Внешний IP</div><div class="v" id="ip">—</div></div>
+  </div>
+  <div class="row" style="margin-top:12px">
+    <button class="sm" id="checkip">Проверить IP через туннель</button>
+    <span class="hint" id="sysproxy"></span>
+  </div>
+</div>
+
+<div class="panel">
+  <details id="settings">
+    <summary>Настройки</summary>
+    <div class="grid">
+      <label for="host">Адрес VPS</label><input type="text" id="host" placeholder="87.58.210.143">
+      <label for="user">Пользователь SSH</label><input type="text" id="user">
+      <label for="keyPath">Приватный ключ</label><input type="text" id="keyPath">
+      <label for="sshPort">SSH-порт</label><input type="number" id="sshPort" min="1" max="65535">
+      <label for="socksPort">Порт SOCKS4/5</label><input type="number" id="socksPort" min="1" max="65535">
+      <label for="httpPort">Порт HTTP-прокси</label><input type="number" id="httpPort" min="1" max="65535">
+      <label for="poolSize">Каналов SSH</label>
+      <div><input type="number" id="poolSize" min="1" max="16">
+        <div class="hint">Несколько параллельных соединений заметно поднимают скорость. 4 — разумное значение.</div>
+      </div>
+
+      <div class="full">
+        <label class="chk"><input type="checkbox" id="sysProxy">
+          <span>Прописывать системный прокси Windows
+            <div class="hint">Покрывает браузеры и приложения на системном сетевом стеке (WinINET/WinHTTP).</div>
+          </span></label>
+      </div>
+      <div class="full">
+        <label class="chk"><input type="checkbox" id="setEnvVars">
+          <span>Прописывать HTTPS_PROXY в переменные среды
+            <div class="hint">Нужно для программ на Node.js, Python и Go — Claude Code, npm, pip, curl. Системный прокси Windows они не читают вовсе. Подхватится процессами, запущенными после включения.</div>
+          </span></label>
+      </div>
+      <div class="full">
+        <label class="chk"><input type="checkbox" id="verbose"><span>Подробный лог</span></label>
+      </div>
+      <div class="full">
+        <label class="chk"><input type="checkbox" id="autoStart"><span>Подключаться сразу при запуске программы</span></label>
+      </div>
+
+      <div class="full row">
+        <button id="save">Сохранить</button>
+        <span class="hint" id="savedNote"></span>
+      </div>
+      <div class="full">
+        <div class="hint">Если не хочешь менять переменные среды глобально — вставь это в терминал перед запуском программы:</div>
+        <pre id="envhint"></pre>
+      </div>
+    </div>
+  </details>
+</div>
+
+<div class="panel">
+  <div class="row" style="margin-bottom:10px">
+    <strong style="font-size:13.5px">Кто ходит в интернет</strong>
+    <span class="spacer"></span>
+    <input type="text" id="filter" placeholder="фильтр" style="width:160px">
+    <button class="sm" id="clear">Очистить</button>
+  </div>
+  <div id="log"></div>
+</div>
+
+</div>
+
+<script>
+const T = new URLSearchParams(location.search).get('t') || '';
+const $ = id => document.getElementById(id);
+const api = (path, body) => fetch(path, {
+  method: body ? 'POST' : 'GET',
+  headers: {'X-Token': T, 'Content-Type': 'application/json'},
+  body: body ? JSON.stringify(body) : undefined
+}).then(r => r.json());
+
+const FIELDS = ['host','user','keyPath','sshPort','socksPort','httpPort','poolSize'];
+const CHECKS = ['sysProxy','setEnvVars','verbose','autoStart'];
+
+let running = false, prev = null, prevAt = 0;
+
+function fmtBytes(n){
+  if(n < 1024) return n + ' Б';
+  if(n < 1048576) return (n/1024).toFixed(0) + ' КБ';
+  if(n < 1073741824) return (n/1048576).toFixed(1) + ' МБ';
+  return (n/1073741824).toFixed(2) + ' ГБ';
+}
+function fmtRate(bytesPerSec){
+  const bits = bytesPerSec * 8;
+  if(bits < 1000) return '0 Мбит/с';
+  if(bits < 1000000) return (bits/1000).toFixed(0) + ' Кбит/с';
+  return (bits/1000000).toFixed(1) + ' Мбит/с';
+}
+
+function setState(s){
+  const dot = $('dot'), label = $('state');
+  dot.className = 'dot';
+  const map = {
+    stopped:      ['остановлен', ''],
+    connecting:   ['подключаюсь…', 'busy'],
+    connected:    ['подключён', 'on'],
+    reconnecting: ['связь потеряна, переподключаюсь…', 'busy'],
+    error:        ['ошибка', 'err'],
+  };
+  const [text, cls] = map[s] || [s, ''];
+  label.textContent = text;
+  if(cls) dot.classList.add(cls);
+  running = (s === 'connected' || s === 'reconnecting' || s === 'connecting');
+  $('toggle').textContent = running ? 'Отключить' : 'Подключить';
+  $('toggle').className = running ? 'danger' : 'primary';
+}
+
+function showError(msg){
+  const box = $('error');
+  if(!msg){ box.hidden = true; return; }
+  box.hidden = false;
+  box.textContent = msg;
+}
+
+// ---- лог ----
+const logEl = $('log');
+let lastKey = null, lastLine = null, lastCount = 1, lastAt = 0;
+
+function addConn(e){
+  const key = (e.process||'') + '|' + e.target + '|' + (e.failed?'f':'o');
+  const now = Date.now();
+  // Одна страница открывает десятки соединений к одному хосту: повторы
+  // в пределах пяти секунд сворачиваем в счётчик, иначе лог нечитаем.
+  if(key === lastKey && now - lastAt < 5000 && lastLine){
+    lastCount++; lastAt = now;
+    lastLine.querySelector('.n').textContent = '×' + lastCount;
+    return;
+  }
+  lastKey = key; lastCount = 1; lastAt = now;
+
+  const d = document.createElement('div');
+  d.className = 'l' + (e.failed ? ' fail' : '') + (e.dnsLeak ? ' leak' : '');
+  const time = new Date(e.time).toLocaleTimeString('ru-RU');
+  d.innerHTML =
+    '<span class="t"></span><span class="p"></span><span class="a"></span>' +
+    '<span class="h"></span><span class="flag"></span><span class="n"></span>';
+  d.querySelector('.t').textContent = time;
+  d.querySelector('.p').textContent = e.process || 'приложение';
+  d.querySelector('.a').textContent = e.failed ? '✗' : '→';
+  d.querySelector('.h').textContent = e.target + (e.failed ? '  ' + (e.error||'') : '');
+  d.querySelector('.flag').textContent = e.dnsLeak ? '  DNS мимо туннеля' : '';
+  d.querySelector('.n').textContent = '';
+  push(d);
+}
+
+function addMsg(e){
+  lastKey = null;
+  const d = document.createElement('div');
+  d.className = 'l msg ' + (e.level === 'error' ? 'err' : e.level === 'warn' ? 'warn' : '');
+  d.textContent = new Date(e.time).toLocaleTimeString('ru-RU') + '  ' + e.text;
+  push(d);
+}
+
+function push(el){
+  const atBottom = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 40;
+  logEl.appendChild(el);
+  lastLine = el;
+  while(logEl.childElementCount > 800) logEl.removeChild(logEl.firstChild);
+  applyFilter(el);
+  if(atBottom) logEl.scrollTop = logEl.scrollHeight;
+}
+
+function applyFilter(el){
+  const q = $('filter').value.trim().toLowerCase();
+  el.style.display = (!q || el.textContent.toLowerCase().includes(q)) ? '' : 'none';
+}
+$('filter').oninput = () => [...logEl.children].forEach(applyFilter);
+$('clear').onclick = () => { logEl.innerHTML = ''; lastKey = null; };
+
+// ---- поток событий ----
+function connectEvents(){
+  const es = new EventSource('/events?t=' + encodeURIComponent(T));
+  es.onmessage = ev => {
+    const e = JSON.parse(ev.data);
+    if(e.kind === 'conn')  return addConn(e);
+    if(e.kind === 'log')   return addMsg(e);
+    if(e.kind === 'state'){
+      setState(e.state);
+      if(e.state === 'error' && e.detail) showError(e.detail); else showError('');
+      return;
+    }
+    if(e.kind === 'stats'){
+      const s = e.stats, now = Date.now();
+      if(prev && now > prevAt){
+        const dt = (now - prevAt) / 1000;
+        $('dn').textContent = fmtRate((s.bytesDown - prev.bytesDown) / dt);
+        $('up').textContent = fmtRate((s.bytesUp - prev.bytesUp) / dt);
+      }
+      prev = s; prevAt = now;
+      $('act').textContent = s.active;
+      $('links').textContent = s.healthy + ' / ' + s.links;
+      $('dn').title = 'всего принято ' + fmtBytes(s.bytesDown);
+      $('up').title = 'всего отдано ' + fmtBytes(s.bytesUp);
+    }
+  };
+  es.onerror = () => {};
+}
+
+// ---- управление ----
+$('toggle').onclick = async () => {
+  $('toggle').disabled = true;
+  showError('');
+  try{
+    const r = running ? await api('/api/stop', {}) : await api('/api/start', {});
+    if(r.error) showError(r.error);
+  } finally {
+    $('toggle').disabled = false;
+    refresh();
+  }
+};
+
+$('checkip').onclick = async () => {
+  $('checkip').disabled = true;
+  $('ip').textContent = '…';
+  const r = await api('/api/checkip');
+  $('ip').textContent = r.ip || '—';
+  if(r.error) showError(r.error);
+  $('checkip').disabled = false;
+};
+
+$('save').onclick = async () => {
+  const cfg = {};
+  FIELDS.forEach(f => {
+    const el = $(f);
+    cfg[f] = el.type === 'number' ? parseInt(el.value, 10) || 0 : el.value.trim();
+  });
+  CHECKS.forEach(f => cfg[f] = $(f).checked);
+  const r = await api('/api/config', cfg);
+  if(r.error){ showError(r.error); return; }
+  showError('');
+  fillConfig(r.config);
+  $('savedNote').textContent = 'сохранено';
+  setTimeout(() => $('savedNote').textContent = '', 2000);
+};
+
+function fillConfig(cfg){
+  FIELDS.forEach(f => { if($(f) && document.activeElement !== $(f)) $(f).value = cfg[f] ?? ''; });
+  CHECKS.forEach(f => { if($(f)) $(f).checked = !!cfg[f]; });
+}
+
+async function refresh(){
+  const st = await api('/api/status');
+  setState(st.state);
+  fillConfig(st.config);
+  $('sysproxy').textContent = 'Системный прокси: ' + st.sysProxy;
+  $('envhint').textContent = (st.envHint || []).join('\n');
+  if(!st.config.host) $('settings').open = true;
+}
+
+connectEvents();
+refresh();
+setInterval(() => { if(!running) refresh(); }, 5000);
+</script>
+</body>
+</html>
