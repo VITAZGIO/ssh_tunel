@@ -1,13 +1,18 @@
 //go:build ignore
 
-// Рисует варианты иконки приложения: щит в цвет логотипа с замком или
-// замочной скважиной внутри, фон прозрачный.
+// Рисует варианты иконки приложения: щит в цвет логотипа со сквозной
+// замочной скважиной, фон прозрачный.
 //
 //	go run tools/mkshield/main.go <папка-результата>
 //
-// Каждый вариант сохраняется отдельным PNG в 512 и в 32 пикселя — второй
-// нужен, чтобы сразу видеть, не разваливается ли рисунок в размере значка
-// в трее. Выбранный вариант потом превращается в .ico тем же mkicon.
+// Все щиты здесь — с ОСТРЫМИ углами: контур задаётся многоугольником, и
+// скруглений нигде нет. Различаются силуэты: пятиугольный значок, чистый
+// треугольник, классический геральдический с выпуклыми боками, со скошенными
+// плечами, норманнский с изломом и с вогнутыми боками.
+//
+// Каждый вариант сохраняется в 512 и в 32 пикселя — второй нужен, чтобы сразу
+// видеть, не разваливается ли рисунок в размере значка в трее. Выбранный
+// вариант потом превращается в .ico инструментом mkicon.
 package main
 
 import (
@@ -21,18 +26,25 @@ import (
 )
 
 // Цвет логотипа VG.
-var (
-	cyan = color.RGBA{0x2d, 0xe2, 0xff, 0xff}
-	deep = color.RGBA{0x12, 0x8c, 0xd8, 0xff} // нижняя точка градиента
-)
+var cyan = color.RGBA{0x2d, 0xe2, 0xff, 0xff}
+
+type pt struct{ x, y float64 }
 
 type variant struct {
-	name string
-	desc string
-	// filled сообщает, закрашена ли точка (x,y) в координатах 0..1.
-	filled func(x, y float64) bool
-	grad   bool
+	name   string
+	desc   string
+	shape  []pt
+	keyCY  float64 // центр скважины по вертикали — зависит от силуэта
+	keyLen float64 // длина прорези
 }
+
+// Общие границы силуэта, чтобы все варианты были одного размера и веса.
+const (
+	top    = 0.055
+	bottom = 0.965
+	left   = 0.085
+	right  = 0.915
+)
 
 func main() {
 	out := "."
@@ -45,82 +57,94 @@ func main() {
 
 	for _, v := range variants() {
 		for _, size := range []int{512, 32} {
-			img := render(v, size)
-			name := fmt.Sprintf("%s-%d.png", v.name, size)
-			f, err := os.Create(filepath.Join(out, name))
+			f, err := os.Create(filepath.Join(out, fmt.Sprintf("%s-%d.png", v.name, size)))
 			if err != nil {
 				panic(err)
 			}
-			if err := png.Encode(f, img); err != nil {
+			if err := png.Encode(f, render(v, size)); err != nil {
 				panic(err)
 			}
 			f.Close()
 		}
-		fmt.Printf("%-12s %s\n", v.name, v.desc)
+		fmt.Printf("%-18s %s\n", v.name, v.desc)
 	}
 }
 
 func variants() []variant {
 	return []variant{
 		{
-			name: "1-skvazhina",
-			desc: "сплошной щит, замочная скважина вырезана насквозь",
-			filled: func(x, y float64) bool {
-				return inShield(x, y) && !inKeyhole(x, y)
+			name: "1-pyatiugolnyy",
+			desc: "пятиугольный значок: прямые плечи, две грани к острию",
+			shape: []pt{
+				{left, top}, {right, top},
+				{right, 0.56}, {0.5, bottom}, {left, 0.56},
 			},
+			keyCY: 0.36, keyLen: 0.21,
 		},
 		{
-			name: "2-zamok",
-			desc: "сплошной щит, навесной замок вырезан насквозь",
-			filled: func(x, y float64) bool {
-				return inShield(x, y) && !inPadlock(x, y)
+			name: "2-treugolnyy",
+			desc: "треугольный: плоский верх и прямые грани в остриё",
+			shape: []pt{
+				{left, top}, {right, top}, {0.5, bottom},
 			},
+			keyCY: 0.30, keyLen: 0.19,
 		},
 		{
-			name: "3-kontur-skvazhina",
-			desc: "контур щита, скважина внутри",
-			filled: func(x, y float64) bool {
-				return shieldOutline(x, y, 0.085) || inKeyhole(x, y)
-			},
+			name: "3-geraldicheskiy",
+			desc: "классический геральдический: прямые плечи, выпуклые бока",
+			shape: append(append([]pt{{left, top}, {right, top}, {right, 0.42}},
+				curve(pt{right, 0.42}, pt{0.885, 0.80}, pt{0.5, bottom})...),
+				curve(pt{0.5, bottom}, pt{0.115, 0.80}, pt{left, 0.42})...),
+			keyCY: 0.35, keyLen: 0.21,
 		},
 		{
-			name: "4-kontur-zamok",
-			desc: "контур щита, замок внутри",
-			filled: func(x, y float64) bool {
-				return shieldOutline(x, y, 0.085) || inPadlock(x, y)
+			name: "4-so-skosom",
+			desc: "со скошенными верхними углами",
+			shape: []pt{
+				{0.24, top}, {0.76, top}, {right, 0.17},
+				{right, 0.54}, {0.5, bottom}, {left, 0.54}, {left, 0.17},
 			},
+			keyCY: 0.37, keyLen: 0.21,
 		},
 		{
-			name: "5-gradient",
-			desc: "сплошной щит с градиентом, скважина вырезана",
-			grad: true,
-			filled: func(x, y float64) bool {
-				return inShield(x, y) && !inKeyhole(x, y)
+			name: "5-normannskiy",
+			desc: "норманнский: бока с изломом, длинное остриё",
+			shape: []pt{
+				{left, top}, {right, top},
+				{right, 0.46}, {0.79, 0.72}, {0.5, bottom}, {0.21, 0.72}, {left, 0.46},
 			},
+			keyCY: 0.34, keyLen: 0.20,
 		},
 		{
-			name: "6-dvoynoy",
-			desc: "щит с внутренней окантовкой, скважина вырезана",
-			filled: func(x, y float64) bool {
-				if !inShield(x, y) {
-					return false
-				}
-				// Тонкая прорезь по контуру внутри — щит выглядит объёмнее.
-				if shieldOutline(x, y, 0.055) {
-					return true
-				}
-				gap := scaleAboutCenter(x, y, 1.0/0.80)
-				if inShield(gap.x, gap.y) {
-					return !inKeyhole(x, y)
-				}
-				return false
-			},
+			name: "6-vognutyy",
+			desc: "с вогнутыми боками, узкое остриё",
+			shape: append(append([]pt{{left, top}, {right, top}, {right, 0.34}},
+				curve(pt{right, 0.34}, pt{0.70, 0.62}, pt{0.5, bottom})...),
+				curve(pt{0.5, bottom}, pt{0.30, 0.62}, pt{left, 0.34})...),
+			keyCY: 0.32, keyLen: 0.19,
 		},
 	}
 }
 
+// curve разбивает квадратичную кривую на отрезки — так изогнутый бок можно
+// хранить тем же многоугольником, что и прямые грани, и не заводить отдельную
+// математику для заливки.
+func curve(a, ctrl, b pt) []pt {
+	const steps = 48
+	out := make([]pt, 0, steps)
+	for i := 1; i <= steps; i++ {
+		t := float64(i) / steps
+		u := 1 - t
+		out = append(out, pt{
+			x: u*u*a.x + 2*u*t*ctrl.x + t*t*b.x,
+			y: u*u*a.y + 2*u*t*ctrl.y + t*t*b.y,
+		})
+	}
+	return out
+}
+
 // render рисует вариант со сглаживанием: покрытие пикселя считается по сетке
-// 4x4. Без этого тонкие места (скважина, окантовка) рвутся уже на 64 пикселях.
+// 4x4. Без этого острые углы и прорезь скважины рвутся уже на 64 пикселях.
 func render(v variant, size int) image.Image {
 	img := image.NewNRGBA(image.Rect(0, 0, size, size))
 	const ss = 4
@@ -133,7 +157,7 @@ func render(v variant, size int) image.Image {
 				for sx := 0; sx < ss; sx++ {
 					x := (float64(px) + (float64(sx)+0.5)/ss) / s
 					y := (float64(py) + (float64(sy)+0.5)/ss) / s
-					if v.filled(x, y) {
+					if inPoly(v.shape, x, y) && !inKeyhole(v, x, y) {
 						hits++
 					}
 				}
@@ -142,118 +166,39 @@ func render(v variant, size int) image.Image {
 				continue
 			}
 			a := float64(hits) / float64(ss*ss)
-
-			c := cyan
-			if v.grad {
-				t := float64(py) / s
-				c = color.RGBA{
-					R: uint8(float64(cyan.R)*(1-t) + float64(deep.R)*t),
-					G: uint8(float64(cyan.G)*(1-t) + float64(deep.G)*t),
-					B: uint8(float64(cyan.B)*(1-t) + float64(deep.B)*t),
-					A: 255,
-				}
-			}
-			img.Set(px, py, color.NRGBA{c.R, c.G, c.B, uint8(a*255 + 0.5)})
+			img.Set(px, py, color.NRGBA{cyan.R, cyan.G, cyan.B, uint8(a*255 + 0.5)})
 		}
 	}
 	return img
 }
 
-// ---------- формы (координаты 0..1) ----------
-
-// inShield — щит: плечи со скруглёнными верхними углами и сходящееся книзу
-// остриё. Доля прямой части намеренно небольшая (до 42% высоты): если сделать
-// её больше, силуэт перестаёт читаться как щит и выглядит скруглённым
-// квадратом.
-func inShield(x, y float64) bool {
-	const padX, top, bottom = 0.115, 0.06, 0.965
-	if y < top || y > bottom {
-		return false
-	}
-	w := 1 - 2*padX
-	nx := (x - padX) / w
-	ny := (y - top) / (bottom - top)
-	if nx < 0 || nx > 1 {
-		return false
-	}
-	dx := math.Abs(nx-0.5) * 2
-
-	const straight = 0.42
-	if ny < straight {
-		r := 0.17 // скругление верхних углов
-		if ny < r && dx > 1-r*2 {
-			ex := (dx - (1 - r*2)) / (r * 2)
-			ey := (r - ny) / r
-			return ex*ex+ey*ey <= 1
+// inPoly — принадлежность точки многоугольнику методом испускания луча.
+func inPoly(p []pt, x, y float64) bool {
+	in := false
+	for i, j := 0, len(p)-1; i < len(p); j, i = i, i+1 {
+		if (p[i].y > y) != (p[j].y > y) &&
+			x < (p[j].x-p[i].x)*(y-p[i].y)/(p[j].y-p[i].y)+p[i].x {
+			in = !in
 		}
-		return true
 	}
-	// Остриё: четверть эллипса даёт плавные бока и аккуратный кончик.
-	k := (ny - straight) / (1 - straight)
-	return dx <= math.Sqrt(math.Max(0, 1-k*k))
+	return in
 }
 
-// shieldOutline — кольцо вдоль края щита заданной толщины.
-func shieldOutline(x, y, thick float64) bool {
-	if !inShield(x, y) {
-		return false
-	}
-	inner := scaleAboutCenter(x, y, 1/(1-thick*2))
-	return !inShield(inner.x, inner.y)
-}
-
-type pt struct{ x, y float64 }
-
-// scaleAboutCenter растягивает точку относительно визуального центра щита —
-// так получается равномерный отступ внутрь без сложной математики контуров.
-func scaleAboutCenter(x, y, k float64) pt {
-	const cx, cy = 0.5, 0.44
-	return pt{cx + (x-cx)*k, cy + (y-cy)*k}
-}
-
-// inKeyhole — замочная скважина: круг и сужающаяся книзу прорезь.
-func inKeyhole(x, y float64) bool {
-	const cx, cy = 0.5, 0.38
-	dx, dy := x-cx, y-cy
-
-	if math.Hypot(dx, dy) <= 0.105 {
-		return true
-	}
-	// Прорезь: сверху уже, книзу шире — так читается даже в 16 пикселей.
-	if y > cy && y < cy+0.23 {
-		t := (y - cy) / 0.23
-		half := 0.045 + 0.045*t
-		return math.Abs(dx) <= half
-	}
-	return false
-}
-
-// inPadlock — навесной замок: корпус со скруглёнными углами и дужка сверху.
-func inPadlock(x, y float64) bool {
+// inKeyhole — замочная скважина: круг и расширяющаяся книзу прорезь.
+// Прорезь именно расширяется: сужающаяся к низу в размере значка в трее
+// схлопывается в точку и перестаёт читаться.
+func inKeyhole(v variant, x, y float64) bool {
 	const cx = 0.5
+	const r = 0.105
+	dx, dy := x-cx, y-v.keyCY
 
-	// Корпус.
-	const bt, bb, bhw = 0.40, 0.66, 0.150
-	if y >= bt && y <= bb && math.Abs(x-cx) <= bhw {
-		r := 0.045
-		dx := math.Abs(x-cx) - (bhw - r)
-		var dy float64
-		if y < bt+r {
-			dy = bt + r - y
-		} else if y > bb-r {
-			dy = y - (bb - r)
-		}
-		if dx > 0 && dy > 0 {
-			return dx*dx+dy*dy <= r*r
-		}
+	if math.Hypot(dx, dy) <= r {
 		return true
 	}
-
-	// Дужка: полукольцо, упирающееся в корпус.
-	const sc, sr, st = 0.40, 0.095, 0.038
-	if y <= sc {
-		d := math.Hypot(x-cx, y-sc)
-		return math.Abs(d-sr) <= st/2+0.012
+	if y > v.keyCY && y < v.keyCY+v.keyLen {
+		t := (y - v.keyCY) / v.keyLen
+		half := 0.042 + 0.046*t
+		return math.Abs(dx) <= half
 	}
 	return false
 }
