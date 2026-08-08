@@ -55,8 +55,8 @@ func TestMeasuresBothDirections(t *testing.T) {
 		Streams:  2,
 		Duration: 900 * time.Millisecond,
 		WarmUp:   150 * time.Millisecond,
-		DownURL:  base + "/down",
-		UpURL:    base + "/up",
+		DownURLs: []string{base + "/down"},
+		UpURLs:   []string{base + "/up"},
 		OnProgress: func(phase string, mbps float64) {
 			phases = append(phases, phase)
 		},
@@ -97,8 +97,8 @@ func TestParallelStreamsAddUp(t *testing.T) {
 			Streams:  streams,
 			Duration: 800 * time.Millisecond,
 			WarmUp:   150 * time.Millisecond,
-			DownURL:  base + "/down",
-			UpURL:    base + "/up",
+			DownURLs: []string{base + "/down"},
+			UpURLs:   []string{base + "/up"},
 		})
 		if err != nil {
 			t.Fatalf("%d поток(ов): %v", streams, err)
@@ -122,8 +122,8 @@ func TestReportsErrorInsteadOfZero(t *testing.T) {
 		Streams:  1,
 		Duration: 500 * time.Millisecond,
 		WarmUp:   100 * time.Millisecond,
-		DownURL:  base + "/fail",
-		UpURL:    base + "/up",
+		DownURLs: []string{base + "/fail"},
+		UpURLs:   []string{base + "/up"},
 	})
 	if err == nil {
 		t.Fatal("ошибка сервера измерения выдана за успешный тест")
@@ -134,4 +134,53 @@ func TestNeedsDial(t *testing.T) {
 	if _, err := Run(context.Background(), Options{}); err == nil {
 		t.Fatal("тест без способа подключения должен возвращать ошибку")
 	}
+}
+
+// Первый адрес может отвечать отказом — тогда берётся следующий рабочий.
+// Именно этого не хватало, когда Cloudflare начал отдавать 403.
+func TestFallsBackToWorkingServer(t *testing.T) {
+	base := testServer(t)
+
+	res, err := Run(context.Background(), Options{
+		Dial:     directDial,
+		Streams:  2,
+		Duration: 700 * time.Millisecond,
+		WarmUp:   120 * time.Millisecond,
+		DownURLs: []string{base + "/fail", base + "/down"},
+		UpURLs:   []string{base + "/up"},
+	})
+	if err != nil {
+		t.Fatalf("перебор адресов не сработал: %v", err)
+	}
+	if res.DownMbps <= 0 {
+		t.Fatal("приём не измерен, хотя рабочий адрес в списке был")
+	}
+}
+
+// Отдачу принимают немногие сервисы. Если ни один не отвечает, уже измеренный
+// приём выбрасывать нельзя — пользователю нужна хотя бы половина результата.
+func TestUploadFailureKeepsDownload(t *testing.T) {
+	base := testServer(t)
+
+	res, err := Run(context.Background(), Options{
+		Dial:     directDial,
+		Streams:  1,
+		Duration: 700 * time.Millisecond,
+		WarmUp:   120 * time.Millisecond,
+		DownURLs: []string{base + "/down"},
+		UpURLs:   []string{base + "/fail"},
+	})
+	if err != nil {
+		t.Fatalf("неудача с отдачей не должна ронять весь тест: %v", err)
+	}
+	if res.DownMbps <= 0 {
+		t.Fatal("приём потерян из-за неудачи с отдачей")
+	}
+	if res.UpMbps != 0 {
+		t.Fatalf("отдача измерена как %v, хотя сервер отказал", res.UpMbps)
+	}
+	if res.Note == "" {
+		t.Fatal("про неудачу с отдачей ничего не сказано")
+	}
+	t.Logf("приём %.0f Мбит/с, пометка: %s", res.DownMbps, res.Note)
 }

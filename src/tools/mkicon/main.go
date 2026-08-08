@@ -3,10 +3,14 @@
 // Собирает иконку приложения (.ico) из одной исходной картинки: уменьшает её
 // до всех размеров, которые спрашивает Windows, и складывает в один файл.
 //
-// Сделано инструментом, а не готовым .ico из редактора, чтобы иконку можно
-// было пересобрать одной командой, а в репозитории лежал понятный исходник:
+//	go run tools/mkicon/main.go internal/nativeui/icon-source.png internal/nativeui/icon.ico
 //
-//	go run tools/mkicon/main.go internal/nativeui/logo.png internal/nativeui/icon.ico
+// Важная деталь про формат. Внутри .ico каждая картинка лежит либо как PNG,
+// либо как DIB (несжатый растр Windows). PNG внутри иконок понимают начиная с
+// Vista, но НЕ везде: часть механизмов оболочки — панель задач, Alt+Tab,
+// значки в проводнике — для размеров меньше 256 ждут именно DIB и на PNG
+// показывают старую иконку из кэша или вообще ничего. Поэтому здесь всё до
+// 256 пишется как DIB, и только 256 — как PNG (иначе он раздул бы файл).
 package main
 
 import (
@@ -35,14 +39,25 @@ func main() {
 		os.Exit(1)
 	}
 
-	var images [][]byte
+	type entry struct {
+		size int
+		data []byte
+	}
+	var entries []entry
 	for _, s := range sizes {
-		var buf bytes.Buffer
-		if err := png.Encode(&buf, resize(src, s)); err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
+		img := resize(src, s)
+		var data []byte
+		if s >= 256 {
+			var buf bytes.Buffer
+			if err := png.Encode(&buf, img); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
+			data = buf.Bytes()
+		} else {
+			data = encodeDIB(img)
 		}
-		images = append(images, buf.Bytes())
+		entries = append(entries, entry{s, data})
 	}
 
 	f, err := os.Create(os.Args[2])
@@ -51,7 +66,69 @@ func main() {
 		os.Exit(1)
 	}
 	defer f.Close()
-	writeICO(f, images)
+
+	n := len(entries)
+	binary.Write(f, binary.LittleEndian, uint16(0)) // зарезервировано
+	binary.Write(f, binary.LittleEndian, uint16(1)) // тип: иконка
+	binary.Write(f, binary.LittleEndian, uint16(n))
+
+	offset := 6 + 16*n
+	for _, e := range entries {
+		b := byte(e.size)
+		if e.size >= 256 {
+			b = 0 // 256 кодируется нулём
+		}
+		f.Write([]byte{b, b, 0, 0})
+		binary.Write(f, binary.LittleEndian, uint16(1))  // плоскости
+		binary.Write(f, binary.LittleEndian, uint16(32)) // бит на пиксель
+		binary.Write(f, binary.LittleEndian, uint32(len(e.data)))
+		binary.Write(f, binary.LittleEndian, uint32(offset))
+		offset += len(e.data)
+	}
+	for _, e := range entries {
+		f.Write(e.data)
+	}
+
+	fmt.Printf("иконка собрана: %d размеров, %d байт\n", n, offset)
+}
+
+// encodeDIB пишет картинку в том виде, в каком иконку ждёт Windows:
+// заголовок BITMAPINFOHEADER, затем пиксели BGRA снизу вверх, затем маска
+// прозрачности. Маска нулевая — прозрачность берётся из альфа-канала, но сама
+// маска обязана присутствовать, иначе картинка считается битой.
+func encodeDIB(img *image.NRGBA) []byte {
+	b := img.Bounds()
+	w, h := b.Dx(), b.Dy()
+	var out bytes.Buffer
+
+	// BITMAPINFOHEADER. Высота удвоена: формат считает, что за картинкой идёт
+	// маска той же высоты.
+	binary.Write(&out, binary.LittleEndian, uint32(40))
+	binary.Write(&out, binary.LittleEndian, int32(w))
+	binary.Write(&out, binary.LittleEndian, int32(h*2))
+	binary.Write(&out, binary.LittleEndian, uint16(1))  // плоскости
+	binary.Write(&out, binary.LittleEndian, uint16(32)) // бит на пиксель
+	binary.Write(&out, binary.LittleEndian, uint32(0))  // без сжатия
+	binary.Write(&out, binary.LittleEndian, uint32(w*h*4))
+	binary.Write(&out, binary.LittleEndian, int32(0)) // разрешение по X
+	binary.Write(&out, binary.LittleEndian, int32(0)) // разрешение по Y
+	binary.Write(&out, binary.LittleEndian, uint32(0))
+	binary.Write(&out, binary.LittleEndian, uint32(0))
+
+	// Пиксели: снизу вверх, порядок каналов B, G, R, A.
+	for y := h - 1; y >= 0; y-- {
+		for x := 0; x < w; x++ {
+			c := img.NRGBAAt(b.Min.X+x, b.Min.Y+y)
+			out.Write([]byte{c.B, c.G, c.R, c.A})
+		}
+	}
+
+	// Маска: по биту на пиксель, строки выровнены на 4 байта.
+	rowBytes := ((w + 31) / 32) * 4
+	mask := make([]byte, rowBytes*h)
+	out.Write(mask)
+
+	return out.Bytes()
 }
 
 func loadPNG(path string) (image.Image, error) {
@@ -64,13 +141,12 @@ func loadPNG(path string) (image.Image, error) {
 }
 
 // resize уменьшает картинку усреднением по площади. Для уменьшения этого
-// достаточно и результат чище, чем у выборки ближайшего пикселя: логотип
-// состоит из тонких диагоналей, которые иначе рассыпались бы на мелких
-// размерах.
+// достаточно и результат чище, чем у выборки ближайшего пикселя: остриё щита
+// и прорезь скважины иначе рассыпаются на мелких размерах.
 //
 // Усреднять надо ЦВЕТ, УМНОЖЕННЫЙ НА ПРОЗРАЧНОСТЬ, иначе по краям вылезает
 // тёмная кайма из полностью прозрачных пикселей.
-func resize(src image.Image, size int) image.Image {
+func resize(src image.Image, size int) *image.NRGBA {
 	b := src.Bounds()
 	dst := image.NewNRGBA(image.Rect(0, 0, size, size))
 
@@ -87,8 +163,7 @@ func resize(src image.Image, size int) image.Image {
 				y1 = y0 + 1
 			}
 
-			var sr, sg, sb, sa uint64
-			var n uint64
+			var sr, sg, sb, sa, n uint64
 			for yy := y0; yy < y1; yy++ {
 				for xx := x0; xx < x1; xx++ {
 					r, g, bl, a := src.At(xx, yy).RGBA() // уже умножены на альфу
@@ -113,31 +188,4 @@ func resize(src image.Image, size int) image.Image {
 		}
 	}
 	return dst
-}
-
-// writeICO собирает контейнер .ico из готовых PNG. Начиная с Vista Windows
-// понимает PNG внутри ico, поэтому возиться с форматом BMP не нужно.
-func writeICO(f *os.File, images [][]byte) {
-	n := len(images)
-	binary.Write(f, binary.LittleEndian, uint16(0)) // зарезервировано
-	binary.Write(f, binary.LittleEndian, uint16(1)) // тип: иконка
-	binary.Write(f, binary.LittleEndian, uint16(n))
-
-	offset := 6 + 16*n
-	for i, img := range images {
-		s := sizes[i]
-		b := byte(s)
-		if s >= 256 {
-			b = 0 // 256 кодируется нулём
-		}
-		f.Write([]byte{b, b, 0, 0})
-		binary.Write(f, binary.LittleEndian, uint16(1))  // плоскости
-		binary.Write(f, binary.LittleEndian, uint16(32)) // бит на пиксель
-		binary.Write(f, binary.LittleEndian, uint32(len(img)))
-		binary.Write(f, binary.LittleEndian, uint32(offset))
-		offset += len(img)
-	}
-	for _, img := range images {
-		f.Write(img)
-	}
 }

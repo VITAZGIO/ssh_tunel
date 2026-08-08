@@ -436,6 +436,10 @@ function onSpeed(e){
     (e.phase === 'up' ? 'отдача' : 'приём') + '</span>';
 }
 
+// Последний удачный результат держим отдельно: если следующий тест сорвётся,
+// стирать уже измеренное незачем — пользователь останется вообще без цифр.
+let lastSpeed = null;
+
 $('speedtest').onclick = async () => {
   if(!running || speedRunning) return;
   speedRunning = true;
@@ -449,14 +453,29 @@ $('speedtest').onclick = async () => {
   speedRunning = false;
   $('speedtest').disabled = !running;
   $('speedtest').innerHTML = 'Тест скорости';
+
   if(r.error){
     showError(r.error);
-    $('dn').textContent = '—'; $('up').textContent = '—';
+    showSpeed(lastSpeed);   // вернуть прошлый результат, а не обнулять
     return;
   }
-  $('dn').textContent = fmtMbps(r.downMbps);
-  $('up').textContent = fmtMbps(r.upMbps);
+  lastSpeed = { down: r.downMbps, up: r.upMbps };
+  showSpeed(lastSpeed);
+  // Приём мог измериться, а отдача — нет. Это не ошибка целиком, поэтому
+  // говорим об этом отдельно и результат оставляем.
+  if(r.note) showError(r.note);
 };
+
+// showSpeed рисует результат. null означает, что теста ещё не было — тогда
+// плитки прячутся обратно, чтобы не показывать прочерки без причины.
+function showSpeed(v){
+  const has = v !== null;
+  $('tileDown').hidden = !has;
+  $('tileUp').hidden = !has;
+  if(!has) return;
+  $('dn').textContent = fmtMbps(v.down);
+  $('up').textContent = v.up > 0 ? fmtMbps(v.up) : '—';
+}
 
 /* ---------- настройки ---------- */
 [...FIELDS, ...CHECKS].forEach(f => {
