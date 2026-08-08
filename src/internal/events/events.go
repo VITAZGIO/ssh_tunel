@@ -16,6 +16,7 @@ const (
 	KindConn  Kind = "conn"  // приложение открыло соединение через туннель
 	KindLog   Kind = "log"   // произвольное сообщение (ошибка, предупреждение)
 	KindStats Kind = "stats" // периодическая статистика трафика
+	KindSpeed Kind = "speed" // ход и результат теста скорости
 )
 
 // Состояния туннеля.
@@ -63,6 +64,17 @@ type Event struct {
 
 	// KindStats
 	Stats *Stats `json:"stats,omitempty"`
+
+	// KindSpeed
+	Phase string  `json:"phase,omitempty"` // down / up
+	Mbps  float64 `json:"mbps,omitempty"`
+	Done  bool    `json:"done,omitempty"`
+}
+
+// Speed сообщает ход теста скорости: какое направление меряется сейчас и
+// сколько получилось. Done=true — тест завершён.
+func (b *Bus) Speed(phase string, mbps float64, done bool) {
+	b.Publish(Event{Kind: KindSpeed, Phase: phase, Mbps: mbps, Done: done})
 }
 
 // Bus раздаёт события подписчикам. Публикация никогда не блокируется: если
@@ -111,7 +123,9 @@ func (b *Bus) Publish(e Event) {
 		e.Time = time.Now()
 	}
 	b.mu.Lock()
-	if e.Kind != KindStats { // статистика идёт часто и в историю не нужна
+	// Статистика и ход теста скорости идут часто и в истории не нужны:
+	// иначе они вытеснят из неё осмысленные сообщения.
+	if e.Kind != KindStats && e.Kind != KindSpeed {
 		b.history = append(b.history, e)
 		if len(b.history) > b.maxHist {
 			b.history = b.history[len(b.history)-b.maxHist:]

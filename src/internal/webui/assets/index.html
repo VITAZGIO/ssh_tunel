@@ -75,6 +75,9 @@
   @keyframes breathe{50%{opacity:.55}}
 
   .tiles{display:grid;grid-template-columns:1fr 1fr;gap:9px;flex:none}
+  .tile[hidden]{display:none}
+  button.btn.speed{width:100%;margin-top:9px;flex:none;padding:9px}
+  button.btn.speed .ph{color:var(--dim);font-size:12px;margin-left:6px}
   .tile{background:var(--card);border:1px solid var(--line);border-radius:11px;
         padding:9px 12px}
   .tile .k{font-size:10.5px;color:var(--dim);text-transform:uppercase;
@@ -174,11 +177,17 @@
     </div>
 
     <div class="tiles">
-      <div class="tile"><div class="k">Приём</div><div class="v" id="dn">—</div></div>
-      <div class="tile"><div class="k">Отдача</div><div class="v" id="up">—</div></div>
+      <!-- Плитки со скоростью появляются только после теста: до него
+           показывать там нечего. -->
+      <div class="tile" id="tileDown" hidden>
+        <div class="k">Приём</div><div class="v" id="dn">—</div></div>
+      <div class="tile" id="tileUp" hidden>
+        <div class="k">Отдача</div><div class="v" id="up">—</div></div>
       <div class="tile"><div class="k">Соединений</div><div class="v" id="act">—</div></div>
       <div class="tile"><div class="k">Каналов SSH</div><div class="v" id="links">—</div></div>
     </div>
+
+    <button class="btn speed" id="speedtest">Тест скорости</button>
   </div>
 
   <!-- НАСТРОЙКИ -->
@@ -271,7 +280,7 @@ const api = (path, body) => fetch(path, {
 const FIELDS = ['host','user','keyPath','sshPort','socksPort','httpPort','poolSize'];
 const CHECKS = ['sysProxy','setEnvVars','verbose','autoStart'];
 
-let running = false, prev = null, prevAt = 0, formDirty = false;
+let running = false, formDirty = false, speedRunning = false;
 
 /* ---------- переключение экранов ---------- */
 function show(name){
@@ -285,17 +294,9 @@ $('backFromSettings').onclick = () => show('viewMain');
 $('backFromLog').onclick = () => show('viewMain');
 
 /* ---------- форматирование ---------- */
-function fmtRate(bps){
-  const bits = bps * 8;
-  if(bits < 1000) return '0 Мбит/с';
-  if(bits < 1000000) return (bits/1000).toFixed(0) + ' Кбит/с';
-  return (bits/1000000).toFixed(1) + ' Мбит/с';
-}
-function fmtBytes(n){
-  if(n < 1024) return n + ' Б';
-  if(n < 1048576) return (n/1024).toFixed(0) + ' КБ';
-  if(n < 1073741824) return (n/1048576).toFixed(1) + ' МБ';
-  return (n/1073741824).toFixed(2) + ' ГБ';
+function fmtMbps(v){
+  if(v >= 100) return v.toFixed(0) + ' Мбит/с';
+  return v.toFixed(1) + ' Мбит/с';
 }
 
 /* ---------- состояние ---------- */
@@ -313,7 +314,7 @@ function setState(s, detail){
   $('powerCap').textContent = cap;
   $('power').className = cls;
   running = (s === 'connected' || s === 'reconnecting' || s === 'connecting');
-  if(!running){ $('dn').textContent = '—'; $('up').textContent = '—'; prev = null; }
+  $('speedtest').disabled = !running || speedRunning;
 }
 function showError(msg, where){
   const box = $(where || 'error');
@@ -371,6 +372,7 @@ function connectEvents(){
   es.onmessage = ev => {
     const e = JSON.parse(ev.data);
     if(e.kind === 'conn')  return addConn(e);
+    if(e.kind === 'speed') return onSpeed(e);
     if(e.kind === 'log')   return addMsg(e);
     if(e.kind === 'state'){
       setState(e.state, e.state === 'connected' ? e.detail : '');
@@ -378,15 +380,7 @@ function connectEvents(){
       return;
     }
     if(e.kind === 'stats'){
-      const s = e.stats, now = Date.now();
-      if(prev && now > prevAt){
-        const dt = (now - prevAt) / 1000;
-        $('dn').textContent = fmtRate((s.bytesDown - prev.bytesDown) / dt);
-        $('up').textContent = fmtRate((s.bytesUp - prev.bytesUp) / dt);
-        $('dn').title = 'всего принято ' + fmtBytes(s.bytesDown);
-        $('up').title = 'всего отдано ' + fmtBytes(s.bytesUp);
-      }
-      prev = s; prevAt = now;
+      const s = e.stats;
       $('act').textContent = s.active;
       $('links').textContent = s.healthy + ' / ' + s.links;
     }
@@ -422,6 +416,46 @@ $('stateDetail').onclick = async () => {
   }
   $('stateDetail').textContent = r.ip === shown ? shown + '  ✓' : r.ip;
   setTimeout(() => { if(running) $('stateDetail').textContent = r.ip; }, 4000);
+};
+
+/* ---------- тест скорости ---------- */
+/* Замер идёт около двадцати секунд, поэтому показываем не только итог, но и
+   ход: плитка нужного направления обновляется прямо во время теста. */
+function onSpeed(e){
+  if(e.done){
+    speedRunning = false;
+    $('speedtest').disabled = !running;
+    $('speedtest').innerHTML = 'Тест скорости';
+    return;
+  }
+  const tile = e.phase === 'up' ? 'tileUp' : 'tileDown';
+  const val  = e.phase === 'up' ? 'up' : 'dn';
+  $(tile).hidden = false;
+  $(val).textContent = fmtMbps(e.mbps);
+  $('speedtest').innerHTML = 'Измеряю…<span class="ph">' +
+    (e.phase === 'up' ? 'отдача' : 'приём') + '</span>';
+}
+
+$('speedtest').onclick = async () => {
+  if(!running || speedRunning) return;
+  speedRunning = true;
+  $('speedtest').disabled = true;
+  $('speedtest').innerHTML = 'Измеряю…<span class="ph">приём</span>';
+  $('tileDown').hidden = false; $('tileUp').hidden = false;
+  $('dn').textContent = '…'; $('up').textContent = '…';
+  showError('');
+
+  const r = await api('/api/speedtest', {});
+  speedRunning = false;
+  $('speedtest').disabled = !running;
+  $('speedtest').innerHTML = 'Тест скорости';
+  if(r.error){
+    showError(r.error);
+    $('dn').textContent = '—'; $('up').textContent = '—';
+    return;
+  }
+  $('dn').textContent = fmtMbps(r.downMbps);
+  $('up').textContent = fmtMbps(r.upMbps);
 };
 
 /* ---------- настройки ---------- */

@@ -74,6 +74,7 @@ func (s *Server) Serve() error {
 	mux.HandleFunc("/api/stop", s.guard(s.handleStop))
 	mux.HandleFunc("/api/config", s.guard(s.handleConfig))
 	mux.HandleFunc("/api/checkip", s.guard(s.handleCheckIP))
+	mux.HandleFunc("/api/speedtest", s.guard(s.handleSpeedTest))
 
 	srv := &http.Server{
 		Handler:           mux,
@@ -181,6 +182,17 @@ func (s *Server) handleCheckIP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]string{"ip": ip})
+}
+
+// handleSpeedTest запускает измерение. Оно занимает около двадцати секунд, а
+// ход показывается через поток событий, поэтому здесь только итог.
+func (s *Server) handleSpeedTest(w http.ResponseWriter, r *http.Request) {
+	res, err := s.app.SpeedTest()
+	if err != nil {
+		writeJSON(w, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, res)
 }
 
 // handleEvents — поток событий в окно (Server-Sent Events). Проще вебсокетов

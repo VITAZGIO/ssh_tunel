@@ -11,10 +11,12 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"vpstunnel/internal/config"
 	"vpstunnel/internal/events"
+	"vpstunnel/internal/speedtest"
 	"vpstunnel/internal/sysproxy"
 	"vpstunnel/internal/tunnel"
 )
@@ -29,6 +31,8 @@ type App struct {
 	sysOn    bool
 	running  bool
 	proxyURL string
+
+	speedRunning atomic.Bool
 }
 
 func New(cfg config.Config) *App {
@@ -194,6 +198,44 @@ func (a *App) CheckIP() (string, error) {
 		return "", fmt.Errorf("сервис вернул что-то странное: %q", ip)
 	}
 	return ip, nil
+}
+
+// SpeedTest меряет реальную пропускную способность туннеля. В отличие от
+// счётчиков на главном экране, которые показывают текущий трафик, тест сам
+// нагружает канал и показывает потолок.
+//
+// Одновременно тест может идти только один: два теста мешали бы друг другу и
+// показали бы обоим заниженный результат.
+func (a *App) SpeedTest() (speedtest.Result, error) {
+	a.mu.Lock()
+	tun, cfg := a.tun, a.cfg
+	a.mu.Unlock()
+	if tun == nil {
+		return speedtest.Result{}, errors.New("туннель не запущен")
+	}
+	if !a.speedRunning.CompareAndSwap(false, true) {
+		return speedtest.Result{}, errors.New("тест скорости уже идёт")
+	}
+	defer a.speedRunning.Store(false)
+
+	a.Bus.Infof("Тест скорости запущен")
+	res, err := speedtest.Run(context.Background(), speedtest.Options{
+		Dial: tun.Dial,
+		// Потоков столько же, сколько соединений в пуле: меряем ровно то,
+		// чем пользуются приложения.
+		Streams: cfg.PoolSize,
+		OnProgress: func(phase string, mbps float64) {
+			a.Bus.Speed(phase, mbps, false)
+		},
+	})
+	if err != nil {
+		a.Bus.Speed("", 0, true)
+		a.Bus.Warnf("Тест скорости не удался: %v", err)
+		return res, err
+	}
+	a.Bus.Speed("", 0, true)
+	a.Bus.Infof("Тест скорости: приём %.1f Мбит/с, отдача %.1f Мбит/с", res.DownMbps, res.UpMbps)
+	return res, nil
 }
 
 // ProxyURL — адрес HTTP-прокси для подсказок в интерфейсе.
