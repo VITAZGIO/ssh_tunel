@@ -10,8 +10,8 @@ mkdir -p "$OUT"
 echo "Проверяю тесты..."
 go test ./... >/dev/null
 
-echo "Рисую иконку..."
-go run tools/mkicon/main.go internal/nativeui/icon.ico
+echo "Собираю иконку из логотипа..."
+go run tools/mkicon/main.go internal/nativeui/icon-source.png internal/nativeui/icon.ico
 
 # Иконка и манифест попадают в exe отдельной секцией ресурсов. Файл .syso
 # линковщик Go подхватывает автоматически, если он лежит рядом с main-пакетом.

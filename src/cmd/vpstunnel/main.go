@@ -22,7 +22,7 @@ import (
 	"vpstunnel/internal/webui"
 )
 
-const windowTitle = "vpstunnel"
+const windowTitle = "ssh_tunel"
 
 func main() {
 	// Единственный флаг — на случай, если окно почему-то не открывается:

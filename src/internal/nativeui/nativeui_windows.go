@@ -188,7 +188,14 @@ func AlreadyRunning(title string) bool {
 func showExistingWindow(title string) {
 	class, _ := windows.UTF16PtrFromString("webview")
 	name, _ := windows.UTF16PtrFromString(title)
+
 	hwnd, _, _ := pFindWindow.Call(uintptr(unsafe.Pointer(class)), uintptr(unsafe.Pointer(name)))
+	if hwnd == 0 {
+		// Запасной вариант — искать только по классу окна. Нужен, если рядом
+		// работает копия прежней версии с другим заголовком: иначе повторный
+		// запуск просто молча ничего бы не сделал.
+		hwnd, _, _ = pFindWindow.Call(uintptr(unsafe.Pointer(class)), 0)
+	}
 	if hwnd != 0 {
 		pPostMessage.Call(hwnd, wmShowWindow, 0, 0)
 	}

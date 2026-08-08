@@ -1,171 +1,118 @@
 //go:build ignore
 
-// Генератор иконки приложения. Рисует щит с точкой и дугами (соединение под
-// защитой) и складывает несколько размеров в один .ico.
+// Собирает иконку приложения (.ico) из одной исходной картинки: уменьшает её
+// до всех размеров, которые спрашивает Windows, и складывает в один файл.
 //
-// Иконка сделана кодом, а не картинкой из редактора, чтобы её можно было
-// пересобрать одной командой и не тащить в репозиторий бинарный файл
-// непонятного происхождения:
+// Сделано инструментом, а не готовым .ico из редактора, чтобы иконку можно
+// было пересобрать одной командой, а в репозитории лежал понятный исходник:
 //
-//	go run tools/mkicon/main.go internal/nativeui/icon.ico
+//	go run tools/mkicon/main.go internal/nativeui/logo.png internal/nativeui/icon.ico
 package main
 
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"image"
 	"image/color"
-	"image/draw"
 	"image/png"
-	"math"
 	"os"
 )
 
-// Размеры, которые Windows реально спрашивает: трей, панель задач, крупные
-// значки в проводнике и Alt+Tab.
+// Размеры, которые Windows реально спрашивает: трей и мелкие списки (16),
+// панель задач (24, 32), крупные значки проводника (48, 64), Alt+Tab и
+// плитки (128, 256).
 var sizes = []int{16, 24, 32, 48, 64, 128, 256}
 
 func main() {
-	out := "icon.ico"
-	if len(os.Args) > 1 {
-		out = os.Args[1]
+	if len(os.Args) < 3 {
+		fmt.Fprintln(os.Stderr, "использование: mkicon <исходный.png> <результат.ico>")
+		os.Exit(2)
+	}
+	src, err := loadPNG(os.Args[1])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "не могу прочитать исходник:", err)
+		os.Exit(1)
 	}
 
 	var images [][]byte
 	for _, s := range sizes {
 		var buf bytes.Buffer
-		if err := png.Encode(&buf, drawIcon(s)); err != nil {
-			panic(err)
+		if err := png.Encode(&buf, resize(src, s)); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
 		}
 		images = append(images, buf.Bytes())
 	}
 
-	f, err := os.Create(out)
+	f, err := os.Create(os.Args[2])
 	if err != nil {
-		panic(err)
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
 	}
 	defer f.Close()
 	writeICO(f, images)
 }
 
-// drawIcon рисует щит со скруглёнными краями и «сигналом» внутри.
-func drawIcon(size int) image.Image {
-	img := image.NewRGBA(image.Rect(0, 0, size, size))
-	draw.Draw(img, img.Bounds(), image.Transparent, image.Point{}, draw.Src)
+func loadPNG(path string) (image.Image, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return png.Decode(f)
+}
 
-	s := float64(size)
-	// Сглаживание делаем честной суперсэмплингом: считаем покрытие пикселя
-	// по сетке 4x4 — на мелких размерах это единственное, что даёт читаемость.
-	const ss = 4
-	cx, cy := s/2, s/2
-
-	blue := color.RGBA{0x4c, 0x8d, 0xff, 0xff}
-	green := color.RGBA{0x2f, 0xbf, 0x71, 0xff}
+// resize уменьшает картинку усреднением по площади. Для уменьшения этого
+// достаточно и результат чище, чем у выборки ближайшего пикселя: логотип
+// состоит из тонких диагоналей, которые иначе рассыпались бы на мелких
+// размерах.
+//
+// Усреднять надо ЦВЕТ, УМНОЖЕННЫЙ НА ПРОЗРАЧНОСТЬ, иначе по краям вылезает
+// тёмная кайма из полностью прозрачных пикселей.
+func resize(src image.Image, size int) image.Image {
+	b := src.Bounds()
+	dst := image.NewNRGBA(image.Rect(0, 0, size, size))
 
 	for y := 0; y < size; y++ {
 		for x := 0; x < size; x++ {
-			var shield, mark float64
-			for sy := 0; sy < ss; sy++ {
-				for sx := 0; sx < ss; sx++ {
-					px := float64(x) + (float64(sx)+0.5)/ss
-					py := float64(y) + (float64(sy)+0.5)/ss
-					if inShield(px, py, s) {
-						shield++
-						if inMark(px-cx, py-cy, s) {
-							mark++
-						}
-					}
+			x0 := b.Min.X + x*b.Dx()/size
+			x1 := b.Min.X + (x+1)*b.Dx()/size
+			y0 := b.Min.Y + y*b.Dy()/size
+			y1 := b.Min.Y + (y+1)*b.Dy()/size
+			if x1 <= x0 {
+				x1 = x0 + 1
+			}
+			if y1 <= y0 {
+				y1 = y0 + 1
+			}
+
+			var sr, sg, sb, sa uint64
+			var n uint64
+			for yy := y0; yy < y1; yy++ {
+				for xx := x0; xx < x1; xx++ {
+					r, g, bl, a := src.At(xx, yy).RGBA() // уже умножены на альфу
+					sr += uint64(r)
+					sg += uint64(g)
+					sb += uint64(bl)
+					sa += uint64(a)
+					n++
 				}
 			}
-			total := float64(ss * ss)
-			if shield == 0 {
+			if n == 0 || sa == 0 {
 				continue
 			}
-			a := shield / total
-			m := mark / total
-
-			// Лёгкий вертикальный градиент — иконка перестаёт выглядеть плоской.
-			t := float64(y) / s
-			base := color.RGBA{
-				R: uint8(float64(blue.R)*(1-t*0.35)) ,
-				G: uint8(float64(blue.G)*(1-t*0.18)),
-				B: uint8(float64(blue.B)*(1-t*0.05)),
-				A: 255,
-			}
-			c := blend(base, green, m/max(a, 0.0001))
-			img.Set(x, y, color.RGBA{c.R, c.G, c.B, uint8(a * 255)})
+			a := sa / n
+			// Возвращаемся к цвету без домножения на прозрачность.
+			dst.Set(x, y, color.NRGBA{
+				R: uint8(sr / n * 255 / a),
+				G: uint8(sg / n * 255 / a),
+				B: uint8(sb / n * 255 / a),
+				A: uint8(a >> 8),
+			})
 		}
 	}
-	return img
-}
-
-// inShield — форма щита: прямоугольник со скруглённым верхом и сходящимся низом.
-func inShield(x, y, s float64) bool {
-	pad := s * 0.11
-	w := s - 2*pad
-	nx := (x - pad) / w // 0..1
-	ny := (y - pad) / (s - 2*pad)
-	if nx < 0 || nx > 1 || ny < 0 || ny > 1 {
-		return false
-	}
-	dx := math.Abs(nx-0.5) * 2 // 0 в центре, 1 у края
-
-	if ny < 0.62 {
-		// Верх — прямоугольник со скруглёнными углами.
-		r := 0.18
-		if ny < r && dx > 1-r*2 {
-			ex := (dx - (1 - r*2)) / (r * 2)
-			ey := (r - ny) / r
-			return ex*ex+ey*ey <= 1
-		}
-		return true
-	}
-	// Низ — плавное схождение к острию.
-	k := (ny - 0.62) / 0.38
-	return dx <= 1-k*k
-}
-
-// inMark — «сигнал» внутри щита: точка и две дуги, расходящиеся вправо-вверх.
-func inMark(dx, dy, s float64) bool {
-	dy += s * 0.03 // визуальный центр щита выше геометрического
-	r := math.Hypot(dx, dy)
-
-	if r <= s*0.075 { // точка
-		return true
-	}
-	// Дуги рисуем только в верхнем секторе, иначе получается мишень.
-	ang := math.Atan2(-dy, dx)
-	if ang < -0.25 || ang > math.Pi/2+0.25 {
-		return false
-	}
-	for _, k := range []float64{0.19, 0.30} {
-		if math.Abs(r-s*k) <= s*0.036 {
-			return true
-		}
-	}
-	return false
-}
-
-func blend(a, b color.RGBA, t float64) color.RGBA {
-	if t < 0 {
-		t = 0
-	}
-	if t > 1 {
-		t = 1
-	}
-	return color.RGBA{
-		R: uint8(float64(a.R)*(1-t) + float64(b.R)*t),
-		G: uint8(float64(a.G)*(1-t) + float64(b.G)*t),
-		B: uint8(float64(a.B)*(1-t) + float64(b.B)*t),
-		A: 255,
-	}
-}
-
-func max(a, b float64) float64 {
-	if a > b {
-		return a
-	}
-	return b
+	return dst
 }
 
 // writeICO собирает контейнер .ico из готовых PNG. Начиная с Vista Windows
