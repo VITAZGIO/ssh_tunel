@@ -25,6 +25,7 @@ import (
 	"github.com/jchv/go-webview2"
 	"github.com/jchv/go-webview2/webviewloader"
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 )
 
 // Options описывает окно и то, что умеет меню в трее.
@@ -54,6 +55,7 @@ var (
 	user32   = windows.NewLazySystemDLL("user32.dll")
 	shell32  = windows.NewLazySystemDLL("shell32.dll")
 	kernel32 = windows.NewLazySystemDLL("kernel32.dll")
+	dwmapi   = windows.NewLazySystemDLL("dwmapi.dll")
 
 	pSetWindowLongPtr = user32.NewProc("SetWindowLongPtrW")
 	pGetWindowLongPtr = user32.NewProc("GetWindowLongPtrW")
@@ -72,6 +74,8 @@ var (
 	pGetDpiForWindow  = user32.NewProc("GetDpiForWindow")
 	pFindWindow       = user32.NewProc("FindWindowW")
 	pPostMessage      = user32.NewProc("PostMessageW")
+
+	pDwmSetWindowAttribute = dwmapi.NewProc("DwmSetWindowAttribute")
 
 	pShellNotifyIcon = shell32.NewProc("Shell_NotifyIconW")
 	pCreateMutex     = kernel32.NewProc("CreateMutexW")
@@ -117,6 +121,12 @@ const (
 
 	mfString    = 0x0000
 	mfSeparator = 0x0800
+
+	// Оформление полосы заголовка. Поддерживается начиная с Windows 11.
+	dwmUseImmersiveDarkMode = 20
+	dwmBorderColor          = 34
+	dwmCaptionColor         = 35
+	dwmTextColor            = 36
 
 	imageIcon        = 1
 	lrDefaultSize    = 0x0040
@@ -229,6 +239,7 @@ func Run(opts Options) error {
 	active = u
 
 	u.fixWindowStyle()
+	u.themeTitleBar()
 	u.hookWindowProc()
 	u.addTrayIcon()
 
@@ -266,6 +277,57 @@ func (u *ui) fixWindowStyle() {
 	pSetWindowPos.Call(u.hwnd, 0, 0, 0,
 		uintptr(r.Right-r.Left), uintptr(r.Bottom-r.Top),
 		swpNoMove|swpNoZOrder|swpFrameChanged)
+}
+
+// themeTitleBar красит полосу заголовка в цвет фона приложения, чтобы окно
+// выглядело цельным, а не «тёмная программа в светлой рамке».
+//
+// Работает на Windows 11 (сборка 22000 и новее). На более старых системах
+// вызовы просто возвращают ошибку и ничего не меняют — заголовок остаётся
+// системным, и это не мешает работе.
+func (u *ui) themeTitleBar() {
+	dark := systemUsesDarkTheme()
+
+	// COLORREF — это 0x00BBGGRR, то есть байты идут в обратном порядке
+	// относительно привычной записи цвета #RRGGBB.
+	var caption, text uint32
+	if dark {
+		caption, text = 0x17100d, 0xf2ebe8 // фон #0d1017, текст #e8ebf2
+	} else {
+		caption, text = 0xf6f1ee, 0x211814 // фон #eef1f6, текст #141821
+	}
+
+	setAttr := func(attr uint32, v uint32) {
+		pDwmSetWindowAttribute.Call(u.hwnd, uintptr(attr),
+			uintptr(unsafe.Pointer(&v)), unsafe.Sizeof(v))
+	}
+
+	// Тёмный режим переключает отрисовку самих кнопок свернуть/развернуть/
+	// закрыть: без него они остаются чёрными на тёмном фоне и не видны.
+	var darkFlag uint32
+	if dark {
+		darkFlag = 1
+	}
+	setAttr(dwmUseImmersiveDarkMode, darkFlag)
+	setAttr(dwmCaptionColor, caption)
+	setAttr(dwmTextColor, text)
+	setAttr(dwmBorderColor, caption)
+}
+
+// systemUsesDarkTheme читает выбранную пользователем тему приложений: окно
+// красится под неё, потому что и сам интерфейс подстраивается под тему.
+func systemUsesDarkTheme() bool {
+	k, err := registry.OpenKey(registry.CURRENT_USER,
+		`Software\Microsoft\Windows\CurrentVersion\Themes\Personalize`, registry.QUERY_VALUE)
+	if err != nil {
+		return true // тёмная — оформление приложения по умолчанию
+	}
+	defer k.Close()
+	v, _, err := k.GetIntegerValue("AppsUseLightTheme")
+	if err != nil {
+		return true
+	}
+	return v == 0
 }
 
 // hookWindowProc подменяет оконную процедуру, чтобы перехватить закрытие и

@@ -26,11 +26,10 @@
   .bar{display:flex;align-items:flex-start;gap:8px;padding:12px 14px 6px;flex:none}
   .bar .sp{flex:1}
 
-  /* Логотип и название — вертикальной парой в левом верхнем углу.
-     Ширина логотипа выравнивается по ширине надписи (см. fitLogo). */
-  .brand{display:flex;flex-direction:column;align-items:flex-start;gap:5px}
-  .brand svg{display:block;fill:#2de2ff;height:auto}
-  .brand .name{font-size:15px;font-weight:650;letter-spacing:.2px;white-space:nowrap}
+  /* Логотип в левом верхнем углу, без подписи: название и так стоит в
+     заголовке окна. */
+  .brand{display:flex;align-items:center}
+  .brand svg{display:block;fill:#2de2ff;width:48px;height:auto}
   .ico{width:32px;height:32px;border-radius:8px;border:1px solid transparent;
        display:grid;place-items:center;cursor:pointer;color:var(--dim);
        background:transparent;-webkit-app-region:no-drag}
@@ -144,7 +143,6 @@
         <path d="M554 236 394 236 368 319 442 319 529 319Z"/>
         <path d="M373 83 601 83 626 0 398 0Z"/>
       </svg>
-      <span class="name" id="brandName">ssh_tunel</span>
     </div>
     <span class="sp"></span>
     <button class="ico" id="btnLog" title="Журнал">
@@ -285,16 +283,6 @@ $('btnSettings').onclick = () => show('viewSettings');
 $('btnLog').onclick = () => show('viewLog');
 $('backFromSettings').onclick = () => show('viewMain');
 $('backFromLog').onclick = () => show('viewMain');
-
-/* Ширину логотипа подгоняем под ширину надписи под ним — так пара выглядит
-   единым блоком при любом шрифте и масштабе экрана. */
-function fitLogo(){
-  const w = $('brandName').offsetWidth;
-  if(w > 0) $('logo').style.width = w + 'px';
-}
-fitLogo();
-window.addEventListener('resize', fitLogo);
-if(document.fonts && document.fonts.ready) document.fonts.ready.then(fitLogo);
 
 /* ---------- форматирование ---------- */
 function fmtRate(bps){
