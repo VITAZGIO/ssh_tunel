@@ -36,9 +36,15 @@ type Config struct {
 	AutoStart bool `json:"autoStart"`
 }
 
+// DefaultHost — сервер, который подставляется в пустую форму, чтобы не
+// вводить адрес вручную при каждом чистом запуске. Меняется здесь либо прямо
+// в окне настроек (сохранённое значение имеет приоритет).
+const DefaultHost = "87.58.210.143"
+
 func Default() Config {
 	home, _ := os.UserHomeDir()
 	return Config{
+		Host:       DefaultHost,
 		SSHPort:    22,
 		User:       "root",
 		KeyPath:    filepath.Join(home, ".ssh", "id_ed25519"),
@@ -93,6 +99,11 @@ func (c *Config) Save() error {
 // normalize чинит заведомо нерабочие значения, которые могли прийти из
 // руками правленного JSON или из формы настроек.
 func (c *Config) normalize() {
+	// Пустой адрес мог остаться в сохранённом конфиге от прежних запусков —
+	// подставляем значение по умолчанию, чтобы форма не была пустой.
+	if c.Host == "" {
+		c.Host = DefaultHost
+	}
 	if c.SSHPort <= 0 || c.SSHPort > 65535 {
 		c.SSHPort = 22
 	}

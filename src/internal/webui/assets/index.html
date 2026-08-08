@@ -342,14 +342,24 @@ $('save').onclick = async () => {
 };
 
 function fillConfig(cfg){
-  FIELDS.forEach(f => { if($(f) && document.activeElement !== $(f)) $(f).value = cfg[f] ?? ''; });
+  FIELDS.forEach(f => { if($(f)) $(f).value = cfg[f] ?? ''; });
   CHECKS.forEach(f => { if($(f)) $(f).checked = !!cfg[f]; });
+  formDirty = false;
 }
+
+// Пока пользователь правит форму, обновление с сервера её НЕ трогает.
+// Иначе набранный, но ещё не сохранённый адрес затирался пустым значением
+// с сервера при очередном опросе — поле «само очищалось» через пару секунд.
+let formDirty = false;
+[...FIELDS, ...CHECKS].forEach(f => {
+  const el = $(f);
+  if(el) el.addEventListener('input', () => { formDirty = true; });
+});
 
 async function refresh(){
   const st = await api('/api/status');
   setState(st.state);
-  fillConfig(st.config);
+  if(!formDirty) fillConfig(st.config);
   $('sysproxy').textContent = 'Системный прокси: ' + st.sysProxy;
   $('envhint').textContent = (st.envHint || []).join('\n');
   if(!st.config.host) $('settings').open = true;
