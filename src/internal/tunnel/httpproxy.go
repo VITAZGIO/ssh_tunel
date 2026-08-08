@@ -79,15 +79,15 @@ func (t *Tunnel) httpForward(conn net.Conn, br *bufio.Reader, req *http.Request)
 	}
 
 	proc, pid := lookupProcess(conn)
-	remote, err := t.Dial("tcp", target)
+	remote, direct, err := t.dialFor(proc, target)
 	if err != nil {
-		t.bus.Publish(eventConn(proc, pid, target, "http", false, err))
+		t.bus.Publish(eventConn(proc, pid, target, "http", false, direct, err))
 		fmt.Fprintf(conn, "HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\nvpstunnel: %s\r\n", shortErr(err))
 		return
 	}
 	defer remote.Close()
 
-	t.bus.Publish(eventConn(proc, pid, target, "http", isIPHost(target), nil))
+	t.bus.Publish(eventConn(proc, pid, target, "http", isIPHost(target), direct, nil))
 	t.stats.active.Add(1)
 	t.stats.total.Add(1)
 	defer t.stats.active.Add(-1)

@@ -29,7 +29,7 @@
   /* Логотип в левом верхнем углу, без подписи: название и так стоит в
      заголовке окна. */
   .brand{display:flex;align-items:center}
-  .brand svg{display:block;fill:#2de2ff;width:48px;height:auto}
+  .brand svg{display:block;fill:#2de2ff;width:32px;height:auto}
   .ico{width:32px;height:32px;border-radius:8px;border:1px solid transparent;
        display:grid;place-items:center;cursor:pointer;color:var(--dim);
        background:transparent;-webkit-app-region:no-drag}
@@ -97,6 +97,17 @@
   input:focus{outline:none;border-color:var(--accent)}
   .two{display:grid;grid-template-columns:1fr 1fr;gap:9px}
   .hint{font-size:11.5px;color:var(--dim);margin-top:3px;line-height:1.35}
+
+  select{width:100%;background:var(--card);border:1px solid var(--line);
+         border-radius:8px;padding:7px 9px;color:var(--text);font:inherit}
+  select:focus{outline:none;border-color:var(--accent)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+  .chip{font:inherit;font-size:12px;padding:4px 9px;border-radius:999px;
+        border:1px solid var(--line);background:var(--card);color:var(--dim);
+        cursor:pointer;font-family:var(--mono)}
+  .chip:hover{border-color:var(--accent)}
+  .chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .chip .x{opacity:.7;margin-left:5px}
 
   .chk{display:flex;gap:9px;align-items:flex-start;cursor:pointer;
        padding:8px 0;border-top:1px solid var(--line)}
@@ -235,6 +246,25 @@
           прокси не читают. Подхватится терминалами, открытыми после включения.</div>
       </span></label>
 
+    <div class="field" style="margin-top:14px">
+      <label for="filterMode">Какие программы вести через туннель</label>
+      <select id="filterMode">
+        <option value="all">Все</option>
+        <option value="only">Только выбранные</option>
+        <option value="except">Все, кроме выбранных</option>
+      </select>
+    </div>
+    <div id="filterBox" hidden>
+      <div class="hint">Нажми на программу, чтобы отметить её. В списке те,
+        что уже ходили через туннель за этот запуск.</div>
+      <div class="chips" id="appChips"></div>
+      <input type="text" id="appAdd" spellcheck="false"
+             placeholder="добавить вручную и нажать Enter, например steam.exe">
+      <div class="hint">Программы, которые вообще не обращаются к прокси
+        (часть игр, приложения со своим сетевым стеком), туннель не видит —
+        они идут мимо в любом случае.</div>
+    </div>
+
     <label class="chk"><input type="checkbox" id="autoStart">
       <span class="lbl">Подключаться сразу при запуске</span></label>
 
@@ -279,6 +309,64 @@ const api = (path, body) => fetch(path, {
 
 const FIELDS = ['host','user','keyPath','sshPort','socksPort','httpPort','poolSize'];
 const CHECKS = ['sysProxy','setEnvVars','verbose','autoStart'];
+
+/* Список программ для фильтра. Держим отдельно от полей формы: он собирается
+   щелчками по «фишкам», а не набором текста. */
+let filterApps = [];
+let seenApps = [];
+
+function normApp(name){
+  name = (name || '').trim().toLowerCase();
+  if(!name) return '';
+  const i = Math.max(name.lastIndexOf('\\'), name.lastIndexOf('/'));
+  if(i >= 0) name = name.slice(i + 1);
+  return name.endsWith('.exe') ? name : name + '.exe';
+}
+
+function renderChips(){
+  const box = $('appChips');
+  box.innerHTML = '';
+  // Сначала выбранные, затем всё замеченное — так отмеченные не теряются
+  // в длинном списке.
+  const all = filterApps.concat(seenApps.filter(a => !filterApps.includes(a)));
+  if(all.length === 0){
+    box.innerHTML = '<span class="hint">Пока ни одной программы не замечено — ' +
+      'подключись и попользуйся интернетом, либо впиши имя вручную.</span>';
+    return;
+  }
+  all.forEach(name => {
+    const on = filterApps.includes(name);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip' + (on ? ' on' : '');
+    b.textContent = name;
+    b.onclick = () => {
+      if(on) filterApps = filterApps.filter(a => a !== name);
+      else filterApps = filterApps.concat(name);
+      formDirty = true;
+      renderChips();
+    };
+    box.appendChild(b);
+  });
+}
+
+function syncFilterBox(){
+  $('filterBox').hidden = $('filterMode').value === 'all';
+}
+
+$('filterMode').addEventListener('change', () => { formDirty = true; syncFilterBox(); });
+
+$('appAdd').addEventListener('keydown', ev => {
+  if(ev.key !== 'Enter') return;
+  ev.preventDefault();
+  const name = normApp($('appAdd').value);
+  if(name && !filterApps.includes(name)){
+    filterApps = filterApps.concat(name);
+    formDirty = true;
+    renderChips();
+  }
+  $('appAdd').value = '';
+});
 
 let running = false, formDirty = false, speedRunning = false;
 
@@ -346,8 +434,14 @@ function addConn(e){
   d.querySelector('.p').textContent = e.process || 'приложение';
   d.querySelector('.a').textContent = e.failed ? '✗' : '→';
   d.querySelector('.h').textContent = e.target + (e.failed ? '  ' + (e.error||'') : '');
-  d.querySelector('.flag').textContent = e.dnsLeak ? ' DNS!' : '';
-  if(e.dnsLeak) d.querySelector('.flag').title = 'DNS-запрос ушёл мимо туннеля';
+  const flag = d.querySelector('.flag');
+  if(e.direct){
+    flag.textContent = ' мимо';
+    flag.title = 'по твоим правилам эта программа идёт напрямую, минуя туннель';
+  } else if(e.dnsLeak){
+    flag.textContent = ' DNS!';
+    flag.title = 'DNS-запрос ушёл мимо туннеля';
+  }
   push(d);
 }
 function addMsg(e){
@@ -443,6 +537,7 @@ let lastSpeed = null;
 $('speedtest').onclick = async () => {
   if(!running || speedRunning) return;
   speedRunning = true;
+  clearTimeout(hideTimer);
   $('speedtest').disabled = true;
   $('speedtest').innerHTML = 'Измеряю…<span class="ph">приём</span>';
   $('tileDown').hidden = false; $('tileUp').hidden = false;
@@ -457,14 +552,28 @@ $('speedtest').onclick = async () => {
   if(r.error){
     showError(r.error);
     showSpeed(lastSpeed);   // вернуть прошлый результат, а не обнулять
+    hideSpeedLater();
     return;
   }
   lastSpeed = { down: r.downMbps, up: r.upMbps };
   showSpeed(lastSpeed);
+  hideSpeedLater();
   // Приём мог измериться, а отдача — нет. Это не ошибка целиком, поэтому
   // говорим об этом отдельно и результат оставляем.
   if(r.note) showError(r.note);
 };
+
+// Плитки со скоростью убираются сами через десять секунд: результат нужен
+// сразу после теста, а дальше он только занимает место. Таймер сбрасывается
+// при новом тесте, иначе он погасил бы свежий результат раньше времени.
+let hideTimer = null;
+function hideSpeedLater(){
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => {
+    $('tileDown').hidden = true;
+    $('tileUp').hidden = true;
+  }, 10000);
+}
 
 // showSpeed рисует результат. null означает, что теста ещё не было — тогда
 // плитки прячутся обратно, чтобы не показывать прочерки без причины.
@@ -490,17 +599,23 @@ $('save').onclick = async () => {
     cfg[f] = el.type === 'number' ? parseInt(el.value, 10) || 0 : el.value.trim();
   });
   CHECKS.forEach(f => cfg[f] = $(f).checked);
+  cfg.filterMode = $('filterMode').value;
+  cfg.filterApps = filterApps;
   const r = await api('/api/config', cfg);
   if(r.error){ showError(r.error, 'setError'); return; }
   showError('', 'setError');
   fillConfig(r.config);
-  $('savedNote').textContent = 'сохранено';
-  setTimeout(() => $('savedNote').textContent = '', 2000);
+  $('savedNote').textContent = r.note ? 'сохранено — ' + r.note : 'сохранено';
+  setTimeout(() => $('savedNote').textContent = '', 4000);
 };
 
 function fillConfig(cfg){
   FIELDS.forEach(f => { if($(f)) $(f).value = cfg[f] ?? ''; });
   CHECKS.forEach(f => { if($(f)) $(f).checked = !!cfg[f]; });
+  $('filterMode').value = cfg.filterMode || 'all';
+  filterApps = (cfg.filterApps || []).map(normApp);
+  syncFilterBox();
+  renderChips();
   formDirty = false;
 }
 
@@ -509,7 +624,8 @@ async function refresh(){
   setState(st.state, st.state === 'connected' ? st.config.host : '');
   // Пока пользователь правит форму, обновление с сервера её не трогает —
   // иначе набранный, но ещё не сохранённый адрес затирался бы.
-  if(!formDirty) fillConfig(st.config);
+  seenApps = (st.seenApps || []);
+  if(!formDirty) fillConfig(st.config); else renderChips();
   $('envhint').textContent = (st.envHint || []).join('\n');
 }
 

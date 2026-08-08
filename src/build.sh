@@ -19,22 +19,22 @@ go run tools/mkicon/main.go internal/nativeui/icon-source.png internal/nativeui/
 # двойку ссылается код в internal/nativeui.
 echo "Вшиваю иконку и манифест..."
 go run github.com/akavel/rsrc@v0.10.2 \
-  -manifest cmd/vpstunnel/app.manifest \
+  -manifest cmd/ssh_tunel/app.manifest \
   -ico internal/nativeui/icon.ico \
   -arch amd64 \
-  -o cmd/vpstunnel/rsrc_windows_amd64.syso
+  -o cmd/ssh_tunel/rsrc_windows_amd64.syso
 
-echo "Собираю vpstunnel.exe (окно)..."
+echo "Собираю ssh_tunel.exe (окно)..."
 GOOS=windows GOARCH=amd64 go build \
   -ldflags="-s -w -H windowsgui" \
-  -o "$OUT/vpstunnel.exe" ./cmd/vpstunnel
+  -o "$OUT/ssh_tunel.exe" ./cmd/ssh_tunel
 
-echo "Собираю vpstunnel-cli.exe (консоль)..."
+echo "Собираю ssh_tunel-cli.exe (консоль)..."
 GOOS=windows GOARCH=amd64 go build \
   -ldflags="-s -w" \
-  -o "$OUT/vpstunnel-cli.exe" ./cmd/vpstunnel-cli
+  -o "$OUT/ssh_tunel-cli.exe" ./cmd/ssh_tunel-cli
 
-( cd "$OUT" && sha256sum vpstunnel.exe vpstunnel-cli.exe > SHA256SUMS.txt )
+( cd "$OUT" && sha256sum ssh_tunel.exe ssh_tunel-cli.exe > SHA256SUMS.txt )
 
 echo
 ls -lh "$OUT"/*.exe

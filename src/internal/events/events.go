@@ -54,9 +54,12 @@ type Event struct {
 	Proto   string `json:"proto,omitempty"` // socks4 / socks4a / socks5 / http
 	// DNSLeak=true означает, что приложение прислало нам уже готовый IP-адрес,
 	// то есть DNS-запрос оно сделало само — в обход туннеля, через провайдера.
-	DNSLeak bool   `json:"dnsLeak,omitempty"`
-	Failed  bool   `json:"failed,omitempty"`
-	Error   string `json:"error,omitempty"`
+	DNSLeak bool `json:"dnsLeak,omitempty"`
+	// Direct=true — соединение намеренно пущено мимо туннеля по правилам
+	// фильтра, а не из-за сбоя.
+	Direct bool   `json:"direct,omitempty"`
+	Failed bool   `json:"failed,omitempty"`
+	Error  string `json:"error,omitempty"`
 
 	// KindLog
 	Level string `json:"level,omitempty"` // info / warn / error
@@ -144,8 +147,8 @@ func (b *Bus) State(state, detail string) {
 	b.Publish(Event{Kind: KindState, State: state, Detail: detail})
 }
 
-func (b *Bus) Infof(format string, args ...any) { b.logf("info", format, args...) }
-func (b *Bus) Warnf(format string, args ...any) { b.logf("warn", format, args...) }
+func (b *Bus) Infof(format string, args ...any)  { b.logf("info", format, args...) }
+func (b *Bus) Warnf(format string, args ...any)  { b.logf("warn", format, args...) }
 func (b *Bus) Errorf(format string, args ...any) { b.logf("error", format, args...) }
 
 func (b *Bus) logf(level, format string, args ...any) {

@@ -30,6 +30,13 @@ type Config struct {
 	// npm, pip, curl), которые системный прокси Windows не читают вовсе.
 	SetEnvVars bool `json:"setEnvVars"`
 
+	// FilterMode и FilterApps — какие программы пускать через туннель:
+	//   all    — все;
+	//   only   — только перечисленные, остальные напрямую;
+	//   except — все, кроме перечисленных.
+	FilterMode string   `json:"filterMode"`
+	FilterApps []string `json:"filterApps"`
+
 	// Verbose — подробный лог (включая закрытие соединений).
 	Verbose bool `json:"verbose"`
 	// AutoStart — при запуске GUI сразу поднимать туннель.
@@ -53,18 +60,38 @@ func Default() Config {
 		PoolSize:   4,
 		SysProxy:   true,
 		SetEnvVars: true,
+		FilterMode: "all",
 	}
 }
 
-// Dir — папка с настройками: %APPDATA%\vpstunnel на Windows,
-// ~/.config/vpstunnel на остальных системах.
+// Dir — папка с настройками: %APPDATA%\ssh_tunel на Windows,
+// ~/.config/ssh_tunel на остальных системах.
 func Dir() string {
+	return filepath.Join(baseDir(), "ssh_tunel")
+}
+
+func baseDir() string {
 	base, err := os.UserConfigDir()
 	if err != nil {
 		home, _ := os.UserHomeDir()
 		base = filepath.Join(home, ".config")
 	}
-	return filepath.Join(base, "vpstunnel")
+	return base
+}
+
+// migrateOldDir переносит настройки из папки прежнего названия. Без этого
+// после переименования программы человек потерял бы адрес сервера и путь к
+// ключу и решил бы, что всё сломалось.
+func migrateOldDir() {
+	newDir := Dir()
+	if _, err := os.Stat(newDir); err == nil {
+		return // уже переехали
+	}
+	oldDir := filepath.Join(baseDir(), "vpstunnel")
+	if _, err := os.Stat(oldDir); err != nil {
+		return // и не было ничего
+	}
+	os.Rename(oldDir, newDir)
 }
 
 func Path() string { return filepath.Join(Dir(), "config.json") }
@@ -74,6 +101,7 @@ func KnownHostsPath() string { return filepath.Join(Dir(), "known_hosts") }
 // Load читает конфиг с диска. Отсутствие файла — не ошибка: возвращаются
 // значения по умолчанию.
 func Load() Config {
+	migrateOldDir()
 	cfg := Default()
 	data, err := os.ReadFile(Path())
 	if err != nil {
@@ -128,6 +156,11 @@ func (c *Config) normalize() {
 	if c.KeyPath == "" {
 		home, _ := os.UserHomeDir()
 		c.KeyPath = filepath.Join(home, ".ssh", "id_ed25519")
+	}
+	switch c.FilterMode {
+	case "only", "except":
+	default:
+		c.FilterMode = "all"
 	}
 	if runtime.GOOS != "windows" {
 		// На не-Windows системный прокси и переменные среды мы не трогаем.

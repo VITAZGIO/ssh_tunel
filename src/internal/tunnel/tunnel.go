@@ -25,8 +25,9 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"vpstunnel/internal/events"
-	"vpstunnel/internal/hostkey"
+	"sshtunel/internal/events"
+	"sshtunel/internal/hostkey"
+	"sshtunel/internal/routing"
 )
 
 type Config struct {
@@ -41,6 +42,10 @@ type Config struct {
 	PoolSize       int
 	KnownHostsPath string
 	Verbose        bool
+
+	// Policy решает по имени программы, вести соединение через сервер или
+	// выпустить напрямую. nil означает «всё через туннель».
+	Policy *routing.Policy
 }
 
 var ErrNotConnected = errors.New("нет живого SSH-соединения с сервером")
@@ -77,6 +82,7 @@ type Tunnel struct {
 
 	listeners []net.Listener
 	stats     stats
+	mu        sync.RWMutex // защищает изменяемую часть настроек (правила)
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -403,6 +409,24 @@ func (t *Tunnel) tryDial(network, target string) (conn net.Conn, err error, hadL
 		lastErr = ErrNotConnected
 	}
 	return nil, lastErr, true
+}
+
+// SetPolicy меняет правила на ходу — останавливать туннель ради этого не надо.
+func (t *Tunnel) SetPolicy(p *routing.Policy) {
+	t.mu.Lock()
+	t.cfg.Policy = p
+	t.mu.Unlock()
+}
+
+// useTunnel — вести ли соединение этой программы через сервер.
+func (t *Tunnel) useTunnel(process string) bool {
+	t.mu.RLock()
+	p := t.cfg.Policy
+	t.mu.RUnlock()
+	if p == nil {
+		return true
+	}
+	return p.UseTunnel(process)
 }
 
 // WaitReady ждёт, пока в пуле поднимется не меньше n соединений. Нужно тестам

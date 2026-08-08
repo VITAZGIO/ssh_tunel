@@ -14,12 +14,12 @@ import (
 	"os"
 	"time"
 
-	"vpstunnel/internal/app"
-	"vpstunnel/internal/config"
-	"vpstunnel/internal/events"
-	"vpstunnel/internal/nativeui"
-	"vpstunnel/internal/shutdown"
-	"vpstunnel/internal/webui"
+	"sshtunel/internal/app"
+	"sshtunel/internal/config"
+	"sshtunel/internal/events"
+	"sshtunel/internal/nativeui"
+	"sshtunel/internal/shutdown"
+	"sshtunel/internal/webui"
 )
 
 const windowTitle = "ssh_tunel"
@@ -76,7 +76,7 @@ func main() {
 			"Обычно он уже есть в Windows 10 и 11 вместе с Edge. Если его нет,\n" +
 			"поставь «Microsoft Edge WebView2 Runtime» с сайта Microsoft.\n\n" +
 			"Пока его нет, интерфейс можно открыть в браузере — запусти так:\n" +
-			"vpstunnel.exe -nowindow")
+			"ssh_tunel.exe -nowindow")
 	}
 
 	err = nativeui.Run(nativeui.Options{

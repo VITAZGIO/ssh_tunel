@@ -9,16 +9,18 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sort"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"vpstunnel/internal/config"
-	"vpstunnel/internal/events"
-	"vpstunnel/internal/speedtest"
-	"vpstunnel/internal/sysproxy"
-	"vpstunnel/internal/tunnel"
+	"sshtunel/internal/config"
+	"sshtunel/internal/events"
+	"sshtunel/internal/routing"
+	"sshtunel/internal/speedtest"
+	"sshtunel/internal/sysproxy"
+	"sshtunel/internal/tunnel"
 )
 
 type App struct {
@@ -33,14 +35,55 @@ type App struct {
 	proxyURL string
 
 	speedRunning atomic.Bool
+
+	// policy живёт отдельно от туннеля: правила фильтра меняются на ходу,
+	// без переподключения.
+	policy *routing.Policy
+
+	// seenApps — программы, которые уже ходили через прокси. Нужны, чтобы в
+	// настройках можно было выбрать их из списка, а не вспоминать имена.
+	seenMu   sync.Mutex
+	seenApps map[string]struct{}
 }
 
 func New(cfg config.Config) *App {
-	return &App{
-		Bus: events.NewBus(),
-		cfg: cfg,
-		sys: sysproxy.NewManager(config.Dir()),
+	a := &App{
+		Bus:      events.NewBus(),
+		cfg:      cfg,
+		sys:      sysproxy.NewManager(config.Dir()),
+		policy:   routing.New(routing.Mode(cfg.FilterMode), cfg.FilterApps),
+		seenApps: map[string]struct{}{},
 	}
+	go a.collectSeenApps()
+	return a
+}
+
+// collectSeenApps запоминает имена программ из событий соединений.
+func (a *App) collectSeenApps() {
+	ch, _ := a.Bus.Subscribe()
+	for e := range ch {
+		if e.Kind != events.KindConn || e.Process == "" {
+			continue
+		}
+		name := routing.Normalize(e.Process)
+		a.seenMu.Lock()
+		if len(a.seenApps) < 200 {
+			a.seenApps[name] = struct{}{}
+		}
+		a.seenMu.Unlock()
+	}
+}
+
+// SeenApps — отсортированный список программ, замеченных за этот запуск.
+func (a *App) SeenApps() []string {
+	a.seenMu.Lock()
+	out := make([]string, 0, len(a.seenApps))
+	for n := range a.seenApps {
+		out = append(out, n)
+	}
+	a.seenMu.Unlock()
+	sort.Strings(out)
+	return out
 }
 
 func (a *App) Config() config.Config {
@@ -49,15 +92,38 @@ func (a *App) Config() config.Config {
 	return a.cfg
 }
 
-func (a *App) SetConfig(cfg config.Config) error {
+// SetConfig сохраняет настройки. Правила фильтра применяются сразу, даже на
+// работающем туннеле — ради них останавливаться незачем. Остальное (адрес
+// сервера, порты, число каналов) вступит в силу при следующем подключении, о
+// чём сообщается в возвращаемом тексте.
+func (a *App) SetConfig(cfg config.Config) (string, error) {
 	a.mu.Lock()
-	if a.running {
-		a.mu.Unlock()
-		return errors.New("останови туннель, прежде чем менять настройки")
-	}
+	old, running := a.cfg, a.running
 	a.cfg = cfg
+	tun := a.tun
 	a.mu.Unlock()
-	return cfg.Save()
+
+	a.policy.Set(routing.Mode(cfg.FilterMode), cfg.FilterApps)
+	if tun != nil {
+		tun.SetPolicy(a.policy)
+	}
+
+	if err := cfg.Save(); err != nil {
+		return "", err
+	}
+
+	if running && connectionSettingsChanged(old, cfg) {
+		return "часть настроек вступит в силу после переподключения", nil
+	}
+	return "", nil
+}
+
+// connectionSettingsChanged — поменялось ли то, ради чего надо переподключаться.
+func connectionSettingsChanged(a, b config.Config) bool {
+	return a.Host != b.Host || a.SSHPort != b.SSHPort || a.User != b.User ||
+		a.KeyPath != b.KeyPath || a.SocksPort != b.SocksPort ||
+		a.HTTPPort != b.HTTPPort || a.PoolSize != b.PoolSize ||
+		a.SysProxy != b.SysProxy || a.SetEnvVars != b.SetEnvVars
 }
 
 func (a *App) Running() bool {
@@ -100,6 +166,7 @@ func (a *App) Start() error {
 		PoolSize:       cfg.PoolSize,
 		KnownHostsPath: config.KnownHostsPath(),
 		Verbose:        cfg.Verbose,
+		Policy:         a.policy,
 	}, a.Bus)
 
 	if err := tun.Start(); err != nil {

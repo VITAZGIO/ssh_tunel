@@ -1,4 +1,4 @@
-module vpstunnel
+module sshtunel
 
 go 1.22
 

@@ -1,4 +1,4 @@
-# vpstunnel
+# ssh_tunel
 
 Один exe для Windows, который гонит трафик через SSH-туннель до собственного
 VPS. Без установки, без внешних `ssh.exe`/PuTTY, без прав администратора.
@@ -31,10 +31,14 @@ VPS. Без установки, без внешних `ssh.exe`/PuTTY, без п
 - **Возвращает настройки как было** — при любом закрытии, включая крестик и
   аварийное завершение. Интернет после выхода не пропадает.
 - **Проверяет ключ сервера** — вместо прежнего «доверять чему угодно».
+- **Разделяет трафик по программам** — можно вести через туннель всё, только
+  выбранные приложения, или всё кроме выбранных. Правила меняются на ходу.
+- **Меряет реальную скорость** — кнопка теста качает данные через туннель в
+  несколько потоков и показывает приём и отдачу.
 
 ## Быстрый старт
 
-1. Скачай `vpstunnel.exe` из папки [releases](releases/).
+1. Скачай `ssh_tunel.exe` из папки [releases](releases/).
 2. Запусти двойным щелчком — откроется окно.
 3. Открой настройки (шестерёнка справа сверху), проверь адрес VPS,
    пользователя и путь к приватному ключу. Нажми «Сохранить» и вернись назад.
@@ -52,14 +56,14 @@ VPS. Без установки, без внешних `ssh.exe`/PuTTY, без п
 
 ## Консольная версия
 
-Если больше нравятся команды, есть `vpstunnel-cli.exe`:
+Если больше нравятся команды, есть `ssh_tunel-cli.exe`:
 
 ```powershell
-.\vpstunnel-cli.exe -host 87.58.210.143 -user root -key C:\Users\vitaz\.ssh\id_ed25519 -save
+.\ssh_tunel-cli.exe -host 87.58.210.143 -user root -key C:\Users\vitaz\.ssh\id_ed25519 -save
 ```
 
-Флаг `-save` запоминает настройки — дальше достаточно просто `.\vpstunnel-cli.exe`.
-Полный список флагов: `.\vpstunnel-cli.exe` без аргументов.
+Флаг `-save` запоминает настройки — дальше достаточно просто `.\ssh_tunel-cli.exe`.
+Полный список флагов: `.\ssh_tunel-cli.exe` без аргументов.
 
 Лог теперь компактный, по строке на соединение:
 
@@ -67,6 +71,13 @@ VPS. Без установки, без внешних `ssh.exe`/PuTTY, без п
 00:26:48  msedge.exe         → www.youtube.com:443
 00:26:50  node.exe           → api.anthropic.com:443
 00:26:51  Discord.exe        → 162.159.128.233:443   DNS мимо туннеля
+00:26:52  steam.exe          → store.steampowered.com:443   мимо туннеля (по правилам)
+```
+
+Фильтр по программам есть и здесь:
+
+```powershell
+.\ssh_tunel-cli.exe -filter except -apps steam.exe,discord.exe
 ```
 
 ## Сборка из исходников
@@ -83,8 +94,8 @@ go test ./... -race                      # проверить, что всё р�
 
 ```bash
 cd src
-GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -H windowsgui" -o vpstunnel.exe ./cmd/vpstunnel
-GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o vpstunnel-cli.exe ./cmd/vpstunnel-cli
+GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -H windowsgui" -o ssh_tunel.exe ./cmd/ssh_tunel
+GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o ssh_tunel-cli.exe ./cmd/ssh_tunel-cli
 ```
 
 ## Что где лежит

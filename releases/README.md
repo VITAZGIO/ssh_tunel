@@ -2,8 +2,8 @@
 
 | Файл | Что это |
 |---|---|
-| `vpstunnel.exe` | Версия с окном. Запускается двойным щелчком, консоли нет. |
-| `vpstunnel-cli.exe` | Консольная версия, управляется флагами. |
+| `ssh_tunel.exe` | Версия с окном. Запускается двойным щелчком, консоли нет. |
+| `ssh_tunel-cli.exe` | Консольная версия, управляется флагами. |
 | `SHA256SUMS.txt` | Контрольные суммы. |
 
 Обе собраны из `../src` командой `./build.sh` под `windows/amd64`.
@@ -11,7 +11,7 @@
 Проверить целостность в PowerShell:
 
 ```powershell
-Get-FileHash .\vpstunnel.exe -Algorithm SHA256
+Get-FileHash .\ssh_tunel.exe -Algorithm SHA256
 ```
 
 и сравнить с `SHA256SUMS.txt`.

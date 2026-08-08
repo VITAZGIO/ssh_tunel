@@ -7,8 +7,8 @@ import (
 	"syscall"
 	"time"
 
-	"vpstunnel/internal/events"
-	"vpstunnel/internal/procinfo"
+	"sshtunel/internal/events"
+	"sshtunel/internal/procinfo"
 )
 
 const syscallECONNRESET = syscall.ECONNRESET
@@ -69,9 +69,9 @@ func (t *Tunnel) serve(r request) {
 
 	proc, pid := lookupProcess(r.conn)
 
-	remote, err := t.Dial("tcp", r.target)
+	remote, direct, err := t.dialFor(proc, r.target)
 	if err != nil {
-		t.bus.Publish(eventConn(proc, pid, r.target, r.proto, r.byIP, err))
+		t.bus.Publish(eventConn(proc, pid, r.target, r.proto, r.byIP, direct, err))
 		if r.writeErr != nil {
 			r.writeErr(err)
 		}
@@ -85,7 +85,7 @@ func (t *Tunnel) serve(r request) {
 		}
 	}
 
-	t.bus.Publish(eventConn(proc, pid, r.target, r.proto, r.byIP, nil))
+	t.bus.Publish(eventConn(proc, pid, r.target, r.proto, r.byIP, direct, nil))
 
 	t.stats.active.Add(1)
 	t.stats.total.Add(1)
@@ -144,10 +144,25 @@ func closeWrite(c net.Conn) {
 	_ = c.SetReadDeadline(time.Now().Add(30 * time.Second))
 }
 
-func eventConn(proc string, pid int, target, proto string, byIP bool, err error) events.Event {
+// dialFor открывает соединение до цели тем путём, который положен этой
+// программе по правилам: через сервер или напрямую с этого компьютера.
+//
+// Прямое соединение — не «отказ туннеля», а осознанный обход: так работает
+// режим, в котором выбранные приложения намеренно ходят мимо.
+func (t *Tunnel) dialFor(process, target string) (net.Conn, bool, error) {
+	if t.useTunnel(process) {
+		c, err := t.Dial("tcp", target)
+		return c, false, err
+	}
+	d := net.Dialer{Timeout: 15 * time.Second}
+	c, err := d.Dial("tcp", target)
+	return c, true, err
+}
+
+func eventConn(proc string, pid int, target, proto string, byIP, direct bool, err error) events.Event {
 	e := events.Event{
 		Kind: events.KindConn, Process: proc, PID: pid,
-		Target: target, Proto: proto, DNSLeak: byIP,
+		Target: target, Proto: proto, DNSLeak: byIP, Direct: direct,
 	}
 	if err != nil {
 		e.Failed = true

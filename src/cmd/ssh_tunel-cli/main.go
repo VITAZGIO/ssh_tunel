@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"vpstunnel/internal/app"
-	"vpstunnel/internal/config"
-	"vpstunnel/internal/events"
-	"vpstunnel/internal/shutdown"
+	"sshtunel/internal/app"
+	"sshtunel/internal/config"
+	"sshtunel/internal/events"
+	"sshtunel/internal/shutdown"
 )
 
 func main() {
@@ -28,9 +28,15 @@ func main() {
 	flag.IntVar(&cfg.PoolSize, "pool", cfg.PoolSize, "сколько SSH-соединений держать (больше — быстрее)")
 	flag.BoolVar(&cfg.SysProxy, "sysproxy", cfg.SysProxy, "прописывать системный прокси Windows")
 	flag.BoolVar(&cfg.SetEnvVars, "setenv", cfg.SetEnvVars, "прописывать HTTPS_PROXY в переменные среды (нужно для Claude Code, npm, pip)")
+	flag.StringVar(&cfg.FilterMode, "filter", cfg.FilterMode,
+		"какие программы вести через туннель: all (все), only (только указанные), except (все, кроме указанных)")
+	apps := flag.String("apps", strings.Join(cfg.FilterApps, ","),
+		"список программ для -filter через запятую, например steam.exe,discord.exe")
 	flag.BoolVar(&cfg.Verbose, "v", cfg.Verbose, "подробный лог")
 	save := flag.Bool("save", false, "сохранить указанные настройки как значения по умолчанию и выйти")
 	flag.Parse()
+
+	cfg.FilterApps = splitApps(*apps)
 
 	if cfg.Host == "" {
 		usage()
@@ -114,7 +120,10 @@ func printEvents(bus *events.Bus, verbose bool) {
 				continue
 			}
 			note := ""
-			if e.DNSLeak {
+			switch {
+			case e.Direct:
+				note = "   мимо туннеля (по правилам)"
+			case e.DNSLeak:
 				note = "   DNS мимо туннеля"
 			}
 			fmt.Printf("%s  %-18s → %s%s\n", ts, trim(proc, 18), e.Target, note)
@@ -142,6 +151,18 @@ func printEvents(bus *events.Bus, verbose bool) {
 	}
 }
 
+// splitApps разбирает список программ из флага. Пустые куски выбрасываются,
+// чтобы запятая в конце не превращалась в безымянную запись.
+func splitApps(v string) []string {
+	var out []string
+	for _, part := range strings.Split(v, ",") {
+		if p := strings.TrimSpace(part); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 func trim(s string, n int) string {
 	r := []rune(s)
 	if len(r) <= n {
@@ -163,6 +184,11 @@ func usage() {
   -port       порт SOCKS4/SOCKS5 (по умолчанию 1080)
   -httpport   порт HTTP-прокси (по умолчанию 1081)
   -pool       число SSH-соединений, больше — выше скорость (по умолчанию 4)
+  -filter     какие программы вести через туннель:
+              all — все (по умолчанию)
+              only — только указанные в -apps
+              except — все, кроме указанных в -apps
+  -apps       список программ для -filter через запятую
   -sysproxy   прописывать системный прокси Windows (по умолчанию да)
   -setenv     прописывать HTTPS_PROXY в переменные среды (по умолчанию да)
   -save       запомнить настройки, чтобы дальше запускать без флагов

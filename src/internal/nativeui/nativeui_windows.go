@@ -186,7 +186,7 @@ var active *ui // окно в программе одно, поэтому гло
 // второй копии надо просто показать окно первой. Мьютекс намеренно не
 // освобождается — он живёт до конца процесса.
 func AlreadyRunning(title string) bool {
-	name, _ := windows.UTF16PtrFromString("Local\\vpstunnel-single-instance")
+	name, _ := windows.UTF16PtrFromString("Local\\ssh_tunel-single-instance")
 	_, _, err := pCreateMutex.Call(0, 0, uintptr(unsafe.Pointer(name)))
 	if errno, ok := err.(windows.Errno); ok && uintptr(errno) == errAlreadyExists {
 		showExistingWindow(title)

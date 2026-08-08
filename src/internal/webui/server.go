@@ -28,10 +28,10 @@ import (
 	"sync"
 	"time"
 
-	"vpstunnel/internal/app"
-	"vpstunnel/internal/config"
-	"vpstunnel/internal/events"
-	"vpstunnel/internal/sysproxy"
+	"sshtunel/internal/app"
+	"sshtunel/internal/config"
+	"sshtunel/internal/events"
+	"sshtunel/internal/sysproxy"
 )
 
 //go:embed assets/*
@@ -131,6 +131,9 @@ type statusResp struct {
 	SysProxy string        `json:"sysProxy"`
 	EnvHint  []string      `json:"envHint"`
 	ProxyURL string        `json:"proxyUrl"`
+	// SeenApps — программы, замеченные за этот запуск: из них удобно
+	// собирать список фильтра, не вспоминая имена вручную.
+	SeenApps []string `json:"seenApps"`
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -142,6 +145,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		SysProxy: sysproxy.Current(),
 		EnvHint:  s.app.EnvHint(),
 		ProxyURL: s.app.ProxyURL(),
+		SeenApps: s.app.SeenApps(),
 	})
 }
 
@@ -168,11 +172,12 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]string{"error": "не разобрал настройки: " + err.Error()})
 		return
 	}
-	if err := s.app.SetConfig(cfg); err != nil {
+	note, err := s.app.SetConfig(cfg)
+	if err != nil {
 		writeJSON(w, map[string]string{"error": err.Error()})
 		return
 	}
-	writeJSON(w, map[string]any{"ok": true, "config": s.app.Config()})
+	writeJSON(w, map[string]any{"ok": true, "config": s.app.Config(), "note": note})
 }
 
 func (s *Server) handleCheckIP(w http.ResponseWriter, r *http.Request) {

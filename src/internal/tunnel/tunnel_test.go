@@ -14,12 +14,14 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"golang.org/x/crypto/ssh"
 
-	"vpstunnel/internal/events"
+	"sshtunel/internal/events"
+	"sshtunel/internal/routing"
 )
 
 // Тесты поднимают настоящий SSH-сервер прямо в процессе и прогоняют через него
@@ -32,9 +34,12 @@ type testSSHServer struct {
 	addr     string
 	hostKey  ssh.Signer
 	ln       net.Listener
-	conns    int
 	closeCh  chan struct{}
 	rejectTo string // если цель совпала — отказать (проверка обработки ошибок)
+
+	// channels считает открытые через сервер соединения — по нему видно,
+	// действительно ли трафик пошёл через туннель.
+	channels atomic.Int64
 }
 
 func newTestSSHServer(t *testing.T, clientPub ssh.PublicKey) *testSSHServer {
@@ -108,6 +113,7 @@ func (s *testSSHServer) handle(t *testing.T, c net.Conn, cfg *ssh.ServerConfig) 
 			nc.Reject(ssh.ConnectionFailed, "битый запрос")
 			continue
 		}
+		s.channels.Add(1)
 		target := net.JoinHostPort(payload.Host, strconv.Itoa(int(payload.Port)))
 		if s.rejectTo != "" && target == s.rejectTo {
 			nc.Reject(ssh.ConnectionFailed, "administratively prohibited")
@@ -570,4 +576,86 @@ func readHTTPBodyFrom(t *testing.T, br *bufio.Reader) []byte {
 		t.Fatalf("не смог дочитать тело ответа: %v", err)
 	}
 	return body
+}
+
+// ---------- разделение трафика по программам ----------
+
+// Главная проверка фильтра: соединение исключённой программы обязано пойти
+// НАПРЯМУЮ, минуя сервер. Считаем каналы на тестовом SSH-сервере — если они
+// не выросли, значит трафик действительно прошёл мимо туннеля.
+func TestPolicySendsExcludedAppDirect(t *testing.T) {
+	tun, _, _, srv := startTunnel(t, 1)
+	target := echoServer(t)
+
+	tun.SetPolicy(routing.New(routing.ModeExcept, []string{"steam.exe"}))
+
+	before := srv.channels.Load()
+
+	conn, direct, err := tun.dialFor("steam.exe", target.String())
+	if err != nil {
+		t.Fatalf("прямое соединение не открылось: %v", err)
+	}
+	defer conn.Close()
+	if !direct {
+		t.Fatal("исключённая программа помечена как идущая через туннель")
+	}
+	if got := srv.channels.Load(); got != before {
+		t.Fatalf("сервер открыл %d новых каналов — трафик всё-таки пошёл через туннель", got-before)
+	}
+	assertHTTPBody(t, conn, target.String(), "/hello", "привет от ")
+}
+
+// Обратный случай: не исключённая программа должна идти через сервер.
+func TestPolicyKeepsOtherAppsInTunnel(t *testing.T) {
+	tun, _, _, srv := startTunnel(t, 1)
+	target := echoServer(t)
+
+	tun.SetPolicy(routing.New(routing.ModeExcept, []string{"steam.exe"}))
+
+	before := srv.channels.Load()
+
+	conn, direct, err := tun.dialFor("chrome.exe", target.String())
+	if err != nil {
+		t.Fatalf("соединение через туннель не открылось: %v", err)
+	}
+	defer conn.Close()
+	if direct {
+		t.Fatal("обычная программа выпущена мимо туннеля")
+	}
+	if got := srv.channels.Load(); got != before+1 {
+		t.Fatalf("сервер открыл %d каналов вместо одного — трафик пошёл не туда", got-before)
+	}
+	assertHTTPBody(t, conn, target.String(), "/hello", "привет от ")
+}
+
+// Правила меняются на ходу: одна и та же программа до и после смены режима
+// должна идти разными путями без переподключения туннеля.
+func TestPolicyChangesWithoutRestart(t *testing.T) {
+	tun, _, _, srv := startTunnel(t, 1)
+	target := echoServer(t)
+
+	before := srv.channels.Load()
+	c1, direct1, err := tun.dialFor("steam.exe", target.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	c1.Close()
+	if direct1 || srv.channels.Load() != before+1 {
+		t.Fatal("до включения правил всё должно идти через туннель")
+	}
+
+	tun.SetPolicy(routing.New(routing.ModeOnly, []string{"chrome.exe"}))
+
+	before = srv.channels.Load()
+	c2, direct2, err := tun.dialFor("steam.exe", target.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	c2.Close()
+	if !direct2 {
+		t.Fatal("после включения правил программа не ушла напрямую")
+	}
+	if srv.channels.Load() != before {
+		t.Fatal("после включения правил трафик всё ещё идёт через туннель")
+	}
 }
