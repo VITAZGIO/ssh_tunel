@@ -1,31 +1,40 @@
-// vpstunnel — версия с окном. Запускается двойным щелчком, без команд и
-// флагов: всё настраивается в окне и запоминается.
+// vpstunnel — приложение с окном. Запускается двойным щелчком, никаких команд
+// и флагов: всё настраивается в окне и запоминается.
 //
-// Собирается с -H windowsgui, поэтому чёрного окна консоли за ней не
-// появляется. Само окно — это страница, открытая браузером в режиме
-// приложения (без адресной строки и вкладок).
+// Собирается с -H windowsgui, поэтому чёрного окна консоли за ним не
+// появляется. Окно — настоящее окно Windows со своей иконкой и местом в
+// панели задач; внутри него рисует WebView2 (движок Edge, встроенный в
+// систему). Крестик прячет окно в трей, чтобы туннель не рвался от случайного
+// закрытия; выход — через меню у значка рядом с часами.
 package main
 
 import (
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"runtime"
 	"time"
 
 	"vpstunnel/internal/app"
 	"vpstunnel/internal/config"
+	"vpstunnel/internal/events"
+	"vpstunnel/internal/nativeui"
 	"vpstunnel/internal/shutdown"
 	"vpstunnel/internal/webui"
 )
 
+const windowTitle = "vpstunnel"
+
 func main() {
-	// Единственный флаг: не открывать окно самому, а напечатать адрес. Нужен,
-	// если браузер не находится или окно хочется открыть вручную.
+	// Единственный флаг — на случай, если окно почему-то не открывается:
+	// тогда программа печатает адрес, который можно открыть браузером.
 	noWindow := flag.Bool("nowindow", false, "не открывать окно, только напечатать адрес")
 	flag.Parse()
+
+	// Вторая копия не нужна: она всё равно не займёт уже занятые порты.
+	// Вместо неё показываем окно той, что уже работает.
+	if !*noWindow && nativeui.AlreadyRunning(windowTitle) {
+		return
+	}
 
 	cfg := config.Load()
 	a := app.New(cfg)
@@ -35,20 +44,16 @@ func main() {
 	if err != nil {
 		fatal("Не удалось запустить интерфейс: " + err.Error())
 	}
+	go srv.Serve()
 
-	go func() {
-		if err := srv.Serve(); err != nil {
-			// Сервер падает только при закрытии — это штатный выход.
-			_ = err
-		}
-	}()
-
-	// Прокси обязан сняться при любом закрытии окна, иначе система продолжит
+	// Прокси обязан сняться при любом завершении, иначе система продолжит
 	// слать трафик на порт, который уже никто не слушает, и интернет пропадёт.
 	go func() {
 		<-shutdown.OnExit(func() { a.Stop() })
 		os.Exit(0)
 	}()
+
+	go showStateInTray(a)
 
 	if cfg.AutoStart && cfg.Host != "" {
 		go func() {
@@ -60,65 +65,61 @@ func main() {
 	}
 
 	url := srv.URL()
+
 	if *noWindow {
 		fmt.Println(url)
-	} else if err := openWindow(url); err != nil {
-		fatal("Не удалось открыть окно программы.\n\n" +
-			"Открой этот адрес в браузере вручную:\n" + url)
+		select {}
 	}
 
-	// Процесс живёт, пока не закроют его явно. Закрытие окна браузера мы не
-	// отслеживаем специально: пользователь может закрыть вкладку, но захотеть
-	// оставить туннель — выход делается кнопкой в трее браузера или Ctrl+C.
-	select {}
+	if !nativeui.WebView2Installed() {
+		fatal("Не найден компонент WebView2, на котором рисуется окно.\n\n" +
+			"Обычно он уже есть в Windows 10 и 11 вместе с Edge. Если его нет,\n" +
+			"поставь «Microsoft Edge WebView2 Runtime» с сайта Microsoft.\n\n" +
+			"Пока его нет, интерфейс можно открыть в браузере — запусти так:\n" +
+			"vpstunnel.exe -nowindow")
+	}
+
+	err = nativeui.Run(nativeui.Options{
+		Title:    windowTitle,
+		URL:      url,
+		Width:    420,
+		Height:   700,
+		DataPath: config.Dir(),
+		Running:  a.Running,
+		Toggle: func() {
+			if a.Running() {
+				a.Stop()
+				return
+			}
+			if err := a.Start(); err != nil {
+				a.Bus.Errorf("%v", err)
+			}
+		},
+		OnQuit: a.Stop,
+	})
+	if err != nil {
+		fatal(err.Error())
+	}
 }
 
-// openWindow пытается открыть страницу в режиме приложения — так окно выглядит
-// как обычная программа, без адресной строки, вкладок и закладок. Если ни
-// одного подходящего браузера нет, открываем как обычную ссылку.
-func openWindow(url string) error {
-	arg := "--app=" + url + " --window-size=1000,760"
-	for _, exe := range appModeBrowsers() {
-		if _, err := os.Stat(exe); err != nil {
+// showStateInTray держит подсказку у значка в трее в актуальном состоянии,
+// чтобы состояние было видно, не открывая окно.
+func showStateInTray(a *app.App) {
+	ch, _ := a.Bus.Subscribe()
+	names := map[string]string{
+		events.StateStopped:      "отключено",
+		events.StateConnecting:   "подключаюсь",
+		events.StateConnected:    "защищено",
+		events.StateReconnecting: "связь потеряна",
+		events.StateError:        "ошибка",
+	}
+	for e := range ch {
+		if e.Kind != events.KindState {
 			continue
 		}
-		cmd := exec.Command(exe, "--app="+url, "--window-size=1000,760")
-		if err := cmd.Start(); err == nil {
-			return nil
+		if name, ok := names[e.State]; ok {
+			nativeui.SetStatus(name)
 		}
-	}
-	_ = arg
-	return openDefault(url)
-}
-
-func appModeBrowsers() []string {
-	switch runtime.GOOS {
-	case "windows":
-		pf := os.Getenv("ProgramFiles")
-		pf86 := os.Getenv("ProgramFiles(x86)")
-		local := os.Getenv("LOCALAPPDATA")
-		return []string{
-			filepath.Join(pf86, `Microsoft\Edge\Application\msedge.exe`),
-			filepath.Join(pf, `Microsoft\Edge\Application\msedge.exe`),
-			filepath.Join(pf, `Google\Chrome\Application\chrome.exe`),
-			filepath.Join(pf86, `Google\Chrome\Application\chrome.exe`),
-			filepath.Join(local, `Google\Chrome\Application\chrome.exe`),
-		}
-	case "darwin":
-		return []string{"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"}
-	default:
-		return []string{"/usr/bin/google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser"}
-	}
-}
-
-func openDefault(url string) error {
-	switch runtime.GOOS {
-	case "windows":
-		return exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
-	case "darwin":
-		return exec.Command("open", url).Start()
-	default:
-		return exec.Command("xdg-open", url).Start()
 	}
 }
 
