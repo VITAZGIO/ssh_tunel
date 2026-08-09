@@ -200,6 +200,8 @@
        padding:8px 0;border-top:1px solid var(--line)}
   .chk input{margin-top:2px;flex:none;accent-color:var(--accent)}
   .chk .lbl{font-size:13px}
+  .chk .sub{display:block;margin-top:3px;font-size:11px;color:var(--dim);
+       line-height:1.35}
 
   button.btn{font:inherit;color:var(--text);background:var(--card2);
        border:1px solid var(--line);border-radius:8px;padding:8px 15px;cursor:pointer}
@@ -299,7 +301,7 @@
 
     <div class="err-box" id="setError"></div>
 
-    <div class="field"><label for="host">Адрес VPS</label>
+    <div class="field"><label for="host">Адрес сервера</label>
       <input type="text" id="host" placeholder="адрес или домен сервера" spellcheck="false"></div>
     <div class="field"><label for="user">Пользователь SSH</label>
       <input type="text" id="user" spellcheck="false"></div>
@@ -313,12 +315,12 @@
 
     <div class="help" id="keyHelp" hidden>
       <p>Быстрая настройка на новом компьютере. Команда создаёт ключ (если его
-        ещё нет) и сразу кладёт его на сервер — пароль от VPS спросят один раз,
+        ещё нет) и сразу кладёт его на сервер — пароль от сервера спросят один раз,
         больше он не понадобится.</p>
       <ol>
         <li>Нажми «Открыть PowerShell» — команда уже будет в буфере обмена.</li>
         <li>Вставь её (Ctrl+V) и нажми Enter.</li>
-        <li>Введи пароль от VPS.</li>
+        <li>Введи пароль от сервера.</li>
       </ol>
       <div class="cmdbox" id="setupCmd">
         <button class="cp" id="copyCmd" title="Скопировать">
@@ -358,6 +360,12 @@
 
     <label class="chk"><input type="checkbox" id="autoStart">
       <span class="lbl">Подключаться сразу при запуске</span></label>
+
+    <label class="chk"><input type="checkbox" id="localViaTunnel">
+      <span class="lbl">Локальную сеть тоже вести через сервер
+        <span class="sub">Обычно не нужно: домашние адреса (роутер, NAS,
+        Home&nbsp;Assistant) идут напрямую и остаются доступны. Включи, если
+        нужна внутренняя сеть самого сервера.</span></span></label>
 
     <label class="chk"><input type="checkbox" id="verbose">
       <span class="lbl">Подробный журнал</span></label>
@@ -461,7 +469,7 @@ const api = (path, body) => fetch(path, {
 }).then(r => r.json());
 
 const FIELDS = ['host','user','keyPath','sshPort','socksPort','httpPort','poolSize'];
-const CHECKS = ['verbose','autoStart'];
+const CHECKS = ['verbose','autoStart','localViaTunnel'];
 
 /* Правила фильтра живут отдельно от полей формы: они правятся на своём
    экране и сохраняются своей кнопкой. */
@@ -885,7 +893,7 @@ function showSpeed(v){
    оттуда, чтобы не подставлять их руками. Пока адрес не введён — на его месте
    заметная заглушка, а не пустое место. */
 function setupCommand(){
-  const host = ($('host').value || '').trim() || 'IP_ТВОЕГО_VPS';
+  const host = ($('host').value || '').trim() || 'IP_ТВОЕГО_СЕРВЕРА';
   const user = ($('user').value || '').trim() || 'root';
   const key = '$env:USERPROFILE\\.ssh\\id_ed25519';
   return 'if (!(Test-Path "' + key + '")) { ssh-keygen -t ed25519 -f "' + key +

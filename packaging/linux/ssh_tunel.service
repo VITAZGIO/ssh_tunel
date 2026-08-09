@@ -13,7 +13,7 @@
 # Путь поправь под себя, если положил программу не в /usr/local/bin.
 
 [Unit]
-Description=ssh_tunel — SSH-туннель до собственного VPS
+Description=ssh_tunel — SSH-туннель до собственного сервера
 Documentation=https://github.com/VITAZGIO/ssh_tunel
 After=network-online.target
 Wants=network-online.target

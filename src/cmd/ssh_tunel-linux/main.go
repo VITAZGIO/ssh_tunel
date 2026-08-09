@@ -38,7 +38,7 @@ const defaultWebAddr = "127.0.0.1:47821"
 func main() {
 	cfg := config.Load()
 
-	flag.StringVar(&cfg.Host, "host", cfg.Host, "адрес VPS")
+	flag.StringVar(&cfg.Host, "host", cfg.Host, "адрес сервера")
 	flag.IntVar(&cfg.SSHPort, "sshport", cfg.SSHPort, "SSH-порт сервера")
 	flag.StringVar(&cfg.User, "user", cfg.User, "пользователь SSH")
 	flag.StringVar(&cfg.KeyPath, "key", cfg.KeyPath, "путь к приватному ключу")
@@ -51,6 +51,8 @@ func main() {
 		"какие программы вести через туннель: all, only, except")
 	apps := flag.String("apps", strings.Join(cfg.FilterApps, ","),
 		"список программ для -filter через запятую")
+	flag.BoolVar(&cfg.LocalViaTunnel, "local-via-tunnel", cfg.LocalViaTunnel,
+		"вести через сервер и локальную сеть (по умолчанию она идёт напрямую)")
 	flag.BoolVar(&cfg.Verbose, "v", cfg.Verbose, "подробный журнал")
 
 	web := flag.Bool("web", false, "включить веб-интерфейс")
@@ -231,10 +233,10 @@ func fatal(format string, args ...any) {
 }
 
 func usage() {
-	fmt.Printf(`ssh_tunel — SSH-туннель до своего VPS (SOCKS4/5 + HTTP-прокси)
+	fmt.Printf(`ssh_tunel — SSH-туннель до своего сервера (SOCKS4/5 + HTTP-прокси)
 
 Первый запуск:
-  ssh_tunel-linux -host ТВОЙ_VPS -user root -save
+  ssh_tunel-linux -host ТВОЙ_СЕРВЕР -user root -save
 
 Дальше достаточно:
   ssh_tunel-linux            # только туннель, журнал в вывод

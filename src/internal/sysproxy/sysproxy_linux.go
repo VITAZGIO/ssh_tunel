@@ -58,13 +58,13 @@ var gsettingsKeys = []string{
 	"org.gnome.system.proxy ignore-hosts",
 }
 
-func (m *Manager) Enable(httpAddr, socksAddr string, setEnv bool) error {
+func (m *Manager) Enable(httpAddr, socksAddr string, setEnv, bypassLocal bool) error {
 	if m.snap != nil {
 		return nil
 	}
 	snap := &snapshot{GSettings: map[string]string{}}
 
-	if err := m.writeEnvFile(httpAddr); err != nil {
+	if err := m.writeEnvFile(httpAddr, bypassLocal); err != nil {
 		return err
 	}
 
@@ -83,7 +83,7 @@ func (m *Manager) Enable(httpAddr, socksAddr string, setEnv bool) error {
 			{"org.gnome.system.proxy.https port", hPort},
 			{"org.gnome.system.proxy.socks host", sHost},
 			{"org.gnome.system.proxy.socks port", sPort},
-			{"org.gnome.system.proxy ignore-hosts", "['localhost', '127.0.0.0/8', '::1']"},
+			{"org.gnome.system.proxy ignore-hosts", gnomeIgnoreHosts(bypassLocal)},
 			{"org.gnome.system.proxy mode", "'manual'"},
 		}
 		for _, kv := range set {
@@ -100,11 +100,12 @@ func (m *Manager) Enable(httpAddr, socksAddr string, setEnv bool) error {
 // writeEnvFile кладёт рядом с настройками готовый файл для подключения в
 // оболочке. Пишется всегда: на сервере это единственный рабочий способ, а на
 // рабочем столе — запасной.
-func (m *Manager) writeEnvFile(httpAddr string) error {
+func (m *Manager) writeEnvFile(httpAddr string, bypassLocal bool) error {
 	if err := os.MkdirAll(m.dir, 0o700); err != nil {
 		return err
 	}
 	url := "http://" + httpAddr
+	noProxy := noProxyList(bypassLocal)
 	body := fmt.Sprintf(`# Создано ssh_tunel. Подключить в текущую оболочку:
 #   source %s
 # Отключить: unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY no_proxy NO_PROXY
@@ -112,9 +113,9 @@ export http_proxy=%s
 export https_proxy=%s
 export HTTP_PROXY=%s
 export HTTPS_PROXY=%s
-export no_proxy=localhost,127.0.0.1,::1
-export NO_PROXY=localhost,127.0.0.1,::1
-`, m.envPath, url, url, url, url)
+export no_proxy=%s
+export NO_PROXY=%s
+`, m.envPath, url, url, url, url, noProxy, noProxy)
 	return os.WriteFile(m.envPath, []byte(body), 0o600)
 }
 
@@ -234,6 +235,6 @@ func EnvHint(httpAddr string) []string {
 	return []string{
 		"export HTTPS_PROXY=" + url,
 		"export HTTP_PROXY=" + url,
-		"export NO_PROXY=localhost,127.0.0.1",
+		"export NO_PROXY=" + noProxyList(true),
 	}
 }

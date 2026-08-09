@@ -9,6 +9,7 @@ import (
 
 	"sshtunel/internal/events"
 	"sshtunel/internal/procinfo"
+	"sshtunel/internal/routing"
 )
 
 const syscallECONNRESET = syscall.ECONNRESET
@@ -148,15 +149,26 @@ func closeWrite(c net.Conn) {
 // программе по правилам: через сервер или напрямую с этого компьютера.
 //
 // Прямое соединение — не «отказ туннеля», а осознанный обход: так работает
-// режим, в котором выбранные приложения намеренно ходят мимо.
+// режим, в котором выбранные приложения намеренно ходят мимо, и так же
+// обрабатывается локальная сеть.
 func (t *Tunnel) dialFor(process, target string) (net.Conn, bool, error) {
-	if t.useTunnel(process) {
+	if t.useTunnel(process) && !t.localDirect(target) {
 		c, err := t.Dial("tcp", target)
 		return c, false, err
 	}
 	d := net.Dialer{Timeout: 15 * time.Second}
 	c, err := d.Dial("tcp", target)
 	return c, true, err
+}
+
+// localDirect — цель в локальной сети и её незачем вести через сервер.
+// Проверяется раньше правил по программам: даже в режиме «всё через туннель»
+// домашний NAS должен оставаться доступным.
+func (t *Tunnel) localDirect(target string) bool {
+	if t.localViaTunnel.Load() {
+		return false
+	}
+	return routing.IsLocalTarget(target)
 }
 
 func eventConn(proc string, pid int, target, proto string, byIP, direct bool, err error) events.Event {
@@ -198,7 +210,7 @@ func shortErr(err error) string {
 	case containsAny(s, "i/o timeout", "timeout"):
 		return "таймаут"
 	case containsAny(s, "administratively prohibited"):
-		return "VPS запретил исходящее соединение"
+		return "сервер запретил исходящее соединение"
 	}
 	if i := strings.LastIndex(s, ": "); i > 0 && len(s)-i < 60 {
 		return s[i+2:]

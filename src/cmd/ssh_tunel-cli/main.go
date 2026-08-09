@@ -19,7 +19,7 @@ import (
 func main() {
 	cfg := config.Load()
 
-	flag.StringVar(&cfg.Host, "host", cfg.Host, "адрес VPS")
+	flag.StringVar(&cfg.Host, "host", cfg.Host, "адрес сервера")
 	flag.IntVar(&cfg.SSHPort, "sshport", cfg.SSHPort, "SSH-порт сервера")
 	flag.StringVar(&cfg.User, "user", cfg.User, "пользователь SSH")
 	flag.StringVar(&cfg.KeyPath, "key", cfg.KeyPath, "путь к приватному ключу")
@@ -32,6 +32,8 @@ func main() {
 		"какие программы вести через туннель: all (все), only (только указанные), except (все, кроме указанных)")
 	apps := flag.String("apps", strings.Join(cfg.FilterApps, ","),
 		"список программ для -filter через запятую, например steam.exe,discord.exe")
+	flag.BoolVar(&cfg.LocalViaTunnel, "local-via-tunnel", cfg.LocalViaTunnel,
+		"вести через сервер и локальную сеть (по умолчанию она идёт напрямую)")
 	flag.BoolVar(&cfg.Verbose, "v", cfg.Verbose, "подробный лог")
 	save := flag.Bool("save", false, "сохранить указанные настройки как значения по умолчанию и выйти")
 	flag.Parse()
@@ -172,13 +174,13 @@ func trim(s string, n int) string {
 }
 
 func usage() {
-	fmt.Print(`vpstunnel — SSH-туннель до своего VPS (SOCKS4/5 + HTTP-прокси)
+	fmt.Print(`ssh_tunel — SSH-туннель до своего сервера (SOCKS4/5 + HTTP-прокси)
 
 Использование:
   vpstunnel-cli -host <IP сервера> [-user root] [-key путь-к-ключу]
 
 Основные флаги:
-  -host       адрес VPS (обязателен при первом запуске)
+  -host       адрес сервера (обязателен при первом запуске)
   -user       пользователь SSH (по умолчанию root)
   -key        приватный ключ (по умолчанию ~/.ssh/id_ed25519)
   -port       порт SOCKS4/SOCKS5 (по умолчанию 1080)
@@ -195,7 +197,7 @@ func usage() {
   -v          подробный лог
 
 Пример первого запуска:
-  ssh_tunel-cli -host ТВОЙ_VPS -user root -save
+  ssh_tunel-cli -host ТВОЙ_СЕРВЕР -user root -save
 
 Дальше достаточно просто:
   vpstunnel-cli

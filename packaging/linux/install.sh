@@ -22,7 +22,7 @@ cat <<MSG
 Готово. Дальше:
 
   1. Задай сервер (один раз):
-       ssh_tunel-linux -host ТВОЙ_VPS -user root -save
+       ssh_tunel-linux -host ТВОЙ_СЕРВЕР -user root -save
 
   2. Включи службу:
        systemctl --user enable --now ssh_tunel

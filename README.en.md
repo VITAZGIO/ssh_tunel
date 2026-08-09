@@ -59,6 +59,9 @@ reach, and with your local law, is your responsibility.
 - 🎯 **Per-application split tunnelling** — everything goes through the tunnel,
   or only the applications you pick, or everything except them. Rules apply on
   the fly, without reconnecting.
+- 🏠 **Your LAN stays reachable** — the router, a NAS, Home Assistant and
+  anything else on `192.168.x.x` or reachable by a local name goes direct
+  instead of through the server.
 - 🧩 **Works where the system proxy cannot** — Node.js, Python, Go and everything
   built on them (Claude Code, npm, pip, curl) read only environment variables,
   and the program sets them.
@@ -185,10 +188,11 @@ flags do.
 | `poolSize` | Number of parallel SSH connections. More streams — higher throughput on a long link. |
 | `filterMode` | `all`, `only` or `except` — the split-tunnelling mode. |
 | `filterApps` | The list of applications that mode applies to. |
+| `localViaTunnel` | Whether the local network goes through the server too. `false` by default — it goes direct. |
 
 Linux flags: `-host`, `-sshport`, `-user`, `-key`, `-port`, `-httpport`,
-`-pool`, `-filter`, `-apps`, `-sysproxy`, `-setenv`, `-save`, `-env`, `-web`,
-`-web-listen`, `-v`.
+`-pool`, `-filter`, `-apps`, `-local-via-tunnel`, `-sysproxy`, `-setenv`,
+`-save`, `-env`, `-web`, `-web-listen`, `-v`.
 
 ---
 
@@ -224,6 +228,10 @@ SSH connection has — no more, no less. The full picture is in
   when QUIC is unavailable.
 - DNS lookups made by applications that resolve names on their own, before they
   ever talk to the proxy. Such connections are marked in the log.
+- The local network, deliberately: `192.168.x.x`, `10.x.x.x`, dotless names and
+  the `.local`/`.lan`/`.home` suffixes go direct, otherwise your home services
+  would stop opening. If you need the opposite — the server's own internal
+  network — tick «Локальную сеть тоже вести через сервер» in the settings.
 
 ---
 

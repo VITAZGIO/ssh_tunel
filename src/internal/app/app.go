@@ -106,6 +106,7 @@ func (a *App) SetConfig(cfg config.Config) (string, error) {
 	a.policy.Set(routing.Mode(cfg.FilterMode), cfg.FilterApps)
 	if tun != nil {
 		tun.SetPolicy(a.policy)
+		tun.SetLocalViaTunnel(cfg.LocalViaTunnel)
 	}
 
 	if err := cfg.Save(); err != nil {
@@ -123,7 +124,8 @@ func connectionSettingsChanged(a, b config.Config) bool {
 	return a.Host != b.Host || a.SSHPort != b.SSHPort || a.User != b.User ||
 		a.KeyPath != b.KeyPath || a.SocksPort != b.SocksPort ||
 		a.HTTPPort != b.HTTPPort || a.PoolSize != b.PoolSize ||
-		a.SysProxy != b.SysProxy || a.SetEnvVars != b.SetEnvVars
+		a.SysProxy != b.SysProxy || a.SetEnvVars != b.SetEnvVars ||
+		a.LocalViaTunnel != b.LocalViaTunnel
 }
 
 func (a *App) Running() bool {
@@ -167,6 +169,7 @@ func (a *App) Start() error {
 		KnownHostsPath: config.KnownHostsPath(),
 		Verbose:        cfg.Verbose,
 		Policy:         a.policy,
+		LocalViaTunnel: cfg.LocalViaTunnel,
 	}, a.Bus)
 
 	if err := tun.Start(); err != nil {
@@ -180,7 +183,7 @@ func (a *App) Start() error {
 	a.mu.Unlock()
 
 	if cfg.SysProxy {
-		if err := a.sys.Enable(httpAddr, socksAddr, cfg.SetEnvVars); err != nil {
+		if err := a.sys.Enable(httpAddr, socksAddr, cfg.SetEnvVars, !cfg.LocalViaTunnel); err != nil {
 			a.Bus.Warnf("Не удалось включить системный прокси: %v. Туннель работает, но приложения надо настроить вручную.", err)
 		} else {
 			a.mu.Lock()
@@ -235,7 +238,7 @@ func (a *App) State() string {
 
 // CheckIP спрашивает у внешнего сервиса, каким адресом мы выходим в интернет,
 // причём ЧЕРЕЗ туннель. Это и есть проверка "работает ли": если вернулся адрес
-// VPS, значит трафик действительно идёт через сервер.
+// сервера, значит трафик действительно идёт через него.
 func (a *App) CheckIP() (string, error) {
 	a.mu.Lock()
 	tun := a.tun

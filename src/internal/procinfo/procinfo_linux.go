@@ -25,8 +25,8 @@ import (
 
 type procCache struct {
 	mu       sync.Mutex
-	inodePID map[string]int    // inode сокета -> pid
-	names    map[int]string    // pid -> имя программы
+	inodePID map[string]int // inode сокета -> pid
+	names    map[int]string // pid -> имя программы
 	at       time.Time
 }
 

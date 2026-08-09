@@ -222,6 +222,10 @@ func startTunnel(t *testing.T, poolSize int) (*Tunnel, string, string, *testSSHS
 		HTTPAddr:       httpAddr,
 		PoolSize:       poolSize,
 		KnownHostsPath: filepath.Join(dir, "known_hosts"),
+		// Цели в тестах поднимаются на 127.0.0.1, а локальные адреса в
+		// обычном режиме идут мимо туннеля. Здесь проверяется сам туннель,
+		// поэтому локальную сеть намеренно заворачиваем в него.
+		LocalViaTunnel: true,
 	}, events.NewBus())
 
 	if err := tun.Start(); err != nil {
@@ -657,5 +661,53 @@ func TestPolicyChangesWithoutRestart(t *testing.T) {
 	}
 	if srv.channels.Load() != before {
 		t.Fatal("после включения правил трафик всё ещё идёт через туннель")
+	}
+}
+
+// ---------- Локальная сеть ----------
+
+// Локальная цель не должна уходить в туннель даже в режиме «всё через
+// сервер»: сервер искал бы такой адрес в своей сети, и домашние сервисы
+// (роутер, NAS, Home Assistant) перестали бы открываться.
+func TestLocalTargetGoesDirect(t *testing.T) {
+	tun, _, _, srv := startTunnel(t, 1)
+	target := echoServer(t) // 127.0.0.1:порт — заведомо локальный адрес
+	tun.SetLocalViaTunnel(false)
+
+	before := srv.channels.Load()
+
+	conn, direct, err := tun.dialFor("chrome.exe", target.String())
+	if err != nil {
+		t.Fatalf("прямое соединение до локального адреса не открылось: %v", err)
+	}
+	defer conn.Close()
+	if !direct {
+		t.Fatal("локальный адрес помечен как идущий через туннель")
+	}
+	if got := srv.channels.Load(); got != before {
+		t.Fatalf("сервер открыл %d каналов — локальный адрес всё-таки ушёл в туннель", got-before)
+	}
+	assertHTTPBody(t, conn, target.String(), "/hello", "привет от ")
+}
+
+// Обратная сторона того же правила: не-локальные адреса при выключенном
+// LocalViaTunnel обязаны по-прежнему идти через сервер. Соединение до
+// несуществующего имени не установится, но канал на сервере откроется — по
+// счётчику видно, что маршрут выбран верно.
+func TestRemoteTargetStillGoesThroughTunnel(t *testing.T) {
+	tun, _, _, srv := startTunnel(t, 1)
+	tun.SetLocalViaTunnel(false)
+
+	before := srv.channels.Load()
+
+	conn, direct, _ := tun.dialFor("chrome.exe", "example.invalid:80")
+	if conn != nil {
+		conn.Close()
+	}
+	if direct {
+		t.Fatal("внешний адрес выпущен мимо туннеля")
+	}
+	if got := srv.channels.Load(); got != before+1 {
+		t.Fatalf("сервер открыл %d каналов вместо одного — внешний адрес пошёл не туда", got-before)
 	}
 }

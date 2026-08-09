@@ -62,10 +62,13 @@ func NewManager(configDir string) *Manager {
 // Enable прописывает системный прокси и переменные среды.
 //
 // httpAddr указывается и для http, и для https: WinINET умеет CONNECT, а через
-// него имя хоста уходит на VPS и не светится в DNS-запросах провайдера.
+// него имя хоста уходит на сервер и не разрешается локально.
 // socksAddr прописывается дополнительно — для приложений, которые ходят
 // только по SOCKS.
-func (m *Manager) Enable(httpAddr, socksAddr string, setEnv bool) error {
+//
+// bypassLocal=true добавляет в исключения всю локальную сеть, чтобы домашние
+// сервисы оставались доступны при включённом туннеле.
+func (m *Manager) Enable(httpAddr, socksAddr string, setEnv, bypassLocal bool) error {
 	if m.snap != nil {
 		return nil // уже включено
 	}
@@ -95,7 +98,7 @@ func (m *Manager) Enable(httpAddr, socksAddr string, setEnv bool) error {
 	// строка — то есть даже обращение к 127.0.0.1 система пыталась гнать через
 	// прокси; это ломает локальные серверы разработки и наше собственное окно
 	// настроек.
-	if err := k.SetStringValue("ProxyOverride", "<local>;localhost;127.0.0.1;::1;*.local"); err != nil {
+	if err := k.SetStringValue("ProxyOverride", winProxyOverride(bypassLocal)); err != nil {
 		return err
 	}
 	if err := k.SetDWordValue("ProxyEnable", 1); err != nil {
@@ -103,7 +106,7 @@ func (m *Manager) Enable(httpAddr, socksAddr string, setEnv bool) error {
 	}
 
 	if setEnv {
-		if err := m.applyEnv(snap, httpAddr); err != nil {
+		if err := m.applyEnv(snap, httpAddr, bypassLocal); err != nil {
 			// Переменные среды — приятное дополнение, но не повод отменять
 			// уже включённый системный прокси.
 			snap.EnvApplied = false
@@ -126,7 +129,7 @@ func (m *Manager) Enable(httpAddr, socksAddr string, setEnv bool) error {
 //
 // Важно: переменные среды подхватываются только процессами, запущенными ПОСЛЕ
 // изменения. Уже открытый терминал их не увидит.
-func (m *Manager) applyEnv(snap *snapshot, httpAddr string) error {
+func (m *Manager) applyEnv(snap *snapshot, httpAddr string, bypassLocal bool) error {
 	k, err := registry.OpenKey(registry.CURRENT_USER, envKey, registry.QUERY_VALUE|registry.SET_VALUE)
 	if err != nil {
 		return err
@@ -150,7 +153,7 @@ func (m *Manager) applyEnv(snap *snapshot, httpAddr string) error {
 	if err := k.SetStringValue("HTTPS_PROXY", url); err != nil {
 		return err
 	}
-	return k.SetStringValue("NO_PROXY", "localhost,127.0.0.1,::1")
+	return k.SetStringValue("NO_PROXY", noProxyList(bypassLocal))
 }
 
 // Disable возвращает всё как было.
@@ -291,7 +294,7 @@ func EnvHint(httpAddr string) []string {
 	return []string{
 		`$env:HTTPS_PROXY="` + url + `"`,
 		`$env:HTTP_PROXY="` + url + `"`,
-		`$env:NO_PROXY="localhost,127.0.0.1"`,
+		`$env:NO_PROXY="` + noProxyList(true) + `"`,
 	}
 }
 

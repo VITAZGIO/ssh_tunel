@@ -37,6 +37,13 @@ type Config struct {
 	FilterMode string   `json:"filterMode"`
 	FilterApps []string `json:"filterApps"`
 
+	// LocalViaTunnel — вести ли локальную сеть (192.168.x.x, домашние имена)
+	// через сервер. По умолчанию false: такие адреса идут напрямую, иначе
+	// домашние сервисы становятся недоступны при включённом туннеле.
+	// Включать имеет смысл только чтобы дотянуться до внутренней сети самого
+	// сервера.
+	LocalViaTunnel bool `json:"localViaTunnel"`
+
 	// Verbose — подробный лог (включая закрытие соединений).
 	Verbose bool `json:"verbose"`
 	// AutoStart — при запуске GUI сразу поднимать туннель.

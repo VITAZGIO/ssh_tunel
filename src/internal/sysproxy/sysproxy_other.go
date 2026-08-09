@@ -9,9 +9,9 @@ type Manager struct{}
 
 func NewManager(configDir string) *Manager { return &Manager{} }
 
-func (m *Manager) Enable(httpAddr, socksAddr string, setEnv bool) error { return nil }
-func (m *Manager) Disable() error                                       { return nil }
-func (m *Manager) RecoverStale() bool                                   { return false }
+func (m *Manager) Enable(httpAddr, socksAddr string, setEnv, bypassLocal bool) error { return nil }
+func (m *Manager) Disable() error                                                    { return nil }
+func (m *Manager) RecoverStale() bool                                                { return false }
 
 func Current() string { return "не поддерживается на этой ОС" }
 
@@ -20,6 +20,6 @@ func EnvHint(httpAddr string) []string {
 	return []string{
 		`export HTTPS_PROXY=` + url,
 		`export HTTP_PROXY=` + url,
-		`export NO_PROXY=localhost,127.0.0.1`,
+		`export NO_PROXY=` + noProxyList(true),
 	}
 }

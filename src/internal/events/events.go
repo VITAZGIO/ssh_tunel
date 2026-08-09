@@ -53,7 +53,7 @@ type Event struct {
 	Target  string `json:"target,omitempty"`
 	Proto   string `json:"proto,omitempty"` // socks4 / socks4a / socks5 / http
 	// DNSLeak=true означает, что приложение прислало нам уже готовый IP-адрес,
-	// то есть DNS-запрос оно сделало само — в обход туннеля, через провайдера.
+	// то есть DNS-запрос оно сделало само — в обход туннеля.
 	DNSLeak bool `json:"dnsLeak,omitempty"`
 	// Direct=true — соединение намеренно пущено мимо туннеля по правилам
 	// фильтра, а не из-за сбоя.

@@ -1,9 +1,9 @@
-// Package tunnel — ядро: пул SSH-соединений до VPS и локальные прокси-серверы
+// Package tunnel — ядро: пул SSH-соединений до сервера и локальные прокси-серверы
 // (SOCKS4/4a, SOCKS5, HTTP CONNECT), которые пробрасывают через него трафик.
 //
 // Почему пул, а не одно соединение, как было раньше:
-//   - одно TCP-соединение — это одно окно перегрузки; на канале до Амстердама
-//     с задержкой ~50 мс оно и есть главный потолок скорости;
+//   - одно TCP-соединение — это одно окно перегрузки; на дальнем канале
+//     с задержкой в десятки миллисекунд оно и есть главный потолок скорости;
 //   - библиотека x/crypto/ssh сериализует запись пакетов одним мьютексом на
 //     соединение, то есть все каналы делят один поток шифрования;
 //   - если единственное соединение умирает, умирает вообще всё.
@@ -46,6 +46,14 @@ type Config struct {
 	// Policy решает по имени программы, вести соединение через сервер или
 	// выпустить напрямую. nil означает «всё через туннель».
 	Policy *routing.Policy
+
+	// LocalViaTunnel — вести ли в туннель и адреса локальной сети.
+	//
+	// По умолчанию (false) 192.168.x.x, домашние имена и прочая локальная
+	// сеть идут напрямую: сервер всё равно искал бы такой адрес у себя.
+	// Включать это стоит ровно в одном случае — когда нужна внутренняя сеть
+	// САМОГО сервера, а не своя.
+	LocalViaTunnel bool
 }
 
 var ErrNotConnected = errors.New("нет живого SSH-соединения с сервером")
@@ -89,6 +97,10 @@ type Tunnel struct {
 	wg     sync.WaitGroup
 
 	state atomic.Value // string
+
+	// localViaTunnel меняется на ходу из настроек, поэтому atomic, а не поле
+	// в cfg: перезапускать туннель ради галочки не надо.
+	localViaTunnel atomic.Bool
 }
 
 type stats struct {
@@ -100,9 +112,13 @@ type stats struct {
 
 func New(cfg Config, bus *events.Bus) *Tunnel {
 	t := &Tunnel{cfg: cfg, bus: bus}
+	t.localViaTunnel.Store(cfg.LocalViaTunnel)
 	t.state.Store(events.StateStopped)
 	return t
 }
+
+// SetLocalViaTunnel переключает обработку локальной сети без перезапуска.
+func (t *Tunnel) SetLocalViaTunnel(v bool) { t.localViaTunnel.Store(v) }
 
 func (t *Tunnel) State() string {
 	s, _ := t.state.Load().(string)
