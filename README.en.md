@@ -111,6 +111,10 @@ reach, and with your local law, is your responsibility.
   makes no difference. Nothing has to be installed on it: the proxy runs on
   your machine, the server only passes connections through.
 
+Freshly rented server, still stock? Turn password logins off and switch the
+firewall on first — a ready-to-paste block of commands is in
+[SERVER-SETUP.md](docs/SERVER-SETUP.md) (in Russian).
+
 ---
 
 ## Windows
