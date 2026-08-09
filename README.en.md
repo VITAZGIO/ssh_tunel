@@ -252,9 +252,3 @@ addresses, keys, `config.json`, `known_hosts`) — they are already in
 
 [MIT](LICENSE) © 2026 Vitaliy ([VITAZGIO](https://github.com/VITAZGIO)).
 Developed together with Claude (Anthropic).
-
-Take it, change it, use it however you like, including in your own projects. The
-only condition is to keep the license text and the attribution.
-
-The software is provided as is, without warranty. It is meant for reaching your
-own server; how you use it is your responsibility.
