@@ -58,13 +58,13 @@ var gsettingsKeys = []string{
 	"org.gnome.system.proxy ignore-hosts",
 }
 
-func (m *Manager) Enable(httpAddr, socksAddr string, setEnv, bypassLocal bool) error {
+func (m *Manager) Enable(httpAddr, socksAddr string, setEnv, bypassLocal bool, extra []string) error {
 	if m.snap != nil {
 		return nil
 	}
 	snap := &snapshot{GSettings: map[string]string{}}
 
-	if err := m.writeEnvFile(httpAddr, bypassLocal); err != nil {
+	if err := m.writeEnvFile(httpAddr, bypassLocal, extra); err != nil {
 		return err
 	}
 
@@ -83,7 +83,7 @@ func (m *Manager) Enable(httpAddr, socksAddr string, setEnv, bypassLocal bool) e
 			{"org.gnome.system.proxy.https port", hPort},
 			{"org.gnome.system.proxy.socks host", sHost},
 			{"org.gnome.system.proxy.socks port", sPort},
-			{"org.gnome.system.proxy ignore-hosts", gnomeIgnoreHosts(bypassLocal)},
+			{"org.gnome.system.proxy ignore-hosts", gnomeIgnoreHosts(bypassLocal, extra...)},
 			{"org.gnome.system.proxy mode", "'manual'"},
 		}
 		for _, kv := range set {
@@ -100,12 +100,12 @@ func (m *Manager) Enable(httpAddr, socksAddr string, setEnv, bypassLocal bool) e
 // writeEnvFile кладёт рядом с настройками готовый файл для подключения в
 // оболочке. Пишется всегда: на сервере это единственный рабочий способ, а на
 // рабочем столе — запасной.
-func (m *Manager) writeEnvFile(httpAddr string, bypassLocal bool) error {
+func (m *Manager) writeEnvFile(httpAddr string, bypassLocal bool, extra []string) error {
 	if err := os.MkdirAll(m.dir, 0o700); err != nil {
 		return err
 	}
 	url := "http://" + httpAddr
-	noProxy := noProxyList(bypassLocal)
+	noProxy := noProxyList(bypassLocal, extra...)
 	body := fmt.Sprintf(`# Создано ssh_tunel. Подключить в текущую оболочку:
 #   source %s
 # Отключить: unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY no_proxy NO_PROXY

@@ -13,6 +13,7 @@ import (
 	"sshtunel/internal/app"
 	"sshtunel/internal/config"
 	"sshtunel/internal/events"
+	"sshtunel/internal/routing"
 	"sshtunel/internal/shutdown"
 )
 
@@ -34,11 +35,14 @@ func main() {
 		"список программ для -filter через запятую, например steam.exe,discord.exe")
 	flag.BoolVar(&cfg.LocalViaTunnel, "local-via-tunnel", cfg.LocalViaTunnel,
 		"вести через сервер и локальную сеть (по умолчанию она идёт напрямую)")
+	direct := flag.String("direct", strings.Join(cfg.DirectHosts, ","),
+		"адреса и сети, которые всегда идут напрямую (через запятую)")
 	flag.BoolVar(&cfg.Verbose, "v", cfg.Verbose, "подробный лог")
 	save := flag.Bool("save", false, "сохранить указанные настройки как значения по умолчанию и выйти")
 	flag.Parse()
 
 	cfg.FilterApps = splitApps(*apps)
+	cfg.DirectHosts = routing.SplitEntries(*direct)
 
 	if cfg.Host == "" {
 		usage()
@@ -191,6 +195,7 @@ func usage() {
               only — только указанные в -apps
               except — все, кроме указанных в -apps
   -apps       список программ для -filter через запятую
+  -direct     адреса и сети, которые всегда идут напрямую (через запятую)
   -sysproxy   прописывать системный прокси Windows (по умолчанию да)
   -setenv     прописывать HTTPS_PROXY в переменные среды (по умолчанию да)
   -save       запомнить настройки, чтобы дальше запускать без флагов

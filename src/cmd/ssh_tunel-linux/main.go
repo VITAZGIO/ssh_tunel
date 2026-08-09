@@ -27,6 +27,7 @@ import (
 	"sshtunel/internal/app"
 	"sshtunel/internal/config"
 	"sshtunel/internal/events"
+	"sshtunel/internal/routing"
 	"sshtunel/internal/shutdown"
 	"sshtunel/internal/webui"
 )
@@ -53,6 +54,8 @@ func main() {
 		"список программ для -filter через запятую")
 	flag.BoolVar(&cfg.LocalViaTunnel, "local-via-tunnel", cfg.LocalViaTunnel,
 		"вести через сервер и локальную сеть (по умолчанию она идёт напрямую)")
+	direct := flag.String("direct", strings.Join(cfg.DirectHosts, ","),
+		"адреса и сети, которые всегда идут напрямую (через запятую)")
 	flag.BoolVar(&cfg.Verbose, "v", cfg.Verbose, "подробный журнал")
 
 	web := flag.Bool("web", false, "включить веб-интерфейс")
@@ -63,6 +66,7 @@ func main() {
 	flag.Parse()
 
 	cfg.FilterApps = splitApps(*apps)
+	cfg.DirectHosts = routing.SplitEntries(*direct)
 
 	if *printEnv {
 		for _, line := range envLines(cfg) {
@@ -246,6 +250,7 @@ func usage() {
   -env        напечатать строки для подключения прокси в оболочке
   -filter     all | only | except — какие программы вести через туннель
   -apps       список программ для -filter через запятую
+  -direct     адреса и сети, которые всегда идут напрямую (через запятую)
   -pool       число SSH-соединений, больше — выше скорость (по умолчанию 4)
   -v          подробный журнал
 

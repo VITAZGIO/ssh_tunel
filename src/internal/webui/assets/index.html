@@ -202,6 +202,10 @@
   .chk .lbl{font-size:13px}
   .chk .sub{display:block;margin-top:3px;font-size:11px;color:var(--dim);
        line-height:1.35}
+  textarea{width:100%;box-sizing:border-box;resize:vertical;
+       background:var(--card);border:1px solid var(--line);border-radius:8px;
+       padding:7px 10px;color:var(--text);font:inherit;line-height:1.4}
+  textarea:focus{outline:none;border-color:var(--accent)}
 
   button.btn{font:inherit;color:var(--text);background:var(--card2);
        border:1px solid var(--line);border-radius:8px;padding:8px 15px;cursor:pointer}
@@ -366,6 +370,17 @@
         <span class="sub">Обычно не нужно: домашние адреса (роутер, NAS,
         Home&nbsp;Assistant) идут напрямую и остаются доступны. Включи, если
         нужна внутренняя сеть самого сервера.</span></span></label>
+
+    <div class="field" style="margin-top:12px">
+      <label for="directHosts">Всегда напрямую</label>
+      <textarea id="directHosts" rows="2" spellcheck="false"
+        placeholder="100.64.0.0/10, 10.8.*, .netbird.cloud"></textarea>
+      <div class="hint">Адреса и сети чужих VPN, которые не надо вести через
+        сервер. Домашняя сеть и mesh-VPN (NetBird, Tailscale) уже учтены —
+        сюда вписывают всё остальное. Через запятую: сеть
+        (<code>10.8.0.0/16</code> или <code>10.8.*</code>), адрес или окончание
+        имени (<code>.corp.local</code>).</div>
+    </div>
 
     <label class="chk"><input type="checkbox" id="verbose">
       <span class="lbl">Подробный журнал</span></label>
@@ -953,7 +968,13 @@ $('openPs').onclick = async () => {
 };
 
 /* ---------- настройки ---------- */
-[...FIELDS, ...CHECKS].forEach(f => {
+/* Список «всегда напрямую» человек пишет как получится: через запятую, через
+   пробел, с новой строки. Разбираем так же, как это делает ядро. */
+function splitEntries(v){
+  return (v || '').split(/[\s,;]+/).map(x => x.trim()).filter(Boolean);
+}
+
+[...FIELDS, ...CHECKS, 'directHosts'].forEach(f => {
   const el = $(f);
   if(el) el.addEventListener('input', () => { formDirty = true; });
 });
@@ -965,6 +986,7 @@ $('save').onclick = async () => {
     cfg[f] = el.type === 'number' ? parseInt(el.value, 10) || 0 : el.value.trim();
   });
   CHECKS.forEach(f => cfg[f] = $(f).checked);
+  cfg.directHosts = splitEntries($('directHosts').value);
   cfg.filterMode = filterMode;
   cfg.filterApps = filterApps;
   const r = await api('/api/config', cfg);
@@ -979,6 +1001,7 @@ function fillConfig(cfg){
   lastConfig = cfg;
   FIELDS.forEach(f => { if($(f)) $(f).value = cfg[f] ?? ''; });
   CHECKS.forEach(f => { if($(f)) $(f).checked = !!cfg[f]; });
+  $('directHosts').value = (cfg.directHosts || []).join(', ');
   if(!filterDirty){
     filterMode = cfg.filterMode || 'all';
     filterApps = (cfg.filterApps || []).map(normApp);

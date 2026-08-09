@@ -61,7 +61,8 @@ HTTP CONNECT, каналы SSH и определение процесса по �
   без переподключения.
 - 🏠 **Локальная сеть остаётся доступной** — роутер, NAS, Home Assistant и
   прочее по адресам `192.168.x.x` или по имени идут напрямую, а не через
-  сервер.
+  сервер. Mesh-VPN (NetBird, Tailscale) тоже: их адреса `100.64.x.x` учтены.
+  Для остальных сетей есть свой список «всегда напрямую».
 - 🧩 **Работает там, где системный прокси бессилен** — Node.js, Python, Go и всё
   на них (Claude Code, npm, pip, curl) читают только переменные окружения,
   и программа их прописывает.
@@ -184,10 +185,11 @@ systemctl --user enable --now ssh_tunel
 | `filterMode` | `all`, `only` или `except` — режим разделения трафика. |
 | `filterApps` | Список программ, к которым режим применяется. |
 | `localViaTunnel` | Вести ли через сервер и локальную сеть. По умолчанию `false` — она идёт напрямую. |
+| `directHosts` | Свой список адресов и сетей, которые всегда идут напрямую: `100.64.0.0/10`, `10.8.*`, `.netbird.cloud`. |
 
 Флаги версии для Linux: `-host`, `-sshport`, `-user`, `-key`, `-port`,
-`-httpport`, `-pool`, `-filter`, `-apps`, `-local-via-tunnel`, `-sysproxy`,
-`-setenv`, `-save`, `-env`, `-web`, `-web-listen`, `-v`.
+`-httpport`, `-pool`, `-filter`, `-apps`, `-direct`, `-local-via-tunnel`,
+`-sysproxy`, `-setenv`, `-save`, `-env`, `-web`, `-web-listen`, `-v`.
 
 ---
 

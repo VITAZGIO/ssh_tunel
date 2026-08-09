@@ -39,6 +39,7 @@ type App struct {
 	// policy живёт отдельно от туннеля: правила фильтра меняются на ходу,
 	// без переподключения.
 	policy *routing.Policy
+	direct *routing.DirectList
 
 	// seenApps — программы, которые уже ходили через прокси. Нужны, чтобы в
 	// настройках можно было выбрать их из списка, а не вспоминать имена.
@@ -52,6 +53,7 @@ func New(cfg config.Config) *App {
 		cfg:      cfg,
 		sys:      sysproxy.NewManager(config.Dir()),
 		policy:   routing.New(routing.Mode(cfg.FilterMode), cfg.FilterApps),
+		direct:   routing.NewDirectList(cfg.DirectHosts),
 		seenApps: map[string]struct{}{},
 	}
 	go a.collectSeenApps()
@@ -104,8 +106,10 @@ func (a *App) SetConfig(cfg config.Config) (string, error) {
 	a.mu.Unlock()
 
 	a.policy.Set(routing.Mode(cfg.FilterMode), cfg.FilterApps)
+	a.direct.Set(cfg.DirectHosts)
 	if tun != nil {
 		tun.SetPolicy(a.policy)
+		tun.SetDirect(a.direct)
 		tun.SetLocalViaTunnel(cfg.LocalViaTunnel)
 	}
 
@@ -169,6 +173,7 @@ func (a *App) Start() error {
 		KnownHostsPath: config.KnownHostsPath(),
 		Verbose:        cfg.Verbose,
 		Policy:         a.policy,
+		Direct:         a.direct,
 		LocalViaTunnel: cfg.LocalViaTunnel,
 	}, a.Bus)
 
@@ -183,7 +188,7 @@ func (a *App) Start() error {
 	a.mu.Unlock()
 
 	if cfg.SysProxy {
-		if err := a.sys.Enable(httpAddr, socksAddr, cfg.SetEnvVars, !cfg.LocalViaTunnel); err != nil {
+		if err := a.sys.Enable(httpAddr, socksAddr, cfg.SetEnvVars, !cfg.LocalViaTunnel, cfg.DirectHosts); err != nil {
 			a.Bus.Warnf("Не удалось включить системный прокси: %v. Туннель работает, но приложения надо настроить вручную.", err)
 		} else {
 			a.mu.Lock()

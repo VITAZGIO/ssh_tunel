@@ -9,9 +9,11 @@ type Manager struct{}
 
 func NewManager(configDir string) *Manager { return &Manager{} }
 
-func (m *Manager) Enable(httpAddr, socksAddr string, setEnv, bypassLocal bool) error { return nil }
-func (m *Manager) Disable() error                                                    { return nil }
-func (m *Manager) RecoverStale() bool                                                { return false }
+func (m *Manager) Enable(httpAddr, socksAddr string, setEnv, bypassLocal bool, extra []string) error {
+	return nil
+}
+func (m *Manager) Disable() error     { return nil }
+func (m *Manager) RecoverStale() bool { return false }
 
 func Current() string { return "не поддерживается на этой ОС" }
 

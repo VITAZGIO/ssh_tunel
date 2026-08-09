@@ -47,6 +47,10 @@ type Config struct {
 	// выпустить напрямую. nil означает «всё через туннель».
 	Policy *routing.Policy
 
+	// Direct — собственный список адресов и сетей, которые всегда идут
+	// напрямую. nil означает «список пуст».
+	Direct *routing.DirectList
+
 	// LocalViaTunnel — вести ли в туннель и адреса локальной сети.
 	//
 	// По умолчанию (false) 192.168.x.x, домашние имена и прочая локальная
@@ -119,6 +123,14 @@ func New(cfg Config, bus *events.Bus) *Tunnel {
 
 // SetLocalViaTunnel переключает обработку локальной сети без перезапуска.
 func (t *Tunnel) SetLocalViaTunnel(v bool) { t.localViaTunnel.Store(v) }
+
+// SetDirect меняет список «всегда напрямую» на ходу, как и правила по
+// программам: переподключаться ради него не нужно.
+func (t *Tunnel) SetDirect(d *routing.DirectList) {
+	t.mu.Lock()
+	t.cfg.Direct = d
+	t.mu.Unlock()
+}
 
 func (t *Tunnel) State() string {
 	s, _ := t.state.Load().(string)

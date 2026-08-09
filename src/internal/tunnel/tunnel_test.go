@@ -711,3 +711,26 @@ func TestRemoteTargetStillGoesThroughTunnel(t *testing.T) {
 		t.Fatalf("сервер открыл %d каналов вместо одного — внешний адрес пошёл не туда", got-before)
 	}
 }
+
+// Пользовательский список «всегда напрямую» перекрывает режим «всё через
+// туннель»: сюда попадают чужие сети (mesh-VPN, рабочий VPN), про которые
+// программа знать не может.
+func TestDirectListSkipsTunnel(t *testing.T) {
+	tun, _, _, srv := startTunnel(t, 1)
+	tun.SetDirect(routing.NewDirectList([]string{"example.invalid", "203.0.113.0/24"}))
+
+	for _, target := range []string{"example.invalid:80", "203.0.113.9:443"} {
+		before := srv.channels.Load()
+		conn, direct, _ := tun.dialFor("chrome.exe", target)
+		if conn != nil {
+			conn.Close()
+		}
+		if !direct {
+			t.Errorf("%s: цель из списка помечена как идущая через туннель", target)
+		}
+		if got := srv.channels.Load(); got != before {
+			t.Errorf("%s: сервер открыл %d каналов — цель из списка ушла в туннель",
+				target, got-before)
+		}
+	}
+}

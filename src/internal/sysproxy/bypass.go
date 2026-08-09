@@ -28,14 +28,39 @@ var localNets = []string{
 // localSuffixes — доменные суффиксы домашних и внутренних сетей.
 var localSuffixes = []string{".local", ".lan", ".home", ".internal"}
 
+// cgnatNet — 100.64.0.0/10: адреса mesh-VPN (NetBird, Tailscale). В NO_PROXY
+// запись CIDR понимают и Go, и curl, поэтому диапазон указывается как есть.
+// В ProxyOverride его нет: WinINET понимает только шаблоны, и пришлось бы
+// перечислять 64 подсети — ядро всё равно решает этот случай само.
+const cgnatNet = "100.64.0.0/10"
+
 // noProxyList — значение для NO_PROXY/no_proxy.
-func noProxyList(bypassLocal bool) string {
+func noProxyList(bypassLocal bool, extra ...string) string {
 	parts := append([]string{}, alwaysBypass...)
 	if bypassLocal {
 		parts = append(parts, localNets...)
+		parts = append(parts, cgnatNet)
 		parts = append(parts, localSuffixes...)
 	}
+	parts = append(parts, extra...)
 	return strings.Join(parts, ",")
+}
+
+// winExtra оставляет из пользовательского списка то, что WinINET способен
+// понять: сети в записи CIDR он не поддерживает, а ядро их и так учитывает.
+func winExtra(extra []string) []string {
+	out := make([]string, 0, len(extra))
+	for _, e := range extra {
+		e = strings.TrimSpace(e)
+		if e == "" || strings.Contains(e, "/") {
+			continue
+		}
+		if strings.HasPrefix(e, ".") {
+			e = "*" + e // ".corp.local" -> "*.corp.local"
+		}
+		out = append(out, e)
+	}
+	return out
 }
 
 // winProxyOverride — значение для ProxyOverride в реестре.
@@ -43,7 +68,7 @@ func noProxyList(bypassLocal bool) string {
 // WinINET не понимает CIDR, только шаблоны с '*', поэтому 172.16/12
 // приходится расписывать по одной подсети. "<local>" означает имена без точек
 // ("homeassistant") — их WinINET исключает сам.
-func winProxyOverride(bypassLocal bool) string {
+func winProxyOverride(bypassLocal bool, extra ...string) string {
 	parts := []string{"<local>", "localhost", "127.0.0.1", "::1", "*.local"}
 	if bypassLocal {
 		parts = append(parts, "*.lan", "*.home", "*.internal",
@@ -52,17 +77,20 @@ func winProxyOverride(bypassLocal bool) string {
 			parts = append(parts, fmt.Sprintf("172.%d.*", i))
 		}
 	}
+	parts = append(parts, winExtra(extra)...)
 	return strings.Join(parts, ";")
 }
 
 // gnomeIgnoreHosts — значение org.gnome.system.proxy ignore-hosts: список
 // строк в синтаксисе GVariant.
-func gnomeIgnoreHosts(bypassLocal bool) string {
+func gnomeIgnoreHosts(bypassLocal bool, extra ...string) string {
 	parts := []string{"localhost", "127.0.0.0/8", "::1"}
 	if bypassLocal {
 		parts = append(parts, localNets...)
+		parts = append(parts, cgnatNet)
 		parts = append(parts, localSuffixes...)
 	}
+	parts = append(parts, extra...)
 	quoted := make([]string, len(parts))
 	for i, p := range parts {
 		quoted[i] = "'" + p + "'"

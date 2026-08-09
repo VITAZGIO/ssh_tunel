@@ -37,6 +37,11 @@ type Config struct {
 	FilterMode string   `json:"filterMode"`
 	FilterApps []string `json:"filterApps"`
 
+	// DirectHosts — адреса, сети и имена, которые всегда идут напрямую,
+	// помимо встроенного списка локальных диапазонов. Сюда вписывают чужие
+	// сети: mesh-VPN, рабочий VPN, самодельный WireGuard.
+	DirectHosts []string `json:"directHosts"`
+
 	// LocalViaTunnel — вести ли локальную сеть (192.168.x.x, домашние имена)
 	// через сервер. По умолчанию false: такие адреса идут напрямую, иначе
 	// домашние сервисы становятся недоступны при включённом туннеле.

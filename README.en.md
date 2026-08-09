@@ -61,7 +61,9 @@ reach, and with your local law, is your responsibility.
   the fly, without reconnecting.
 - 🏠 **Your LAN stays reachable** — the router, a NAS, Home Assistant and
   anything else on `192.168.x.x` or reachable by a local name goes direct
-  instead of through the server.
+  instead of through the server. Mesh VPNs (NetBird, Tailscale) too: their
+  `100.64.x.x` addresses are covered. Other networks go in your own
+  always-direct list.
 - 🧩 **Works where the system proxy cannot** — Node.js, Python, Go and everything
   built on them (Claude Code, npm, pip, curl) read only environment variables,
   and the program sets them.
@@ -189,10 +191,11 @@ flags do.
 | `filterMode` | `all`, `only` or `except` — the split-tunnelling mode. |
 | `filterApps` | The list of applications that mode applies to. |
 | `localViaTunnel` | Whether the local network goes through the server too. `false` by default — it goes direct. |
+| `directHosts` | Your own list of addresses and networks that always go direct: `100.64.0.0/10`, `10.8.*`, `.netbird.cloud`. |
 
 Linux flags: `-host`, `-sshport`, `-user`, `-key`, `-port`, `-httpport`,
-`-pool`, `-filter`, `-apps`, `-local-via-tunnel`, `-sysproxy`, `-setenv`,
-`-save`, `-env`, `-web`, `-web-listen`, `-v`.
+`-pool`, `-filter`, `-apps`, `-direct`, `-local-via-tunnel`, `-sysproxy`,
+`-setenv`, `-save`, `-env`, `-web`, `-web-listen`, `-v`.
 
 ---
 

@@ -152,7 +152,7 @@ func closeWrite(c net.Conn) {
 // режим, в котором выбранные приложения намеренно ходят мимо, и так же
 // обрабатывается локальная сеть.
 func (t *Tunnel) dialFor(process, target string) (net.Conn, bool, error) {
-	if t.useTunnel(process) && !t.localDirect(target) {
+	if t.useTunnel(process) && !t.localDirect(target) && !t.listedDirect(target) {
 		c, err := t.Dial("tcp", target)
 		return c, false, err
 	}
@@ -169,6 +169,16 @@ func (t *Tunnel) localDirect(target string) bool {
 		return false
 	}
 	return routing.IsLocalTarget(target)
+}
+
+// listedDirect — цель попала в пользовательский список «всегда напрямую».
+// Это про чужие сети, о которых программа знать не может: mesh-VPN, рабочий
+// VPN, самодельный WireGuard.
+func (t *Tunnel) listedDirect(target string) bool {
+	t.mu.RLock()
+	d := t.cfg.Direct
+	t.mu.RUnlock()
+	return d.Match(target)
 }
 
 func eventConn(proc string, pid int, target, proto string, byIP, direct bool, err error) events.Event {
