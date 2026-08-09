@@ -101,13 +101,78 @@
   select{width:100%;background:var(--card);border:1px solid var(--line);
          border-radius:8px;padding:7px 9px;color:var(--text);font:inherit}
   select:focus{outline:none;border-color:var(--accent)}
-  .chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
-  .chip{font:inherit;font-size:12px;padding:4px 9px;border-radius:999px;
-        border:1px solid var(--line);background:var(--card);color:var(--dim);
-        cursor:pointer;font-family:var(--mono)}
-  .chip:hover{border-color:var(--accent)}
-  .chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
-  .chip .x{opacity:.7;margin-left:5px}
+  /* Строка настроек, открывающая отдельный экран. */
+  .row-link{display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+            background:var(--card);border:1px solid var(--line);border-radius:10px;
+            padding:11px 13px;cursor:pointer;color:var(--text);font:inherit;
+            margin-bottom:10px}
+  .row-link:hover{border-color:var(--accent)}
+  .row-link .t{flex:1}
+  .row-link .v{color:var(--dim);font-size:12.5px}
+  .row-link .arr{color:var(--dim)}
+
+  /* Выбор режима: три варианта одним блоком, как в обычных VPN-клиентах. */
+  .modes{background:var(--card);border:1px solid var(--line);border-radius:11px;
+         overflow:hidden;margin-bottom:14px}
+  .mode{display:flex;gap:11px;align-items:flex-start;padding:12px 13px;
+        cursor:pointer;border-bottom:1px solid var(--line)}
+  .mode:last-child{border-bottom:none}
+  .mode:hover{background:var(--card2)}
+  .mode .dot{width:16px;height:16px;border-radius:50%;flex:none;margin-top:1px;
+             border:2px solid var(--line);display:grid;place-items:center}
+  .mode.on .dot{border-color:var(--accent)}
+  .mode.on .dot::after{content:"";width:8px;height:8px;border-radius:50%;
+                       background:var(--accent)}
+  .mode .ttl{font-size:13.5px;font-weight:600}
+  .mode.on .ttl{color:var(--accent)}
+  .mode .sub{font-size:11.5px;color:var(--dim);margin-top:2px;line-height:1.35}
+
+  /* Список выбранных программ. */
+  .applist{display:flex;flex-direction:column;gap:7px;margin-bottom:10px}
+  .appitem{display:flex;align-items:center;gap:10px;background:var(--card);
+           border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+  .appitem .nm{flex:1;font-family:var(--mono);font-size:12.5px;overflow:hidden;
+               text-overflow:ellipsis;white-space:nowrap}
+  .appitem .pt{font-size:11px;color:var(--dim);overflow:hidden;
+               text-overflow:ellipsis;white-space:nowrap}
+  .appitem .del{background:none;border:none;color:var(--dim);cursor:pointer;
+                font-size:16px;line-height:1;padding:2px 4px}
+  .appitem .del:hover{color:var(--err)}
+  .empty{color:var(--dim);font-size:12.5px;padding:10px 2px}
+
+  /* Всплывающее меню у кнопки «плюс». */
+  .menu{position:absolute;z-index:20;background:var(--card);
+        border:1px solid var(--line);border-radius:9px;padding:4px;
+        box-shadow:0 8px 24px rgba(0,0,0,.35);min-width:210px}
+  .menu button{display:block;width:100%;text-align:left;background:none;
+               border:none;color:var(--text);font:inherit;font-size:13px;
+               padding:8px 10px;border-radius:6px;cursor:pointer}
+  .menu button:hover{background:var(--card2)}
+
+  /* Окно выбора запущенной программы. */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;
+           display:flex;align-items:center;justify-content:center;padding:18px}
+  /* Без этого скрытое окно продолжает перехватывать щелчки: display:flex
+     перебивает встроенное правило для hidden, и невидимая подложка
+     блокирует весь интерфейс. */
+  .overlay[hidden]{display:none}
+  .dialog{background:var(--card);border:1px solid var(--line);border-radius:13px;
+          width:100%;max-width:380px;max-height:82vh;display:flex;
+          flex-direction:column;overflow:hidden}
+  .dialog .dh{display:flex;align-items:center;gap:9px;padding:12px 13px 9px}
+  .dialog .dh .t{flex:1;font-weight:650;font-size:14px}
+  .dialog .db{padding:0 13px 13px;display:flex;flex-direction:column;min-height:0}
+  .proclist{overflow-y:auto;margin-top:9px;display:flex;flex-direction:column;gap:5px}
+  .proclist::-webkit-scrollbar{width:8px}
+  .proclist::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+  .proc{display:flex;flex-direction:column;gap:1px;background:var(--card2);
+        border:1px solid transparent;border-radius:8px;padding:7px 10px;
+        cursor:pointer;text-align:left;font:inherit;color:var(--text)}
+  .proc:hover{border-color:var(--accent)}
+  .proc.picked{border-color:var(--ok)}
+  .proc .n{font-family:var(--mono);font-size:12.5px}
+  .proc .p{font-size:10.5px;color:var(--dim);overflow:hidden;
+           text-overflow:ellipsis;white-space:nowrap}
 
   .chk{display:flex;gap:9px;align-items:flex-start;cursor:pointer;
        padding:8px 0;border-top:1px solid var(--line)}
@@ -237,33 +302,27 @@
 
     <label class="chk"><input type="checkbox" id="sysProxy">
       <span class="lbl">Системный прокси Windows
-        <div class="hint">Браузеры и приложения на системном сетевом стеке.</div>
+        <div class="hint">Через туннель пойдут браузеры и приложения на
+          системном сетевом стеке. Если выключить — туннель работает, но сам
+          собой им никто не пользуется: прокси придётся прописывать в каждой
+          программе вручную (127.0.0.1 порт HTTP или SOCKS). Выключают обычно
+          те, у кого уже настроен свой прокси и его нельзя трогать.</div>
       </span></label>
 
     <label class="chk"><input type="checkbox" id="setEnvVars">
       <span class="lbl">Переменные среды HTTPS_PROXY
-        <div class="hint">Нужно для Claude Code, npm, pip, curl — они системный
-          прокси не читают. Подхватится терминалами, открытыми после включения.</div>
+        <div class="hint">Нужно для Claude Code, npm, pip, curl и всего на
+          Node.js, Python и Go — системный прокси они не читают вовсе. Если
+          выключить, они снова пойдут напрямую и получат отказ по географии.
+          Подхватывается терминалами, открытыми после включения.</div>
       </span></label>
 
-    <div class="field" style="margin-top:14px">
-      <label for="filterMode">Какие программы вести через туннель</label>
-      <select id="filterMode">
-        <option value="all">Все</option>
-        <option value="only">Только выбранные</option>
-        <option value="except">Все, кроме выбранных</option>
-      </select>
-    </div>
-    <div id="filterBox" hidden>
-      <div class="hint">Нажми на программу, чтобы отметить её. В списке те,
-        что уже ходили через туннель за этот запуск.</div>
-      <div class="chips" id="appChips"></div>
-      <input type="text" id="appAdd" spellcheck="false"
-             placeholder="добавить вручную и нажать Enter, например steam.exe">
-      <div class="hint">Программы, которые вообще не обращаются к прокси
-        (часть игр, приложения со своим сетевым стеком), туннель не видит —
-        они идут мимо в любом случае.</div>
-    </div>
+    <button class="row-link" id="toFilter" style="margin-top:14px">
+      <span class="t">Какие программы вести через туннель
+        <div class="v" id="filterSummary">Все</div>
+      </span>
+      <span class="arr">›</span>
+    </button>
 
     <label class="chk"><input type="checkbox" id="autoStart">
       <span class="lbl">Подключаться сразу при запуске</span></label>
@@ -276,9 +335,61 @@
       <span class="hint" id="savedNote"></span>
     </div>
 
-    <div class="hint" style="margin-top:16px">Если не хочешь менять переменные
-      среды глобально — вставь это в терминал перед запуском:</div>
-    <pre id="envhint"></pre>
+    <div id="envHintBox" hidden>
+      <div class="hint" style="margin-top:16px">Автоматическая установка
+        выключена, поэтому программы вроде Claude Code, npm и pip туннель не
+        увидят. Чтобы пустить через него отдельный терминал, вставь туда это
+        перед запуском:</div>
+      <pre id="envhint"></pre>
+    </div>
+  </div>
+
+  <!-- КАКИЕ ПРОГРАММЫ ВЕСТИ ЧЕРЕЗ ТУННЕЛЬ -->
+  <div class="view" id="viewFilter">
+    <div class="head">
+      <button class="ico" id="backFromFilter" title="Назад в настройки">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <span class="t">Программы и туннель</span>
+    </div>
+
+    <div class="modes" id="modes">
+      <label class="mode" data-mode="all">
+        <span class="dot"></span>
+        <span><span class="ttl">Все</span>
+          <div class="sub">Весь трафик, который попадает в прокси, идёт через сервер.</div>
+        </span>
+      </label>
+      <label class="mode" data-mode="only">
+        <span class="dot"></span>
+        <span><span class="ttl">Только выбранные</span>
+          <div class="sub">Через туннель идут только программы из списка. Остальные выходят напрямую.</div>
+        </span>
+      </label>
+      <label class="mode" data-mode="except">
+        <span class="dot"></span>
+        <span><span class="ttl">Все, кроме выбранных</span>
+          <div class="sub">Программы из списка идут напрямую, в обход туннеля. Остальные — через сервер.</div>
+        </span>
+      </label>
+    </div>
+
+    <div id="appsBox" hidden>
+      <div style="display:flex;align-items:center;margin-bottom:8px">
+        <strong style="font-size:13px;flex:1">Выбранные программы</strong>
+        <span class="hint" id="appsCount" style="margin:0"></span>
+      </div>
+      <div class="applist" id="appList"></div>
+      <button class="btn" id="addApp" style="width:100%">+  Добавить программу</button>
+      <div class="hint" style="margin-top:10px">Программы, которые вообще не
+        обращаются к прокси (часть игр, приложения со своим сетевым стеком),
+        туннель не видит — они идут мимо в любом случае.</div>
+    </div>
+
+    <div style="display:flex;gap:9px;align-items:center;margin-top:16px">
+      <button class="btn primary" id="saveFilter">Сохранить</button>
+      <span class="hint" id="filterNote"></span>
+    </div>
   </div>
 
   <!-- ЖУРНАЛ -->
@@ -298,6 +409,22 @@
 
 </div>
 
+<div class="overlay" id="procOverlay" hidden>
+  <div class="dialog">
+    <div class="dh">
+      <span class="t">Выбери программу</span>
+      <button class="ico" id="closeProc" title="Закрыть">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="db">
+      <input type="text" id="procSearch" spellcheck="false"
+             placeholder="Поиск по имени или пути…">
+      <div class="proclist" id="procList"></div>
+    </div>
+  </div>
+</div>
+
 <script>
 const T = new URLSearchParams(location.search).get('t') || '';
 const $ = id => document.getElementById(id);
@@ -310,9 +437,14 @@ const api = (path, body) => fetch(path, {
 const FIELDS = ['host','user','keyPath','sshPort','socksPort','httpPort','poolSize'];
 const CHECKS = ['sysProxy','setEnvVars','verbose','autoStart'];
 
-/* Список программ для фильтра. Держим отдельно от полей формы: он собирается
-   щелчками по «фишкам», а не набором текста. */
+/* Правила фильтра живут отдельно от полей формы: они правятся на своём
+   экране и сохраняются своей кнопкой. */
+let filterMode = 'all';
 let filterApps = [];
+// Пока правила правят, обновление с сервера их не трогает — иначе очередной
+// опрос затирал бы несохранённый выбор, как это было с полями настроек.
+let filterDirty = false;
+let appPaths = {};   // имя -> путь, только для показа в списке
 let seenApps = [];
 
 function normApp(name){
@@ -323,63 +455,187 @@ function normApp(name){
   return name.endsWith('.exe') ? name : name + '.exe';
 }
 
-function renderChips(){
-  const box = $('appChips');
+const MODE_NAMES = { all:'Все', only:'Только выбранные', except:'Все, кроме выбранных' };
+
+function renderModes(){
+  document.querySelectorAll('#modes .mode').forEach(el =>
+    el.classList.toggle('on', el.dataset.mode === filterMode));
+  $('appsBox').hidden = filterMode === 'all';
+  $('filterSummary').textContent = MODE_NAMES[filterMode] +
+    (filterMode === 'all' ? '' : ' — ' + filterApps.length + ' шт.');
+}
+
+document.querySelectorAll('#modes .mode').forEach(el => {
+  el.onclick = () => { filterMode = el.dataset.mode; filterDirty = true; renderModes(); };
+});
+
+function renderApps(){
+  const box = $('appList');
   box.innerHTML = '';
-  // Сначала выбранные, затем всё замеченное — так отмеченные не теряются
-  // в длинном списке.
-  const all = filterApps.concat(seenApps.filter(a => !filterApps.includes(a)));
-  if(all.length === 0){
-    box.innerHTML = '<span class="hint">Пока ни одной программы не замечено — ' +
-      'подключись и попользуйся интернетом, либо впиши имя вручную.</span>';
+  $('appsCount').textContent = filterApps.length ? filterApps.length + ' шт.' : '';
+
+  if(filterApps.length === 0){
+    box.innerHTML = '<div class="empty">Пока пусто. Нажми «Добавить программу» ' +
+      'и выбери её из запущенных или укажи файл на диске.</div>';
     return;
   }
-  all.forEach(name => {
-    const on = filterApps.includes(name);
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'chip' + (on ? ' on' : '');
-    b.textContent = name;
-    b.onclick = () => {
-      if(on) filterApps = filterApps.filter(a => a !== name);
-      else filterApps = filterApps.concat(name);
-      formDirty = true;
-      renderChips();
+  filterApps.forEach(name => {
+    const row = document.createElement('div');
+    row.className = 'appitem';
+    const info = document.createElement('span');
+    info.style.cssText = 'flex:1;min-width:0';
+    const nm = document.createElement('div');
+    nm.className = 'nm'; nm.textContent = name;
+    info.appendChild(nm);
+    if(appPaths[name]){
+      const pt = document.createElement('div');
+      pt.className = 'pt'; pt.textContent = appPaths[name];
+      info.appendChild(pt);
+    }
+    const del = document.createElement('button');
+    del.className = 'del'; del.textContent = '×'; del.title = 'Убрать';
+    del.onclick = () => {
+      filterApps = filterApps.filter(a => a !== name);
+      filterDirty = true;
+      renderApps(); renderModes();
     };
+    row.appendChild(info); row.appendChild(del);
+    box.appendChild(row);
+  });
+}
+
+function addApp(name, path){
+  const n = normApp(name);
+  if(!n) return;
+  if(path) appPaths[n] = path;
+  if(!filterApps.includes(n)) filterApps = filterApps.concat(n);
+  filterDirty = true;
+  renderApps(); renderModes();
+}
+
+/* ---------- меню кнопки «Добавить программу» ---------- */
+let menuEl = null;
+function closeMenu(){ if(menuEl){ menuEl.remove(); menuEl = null; } }
+document.addEventListener('click', ev => {
+  if(menuEl && !menuEl.contains(ev.target) && ev.target !== $('addApp')) closeMenu();
+});
+
+$('addApp').onclick = ev => {
+  ev.stopPropagation();
+  if(menuEl){ closeMenu(); return; }
+  const r = $('addApp').getBoundingClientRect();
+  menuEl = document.createElement('div');
+  menuEl.className = 'menu';
+  menuEl.style.left = r.left + 'px';
+  menuEl.style.top = (r.bottom + 4) + 'px';
+  [['Из списка запущенных', openProcessPicker],
+   ['Выбрать файл на диске', pickFromDisk],
+   ['Ввести имя вручную', askManually]].forEach(([label, fn]) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.onclick = () => { closeMenu(); fn(); };
+    menuEl.appendChild(b);
+  });
+  document.body.appendChild(menuEl);
+};
+
+function askManually(){
+  const v = prompt('Имя программы, например steam.exe');
+  if(v) addApp(v);
+}
+
+async function pickFromDisk(){
+  const r = await api('/api/pickfile');
+  if(r.error){ alert(r.error); return; }
+  if(r.path) addApp(r.path, r.path);
+}
+
+/* ---------- окно выбора запущенной программы ---------- */
+let procs = [];
+
+async function openProcessPicker(){
+  $('procOverlay').hidden = false;
+  $('procSearch').value = '';
+  $('procList').innerHTML = '<div class="empty">Читаю список программ…</div>';
+  const r = await api('/api/processes');
+  procs = r.processes || [];
+  renderProcs();
+  $('procSearch').focus();
+}
+$('closeProc').onclick = () => { $('procOverlay').hidden = true; };
+$('procOverlay').onclick = ev => { if(ev.target === $('procOverlay')) $('procOverlay').hidden = true; };
+$('procSearch').oninput = renderProcs;
+
+function renderProcs(){
+  const q = $('procSearch').value.trim().toLowerCase();
+  const box = $('procList');
+  box.innerHTML = '';
+  const list = procs.filter(p =>
+    !q || p.name.toLowerCase().includes(q) || (p.path||'').toLowerCase().includes(q));
+  if(list.length === 0){
+    box.innerHTML = '<div class="empty">Ничего не нашлось.</div>';
+    return;
+  }
+  list.forEach(p => {
+    const b = document.createElement('button');
+    b.className = 'proc' + (filterApps.includes(normApp(p.name)) ? ' picked' : '');
+    const n = document.createElement('div'); n.className = 'n'; n.textContent = p.name;
+    b.appendChild(n);
+    if(p.path){
+      const pa = document.createElement('div'); pa.className = 'p'; pa.textContent = p.path;
+      b.appendChild(pa);
+    }
+    b.onclick = () => { addApp(p.name, p.path); renderProcs(); };
     box.appendChild(b);
   });
 }
 
-function syncFilterBox(){
-  $('filterBox').hidden = $('filterMode').value === 'all';
-}
-
-$('filterMode').addEventListener('change', () => { formDirty = true; syncFilterBox(); });
-
-$('appAdd').addEventListener('keydown', ev => {
-  if(ev.key !== 'Enter') return;
-  ev.preventDefault();
-  const name = normApp($('appAdd').value);
-  if(name && !filterApps.includes(name)){
-    filterApps = filterApps.concat(name);
-    formDirty = true;
-    renderChips();
-  }
-  $('appAdd').value = '';
-});
+/* ---------- сохранение правил ---------- */
+$('saveFilter').onclick = async () => {
+  const cfg = Object.assign({}, lastConfig, {
+    filterMode: filterMode,
+    filterApps: filterApps,
+  });
+  const r = await api('/api/config', cfg);
+  if(r.error){ $('filterNote').textContent = r.error; return; }
+  lastConfig = r.config;
+  filterDirty = false;
+  $('filterNote').textContent = 'сохранено, работает сразу';
+  setTimeout(() => $('filterNote').textContent = '', 3000);
+};
 
 let running = false, formDirty = false, speedRunning = false;
+// Последние известные настройки: экран фильтра сохраняет их целиком, меняя
+// только свои поля, иначе он затёр бы адрес сервера и порты.
+let lastConfig = {};
 
 /* ---------- переключение экранов ---------- */
+const VIEWS = ['viewMain','viewSettings','viewFilter','viewLog'];
+let current = 'viewMain';
+
 function show(name){
-  ['viewMain','viewSettings','viewLog'].forEach(v =>
-    $(v).classList.toggle('on', v === name));
+  current = name;
+  VIEWS.forEach(v => $(v).classList.toggle('on', v === name));
+  closeMenu();
   if(name === 'viewLog') $('log').scrollTop = $('log').scrollHeight;
 }
-$('btnSettings').onclick = () => show('viewSettings');
-$('btnLog').onclick = () => show('viewLog');
+
+// Логотип всегда возвращает на главный экран — с любого места.
+$('logo').parentElement.style.cursor = 'pointer';
+$('logo').parentElement.title = 'На главный экран';
+$('logo').parentElement.onclick = () => show('viewMain');
+
+// Шестерёнка работает переключателем: из настроек она возвращает на главную,
+// чтобы не искать кнопку «назад».
+$('btnSettings').onclick = () =>
+  show(current === 'viewSettings' ? 'viewMain' : 'viewSettings');
+$('btnLog').onclick = () =>
+  show(current === 'viewLog' ? 'viewMain' : 'viewLog');
+
 $('backFromSettings').onclick = () => show('viewMain');
 $('backFromLog').onclick = () => show('viewMain');
+$('backFromFilter').onclick = () => show('viewSettings');
+$('toFilter').onclick = () => show('viewFilter');
 
 /* ---------- форматирование ---------- */
 function fmtMbps(v){
@@ -599,7 +855,7 @@ $('save').onclick = async () => {
     cfg[f] = el.type === 'number' ? parseInt(el.value, 10) || 0 : el.value.trim();
   });
   CHECKS.forEach(f => cfg[f] = $(f).checked);
-  cfg.filterMode = $('filterMode').value;
+  cfg.filterMode = filterMode;
   cfg.filterApps = filterApps;
   const r = await api('/api/config', cfg);
   if(r.error){ showError(r.error, 'setError'); return; }
@@ -610,14 +866,27 @@ $('save').onclick = async () => {
 };
 
 function fillConfig(cfg){
+  lastConfig = cfg;
   FIELDS.forEach(f => { if($(f)) $(f).value = cfg[f] ?? ''; });
   CHECKS.forEach(f => { if($(f)) $(f).checked = !!cfg[f]; });
-  $('filterMode').value = cfg.filterMode || 'all';
-  filterApps = (cfg.filterApps || []).map(normApp);
-  syncFilterBox();
-  renderChips();
+  if(!filterDirty){
+    filterMode = cfg.filterMode || 'all';
+    filterApps = (cfg.filterApps || []).map(normApp);
+  }
+  renderModes();
+  renderApps();
+  syncEnvHint();
   formDirty = false;
 }
+
+// Подсказку с переменными среды показываем только когда автоматическая
+// установка выключена — иначе она сбивает с толку: выглядит как обязательное
+// действие, хотя программа уже всё прописала сама.
+function syncEnvHint(){
+  const off = !$('setEnvVars').checked;
+  $('envHintBox').hidden = !off;
+}
+$('setEnvVars').addEventListener('change', syncEnvHint);
 
 async function refresh(){
   const st = await api('/api/status');
@@ -625,7 +894,7 @@ async function refresh(){
   // Пока пользователь правит форму, обновление с сервера её не трогает —
   // иначе набранный, но ещё не сохранённый адрес затирался бы.
   seenApps = (st.seenApps || []);
-  if(!formDirty) fillConfig(st.config); else renderChips();
+  if(!formDirty) fillConfig(st.config);
   $('envhint').textContent = (st.envHint || []).join('\n');
 }
 

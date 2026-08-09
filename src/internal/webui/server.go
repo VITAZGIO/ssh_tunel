@@ -21,6 +21,7 @@ import (
 	"embed"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -31,6 +32,8 @@ import (
 	"sshtunel/internal/app"
 	"sshtunel/internal/config"
 	"sshtunel/internal/events"
+	"sshtunel/internal/filedialog"
+	"sshtunel/internal/procinfo"
 	"sshtunel/internal/sysproxy"
 )
 
@@ -75,6 +78,8 @@ func (s *Server) Serve() error {
 	mux.HandleFunc("/api/config", s.guard(s.handleConfig))
 	mux.HandleFunc("/api/checkip", s.guard(s.handleCheckIP))
 	mux.HandleFunc("/api/speedtest", s.guard(s.handleSpeedTest))
+	mux.HandleFunc("/api/processes", s.guard(s.handleProcesses))
+	mux.HandleFunc("/api/pickfile", s.guard(s.handlePickFile))
 
 	srv := &http.Server{
 		Handler:           mux,
@@ -198,6 +203,27 @@ func (s *Server) handleSpeedTest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, res)
+}
+
+// handleProcesses отдаёт список запущенных программ — из него выбираются
+// приложения для фильтра, как в диспетчере задач.
+func (s *Server) handleProcesses(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, map[string]any{"processes": procinfo.List()})
+}
+
+// handlePickFile показывает системный диалог выбора программы. Отмена — не
+// ошибка, поэтому возвращается пустой путь без сообщения.
+func (s *Server) handlePickFile(w http.ResponseWriter, r *http.Request) {
+	path, err := filedialog.PickExecutable()
+	if errors.Is(err, filedialog.ErrCancelled) {
+		writeJSON(w, map[string]string{"path": ""})
+		return
+	}
+	if err != nil {
+		writeJSON(w, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, map[string]string{"path": path})
 }
 
 // handleEvents — поток событий в окно (Server-Sent Events). Проще вебсокетов
