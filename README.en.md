@@ -9,7 +9,7 @@ An educational project: it shows how a working local proxy is built out of a
 standard SSH mechanism.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-4c8dff)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-4c8dff)](https://github.com/VITAZGIO/ssh_tunel/releases)
+[![Version](https://img.shields.io/badge/version-1.0.1-4c8dff)](https://github.com/VITAZGIO/ssh_tunel/releases)
 [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
 [![Linux](https://img.shields.io/badge/Linux-amd64%20%7C%20arm64-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
 [![Go](https://img.shields.io/badge/Go-1.22+-2de2ff)](src)
@@ -23,7 +23,7 @@ standard SSH mechanism.
 | **Windows** | [**ssh_tunel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunel.exe) | window with a button, tray icon |
 | **Linux** | [**ssh_tunel-linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunel-linux) | console + web interface, systemd service |
 
-The console build for Windows, the ARM build and the checksums are on the
+The ARM build and the checksums are on the
 [release page](https://github.com/VITAZGIO/ssh_tunel/releases/latest).
 
 <img src="docs/screenshot.png" width="300" alt="main screen">
@@ -128,7 +128,8 @@ reach, and with your local law, is your responsibility.
 The close button hides the program in the tray, the tunnel keeps running. To
 quit for real: right-click the tray icon → «Exit».
 
-There is a console build as well — `ssh_tunel-cli.exe`, everything through flags.
+If you want a console build for Windows, it is in the sources and takes one
+command: `GOOS=windows go build -o ssh_tunel-cli.exe ./cmd/ssh_tunel-cli`.
 
 ---
 

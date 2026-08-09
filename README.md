@@ -9,7 +9,7 @@
 локальный прокси.
 
 [![Лицензия: MIT](https://img.shields.io/badge/лицензия-MIT-4c8dff)](LICENSE)
-[![Версия](https://img.shields.io/badge/версия-1.0.0-4c8dff)](https://github.com/VITAZGIO/ssh_tunel/releases)
+[![Версия](https://img.shields.io/badge/версия-1.0.1-4c8dff)](https://github.com/VITAZGIO/ssh_tunel/releases)
 [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
 [![Linux](https://img.shields.io/badge/Linux-amd64%20%7C%20arm64-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
 [![Go](https://img.shields.io/badge/Go-1.22+-2de2ff)](src)
@@ -23,8 +23,8 @@
 | **Windows** | [**ssh_tunel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunel.exe) | окно с кнопкой, значок у часов |
 | **Linux** | [**ssh_tunel-linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunel-linux) | консоль + веб-интерфейс, служба systemd |
 
-Консольная версия для Windows, сборка под ARM и контрольные суммы —
-на [странице релиза](https://github.com/VITAZGIO/ssh_tunel/releases/latest).
+Сборка под ARM и контрольные суммы — на
+[странице релиза](https://github.com/VITAZGIO/ssh_tunel/releases/latest).
 
 <img src="docs/screenshot.png" width="300" alt="главный экран">
 <img src="docs/screenshot-filter.png" width="300" alt="выбор программ">
@@ -124,7 +124,8 @@ HTTP CONNECT, каналы SSH и определение процесса по �
 Крестик прячет программу в трей, туннель продолжает работать. Выйти совсем —
 правый щелчок по значку у часов → «Выход».
 
-Есть и консольная версия — `ssh_tunel-cli.exe`, все настройки флагами.
+Нужна консольная версия для Windows — она есть в исходниках, собирается одной
+командой: `GOOS=windows go build -o ssh_tunel-cli.exe ./cmd/ssh_tunel-cli`.
 
 ---
 

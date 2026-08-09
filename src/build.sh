@@ -29,10 +29,10 @@ GOOS=windows GOARCH=amd64 go build \
   -ldflags="-s -w -H windowsgui" \
   -o "$OUT/windows/ssh_tunel.exe" ./cmd/ssh_tunel
 
-echo "Windows: консоль..."
-GOOS=windows GOARCH=amd64 go build \
-  -ldflags="-s -w" \
-  -o "$OUT/windows/ssh_tunel-cli.exe" ./cmd/ssh_tunel-cli
+# Консольная версия для Windows в релиз не идёт: окно умеет всё то же самое, а
+# лишний файл на странице скачивания только сбивает с толку. Кому нужна —
+# собирается одной командой:
+#   GOOS=windows go build -o ssh_tunel-cli.exe ./cmd/ssh_tunel-cli
 
 # Для Linux собираем две архитектуры: обычные серверы и ARM (Raspberry Pi,
 # облачные ARM-машины, домашние мини-серверы).
@@ -45,6 +45,10 @@ echo "Linux: arm64..."
 GOOS=linux GOARCH=arm64 go build \
   -ldflags="-s -w" \
   -o "$OUT/linux/ssh_tunel-linux-arm64" ./cmd/ssh_tunel-linux
+
+# Файл прошлой сборки мог остаться от предыдущих версий — иначе он попадёт в
+# контрольные суммы, а в релиз нет.
+rm -f "$OUT/windows/ssh_tunel-cli.exe"
 
 ( cd "$OUT" && sha256sum windows/* linux/* > SHA256SUMS.txt )
 
