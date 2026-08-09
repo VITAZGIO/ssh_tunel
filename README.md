@@ -8,6 +8,7 @@
 Провайдер видит только SSH-соединение с сервером за границей — не содержимое
 и не список сайтов.
 
+[![Версия](https://img.shields.io/badge/версия-1.0.0-4c8dff)](https://github.com/VITAZGIO/ssh_tunel/releases)
 [![Лицензия: MIT](https://img.shields.io/badge/лицензия-MIT-4c8dff)](LICENSE)
 [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-2de2ff)](releases/windows)
 [![Linux](https://img.shields.io/badge/Linux-amd64%20%7C%20arm64-2de2ff)](releases/linux)
@@ -19,7 +20,6 @@
 |---|---|---|
 | **Windows** | [**ssh_tunel.exe**](https://github.com/VITAZGIO/ssh_tunel/raw/main/releases/windows/ssh_tunel.exe) | окно с кнопкой, значок у часов |
 | **Linux** | [**ssh_tunel-linux**](https://github.com/VITAZGIO/ssh_tunel/raw/main/releases/linux/ssh_tunel-linux) | консоль + веб-интерфейс, служба systemd |
-| **Android** | [пока нет — почему](android/) | нужен отдельный подход, см. пояснение |
 
 <img src="docs/screenshot.png" width="300" alt="главный экран">
 <img src="docs/screenshot-filter.png" width="300" alt="выбор программ">
@@ -116,13 +116,6 @@ source ~/.config/ssh_tunel/proxy.env
 systemctl --user enable --now ssh_tunel
 ```
 
-## Android
-
-Приложения пока нет. Это **не пересборка того же кода**: в Android нет
-общесистемной настройки прокси, и увести туда трафик можно только через
-`VpnService` с разбором пакетов — то есть отдельная программа с другой
-архитектурой. Что именно нужно и что уже готово — в [android/](android/).
-
 ## Что нужно на сервере
 
 Любой VPS с доступом по SSH — большего не требуется, ничего ставить на него не
@@ -163,7 +156,6 @@ src/          исходный код (модуль Go)
 releases/     готовые файлы: windows/ и linux/
 packaging/    служба systemd и установщик для Linux
 docs/         архитектура, безопасность, диагностика
-android/      статус версии для телефона
 ```
 
 ## Чего туннель не покрывает
