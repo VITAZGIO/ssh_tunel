@@ -10,16 +10,19 @@
 
 [![Версия](https://img.shields.io/badge/версия-1.0.0-4c8dff)](https://github.com/VITAZGIO/ssh_tunel/releases)
 [![Лицензия: MIT](https://img.shields.io/badge/лицензия-MIT-4c8dff)](LICENSE)
-[![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-2de2ff)](releases/windows)
-[![Linux](https://img.shields.io/badge/Linux-amd64%20%7C%20arm64-2de2ff)](releases/linux)
+[![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
+[![Linux](https://img.shields.io/badge/Linux-amd64%20%7C%20arm64-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
 [![Go](https://img.shields.io/badge/Go-1.22+-2de2ff)](src)
 
 ### Скачать
 
 | Система | Файл | |
 |---|---|---|
-| **Windows** | [**ssh_tunel.exe**](https://github.com/VITAZGIO/ssh_tunel/raw/main/releases/windows/ssh_tunel.exe) | окно с кнопкой, значок у часов |
-| **Linux** | [**ssh_tunel-linux**](https://github.com/VITAZGIO/ssh_tunel/raw/main/releases/linux/ssh_tunel-linux) | консоль + веб-интерфейс, служба systemd |
+| **Windows** | [**ssh_tunel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunel.exe) | окно с кнопкой, значок у часов |
+| **Linux** | [**ssh_tunel-linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunel-linux) | консоль + веб-интерфейс, служба systemd |
+
+Консольная версия для Windows, сборка под ARM и контрольные суммы —
+на [странице релиза](https://github.com/VITAZGIO/ssh_tunel/releases/latest).
 
 <img src="docs/screenshot.png" width="300" alt="главный экран">
 <img src="docs/screenshot-filter.png" width="300" alt="выбор программ">
@@ -63,7 +66,7 @@ WireGuard и OpenVPN опознаются по первому же пакету 
 
 ## Windows
 
-1. Скачай [**ssh_tunel.exe**](https://github.com/VITAZGIO/ssh_tunel/raw/main/releases/windows/ssh_tunel.exe)
+1. Скачай [**ssh_tunel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunel.exe)
    и положи в постоянную папку.
 2. Запусти двойным щелчком. Windows предупредит о неизвестном издателе —
    «Подробнее» → «Выполнить в любом случае» (программа не подписана
@@ -84,7 +87,7 @@ WireGuard и OpenVPN опознаются по первому же пакету 
 
 ```bash
 # скачать и сделать исполняемым
-curl -LO https://github.com/VITAZGIO/ssh_tunel/raw/main/releases/linux/ssh_tunel-linux
+curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunel-linux
 chmod +x ssh_tunel-linux
 
 # задать сервер один раз
@@ -153,10 +156,14 @@ go test ./... -race     # проверить, что всё работает
 
 ```
 src/          исходный код (модуль Go)
-releases/     готовые файлы: windows/ и linux/
 packaging/    служба systemd и установщик для Linux
 docs/         архитектура, безопасность, диагностика
 ```
+
+Готовые файлы в репозитории не лежат — они публикуются в
+[релизах](https://github.com/VITAZGIO/ssh_tunel/releases), чтобы история не
+пухла от бинарников. Собрать свои: `cd src && ./build.sh`, результат появится
+в `releases/`.
 
 ## Чего туннель не покрывает
 

@@ -1,24 +1,39 @@
-# Готовые сборки
+# Сюда попадают собранные файлы
 
-## Windows
+Папка намеренно пустая: готовые сборки лежат не в репозитории, а на
+[странице релизов](https://github.com/VITAZGIO/ssh_tunel/releases) — иначе
+каждая пересборка добавляла бы к истории десятки мегабайт.
 
-| Файл | Что это |
+## Скачать готовое
+
+[Последний релиз](https://github.com/VITAZGIO/ssh_tunel/releases/latest):
+
+| Файл | Для чего |
 |---|---|
-| [`windows/ssh_tunel.exe`](windows/ssh_tunel.exe) | версия с окном, запускается двойным щелчком |
-| [`windows/ssh_tunel-cli.exe`](windows/ssh_tunel-cli.exe) | консольная версия, управляется флагами |
+| `ssh_tunel.exe` | Windows, версия с окном |
+| `ssh_tunel-cli.exe` | Windows, консольная версия |
+| `ssh_tunel-linux` | Linux amd64 — обычные серверы и компьютеры |
+| `ssh_tunel-linux-arm64` | Linux ARM — Raspberry Pi, ARM-облако |
+| `SHA256SUMS.txt` | контрольные суммы |
 
-## Linux
+Ссылки, которые всегда ведут на свежую версию:
 
-| Файл | Что это |
-|---|---|
-| [`linux/ssh_tunel-linux`](linux/ssh_tunel-linux) | обычные серверы и компьютеры (amd64) |
-| [`linux/ssh_tunel-linux-arm64`](linux/ssh_tunel-linux-arm64) | ARM: Raspberry Pi, ARM-облако, мини-серверы |
+```
+https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunel.exe
+https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunel-linux
+```
 
-Служба systemd и установщик — в [../packaging/linux](../packaging/linux).
+## Собрать самому
+
+```bash
+cd src
+./build.sh
+```
+
+Файлы появятся здесь, в `windows/` и `linux/`. В git они не попадут — так
+задано в `.gitignore`.
 
 ## Проверить целостность
-
-Контрольные суммы всех файлов лежат в `SHA256SUMS.txt`.
 
 Windows:
 
@@ -31,6 +46,3 @@ Linux:
 ```bash
 sha256sum -c SHA256SUMS.txt
 ```
-
-Всё собрано из `../src` командой `./build.sh`. Ни установки, ни дополнительных
-библиотек, ни прав администратора не требуется.
