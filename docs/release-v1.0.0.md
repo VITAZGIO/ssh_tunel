@@ -66,4 +66,4 @@ chmod +x ssh_tunel-linux
 
 Лежат в `SHA256SUMS.txt` рядом с файлами.
 
-Лицензия MIT. © 2026 Vitaliy (VITAZGIO)
+Лицензия MIT. © 2026 Vitaliy (VITAZGIO). Разработано в паре с Claude (Anthropic).
