@@ -2,11 +2,11 @@
 
 # ssh_tunel
 
-**Your own VPN on your own server — over plain SSH, which nobody blocks.**
+**Routes application traffic through your own Linux server over plain SSH.**
 
 A single file. No installer, no administrator rights.
-Your ISP sees one encrypted SSH connection to a server abroad — not the
-contents, not the list of sites.
+An educational project: it shows how a working local proxy is built out of a
+standard SSH mechanism.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-4c8dff)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.0.0-4c8dff)](https://github.com/VITAZGIO/ssh_tunel/releases)
@@ -35,17 +35,22 @@ The console build for Windows, the ARM build and the checksums are on the
 
 ## What this is
 
-WireGuard and OpenVPN are recognised by their very first packet and get blocked
-wholesale. SSH has no such signature: it is a working tool that administrators
-and developers all over the world use every single day, and switching it off
-entirely means breaking half of the working infrastructure.
+SSH has a standard feature — forwarding TCP connections (`direct-tcpip`, the
+same thing `ssh -D` does). `ssh_tunel` opens an SSH connection to **your** server
+and runs a local proxy on top of it: an application talks to a proxy on its own
+machine, and the connection to the destination is opened by the server.
 
-`ssh_tunel` opens an SSH connection to **your** VPS and runs a local proxy on
-top of it. Browsers and other applications then reach the internet through that
-server, while your ISP only sees an encrypted stream to a single address.
+Where that is useful: seeing how a service answers from your server's address,
+reaching an internal network you already work in over SSH, debugging how an
+application behaves through a proxy, giving a program a stable outgoing address.
 
-No third-party servers, no subscriptions, no accounts: all you need is a VPS you
-can log into over SSH.
+No third-party servers, no subscriptions, no accounts: all you need is a server
+you can log into over SSH.
+
+The project was written for educational purposes — to work out how SOCKS, HTTP
+CONNECT, SSH channels and socket-to-process lookup are put together. How you use
+it, and whether that agrees with the rules of your provider, of the services you
+reach, and with your local law, is your responsibility.
 
 ### Key features
 
@@ -79,14 +84,14 @@ can log into over SSH.
   application
       │  SOCKS4/4a/5 (1080)   HTTP CONNECT (1081)
       ▼
-  ssh_tunel  ──── encrypted SSH (22) ────►  your VPS  ──►  internet
+  ssh_tunel  ──── encrypted SSH (22) ────►  your server  ──►  network
 ```
 
 1. The application thinks it is talking to an ordinary proxy on its own machine.
 2. `ssh_tunel` parses the request, learns the destination and opens a
    `direct-tcpip` channel to it over SSH.
-3. Host names are resolved by the VPS, not by your computer — so the ISP does
-   not see your DNS lookups either.
+3. Host names are resolved by the server, not by your computer: the connection
+   leaves from the server's address in full, DNS lookup included.
 
 ---
 
@@ -97,9 +102,9 @@ can log into over SSH.
 - nothing else: the binary is self-contained, no runtime, no installer
 
 **Your server:**
-- any VPS you can reach over SSH — that is all. Nothing has to be installed on
-  it: the proxy runs on your machine, the server only passes connections
-  through.
+- any Linux server you can reach over SSH — your own box or a rented one, it
+  makes no difference. Nothing has to be installed on it: the proxy runs on
+  your machine, the server only passes connections through.
 
 ---
 
@@ -110,7 +115,7 @@ can log into over SSH.
 2. Run it. Windows will warn about an unknown publisher — «More info» → «Run
    anyway» (the binary is not signed with a certificate: that costs money and
    requires a legal entity).
-3. Open the settings (the gear), enter the VPS address and the user name.
+3. Open the settings (the gear), enter the server address and the user name.
    No key yet? Click the question mark next to «Private key» — there is a
    ready-made command that creates a key and uploads it to the server.
 4. Save, go back, press the round button.
@@ -132,7 +137,7 @@ curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tune
 chmod +x ssh_tunel-linux
 
 # set the server once
-./ssh_tunel-linux -host YOUR_VPS -user root -save
+./ssh_tunel-linux -host YOUR_SERVER -user root -save
 
 # run: tunnel only...
 ./ssh_tunel-linux
@@ -171,7 +176,7 @@ flags do.
 
 | Key | Meaning |
 |---|---|
-| `host` | Address of your VPS. |
+| `host` | Address of your server. |
 | `sshPort` | SSH port, `22` by default. |
 | `user` | User to log in as. |
 | `keyPath` | Private key. Detected automatically among `id_ed25519`, `id_ecdsa`, `id_rsa`. |
@@ -192,9 +197,10 @@ Linux flags: `-host`, `-sshport`, `-user`, `-key`, `-port`, `-httpport`,
 - **The server key is checked.** On the first connection its fingerprint is
   remembered (TOFU) in `known_hosts`; if it changes later, the program refuses
   to connect instead of quietly talking to whoever answered.
-- **Host names are resolved on the VPS**, so DNS queries do not leak to the ISP.
-  Connections that arrive already resolved (the application looked the name up
-  itself) are marked in the log.
+- **Host names are resolved on the server**, so the whole request goes through
+  the tunnel. Connections that arrive already resolved (the application looked
+  the name up itself) are marked in the log: those do not leave entirely via the
+  server.
 - **The system proxy is restored on every exit**, including a crash — there is a
   saved snapshot and a recovery pass at the next start. Losing the internet
   because a program died is not acceptable.
@@ -203,9 +209,10 @@ Linux flags: `-host`, `-sshport`, `-user`, `-key`, `-port`, `-httpport`,
   able to reach `127.0.0.1` and switch the tunnel off or read the settings.
 - **No administrator rights.** Everything is written under the current user.
 
-What the tunnel deliberately does not do: hide the *fact* that you use SSH. Your
-ISP sees an SSH connection to one address abroad — see
-[SECURITY.md](docs/SECURITY.md) (in Russian) for the full picture.
+What the program does not do: disguise itself. From the outside it is an
+ordinary SSH connection to your server, with exactly the properties an ordinary
+SSH connection has — no more, no less. The full picture is in
+[SECURITY.md](docs/SECURITY.md) (in Russian).
 
 ---
 
