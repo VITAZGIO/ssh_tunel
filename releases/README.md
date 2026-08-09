@@ -1,20 +1,36 @@
 # Готовые сборки
 
+## Windows
+
 | Файл | Что это |
 |---|---|
-| `ssh_tunel.exe` | Версия с окном. Запускается двойным щелчком, консоли нет. |
-| `ssh_tunel-cli.exe` | Консольная версия, управляется флагами. |
-| `SHA256SUMS.txt` | Контрольные суммы. |
+| [`windows/ssh_tunel.exe`](windows/ssh_tunel.exe) | версия с окном, запускается двойным щелчком |
+| [`windows/ssh_tunel-cli.exe`](windows/ssh_tunel-cli.exe) | консольная версия, управляется флагами |
 
-Обе собраны из `../src` командой `./build.sh` под `windows/amd64`.
+## Linux
 
-Проверить целостность в PowerShell:
+| Файл | Что это |
+|---|---|
+| [`linux/ssh_tunel-linux`](linux/ssh_tunel-linux) | обычные серверы и компьютеры (amd64) |
+| [`linux/ssh_tunel-linux-arm64`](linux/ssh_tunel-linux-arm64) | ARM: Raspberry Pi, ARM-облако, мини-серверы |
+
+Служба systemd и установщик — в [../packaging/linux](../packaging/linux).
+
+## Проверить целостность
+
+Контрольные суммы всех файлов лежат в `SHA256SUMS.txt`.
+
+Windows:
 
 ```powershell
 Get-FileHash .\ssh_tunel.exe -Algorithm SHA256
 ```
 
-и сравнить с `SHA256SUMS.txt`.
+Linux:
 
-Нужны только эти файлы — ни установки, ни дополнительных библиотек, ни прав
-администратора.
+```bash
+sha256sum -c SHA256SUMS.txt
+```
+
+Всё собрано из `../src` командой `./build.sh`. Ни установки, ни дополнительных
+библиотек, ни прав администратора не требуется.

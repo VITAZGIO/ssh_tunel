@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Собирает оба exe под Windows и кладёт их в ../releases вместе с контрольными
-# суммами. Запускать из папки src.
+# Собирает готовые файлы для всех поддерживаемых систем и раскладывает их по
+# ../releases. Запускать из папки src.
 set -euo pipefail
 
 cd "$(dirname "$0")"
 OUT="../releases"
-mkdir -p "$OUT"
+mkdir -p "$OUT/windows" "$OUT/linux"
 
 echo "Проверяю тесты..."
 go test ./... >/dev/null
 
-echo "Собираю иконку из логотипа..."
+echo "Собираю иконку..."
 go run tools/mkicon/main.go internal/nativeui/icon-source.png internal/nativeui/icon.ico
 
 # Иконка и манифест попадают в exe отдельной секцией ресурсов. Файл .syso
@@ -24,18 +24,30 @@ go run github.com/akavel/rsrc@v0.10.2 \
   -arch amd64 \
   -o cmd/ssh_tunel/rsrc_windows_amd64.syso
 
-echo "Собираю ssh_tunel.exe (окно)..."
+echo "Windows: окно..."
 GOOS=windows GOARCH=amd64 go build \
   -ldflags="-s -w -H windowsgui" \
-  -o "$OUT/ssh_tunel.exe" ./cmd/ssh_tunel
+  -o "$OUT/windows/ssh_tunel.exe" ./cmd/ssh_tunel
 
-echo "Собираю ssh_tunel-cli.exe (консоль)..."
+echo "Windows: консоль..."
 GOOS=windows GOARCH=amd64 go build \
   -ldflags="-s -w" \
-  -o "$OUT/ssh_tunel-cli.exe" ./cmd/ssh_tunel-cli
+  -o "$OUT/windows/ssh_tunel-cli.exe" ./cmd/ssh_tunel-cli
 
-( cd "$OUT" && sha256sum ssh_tunel.exe ssh_tunel-cli.exe > SHA256SUMS.txt )
+# Для Linux собираем две архитектуры: обычные серверы и ARM (Raspberry Pi,
+# облачные ARM-машины, домашние мини-серверы).
+echo "Linux: amd64..."
+GOOS=linux GOARCH=amd64 go build \
+  -ldflags="-s -w" \
+  -o "$OUT/linux/ssh_tunel-linux" ./cmd/ssh_tunel-linux
+
+echo "Linux: arm64..."
+GOOS=linux GOARCH=arm64 go build \
+  -ldflags="-s -w" \
+  -o "$OUT/linux/ssh_tunel-linux-arm64" ./cmd/ssh_tunel-linux
+
+( cd "$OUT" && sha256sum windows/* linux/* > SHA256SUMS.txt )
 
 echo
-ls -lh "$OUT"/*.exe
+ls -lh "$OUT"/windows/* "$OUT"/linux/*
 echo "Готово."

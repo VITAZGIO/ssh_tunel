@@ -51,16 +51,22 @@ type Server struct {
 // App — то, что интерфейс умеет делать с программой.
 type App = app.App
 
+// New поднимает интерфейс на случайном свободном порту петлевого адреса —
+// так окно не конфликтует ни с другими программами, ни со вторым запуском.
 func New(a *App) (*Server, error) {
+	return NewOn(a, "127.0.0.1:0")
+}
+
+// NewOn поднимает интерфейс на заданном адресе. Нужен серверной версии, где
+// адрес должен быть постоянным, иначе его не открыть в браузере.
+func NewOn(a *App, addr string) (*Server, error) {
 	tok := make([]byte, 16)
 	if _, err := rand.Read(tok); err != nil {
 		return nil, err
 	}
-	// Порт 0 — система сама выдаст свободный, чтобы окно не конфликтовало
-	// с другими программами и со вторым запуском.
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	ln, err := net.Listen("tcp", addr)
 	if err != nil {
-		return nil, fmt.Errorf("не могу открыть окно программы: %w", err)
+		return nil, fmt.Errorf("не могу занять адрес %s: %w", addr, err)
 	}
 	return &Server{app: a, token: hex.EncodeToString(tok), ln: ln}, nil
 }

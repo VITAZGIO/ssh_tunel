@@ -195,7 +195,7 @@ func usage() {
   -v          подробный лог
 
 Пример первого запуска:
-  vpstunnel-cli -host 87.58.210.143 -user root -key C:\Users\vitaz\.ssh\id_ed25519 -save
+  ssh_tunel-cli -host ТВОЙ_VPS -user root -save
 
 Дальше достаточно просто:
   vpstunnel-cli

@@ -172,8 +172,9 @@ func (c *Config) normalize() {
 	default:
 		c.FilterMode = "all"
 	}
-	if runtime.GOOS != "windows" {
-		// На не-Windows системный прокси и переменные среды мы не трогаем.
+	// На системах, где трогать общесистемные настройки нечем (macOS и прочее),
+	// оставлять эти галочки включёнными бессмысленно.
+	if runtime.GOOS != "windows" && runtime.GOOS != "linux" {
 		c.SysProxy = false
 		c.SetEnvVars = false
 	}
