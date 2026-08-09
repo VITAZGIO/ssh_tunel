@@ -12,6 +12,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 	"time"
 
 	"sshtunel/internal/app"
@@ -37,6 +38,13 @@ func main() {
 	}
 
 	cfg := config.Load()
+	// В окне этих переключателей нет: без них туннелем никто не пользуется сам
+	// собой, и человек видел бы «подключено» при неработающем интернете.
+	// Управлять ими можно только в консольной версии флагами.
+	if runtime.GOOS == "windows" {
+		cfg.SysProxy = true
+		cfg.SetEnvVars = true
+	}
 	a := app.New(cfg)
 	a.RecoverStaleProxy()
 

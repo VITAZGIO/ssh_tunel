@@ -43,18 +43,11 @@ type Config struct {
 	AutoStart bool `json:"autoStart"`
 }
 
-// DefaultHost — сервер, который подставляется в пустую форму, чтобы не
-// вводить адрес вручную при каждом чистом запуске. Меняется здесь либо прямо
-// в окне настроек (сохранённое значение имеет приоритет).
-const DefaultHost = "87.58.210.143"
-
 func Default() Config {
-	home, _ := os.UserHomeDir()
 	return Config{
-		Host:       DefaultHost,
 		SSHPort:    22,
 		User:       "root",
-		KeyPath:    filepath.Join(home, ".ssh", "id_ed25519"),
+		KeyPath:    DetectKeyPath(),
 		SocksPort:  1080,
 		HTTPPort:   1081,
 		PoolSize:   4,
@@ -96,6 +89,29 @@ func migrateOldDir() {
 
 func Path() string { return filepath.Join(Dir(), "config.json") }
 
+// DetectKeyPath ищет ключ SSH в домашней папке ТЕКУЩЕГО пользователя.
+//
+// Путь не зашит и не угадывается по имени: домашняя папка берётся у системы,
+// поэтому на любом компьютере и под любым пользователем он свой. Из
+// стандартных имён берётся первое существующее — у людей встречаются и
+// ed25519, и ecdsa, и старый rsa.
+func DetectKeyPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	dir := filepath.Join(home, ".ssh")
+	names := []string{"id_ed25519", "id_ecdsa", "id_rsa"}
+	for _, n := range names {
+		p := filepath.Join(dir, n)
+		if st, err := os.Stat(p); err == nil && !st.IsDir() {
+			return p
+		}
+	}
+	// Ничего нет — показываем путь, по которому ключ появится после создания.
+	return filepath.Join(dir, "id_ed25519")
+}
+
 func KnownHostsPath() string { return filepath.Join(Dir(), "known_hosts") }
 
 // Load читает конфиг с диска. Отсутствие файла — не ошибка: возвращаются
@@ -127,11 +143,6 @@ func (c *Config) Save() error {
 // normalize чинит заведомо нерабочие значения, которые могли прийти из
 // руками правленного JSON или из формы настроек.
 func (c *Config) normalize() {
-	// Пустой адрес мог остаться в сохранённом конфиге от прежних запусков —
-	// подставляем значение по умолчанию, чтобы форма не была пустой.
-	if c.Host == "" {
-		c.Host = DefaultHost
-	}
 	if c.SSHPort <= 0 || c.SSHPort > 65535 {
 		c.SSHPort = 22
 	}
@@ -154,8 +165,7 @@ func (c *Config) normalize() {
 		c.User = "root"
 	}
 	if c.KeyPath == "" {
-		home, _ := os.UserHomeDir()
-		c.KeyPath = filepath.Join(home, ".ssh", "id_ed25519")
+		c.KeyPath = DetectKeyPath()
 	}
 	switch c.FilterMode {
 	case "only", "except":

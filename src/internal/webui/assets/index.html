@@ -140,6 +140,28 @@
   .appitem .del:hover{color:var(--err)}
   .empty{color:var(--dim);font-size:12.5px;padding:10px 2px}
 
+  /* Подсказка «как получить ключ». */
+  .lbl-row{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+  .lbl-row label{margin:0}
+  .qmark{width:18px;height:18px;border-radius:50%;border:1px solid var(--line);
+         background:var(--card2);color:var(--dim);font-size:11px;line-height:1;
+         cursor:pointer;display:grid;place-items:center;padding:0;flex:none}
+  .qmark:hover,.qmark.on{border-color:var(--accent);color:var(--accent)}
+  .help{background:var(--card);border:1px solid var(--line);border-radius:10px;
+        padding:11px 12px;margin:6px 0 12px}
+  .help p{margin:0 0 8px;font-size:12px;color:var(--dim);line-height:1.45}
+  .help ol{margin:0 0 8px;padding-left:18px;font-size:12px;color:var(--dim);
+           line-height:1.5}
+  .cmdbox{position:relative;background:var(--card2);border:1px solid var(--line);
+          border-radius:8px;padding:9px 34px 9px 10px;font-family:var(--mono);
+          font-size:11px;line-height:1.45;word-break:break-all;
+          -webkit-user-select:text;user-select:text;color:var(--text)}
+  .cmdbox .cp{position:absolute;top:6px;right:6px;width:22px;height:22px;
+              border-radius:6px;border:1px solid var(--line);background:var(--card);
+              color:var(--dim);cursor:pointer;display:grid;place-items:center;padding:0}
+  .cmdbox .cp:hover{border-color:var(--accent);color:var(--accent)}
+  .cmdbox .cp svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2}
+
   /* Всплывающее меню у кнопки «плюс». */
   .menu{position:absolute;z-index:20;background:var(--card);
         border:1px solid var(--line);border-radius:9px;padding:4px;
@@ -281,8 +303,35 @@
       <input type="text" id="host" placeholder="87.58.210.143" spellcheck="false"></div>
     <div class="field"><label for="user">Пользователь SSH</label>
       <input type="text" id="user" spellcheck="false"></div>
-    <div class="field"><label for="keyPath">Приватный ключ</label>
-      <input type="text" id="keyPath" spellcheck="false"></div>
+    <div class="field">
+      <div class="lbl-row">
+        <label for="keyPath">Приватный ключ</label>
+        <button class="qmark" id="keyHelpBtn" title="Как получить ключ">?</button>
+      </div>
+      <input type="text" id="keyPath" spellcheck="false">
+    </div>
+
+    <div class="help" id="keyHelp" hidden>
+      <p>Быстрая настройка на новом компьютере. Команда создаёт ключ (если его
+        ещё нет) и сразу кладёт его на сервер — пароль от VPS спросят один раз,
+        больше он не понадобится.</p>
+      <ol>
+        <li>Нажми «Открыть PowerShell» — команда уже будет в буфере обмена.</li>
+        <li>Вставь её (Ctrl+V) и нажми Enter.</li>
+        <li>Введи пароль от VPS.</li>
+      </ol>
+      <div class="cmdbox" id="setupCmd">
+        <button class="cp" id="copyCmd" title="Скопировать">
+          <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/>
+            <path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+        </button>
+        <span id="setupCmdText"></span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:9px">
+        <button class="btn" id="openPs" style="font-size:12.5px;padding:6px 12px">Открыть PowerShell</button>
+        <span class="hint" id="keyHelpNote" style="margin:0"></span>
+      </div>
+    </div>
 
     <div class="two">
       <div class="field"><label for="sshPort">SSH-порт</label>
@@ -299,23 +348,6 @@
       <div class="field"><label for="httpPort">Порт HTTP</label>
         <input type="number" id="httpPort" min="1" max="65535"></div>
     </div>
-
-    <label class="chk"><input type="checkbox" id="sysProxy">
-      <span class="lbl">Системный прокси Windows
-        <div class="hint">Через туннель пойдут браузеры и приложения на
-          системном сетевом стеке. Если выключить — туннель работает, но сам
-          собой им никто не пользуется: прокси придётся прописывать в каждой
-          программе вручную (127.0.0.1 порт HTTP или SOCKS). Выключают обычно
-          те, у кого уже настроен свой прокси и его нельзя трогать.</div>
-      </span></label>
-
-    <label class="chk"><input type="checkbox" id="setEnvVars">
-      <span class="lbl">Переменные среды HTTPS_PROXY
-        <div class="hint">Нужно для Claude Code, npm, pip, curl и всего на
-          Node.js, Python и Go — системный прокси они не читают вовсе. Если
-          выключить, они снова пойдут напрямую и получат отказ по географии.
-          Подхватывается терминалами, открытыми после включения.</div>
-      </span></label>
 
     <button class="row-link" id="toFilter" style="margin-top:14px">
       <span class="t">Какие программы вести через туннель
@@ -335,13 +367,7 @@
       <span class="hint" id="savedNote"></span>
     </div>
 
-    <div id="envHintBox" hidden>
-      <div class="hint" style="margin-top:16px">Автоматическая установка
-        выключена, поэтому программы вроде Claude Code, npm и pip туннель не
-        увидят. Чтобы пустить через него отдельный терминал, вставь туда это
-        перед запуском:</div>
-      <pre id="envhint"></pre>
-    </div>
+
   </div>
 
   <!-- КАКИЕ ПРОГРАММЫ ВЕСТИ ЧЕРЕЗ ТУННЕЛЬ -->
@@ -435,7 +461,7 @@ const api = (path, body) => fetch(path, {
 }).then(r => r.json());
 
 const FIELDS = ['host','user','keyPath','sshPort','socksPort','httpPort','poolSize'];
-const CHECKS = ['sysProxy','setEnvVars','verbose','autoStart'];
+const CHECKS = ['verbose','autoStart'];
 
 /* Правила фильтра живут отдельно от полей формы: они правятся на своём
    экране и сохраняются своей кнопкой. */
@@ -513,6 +539,15 @@ function addApp(name, path){
   renderApps(); renderModes();
 }
 
+function toggleApp(name, path){
+  const n = normApp(name);
+  if(!n) return;
+  if(filterApps.includes(n)) filterApps = filterApps.filter(a => a !== n);
+  else { if(path) appPaths[n] = path; filterApps = filterApps.concat(n); }
+  filterDirty = true;
+  renderApps(); renderModes();
+}
+
 /* ---------- меню кнопки «Добавить программу» ---------- */
 let menuEl = null;
 function closeMenu(){ if(menuEl){ menuEl.remove(); menuEl = null; } }
@@ -585,7 +620,9 @@ function renderProcs(){
       const pa = document.createElement('div'); pa.className = 'p'; pa.textContent = p.path;
       b.appendChild(pa);
     }
-    b.onclick = () => { addApp(p.name, p.path); renderProcs(); };
+    // Повторный щелчок снимает выбор — иначе лишнюю программу пришлось бы
+    // убирать, закрыв окно, а это неочевидно.
+    b.onclick = () => { toggleApp(p.name, p.path); renderProcs(); };
     box.appendChild(b);
   });
 }
@@ -614,6 +651,7 @@ const VIEWS = ['viewMain','viewSettings','viewFilter','viewLog'];
 let current = 'viewMain';
 
 function show(name){
+  if(name !== 'viewSettings') hideKeyHelp();
   current = name;
   VIEWS.forEach(v => $(v).classList.toggle('on', v === name));
   closeMenu();
@@ -842,6 +880,70 @@ function showSpeed(v){
   $('up').textContent = v.up > 0 ? fmtMbps(v.up) : '—';
 }
 
+/* ---------- подсказка «как получить ключ» ---------- */
+/* Команда собирается из полей формы: адрес сервера и пользователь берутся
+   оттуда, чтобы не подставлять их руками. Пока адрес не введён — на его месте
+   заметная заглушка, а не пустое место. */
+function setupCommand(){
+  const host = ($('host').value || '').trim() || 'IP_ТВОЕГО_VPS';
+  const user = ($('user').value || '').trim() || 'root';
+  const key = '$env:USERPROFILE\\.ssh\\id_ed25519';
+  return 'if (!(Test-Path "' + key + '")) { ssh-keygen -t ed25519 -f "' + key +
+    '" -N \'""\' }; type "' + key + '.pub" | ssh ' + user + '@' + host +
+    ' "mkdir -p ~/.ssh; chmod 700 ~/.ssh; cat >> ~/.ssh/authorized_keys; chmod 600 ~/.ssh/authorized_keys"';
+}
+
+function renderSetupCmd(){ $('setupCmdText').textContent = setupCommand(); }
+
+// Подсказка закрывается тем же вопросительным знаком и не переживает уход с
+// экрана: вернувшись в настройки, человек видит их в обычном виде.
+$('keyHelpBtn').onclick = () => {
+  const show = $('keyHelp').hidden;
+  $('keyHelp').hidden = !show;
+  $('keyHelpBtn').classList.toggle('on', show);
+  if(show) renderSetupCmd();
+};
+function hideKeyHelp(){
+  $('keyHelp').hidden = true;
+  $('keyHelpBtn').classList.remove('on');
+  $('keyHelpNote').textContent = '';
+}
+
+['host','user'].forEach(f => $(f).addEventListener('input', () => {
+  if(!$('keyHelp').hidden) renderSetupCmd();
+}));
+
+async function copyToClipboard(text){
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch(e) {
+    // Запасной путь на случай, если доступ к буферу закрыт.
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch(e2) {}
+    ta.remove();
+    return ok;
+  }
+}
+
+$('copyCmd').onclick = async () => {
+  const ok = await copyToClipboard(setupCommand());
+  $('keyHelpNote').textContent = ok ? 'команда скопирована' : 'скопируй вручную';
+  setTimeout(() => $('keyHelpNote').textContent = '', 2500);
+};
+
+$('openPs').onclick = async () => {
+  const ok = await copyToClipboard(setupCommand());
+  const r = await api('/api/openterminal', {});
+  if(r.error){ $('keyHelpNote').textContent = r.error; return; }
+  $('keyHelpNote').textContent = ok ? 'вставь Ctrl+V и нажми Enter'
+                                    : 'скопируй команду вручную';
+};
+
 /* ---------- настройки ---------- */
 [...FIELDS, ...CHECKS].forEach(f => {
   const el = $(f);
@@ -875,18 +977,9 @@ function fillConfig(cfg){
   }
   renderModes();
   renderApps();
-  syncEnvHint();
   formDirty = false;
 }
 
-// Подсказку с переменными среды показываем только когда автоматическая
-// установка выключена — иначе она сбивает с толку: выглядит как обязательное
-// действие, хотя программа уже всё прописала сама.
-function syncEnvHint(){
-  const off = !$('setEnvVars').checked;
-  $('envHintBox').hidden = !off;
-}
-$('setEnvVars').addEventListener('change', syncEnvHint);
 
 async function refresh(){
   const st = await api('/api/status');
@@ -895,7 +988,6 @@ async function refresh(){
   // иначе набранный, но ещё не сохранённый адрес затирался бы.
   seenApps = (st.seenApps || []);
   if(!formDirty) fillConfig(st.config);
-  $('envhint').textContent = (st.envHint || []).join('\n');
 }
 
 connectEvents();

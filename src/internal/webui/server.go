@@ -25,6 +25,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os/exec"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -80,6 +82,7 @@ func (s *Server) Serve() error {
 	mux.HandleFunc("/api/speedtest", s.guard(s.handleSpeedTest))
 	mux.HandleFunc("/api/processes", s.guard(s.handleProcesses))
 	mux.HandleFunc("/api/pickfile", s.guard(s.handlePickFile))
+	mux.HandleFunc("/api/openterminal", s.guard(s.handleOpenTerminal))
 
 	srv := &http.Server{
 		Handler:           mux,
@@ -224,6 +227,25 @@ func (s *Server) handlePickFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]string{"path": path})
+}
+
+// handleOpenTerminal открывает PowerShell рядом с окном. Саму команду туда
+// подставить нельзя: любой способ «напечатать за пользователя» либо выполняет
+// её сразу, либо ломается от раскладки и задержек. Поэтому команда кладётся в
+// буфер обмена, а человеку остаётся вставить её и нажать Enter — так он ещё и
+// видит, что именно выполняет.
+func (s *Server) handleOpenTerminal(w http.ResponseWriter, r *http.Request) {
+	if runtime.GOOS != "windows" {
+		writeJSON(w, map[string]string{"error": "поддерживается только на Windows"})
+		return
+	}
+	cmd := exec.Command("cmd", "/c", "start", "", "powershell", "-NoExit",
+		"-Command", "Write-Host 'Вставь команду (Ctrl+V) и нажми Enter' -ForegroundColor Cyan")
+	if err := cmd.Start(); err != nil {
+		writeJSON(w, map[string]string{"error": "не удалось открыть PowerShell: " + err.Error()})
+		return
+	}
+	writeJSON(w, map[string]bool{"ok": true})
 }
 
 // handleEvents — поток событий в окно (Server-Sent Events). Проще вебсокетов
