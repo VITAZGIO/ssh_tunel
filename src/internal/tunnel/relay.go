@@ -156,7 +156,7 @@ func (t *Tunnel) dialFor(process, target string) (net.Conn, bool, error) {
 		c, err := t.Dial("tcp", target)
 		return c, false, err
 	}
-	d := net.Dialer{Timeout: 15 * time.Second}
+	d := t.directDialer(15 * time.Second)
 	c, err := d.Dial("tcp", target)
 	return c, true, err
 }

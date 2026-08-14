@@ -1,0 +1,317 @@
+package io.github.vitazgio.sshtunnel
+
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Intent
+import android.net.VpnService
+import android.os.Build
+import android.os.ParcelFileDescriptor
+import android.util.Log
+import mobile.Callbacks
+import mobile.Mobile
+import java.net.InetAddress
+
+/**
+ * Служба туннеля.
+ *
+ * Здесь происходит то, чего нет и не может быть на компьютере: система отдаёт
+ * виртуальный сетевой интерфейс, в который сыплются сырые IP-пакеты, а разбирать
+ * их и превращать обратно в соединения — забота ядра на Go.
+ */
+class TunnelService : VpnService(), Callbacks {
+
+    companion object {
+        const val ACTION_START = "io.github.vitazgio.sshtunnel.START"
+        const val ACTION_STOP = "io.github.vitazgio.sshtunnel.STOP"
+
+        /** Состояние и журнал для экрана: служба живёт отдельно от него. */
+        @Volatile var state: String = "stopped"
+        @Volatile var detail: String = ""
+        val log = ArrayDeque<String>()
+
+        var onUpdate: (() -> Unit)? = null
+
+        private const val TAG = "ssh_tunnel"
+        private const val CHANNEL = "tunnel"
+        private const val NOTIFICATION_ID = 1
+        private const val MTU = 1500
+    }
+
+    private var fd: ParcelFileDescriptor? = null
+    private val tunnel = Mobile.newTunnel()
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_STOP) {
+            stopTunnel()
+            return START_NOT_STICKY
+        }
+        startTunnel()
+        return START_STICKY
+    }
+
+    private fun startTunnel() {
+        val settings = Settings(this)
+        if (!settings.ready()) {
+            report("error", "не заполнены настройки")
+            stopSelf()
+            return
+        }
+
+        startForeground(NOTIFICATION_ID, notification("подключение…"))
+
+        val iface = try {
+            buildInterface(settings)
+        } catch (e: Exception) {
+            report("error", "не удалось создать интерфейс: ${e.message}")
+            stopSelf()
+            return
+        }
+        fd = iface
+
+        try {
+            tunnel.setCallbacks(this)
+            tunnel.configure(
+                settings.host,
+                settings.sshPort.toLong(),
+                settings.user,
+                settings.keyFile.absolutePath,
+                settings.knownHostsFile.absolutePath,
+                settings.poolSize.toLong(),
+                settings.directHosts,
+                settings.localViaTunnel,
+            )
+            // detachFd, а не getFd: дальше дескриптором распоряжается Go и
+            // закрывает его сам. Иначе его закрыли бы дважды.
+            tunnel.start(iface.detachFd().toLong(), MTU.toLong())
+        } catch (e: Exception) {
+            report("error", e.message ?: "не удалось запустить туннель")
+            stopTunnel()
+            return
+        }
+        report("connecting", "")
+    }
+
+    /**
+     * Собирает виртуальный интерфейс.
+     *
+     * Ключевых мест два. Первое — маршруты: локальные сети в туннель не
+     * заводятся вовсе, поэтому домашние сервисы остаются доступными без единой
+     * проверки в коде. Второе — отбор приложений: за него отвечает сама
+     * система, и это надёжнее любых наших правил.
+     */
+    private fun buildInterface(settings: Settings): ParcelFileDescriptor {
+        val builder = Builder()
+            .setSession(getString(R.string.app_name))
+            .setMtu(MTU)
+            // Адрес самого интерфейса. Из того же диапазона, что и подставные
+            // адреса, — настоящих сайтов там нет.
+            .addAddress("198.18.0.1", 15)
+            .addDnsServer("198.18.0.1")
+            .allowFamily(android.system.OsConstants.AF_INET)
+
+        // Весь трафик IPv4 — в туннель. Дальше из него вычитается локальная сеть.
+        builder.addRoute("0.0.0.0", 0)
+
+        if (!settings.localViaTunnel) {
+            excludeLocalNetworks(builder)
+        }
+
+        applyAppFilter(builder, settings)
+
+        builder.setConfigureIntent(
+            PendingIntent.getActivity(
+                this, 0, Intent(this, MainActivity::class.java),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        )
+
+        return builder.establish()
+            ?: throw IllegalStateException("система не выдала интерфейс")
+    }
+
+    /**
+     * Убирает локальные сети из туннеля.
+     *
+     * Начиная с Android 13 для этого есть готовый способ. На более старых
+     * версиях приходится перечислять маршруты вручную, поэтому там локальная
+     * сеть остаётся в туннеле — иначе список маршрутов пришлось бы считать как
+     * дополнение диапазонов, и одна ошибка в нём отрезала бы связь целиком.
+     */
+    private fun excludeLocalNetworks(builder: Builder) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            Log.i(TAG, "Android старее 13: локальная сеть останется в туннеле")
+            return
+        }
+        val local = listOf(
+            "10.0.0.0" to 8,
+            "172.16.0.0" to 12,
+            "192.168.0.0" to 16,
+            "169.254.0.0" to 16, // адреса без DHCP
+            "100.64.0.0" to 10,  // сети mesh-VPN
+        )
+        for ((addr, prefix) in local) {
+            try {
+                builder.excludeRoute(android.net.IpPrefix(InetAddress.getByName(addr), prefix))
+            } catch (e: Exception) {
+                Log.w(TAG, "не удалось исключить $addr/$prefix: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Отбор приложений средствами системы.
+     *
+     * Смешивать разрешённые и запрещённые в одном подключении нельзя, поэтому
+     * режимы взаимно исключающие — те же три, что и в настройках на компьютере.
+     * Себя в туннель не заводим никогда: соединение с сервером должно идти мимо.
+     */
+    private fun applyAppFilter(builder: Builder, settings: Settings) {
+        val apps = settings.filterApps
+        when (settings.filterMode) {
+            "only" -> {
+                if (apps.isEmpty()) return
+                for (pkg in apps) {
+                    try {
+                        builder.addAllowedApplication(pkg)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "приложение $pkg не найдено")
+                    }
+                }
+            }
+            "except" -> {
+                for (pkg in apps) {
+                    try {
+                        builder.addDisallowedApplication(pkg)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "приложение $pkg не найдено")
+                    }
+                }
+                excludeSelf(builder)
+            }
+            else -> excludeSelf(builder)
+        }
+    }
+
+    private fun excludeSelf(builder: Builder) {
+        try {
+            builder.addDisallowedApplication(packageName)
+        } catch (e: Exception) {
+            Log.w(TAG, "не удалось исключить себя: ${e.message}")
+        }
+    }
+
+    private fun stopTunnel() {
+        try {
+            tunnel.stop()
+        } catch (e: Exception) {
+            Log.w(TAG, "остановка: ${e.message}")
+        }
+        try {
+            fd?.close()
+        } catch (e: Exception) {
+            // Дескриптор уже отдан в Go и закрыт там — это нормально.
+        }
+        fd = null
+        report("stopped", "")
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
+    override fun onDestroy() {
+        stopTunnel()
+        super.onDestroy()
+    }
+
+    override fun onRevoke() {
+        // Систему попросили отдать VPN другому приложению.
+        stopTunnel()
+        super.onRevoke()
+    }
+
+    // ---------- то, что ядро просит сделать у приложения ----------
+
+    /**
+     * Помечает сокет как идущий мимо туннеля.
+     *
+     * Без этого соединение с сервером ушло бы в собственный туннель и
+     * зациклилось: система заворачивает внутрь весь трафик, включая наш.
+     */
+    override fun protect(fd: Long): Boolean = protect(fd.toInt())
+
+    override fun onState(state: String, detail: String) = report(state, detail)
+
+    override fun onLog(line: String) {
+        synchronized(log) {
+            log.addLast(line)
+            while (log.size > 200) log.removeFirst()
+        }
+        onUpdate?.invoke()
+    }
+
+    /**
+     * Разрешает имя средствами системы, минуя туннель.
+     *
+     * Своими силами ядро этого на телефоне не может: файла с настройками DNS,
+     * который читают обычные программы, в Android нет.
+     */
+    override fun resolveLocal(name: String): String = try {
+        InetAddress.getAllByName(name).joinToString(",") { it.hostAddress ?: "" }
+    } catch (e: Exception) {
+        ""
+    }
+
+    private fun report(newState: String, newDetail: String) {
+        state = newState
+        detail = newDetail
+        onUpdate?.invoke()
+        if (newState != "stopped") {
+            notificationManager().notify(NOTIFICATION_ID, notification(describe(newState, newDetail)))
+        }
+    }
+
+    private fun describe(state: String, detail: String): String {
+        val text = when (state) {
+            "connected" -> "подключено"
+            "connecting" -> "подключение…"
+            "error" -> "ошибка"
+            else -> state
+        }
+        return if (detail.isBlank()) text else "$text: $detail"
+    }
+
+    private fun notificationManager(): NotificationManager =
+        getSystemService(NotificationManager::class.java)
+
+    private fun notification(text: String): Notification {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL, getString(R.string.app_name), NotificationManager.IMPORTANCE_LOW
+            )
+            notificationManager().createNotificationChannel(channel)
+        }
+        val open = PendingIntent.getActivity(
+            this, 0, Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val stop = PendingIntent.getService(
+            this, 1, Intent(this, TunnelService::class.java).setAction(ACTION_STOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        return Notification.Builder(this, CHANNEL)
+            .setContentTitle(getString(R.string.app_name))
+            .setContentText(text)
+            .setSmallIcon(android.R.drawable.stat_sys_vpn_ic)
+            .setContentIntent(open)
+            .setOngoing(true)
+            .addAction(
+                Notification.Action.Builder(
+                    null as android.graphics.drawable.Icon?,
+                    getString(R.string.stop),
+                    stop,
+                ).build()
+            )
+            .build()
+    }
+}

@@ -21,6 +21,7 @@ import (
 	"os"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -50,6 +51,17 @@ type Config struct {
 	// Direct — собственный список адресов и сетей, которые всегда идут
 	// напрямую. nil означает «список пуст».
 	Direct *routing.DirectList
+
+	// ProtectSocket вызывается для каждого сокета, который открывает сама
+	// программа: соединения с сервером и прямых соединений мимо туннеля.
+	//
+	// Нужно это только на Android и там обязательно. Система заворачивает в
+	// туннель весь трафик, включая наш собственный, — соединение с сервером
+	// пошло бы внутрь самого себя и зациклилось. VpnService.protect() помечает
+	// сокет как «этот мимо», и обращение к нему разрывает петлю.
+	//
+	// nil означает «ничего помечать не надо» — так на Windows и Linux.
+	ProtectSocket func(network, address string, c syscall.RawConn) error
 
 	// LocalViaTunnel — вести ли в туннель и адреса локальной сети.
 	//
@@ -284,7 +296,7 @@ func (t *Tunnel) clientConfig() *ssh.ClientConfig {
 
 func (t *Tunnel) dial() (*ssh.Client, error) {
 	addr := net.JoinHostPort(t.cfg.Host, fmt.Sprint(t.cfg.SSHPort))
-	client, err := ssh.Dial("tcp", addr, t.clientConfig())
+	client, err := t.dialSSH(addr)
 	if err != nil {
 		var changed *hostkey.ErrChanged
 		if errors.As(err, &changed) {
@@ -293,6 +305,30 @@ func (t *Tunnel) dial() (*ssh.Client, error) {
 		return nil, fmt.Errorf("не удалось подключиться к %s: %w", addr, err)
 	}
 	return client, nil
+}
+
+// dialSSH — то же, что ssh.Dial, но соединение открывается своим диалером.
+// Иначе некуда вставить пометку сокета, без которой на Android соединение с
+// сервером ушло бы в собственный туннель.
+func (t *Tunnel) dialSSH(addr string) (*ssh.Client, error) {
+	cfg := t.clientConfig()
+	conn, err := t.directDialer(cfg.Timeout).Dial("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	c, chans, reqs, err := ssh.NewClientConn(conn, addr, cfg)
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+	return ssh.NewClient(c, chans, reqs), nil
+}
+
+// directDialer — диалер для соединений, которые программа открывает сама.
+// На Android каждое такое соединение должно быть помечено как идущее мимо
+// туннеля, иначе оно вернётся в него же.
+func (t *Tunnel) directDialer(timeout time.Duration) *net.Dialer {
+	return &net.Dialer{Timeout: timeout, Control: t.cfg.ProtectSocket}
 }
 
 // keepLinkAlive держит один слот пула живым: шлёт keepalive, замечает смерть
