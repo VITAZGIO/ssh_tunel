@@ -38,6 +38,19 @@ class AppsActivity : AppCompatActivity() {
         setContentView(R.layout.activity_apps)
         settings = Settings(this)
 
+        // Отступы под полосу часов и вырез камеры: с Android 15 окно занимает
+        // экран целиком, и без этого заголовок оказывается под ними.
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(
+            findViewById(R.id.root)
+        ) { view, insets ->
+            val bars = insets.getInsets(
+                androidx.core.view.WindowInsetsCompat.Type.systemBars() or
+                    androidx.core.view.WindowInsetsCompat.Type.displayCutout()
+            )
+            view.setPadding(bars.left + view.paddingLeft, bars.top, bars.right + view.paddingRight, bars.bottom)
+            insets
+        }
+
         list = findViewById(R.id.list)
         findViewById<View>(R.id.backFromApps).setOnClickListener { finish() }
 

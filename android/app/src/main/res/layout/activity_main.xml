@@ -1,356 +1,367 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Разметка повторяет окно на компьютере: логотип и два значка в шапке,
-    круглая кнопка посередине, плитки со счётчиками внизу. Журнал и настройки
-    открываются поверх, с возвратом стрелкой, — там же, где на компьютере.
+    Шапка одна на все экраны и вынесена из переключателя: логотип слева
+    возвращает на главную, значки справа открывают журнал и настройки. Так
+    навигация не зависит от того, где человек сейчас находится.
+
+    Отступ сверху задаётся из кода по системным полям: на телефонах с вырезом
+    под камеру и с часами поверх окна фиксированное значение либо мало, либо
+    выглядит дырой.
 -->
-<ViewFlipper xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/flipper"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
     android:background="@color/bg">
 
-    <!-- ================= главный ================= -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="8dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp">
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <ImageView
-                android:layout_width="40dp"
-                android:layout_height="34dp"
-                android:src="@drawable/ic_logo"
-                android:contentDescription="@string/app_name" />
-
-            <Space
-                android:layout_width="0dp"
-                android:layout_height="1dp"
-                android:layout_weight="1" />
-
-            <ImageView
-                android:id="@+id/btnLog"
-                style="@style/HeadIcon"
-                android:src="@drawable/ic_head_log"
-                android:contentDescription="@string/log" />
-
-            <ImageView
-                android:id="@+id/btnSettings"
-                style="@style/HeadIcon"
-                android:src="@drawable/ic_head_settings"
-                android:contentDescription="@string/tab_settings" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/error"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/bg_error"
-            android:padding="10dp"
-            android:textSize="12.5sp"
-            android:textColor="@color/err"
-            android:visibility="gone" />
-
-        <Space
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
-
-        <LinearLayout
-            android:id="@+id/power"
-            android:layout_width="172dp"
-            android:layout_height="172dp"
-            android:layout_gravity="center_horizontal"
-            android:orientation="vertical"
-            android:gravity="center"
+        <ImageView
+            android:id="@+id/btnHome"
+            android:layout_width="44dp"
+            android:layout_height="38dp"
+            android:padding="2dp"
             android:clickable="true"
             android:focusable="true"
-            android:background="@drawable/bg_power_off">
-
-            <ImageView
-                android:id="@+id/powerIcon"
-                android:layout_width="86dp"
-                android:layout_height="86dp"
-                android:src="@drawable/ic_power"
-                android:contentDescription="@string/start" />
-
-            <TextView
-                android:id="@+id/powerCap"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                android:text="@string/start" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/state"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:gravity="center"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:textColor="@color/text"
-            android:text="@string/state_stopped" />
-
-        <TextView
-            android:id="@+id/detail"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:gravity="center"
-            android:textSize="12.5sp"
-            android:textColor="@color/dim" />
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_logo"
+            android:contentDescription="@string/app_name" />
 
         <Space
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
+            android:layout_width="0dp"
+            android:layout_height="1dp"
             android:layout_weight="1" />
 
-        <!-- Приём и отдача появляются только при включённом туннеле: пока он
-             выключен, показывать нечего, и на компьютере их тоже нет. -->
-        <LinearLayout
-            android:id="@+id/rowSpeed"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="9dp"
-            android:orientation="horizontal"
-            android:visibility="gone">
+        <ImageView
+            android:id="@+id/btnLog"
+            style="@style/HeadIcon"
+            android:src="@drawable/ic_head_log"
+            android:contentDescription="@string/log" />
 
-            <LinearLayout style="@style/Tile">
-                <TextView style="@style/TileKey" android:text="@string/tile_down" />
-                <TextView android:id="@+id/tileDown" style="@style/TileValue" />
-            </LinearLayout>
-
-            <Space android:layout_width="9dp" android:layout_height="1dp" />
-
-            <LinearLayout style="@style/Tile">
-                <TextView style="@style/TileKey" android:text="@string/tile_up" />
-                <TextView android:id="@+id/tileUp" style="@style/TileValue" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <LinearLayout style="@style/Tile">
-                <TextView style="@style/TileKey" android:text="@string/tile_conns" />
-                <TextView android:id="@+id/tileConns" style="@style/TileValue" />
-            </LinearLayout>
-
-            <Space android:layout_width="9dp" android:layout_height="1dp" />
-
-            <LinearLayout style="@style/Tile">
-                <TextView style="@style/TileKey" android:text="@string/tile_links" />
-                <TextView android:id="@+id/tileLinks" style="@style/TileValue" />
-            </LinearLayout>
-        </LinearLayout>
-
-        <Button
-            android:id="@+id/speedtest"
-            style="@style/SecondaryButton"
-            android:layout_marginTop="9dp"
-            android:text="@string/speedtest" />
+        <ImageView
+            android:id="@+id/btnSettings"
+            style="@style/HeadIcon"
+            android:src="@drawable/ic_head_settings"
+            android:contentDescription="@string/tab_settings" />
     </LinearLayout>
 
-    <!-- ================= журнал ================= -->
-    <LinearLayout
+    <ViewFlipper
+        android:id="@+id/flipper"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:padding="16dp">
+        android:layout_height="0dp"
+        android:layout_weight="1">
 
-        <LinearLayout style="@style/HeadRow">
-            <ImageView
-                android:id="@+id/backFromLog"
-                style="@style/HeadIcon"
-                android:src="@drawable/ic_back"
-                android:contentDescription="@string/back" />
-
-            <TextView style="@style/HeadTitle" android:text="@string/log" />
-        </LinearLayout>
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:paddingBottom="8dp"
-            android:textSize="11.5sp"
-            android:textColor="@color/dim"
-            android:text="@string/log_hint" />
-
-        <ScrollView
-            android:id="@+id/logScroll"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1">
-
-            <TextView
-                android:id="@+id/log"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:fontFamily="monospace"
-                android:textSize="12sp"
-                android:textColor="@color/text"
-                android:lineSpacingExtra="2dp" />
-        </ScrollView>
-    </LinearLayout>
-
-    <!-- ================= настройки ================= -->
-    <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="match_parent">
-
+        <!-- ================= главный ================= -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:orientation="vertical"
-            android:padding="16dp">
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="16dp">
 
-            <LinearLayout style="@style/HeadRow">
-                <ImageView
-                    android:id="@+id/backFromSettings"
-                    style="@style/HeadIcon"
-                    android:src="@drawable/ic_back"
-                    android:contentDescription="@string/back" />
-
-                <TextView style="@style/HeadTitle" android:text="@string/tab_settings" />
-            </LinearLayout>
-
-            <TextView style="@style/FieldLabel" android:text="@string/host_hint" />
-            <EditText android:id="@+id/host" style="@style/Field"
-                android:inputType="textUri" android:autofillHints="" />
-
-            <TextView style="@style/FieldLabel" android:text="@string/user_hint" />
-            <EditText android:id="@+id/user" style="@style/Field"
-                android:inputType="text" android:autofillHints="" />
-
-            <TextView style="@style/FieldLabel" android:text="@string/key" />
             <TextView
-                android:id="@+id/keyState"
+                android:id="@+id/error"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingBottom="4dp"
-                android:textSize="12sp"
-                android:textColor="@color/dim"
-                android:text="@string/key_missing" />
-            <EditText android:id="@+id/key" style="@style/Field"
-                android:inputType="textMultiLine" android:minLines="3"
-                android:gravity="top" android:hint="@string/key_hint"
-                android:textColorHint="@color/dim" android:autofillHints="" />
+                android:background="@drawable/bg_error"
+                android:padding="10dp"
+                android:textSize="12.5sp"
+                android:textColor="@color/err"
+                android:visibility="gone" />
+
+            <Space
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <LinearLayout
+                android:id="@+id/power"
+                android:layout_width="172dp"
+                android:layout_height="172dp"
+                android:layout_gravity="center_horizontal"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="@drawable/bg_power_off">
+
+                <ImageView
+                    android:id="@+id/powerIcon"
+                    android:layout_width="86dp"
+                    android:layout_height="86dp"
+                    android:src="@drawable/ic_power"
+                    android:contentDescription="@string/start" />
+
+                <TextView
+                    android:id="@+id/powerCap"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:text="@string/start" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/state"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:gravity="center"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="@color/text"
+                android:text="@string/state_stopped" />
+
+            <TextView
+                android:id="@+id/detail"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:gravity="center"
+                android:textSize="12.5sp"
+                android:textColor="@color/dim" />
+
+            <!-- Задержка до сервера: важно не точное число, а «нормально это
+                 или нет», поэтому цветом. -->
+            <TextView
+                android:id="@+id/ping"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:gravity="center"
+                android:fontFamily="monospace"
+                android:textSize="12.5sp" />
+
+            <!-- Результат теста скорости живёт здесь и через десять секунд
+                 исчезает: он интересен сразу после замера, а потом только
+                 занимает место и вводит в заблуждение — цифры уже старые. -->
+            <TextView
+                android:id="@+id/speedResult"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:fontFamily="monospace"
+                android:textSize="13sp"
+                android:textColor="@color/accent"
+                android:visibility="gone" />
+
+            <Space
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
 
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-                    <TextView style="@style/FieldLabel" android:text="@string/port_hint" />
-                    <EditText android:id="@+id/port" style="@style/Field"
-                        android:inputType="number" android:autofillHints="" />
+                <LinearLayout style="@style/Tile">
+                    <TextView style="@style/TileKey" android:text="@string/tile_conns" />
+                    <TextView android:id="@+id/tileConns" style="@style/TileValue" />
                 </LinearLayout>
 
-                <Space android:layout_width="9dp" android:layout_height="1dp" />
+                <Space android:layout_width="14dp" android:layout_height="1dp" />
 
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-                    <TextView style="@style/FieldLabel" android:text="@string/pool_hint" />
-                    <EditText android:id="@+id/pool" style="@style/Field"
-                        android:inputType="number" android:autofillHints="" />
+                <LinearLayout style="@style/Tile">
+                    <TextView style="@style/TileKey" android:text="@string/tile_links" />
+                    <TextView android:id="@+id/tileLinks" style="@style/TileValue" />
                 </LinearLayout>
             </LinearLayout>
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="10dp"
-                android:textSize="11.5sp"
-                android:textColor="@color/dim"
-                android:text="@string/pool_note" />
-
-            <!-- Строка-ссылка, как на компьютере: заголовок и текущее значение. -->
-            <LinearLayout
-                android:id="@+id/apps"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:background="@drawable/bg_card"
-                android:padding="12dp"
-                android:clickable="true"
-                android:focusable="true">
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:textSize="14sp"
-                        android:textColor="@color/text"
-                        android:text="@string/apps_row" />
-
-                    <TextView
-                        android:id="@+id/appsSummary"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:textSize="12sp"
-                        android:textColor="@color/dim"
-                        android:text="@string/mode_all" />
-                </LinearLayout>
-
-                <ImageView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:src="@drawable/ic_chevron"
-                    android:contentDescription="@string/apps_row" />
-            </LinearLayout>
-
-            <CheckBox
-                android:id="@+id/localViaTunnel"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:textColor="@color/text"
-                android:text="@string/local_via_tunnel" />
-
-            <TextView style="@style/FieldLabel"
-                android:layout_marginTop="6dp" android:text="@string/direct" />
-            <EditText android:id="@+id/direct" style="@style/Field"
-                android:inputType="textMultiLine" android:minLines="2"
-                android:gravity="top" android:hint="@string/direct_hint"
-                android:textColorHint="@color/dim" android:autofillHints="" />
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingBottom="12dp"
-                android:textSize="11.5sp"
-                android:textColor="@color/dim"
-                android:text="@string/direct_note" />
 
             <Button
-                android:id="@+id/save"
-                style="@style/PrimaryButton"
-                android:text="@string/save" />
+                android:id="@+id/speedtest"
+                style="@style/SecondaryButton"
+                android:layout_marginTop="14dp"
+                android:text="@string/speedtest" />
         </LinearLayout>
-    </ScrollView>
-</ViewFlipper>
+
+        <!-- ================= журнал ================= -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="16dp">
+
+            <TextView style="@style/Head" android:text="@string/log" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="8dp"
+                android:textSize="11.5sp"
+                android:textColor="@color/dim"
+                android:text="@string/log_hint" />
+
+            <ScrollView
+                android:id="@+id/logScroll"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <TextView
+                    android:id="@+id/log"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:textSize="12sp"
+                    android:textColor="@color/text"
+                    android:lineSpacingExtra="2dp" />
+            </ScrollView>
+        </LinearLayout>
+
+        <!-- ================= настройки ================= -->
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="24dp">
+
+                <TextView style="@style/Head" android:text="@string/tab_settings" />
+
+                <TextView style="@style/FieldLabel" android:text="@string/host_hint" />
+                <EditText android:id="@+id/host" style="@style/Field"
+                    android:inputType="textUri" android:autofillHints="" />
+
+                <TextView style="@style/FieldLabel" android:text="@string/user_hint" />
+                <EditText android:id="@+id/user" style="@style/Field"
+                    android:inputType="text" android:autofillHints="" />
+
+                <TextView style="@style/FieldLabel" android:text="@string/key" />
+                <TextView
+                    android:id="@+id/keyState"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingBottom="4dp"
+                    android:textSize="12sp"
+                    android:textColor="@color/dim"
+                    android:text="@string/key_missing" />
+                <EditText android:id="@+id/key" style="@style/Field"
+                    android:inputType="textMultiLine" android:minLines="3"
+                    android:gravity="top" android:hint="@string/key_hint"
+                    android:textColorHint="@color/dim" android:autofillHints="" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView style="@style/FieldLabel" android:text="@string/port_hint" />
+                        <EditText android:id="@+id/port" style="@style/Field"
+                            android:inputType="number" android:autofillHints="" />
+                    </LinearLayout>
+
+                    <Space android:layout_width="12dp" android:layout_height="1dp" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView style="@style/FieldLabel" android:text="@string/pool_hint" />
+                        <EditText android:id="@+id/pool" style="@style/Field"
+                            android:inputType="number" android:autofillHints="" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:textSize="11.5sp"
+                    android:textColor="@color/dim"
+                    android:text="@string/pool_note" />
+
+                <LinearLayout
+                    android:id="@+id/apps"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/bg_card"
+                    android:padding="12dp"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textSize="14sp"
+                            android:textColor="@color/text"
+                            android:text="@string/apps_row" />
+
+                        <TextView
+                            android:id="@+id/appsSummary"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textSize="12sp"
+                            android:textColor="@color/dim"
+                            android:text="@string/mode_all" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:src="@drawable/ic_chevron"
+                        android:contentDescription="@string/apps_row" />
+                </LinearLayout>
+
+                <CheckBox
+                    android:id="@+id/localViaTunnel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:textColor="@color/text"
+                    android:text="@string/local_via_tunnel" />
+
+                <TextView style="@style/FieldLabel"
+                    android:layout_marginTop="8dp" android:text="@string/direct" />
+                <EditText android:id="@+id/direct" style="@style/Field"
+                    android:inputType="textMultiLine" android:minLines="2"
+                    android:gravity="top" android:hint="@string/direct_hint"
+                    android:textColorHint="@color/dim" android:autofillHints="" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingBottom="14dp"
+                    android:textSize="11.5sp"
+                    android:textColor="@color/dim"
+                    android:text="@string/direct_note" />
+
+                <Button
+                    android:id="@+id/save"
+                    style="@style/PrimaryButton"
+                    android:text="@string/save" />
+            </LinearLayout>
+        </ScrollView>
+    </ViewFlipper>
+</LinearLayout>

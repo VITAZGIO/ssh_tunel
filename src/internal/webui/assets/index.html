@@ -67,6 +67,12 @@
   .status .d{font-size:12.5px;color:var(--dim);margin-top:2px;cursor:pointer;
              overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .status .d:hover{color:var(--accent)}
+  /* Задержка: цветом, потому что важно не точное число, а «нормально это
+     или нет». Зелёный до 100 мс, жёлтый до 250, дальше красный. */
+  .status .ping{font-size:12.5px;margin-top:2px;font-family:var(--mono)}
+  .status .ping.good{color:var(--ok)}
+  .status .ping.mid{color:var(--warn)}
+  .status .ping.bad{color:var(--err)}
 
   #power.on{border-color:var(--ok);color:var(--ok);
             box-shadow:0 0 0 6px rgba(47,191,113,.10),0 0 34px rgba(47,191,113,.22)}
@@ -284,6 +290,7 @@
       <div class="status">
         <div class="s" id="stateText">Отключено</div>
         <div class="d" id="stateDetail" title="нажми, чтобы проверить настоящий внешний адрес"></div>
+        <div class="ping" id="ping"></div>
       </div>
     </div>
 
@@ -766,6 +773,7 @@ function setState(s, detail){
   $('powerCap').textContent = cap;
   $('power').className = cls;
   running = (s === 'connected' || s === 'reconnecting' || s === 'connecting');
+  if(s !== 'connected') showPing(0);
   $('speedtest').disabled = !running || speedRunning;
 }
 function showError(msg, where){
@@ -841,8 +849,18 @@ function connectEvents(){
       const s = e.stats;
       $('act').textContent = s.active;
       $('links').textContent = s.healthy + ' / ' + s.links;
+      showPing(s.pingMs);
     }
   };
+}
+
+/* Задержка до сервера. Ноль означает, что замера ещё не было, — тогда
+   ничего не пишем: прочерк выглядел бы как «связи нет». */
+function showPing(ms){
+  const el = $('ping');
+  if(!ms){ el.textContent = ''; el.className = 'ping'; return; }
+  el.textContent = ms + ' мс';
+  el.className = 'ping ' + (ms < 100 ? 'good' : ms < 250 ? 'mid' : 'bad');
 }
 
 /* ---------- кнопка ---------- */

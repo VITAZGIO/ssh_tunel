@@ -50,4 +50,5 @@
     <string name="apps_row">Какие программы вести через туннель</string>
     <string name="pool_note">Несколько параллельных каналов заметно поднимают скорость. 4 — разумное значение.</string>
     <string name="apps_chosen">выбрано %1$d</string>
+    <string name="speed_result">приём %1$s · отдача %2$s</string>
 </resources>

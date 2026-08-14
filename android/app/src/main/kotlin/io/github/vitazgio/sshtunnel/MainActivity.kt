@@ -49,9 +49,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var appsSummary: TextView
     private lateinit var speedButton: Button
 
-    private lateinit var rowSpeed: View
-    private lateinit var tileDown: TextView
-    private lateinit var tileUp: TextView
+    private lateinit var pingView: TextView
+    private lateinit var speedResult: TextView
     private lateinit var tileConns: TextView
     private lateinit var tileLinks: TextView
 
@@ -91,9 +90,8 @@ class MainActivity : AppCompatActivity() {
         appsSummary = findViewById(R.id.appsSummary)
         speedButton = findViewById(R.id.speedtest)
 
-        rowSpeed = findViewById(R.id.rowSpeed)
-        tileDown = findViewById(R.id.tileDown)
-        tileUp = findViewById(R.id.tileUp)
+        pingView = findViewById(R.id.ping)
+        speedResult = findViewById(R.id.speedResult)
         tileConns = findViewById(R.id.tileConns)
         tileLinks = findViewById(R.id.tileLinks)
 
@@ -114,10 +112,13 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, AppsActivity::class.java))
         }
 
+        // Шапка одна на все экраны: логотип всегда возвращает на главную,
+        // значки всегда открывают своё. Так не надо помнить, где находишься.
+        findViewById<View>(R.id.btnHome).setOnClickListener { flipper.displayedChild = MAIN }
         findViewById<View>(R.id.btnLog).setOnClickListener { flipper.displayedChild = LOG }
         findViewById<View>(R.id.btnSettings).setOnClickListener { flipper.displayedChild = SETTINGS }
-        findViewById<View>(R.id.backFromLog).setOnClickListener { flipper.displayedChild = MAIN }
-        findViewById<View>(R.id.backFromSettings).setOnClickListener { flipper.displayedChild = MAIN }
+
+        applyInsets()
 
         // Кнопка «назад» возвращает на главную, а не закрывает приложение:
         // выйти из настроек хочется чаще, чем выйти совсем.
@@ -134,6 +135,26 @@ class MainActivity : AppCompatActivity() {
             })
 
         askNotificationPermission()
+    }
+
+    /**
+     * Отступы под системные полосы.
+     *
+     * Начиная с Android 15 окно занимает экран целиком, вместе с полосой часов
+     * и вырезом под камеру. Без этого шапка оказывается прямо под ними.
+     * Значения берём у системы, а не подбираем на глаз: у каждого телефона
+     * они свои.
+     */
+    private fun applyInsets() {
+        val root = findViewById<View>(R.id.root)
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+            val bars = insets.getInsets(
+                androidx.core.view.WindowInsetsCompat.Type.systemBars() or
+                    androidx.core.view.WindowInsetsCompat.Type.displayCutout()
+            )
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            insets
+        }
     }
 
     override fun onResume() {
@@ -217,6 +238,11 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
+    /**
+     * Показывает результат замера под состоянием и убирает его через десять
+     * секунд: сразу после теста цифры интересны, а через минуту они уже
+     * неправда — связь меняется.
+     */
     private fun showSpeed(json: String) {
         val o = try {
             JSONObject(json)
@@ -224,14 +250,39 @@ class MainActivity : AppCompatActivity() {
             JSONObject()
         }
         val err = o.optString("error")
-        val text = if (err.isNotBlank()) {
-            err
-        } else {
-            "приём %.1f Мбит/с · отдача %.1f Мбит/с".format(
-                o.optDouble("downMbps", 0.0), o.optDouble("upMbps", 0.0)
-            )
+        if (err.isNotBlank()) {
+            Toast.makeText(this, err, Toast.LENGTH_LONG).show()
+            return
         }
-        Toast.makeText(this, text, Toast.LENGTH_LONG).show()
+        speedResult.text = getString(
+            R.string.speed_result,
+            "%.1f Мбит/с".format(o.optDouble("downMbps", 0.0)),
+            "%.1f Мбит/с".format(o.optDouble("upMbps", 0.0)),
+        )
+        speedResult.visibility = View.VISIBLE
+        speedResult.removeCallbacks(hideSpeed)
+        speedResult.postDelayed(hideSpeed, 10_000)
+    }
+
+    private val hideSpeed = Runnable { speedResult.visibility = View.GONE }
+
+    /** Задержка до сервера. Цвет важнее числа: зелёный, жёлтый, красный. */
+    private fun showPing(ms: Long) {
+        if (ms <= 0) {
+            pingView.text = ""
+            return
+        }
+        pingView.text = "$ms мс"
+        pingView.setTextColor(
+            ContextCompat.getColor(
+                this,
+                when {
+                    ms < 100 -> R.color.ok
+                    ms < 250 -> R.color.warn
+                    else -> R.color.err
+                }
+            )
+        )
     }
 
     private fun askNotificationPermission() {
@@ -303,18 +354,13 @@ class MainActivity : AppCompatActivity() {
             JSONObject()
         }
         val running = state != "stopped"
-        rowSpeed.visibility = if (running) View.VISIBLE else View.GONE
-
-        tileDown.text = if (running) size(o.optLong("bytesDown")) else "—"
-        tileUp.text = if (running) size(o.optLong("bytesUp")) else "—"
         tileConns.text = if (running) o.optLong("total").toString() else "—"
         tileLinks.text = if (running) "${o.optInt("healthy")} / ${o.optInt("links")}" else "—"
-    }
 
-    private fun size(bytes: Long): String = when {
-        bytes >= 1024L * 1024 * 1024 -> String.format("%.1f ГБ", bytes / 1024.0 / 1024 / 1024)
-        bytes >= 1024L * 1024 -> String.format("%.1f МБ", bytes / 1024.0 / 1024)
-        bytes >= 1024L -> String.format("%.0f КБ", bytes / 1024.0)
-        else -> "$bytes Б"
+        showPing(if (state == "connected") o.optLong("pingMs") else 0L)
+        if (!running) {
+            speedResult.visibility = View.GONE
+            speedResult.removeCallbacks(hideSpeed)
+        }
     }
 }

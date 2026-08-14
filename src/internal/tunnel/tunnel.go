@@ -122,6 +122,9 @@ type Tunnel struct {
 }
 
 type stats struct {
+	// pingMs — задержка до сервера, миллисекунды.
+	pingMs atomic.Int64
+
 	up     atomic.Int64
 	down   atomic.Int64
 	active atomic.Int64
@@ -210,6 +213,8 @@ func (t *Tunnel) Start() error {
 	t.setState(events.StateConnected, fmt.Sprintf("%s:%d", t.cfg.Host, t.cfg.SSHPort))
 	t.wg.Add(1)
 	go t.publishStats()
+	t.wg.Add(1)
+	go t.pingLoop()
 	return nil
 }
 
@@ -237,6 +242,54 @@ func (t *Tunnel) startListeners() error {
 		go t.acceptLoop(ln, s.handler)
 	}
 	return nil
+}
+
+// pingLoop меряет задержку до сервера.
+//
+// Keepalive для этого не годится: он ходит раз в двадцать секунд, и число на
+// экране было бы почти всегда несвежим. Свой замер стоит копейки — служебный
+// запрос без нагрузки по уже открытому соединению, — зато показывает связь
+// такой, какая она сейчас.
+func (t *Tunnel) pingLoop() {
+	defer t.wg.Done()
+
+	for {
+		select {
+		case <-t.ctx.Done():
+			return
+		case <-time.After(4 * time.Second):
+		}
+
+		client := t.links[0].get()
+		if client == nil {
+			t.stats.pingMs.Store(0)
+			continue
+		}
+
+		start := time.Now()
+		done := make(chan error, 1)
+		go func() {
+			_, _, err := client.SendRequest("keepalive@openssh.com", true, nil)
+			done <- err
+		}()
+
+		select {
+		case err := <-done:
+			if err != nil {
+				t.stats.pingMs.Store(0)
+				continue
+			}
+			ms := time.Since(start).Milliseconds()
+			if ms < 1 {
+				ms = 1 // ноль означает «нет замера», а не «мгновенно»
+			}
+			t.stats.pingMs.Store(ms)
+		case <-time.After(5 * time.Second):
+			t.stats.pingMs.Store(0)
+		case <-t.ctx.Done():
+			return
+		}
+	}
 }
 
 // whoHolds пытается назвать программу, которая уже держит этот порт.
@@ -559,6 +612,7 @@ func (t *Tunnel) Stats() events.Stats {
 		Total:     t.stats.total.Load(),
 		Links:     len(t.links),
 		Healthy:   healthy,
+		PingMs:    t.stats.pingMs.Load(),
 	}
 }
 

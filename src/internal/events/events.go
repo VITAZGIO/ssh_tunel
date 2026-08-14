@@ -37,6 +37,11 @@ type Stats struct {
 	Total     int64 `json:"total"`   // всего обслужено с момента старта
 	Links     int   `json:"links"`   // размер пула SSH-соединений
 	Healthy   int   `json:"healthy"` // сколько из них живы
+
+	// PingMs — задержка до сервера в миллисекундах: сколько идёт туда и
+	// обратно служебный запрос по уже открытому SSH-соединению. Ноль означает,
+	// что замера ещё не было.
+	PingMs int64 `json:"pingMs,omitempty"`
 }
 
 type Event struct {
