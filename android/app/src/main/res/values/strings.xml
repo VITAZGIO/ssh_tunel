@@ -5,6 +5,7 @@
     <string name="state_stopped">Выключено</string>
     <string name="state_connecting">Подключение…</string>
     <string name="state_connected">Подключено</string>
+    <string name="state_reconnecting">Переподключение…</string>
     <string name="state_error">Ошибка</string>
 
     <string name="start">Включить</string>

@@ -149,11 +149,14 @@ class MainActivity : AppCompatActivity() {
             when (TunnelService.state) {
                 "connected" -> R.string.state_connected
                 "connecting" -> R.string.state_connecting
+                "reconnecting" -> R.string.state_reconnecting
                 "error" -> R.string.state_error
                 else -> R.string.state_stopped
             }
         )
-        detailView.text = TunnelService.detail
+        detailView.text = listOf(TunnelService.detail, TunnelService.stats)
+            .filter { it.isNotBlank() }
+            .joinToString("\n")
         toggle.setText(if (TunnelService.state == "stopped") R.string.start else R.string.stop)
         keyStateView.setText(if (settings.hasKey) R.string.key_saved else R.string.key_missing)
 

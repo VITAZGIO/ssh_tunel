@@ -161,14 +161,26 @@ func (t *Tunnel) Start(tunFD int, mtu int) error {
 		mtu = 1500
 	}
 
+	// Подписываемся на события ДО запуска.
+	//
+	// Иначе сообщение «подключено» теряется: туннель успевает его отправить
+	// внутри Start, когда слушать ещё некому, и экран навсегда остаётся с
+	// надписью «подключение…», хотя всё уже работает. Именно так и вышло при
+	// первом запуске на телефоне.
 	bus := events.NewBus()
+	stop := make(chan struct{})
+	ch, unsub := bus.Subscribe()
+	go t.forwardEvents(ch, unsub, stop, cb)
+
 	tun := tunnel.New(cfg, bus)
 	if err := tun.Start(); err != nil {
+		close(stop)
 		return err
 	}
 
 	pool, err := core.NewFakePool(fakeNet)
 	if err != nil {
+		close(stop)
 		tun.Stop()
 		return err
 	}
@@ -197,26 +209,29 @@ func (t *Tunnel) Start(tunFD int, mtu int) error {
 		DNS:     dns,
 	})
 	if err != nil {
+		close(stop)
 		tun.Stop()
 		return err
 	}
 
-	stop := make(chan struct{})
 	t.mu.Lock()
 	t.core, t.engine, t.bus, t.stop = tun, eng, bus, stop
 	t.mu.Unlock()
 
-	go t.forwardEvents(bus, stop, cb)
+	// Ещё и прямо говорим текущее состояние: подписка спасает от гонки, но
+	// приложение не должно зависеть от того, успело ли событие.
+	if cb != nil {
+		cb.OnState(tun.State(), fmt.Sprintf("%s:%d", cfg.Host, cfg.SSHPort))
+	}
 	return nil
 }
 
 // forwardEvents перекладывает события ядра на экран приложения.
-func (t *Tunnel) forwardEvents(bus *events.Bus, stop <-chan struct{}, cb Callbacks) {
+func (t *Tunnel) forwardEvents(ch <-chan events.Event, unsub func(), stop <-chan struct{}, cb Callbacks) {
+	defer unsub()
 	if cb == nil {
 		return
 	}
-	ch, unsub := bus.Subscribe()
-	defer unsub()
 
 	for {
 		select {
