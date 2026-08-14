@@ -1,4 +1,4 @@
-// ssh_tunnel-cli — консольная версия. Запускается флагами, пишет компактный
+// ssh_tunnel_cli — консольная версия. Запускается флагами, пишет компактный
 // лог в окно. Тем, кому нужны кнопки, а не команды, предназначен ssh_tunnel.exe
 // с обычным окном — логика у них общая.
 package main
@@ -181,7 +181,7 @@ func usage() {
 	fmt.Print(`ssh_tunnel — SSH-туннель до своего сервера (SOCKS4/5 + HTTP-прокси)
 
 Использование:
-  ssh_tunnel-cli -host <IP сервера> [-user root] [-key путь-к-ключу]
+  ssh_tunnel_cli -host <IP сервера> [-user root] [-key путь-к-ключу]
 
 Основные флаги:
   -host       адрес сервера (обязателен при первом запуске)
@@ -202,10 +202,10 @@ func usage() {
   -v          подробный лог
 
 Пример первого запуска:
-  ssh_tunnel-cli -host ТВОЙ_СЕРВЕР -user root -save
+  ssh_tunnel_cli -host ТВОЙ_СЕРВЕР -user root -save
 
 Дальше достаточно просто:
-  ssh_tunnel-cli
+  ssh_tunnel_cli
 `)
 	waitEnter()
 }

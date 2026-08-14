@@ -32,25 +32,25 @@ GOOS=windows GOARCH=amd64 go build \
 # Консольная версия для Windows в релиз не идёт: окно умеет всё то же самое, а
 # лишний файл на странице скачивания только сбивает с толку. Кому нужна —
 # собирается одной командой:
-#   GOOS=windows go build -o ssh_tunnel-cli.exe ./cmd/ssh_tunnel-cli
+#   GOOS=windows go build -o ssh_tunnel_cli.exe ./cmd/ssh_tunnel_cli
 
 # Для Linux собираем две архитектуры: обычные серверы и ARM (Raspberry Pi,
 # облачные ARM-машины, домашние мини-серверы).
 echo "Linux: amd64..."
 GOOS=linux GOARCH=amd64 go build \
   -ldflags="-s -w" \
-  -o "$OUT/linux/ssh_tunnel-linux" ./cmd/ssh_tunnel-linux
+  -o "$OUT/linux/ssh_tunnel_linux" ./cmd/ssh_tunnel_linux
 
 echo "Linux: arm64..."
 GOOS=linux GOARCH=arm64 go build \
   -ldflags="-s -w" \
-  -o "$OUT/linux/ssh_tunnel-linux-arm64" ./cmd/ssh_tunnel-linux
+  -o "$OUT/linux/ssh_tunnel_linux_arm64" ./cmd/ssh_tunnel_linux
 
 # Файлы прошлых сборок могли остаться от предыдущих версий и прежних имён —
 # иначе они попадут в контрольные суммы, а в релиз нет.
-rm -f "$OUT/windows/ssh_tunnel-cli.exe" "$OUT/windows/ssh_tunel.exe" \
-      "$OUT/windows/ssh_tunel-cli.exe" "$OUT/linux/ssh_tunel-linux" \
-      "$OUT/linux/ssh_tunel-linux-arm64"
+rm -f "$OUT/windows/ssh_tunnel_cli.exe" "$OUT/windows/ssh_tunel.exe" "$OUT/windows/ssh_tunnel-cli.exe" \
+      "$OUT/windows/ssh_tunel-cli.exe" "$OUT/linux/ssh_tunel-linux" "$OUT/linux/ssh_tunnel-linux" \
+      "$OUT/linux/ssh_tunel-linux-arm64" "$OUT/linux/ssh_tunnel-linux-arm64"
 
 ( cd "$OUT" && sha256sum windows/* linux/* > SHA256SUMS.txt )
 

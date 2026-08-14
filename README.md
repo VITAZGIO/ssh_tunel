@@ -9,7 +9,7 @@
 локальный прокси.
 
 [![Лицензия: MIT](https://img.shields.io/badge/лицензия-MIT-4c8dff)](LICENSE)
-[![Версия](https://img.shields.io/badge/версия-1.1.0-4c8dff)](https://github.com/VITAZGIO/ssh_tunel/releases)
+[![Версия](https://img.shields.io/badge/версия-1.0.0-4c8dff)](https://github.com/VITAZGIO/ssh_tunel/releases)
 [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
 [![Linux](https://img.shields.io/badge/Linux-amd64%20%7C%20arm64-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
 [![Go](https://img.shields.io/badge/Go-1.22+-2de2ff)](src)
@@ -21,13 +21,13 @@
 | Система | Файл | |
 |---|---|---|
 | **Windows** | [**ssh_tunnel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe) | окно с кнопкой, значок у часов |
-| **Linux** | [**ssh_tunnel-linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel-linux) | консоль + веб-интерфейс, служба systemd |
+| **Linux** | [**ssh_tunnel_linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux) | консоль + веб-интерфейс, служба systemd |
 
 Сборка под ARM и контрольные суммы — на
 [странице релиза](https://github.com/VITAZGIO/ssh_tunel/releases/latest).
 
 <img src="docs/screenshot.png" width="300" alt="главный экран">
-<img src="docs/screenshot-filter.png" width="300" alt="выбор программ">
+<img src="docs/screenshot_filter.png" width="300" alt="выбор программ">
 
 </div>
 
@@ -109,7 +109,7 @@ HTTP CONNECT, каналы SSH и определение процесса по �
 
 Сервер только что арендован и настроен «как из коробки»? Первым делом стоит
 закрыть вход по паролю и включить firewall — готовый набор команд одним блоком
-лежит в [первой настройке сервера](docs/SERVER-SETUP.md).
+лежит в [первой настройке сервера](docs/SERVER_SETUP.md).
 
 ---
 
@@ -143,7 +143,7 @@ HTTP CONNECT, каналы SSH и определение процесса по �
 правый щелчок по значку у часов → «Выход».
 
 Нужна консольная версия для Windows — она есть в исходниках, собирается одной
-командой: `GOOS=windows go build -o ssh_tunnel-cli.exe ./cmd/ssh_tunnel-cli`.
+командой: `GOOS=windows go build -o ssh_tunnel_cli.exe ./cmd/ssh_tunnel_cli`.
 
 ---
 
@@ -153,17 +153,17 @@ HTTP CONNECT, каналы SSH и определение процесса по �
 
 ```bash
 # скачать и сделать исполняемым
-curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel-linux
-chmod +x ssh_tunnel-linux
+curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
+chmod +x ssh_tunnel_linux
 
 # задать сервер один раз
-./ssh_tunnel-linux -host ТВОЙ_СЕРВЕР -user tunnel -save
+./ssh_tunnel_linux -host ТВОЙ_СЕРВЕР -user tunnel -save
 
 # запустить: только туннель...
-./ssh_tunnel-linux
+./ssh_tunnel_linux
 
 # ...или сразу с веб-интерфейсом
-./ssh_tunnel-linux -web
+./ssh_tunnel_linux -web
 ```
 
 Веб-интерфейс — тот же самый, что и в версии для Windows, на
@@ -181,7 +181,7 @@ source ~/.config/ssh_tunnel/proxy.env
 Как служба systemd — [packaging/linux](packaging/linux):
 
 ```bash
-./packaging/linux/install.sh ./ssh_tunnel-linux
+./packaging/linux/install.sh ./ssh_tunnel_linux
 systemctl --user enable --now ssh_tunnel
 ```
 

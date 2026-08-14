@@ -9,7 +9,7 @@ An educational project: it shows how a working local proxy is built out of a
 standard SSH mechanism.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-4c8dff)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.0-4c8dff)](https://github.com/VITAZGIO/ssh_tunel/releases)
+[![Version](https://img.shields.io/badge/version-1.0.0-4c8dff)](https://github.com/VITAZGIO/ssh_tunel/releases)
 [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
 [![Linux](https://img.shields.io/badge/Linux-amd64%20%7C%20arm64-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
 [![Go](https://img.shields.io/badge/Go-1.22+-2de2ff)](src)
@@ -21,13 +21,13 @@ standard SSH mechanism.
 | System | File | |
 |---|---|---|
 | **Windows** | [**ssh_tunnel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe) | window with a button, tray icon |
-| **Linux** | [**ssh_tunnel-linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel-linux) | console + web interface, systemd service |
+| **Linux** | [**ssh_tunnel_linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux) | console + web interface, systemd service |
 
 The ARM build and the checksums are on the
 [release page](https://github.com/VITAZGIO/ssh_tunel/releases/latest).
 
 <img src="docs/screenshot.png" width="300" alt="main screen">
-<img src="docs/screenshot-filter.png" width="300" alt="per-app filter">
+<img src="docs/screenshot_filter.png" width="300" alt="per-app filter">
 
 </div>
 
@@ -113,7 +113,7 @@ reach, and with your local law, is your responsibility.
 
 Freshly rented server, still stock? Turn password logins off and switch the
 firewall on first — a ready-to-paste block of commands is in
-[SERVER-SETUP.md](docs/SERVER-SETUP.md) (in Russian).
+[SERVER_SETUP.md](docs/SERVER_SETUP.md) (in Russian).
 
 ---
 
@@ -133,7 +133,7 @@ The close button hides the program in the tray, the tunnel keeps running. To
 quit for real: right-click the tray icon → «Exit».
 
 If you want a console build for Windows, it is in the sources and takes one
-command: `GOOS=windows go build -o ssh_tunnel-cli.exe ./cmd/ssh_tunnel-cli`.
+command: `GOOS=windows go build -o ssh_tunnel_cli.exe ./cmd/ssh_tunnel_cli`.
 
 ---
 
@@ -143,17 +143,17 @@ For servers and workstations, amd64 and arm64.
 
 ```bash
 # download and make executable
-curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel-linux
-chmod +x ssh_tunnel-linux
+curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
+chmod +x ssh_tunnel_linux
 
 # set the server once
-./ssh_tunnel-linux -host YOUR_SERVER -user tunnel -save
+./ssh_tunnel_linux -host YOUR_SERVER -user tunnel -save
 
 # run: tunnel only...
-./ssh_tunnel-linux
+./ssh_tunnel_linux
 
 # ...or with the web interface
-./ssh_tunnel-linux -web
+./ssh_tunnel_linux -web
 ```
 
 The web interface is the very same one the Windows build shows in its window,
@@ -172,7 +172,7 @@ source ~/.config/ssh_tunnel/proxy.env
 As a systemd service — see [packaging/linux](packaging/linux):
 
 ```bash
-./packaging/linux/install.sh ./ssh_tunnel-linux
+./packaging/linux/install.sh ./ssh_tunnel_linux
 systemctl --user enable --now ssh_tunnel
 ```
 

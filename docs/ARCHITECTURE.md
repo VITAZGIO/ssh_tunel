@@ -101,8 +101,8 @@ src/
 │   ├── ssh_tunnel/          приложение с окном (-H windowsgui, без консоли)
 │   │   ├── app.manifest    нет UAC, осведомлённость о масштабе экрана
 │   │   └── *.syso          вшитые иконка и манифест (создаёт build.sh)
-│   ├── ssh_tunnel-cli/      консольная версия для Windows (в релиз не входит)
-│   └── ssh_tunnel-linux/    версия для Linux: консоль + веб-интерфейс
+│   ├── ssh_tunnel_cli/      консольная версия для Windows (в релиз не входит)
+│   └── ssh_tunnel_linux/    версия для Linux: консоль + веб-интерфейс
 ├── tools/mkicon/           собирает .ico из картинки
 ├── tools/mkshield/         рисует заготовки иконки
 └── internal/

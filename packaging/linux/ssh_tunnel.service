@@ -20,7 +20,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/ssh_tunnel-linux -web
+ExecStart=/usr/local/bin/ssh_tunnel_linux -web
 Restart=always
 RestartSec=5
 

@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Ставит ssh_tunnel-linux в /usr/local/bin и готовит службу для текущего
+# Ставит ssh_tunnel_linux в /usr/local/bin и готовит службу для текущего
 # пользователя. Права администратора нужны только чтобы скопировать файл.
 set -euo pipefail
 
-BIN="${1:-./ssh_tunnel-linux}"
+BIN="${1:-./ssh_tunnel_linux}"
 if [ ! -f "$BIN" ]; then
   echo "Не нашёл $BIN — укажи путь к скачанному файлу первым аргументом." >&2
   exit 1
 fi
 
 echo "Копирую в /usr/local/bin (нужен sudo)..."
-sudo install -m 755 "$BIN" /usr/local/bin/ssh_tunnel-linux
+sudo install -m 755 "$BIN" /usr/local/bin/ssh_tunnel_linux
 
 echo "Готовлю службу для пользователя $USER..."
 mkdir -p ~/.config/systemd/user
@@ -22,7 +22,7 @@ cat <<MSG
 Готово. Дальше:
 
   1. Задай сервер (один раз):
-       ssh_tunnel-linux -host ТВОЙ_СЕРВЕР -user root -save
+       ssh_tunnel_linux -host ТВОЙ_СЕРВЕР -user root -save
 
   2. Включи службу:
        systemctl --user enable --now ssh_tunnel

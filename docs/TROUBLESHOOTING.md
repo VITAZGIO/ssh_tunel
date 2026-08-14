@@ -272,7 +272,7 @@ Hamachi с его `25.x.x.x`), впиши её в поле **«Всегда на
 В консольной версии то же самое флагами:
 
 ```powershell
-.\ssh_tunnel-cli.exe -filter except -apps steam.exe,discord.exe
+.\ssh_tunnel_cli.exe -filter except -apps steam.exe,discord.exe
 ```
 
 ## Браузер или антивирус ругается на скачанный файл
@@ -369,7 +369,7 @@ Add-MpPreference -ExclusionPath "C:\Programs\ssh_tunnel"
 ключ просто добавляется ему. Если что-то другое (по умолчанию `tunnel`) —
 команда заодно создаст такого пользователя: с оболочкой `nologin`, без пароля и
 с ключом, которому разрешён только проброс соединений. Подробнее — в
-[первой настройке сервера](SERVER-SETUP.md).
+[первой настройке сервера](SERVER_SETUP.md).
 
 Кнопка «Открыть PowerShell» открывает терминал и кладёт в буфер команду первого
 шага. Команда не выполняется сама и не печатается за тебя намеренно: любой
@@ -406,5 +406,5 @@ VPN обычно никто наизусть не знает. Зато их зн
 прокси, который нельзя трогать) — это осталось в консольной версии:
 
 ```powershell
-.\ssh_tunnel-cli.exe -sysproxy=false -setenv=false
+.\ssh_tunnel_cli.exe -sysproxy=false -setenv=false
 ```
