@@ -302,7 +302,7 @@ class TunnelService : VpnService(), Callbacks {
         return Notification.Builder(this, CHANNEL)
             .setContentTitle(getString(R.string.app_name))
             .setContentText(text)
-            .setSmallIcon(android.R.drawable.stat_sys_vpn_ic)
+            .setSmallIcon(R.drawable.ic_tunnel)
             .setContentIntent(open)
             .setOngoing(true)
             .addAction(
