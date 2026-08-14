@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"sshtunnel/android/core"
 	"sshtunnel/internal/events"
@@ -142,32 +143,25 @@ func (t *Tunnel) callbacks() Callbacks {
 	return t.cb
 }
 
-// Start поднимает туннель и сетевой стек поверх дескриптора от VpnService.
+// StartCore поднимает только туннель по SSH, без сетевого стека.
 //
-// tunFD должен быть получен через detachFd(): дальше им распоряжается Go и
-// закрывает его сам. Если отдать getFd(), дескриптор закроют дважды.
-func (t *Tunnel) Start(tunFD int, mtu int) error {
+// Разделено на два шага ради одной проверки: прежде чем создавать интерфейс,
+// надо узнать, умеет ли сервер IPv6. От этого зависит, объявлять ли его
+// телефону. Объявить и не суметь — худшее из возможного: приложения дружно
+// уходят в шестую версию, и не работает вообще ничего.
+func (t *Tunnel) StartCore() error {
 	t.mu.Lock()
 	if t.core != nil {
 		t.mu.Unlock()
 		return fmt.Errorf("туннель уже запущен")
 	}
-	cfg, direct, cb := t.cfg, t.direct, t.cb
+	cfg, cb := t.cfg, t.cb
 	t.mu.Unlock()
 
 	if cfg.Host == "" {
 		return fmt.Errorf("сначала нужно задать настройки")
 	}
-	if mtu <= 0 {
-		mtu = 1500
-	}
 
-	// Подписываемся на события ДО запуска.
-	//
-	// Иначе сообщение «подключено» теряется: туннель успевает его отправить
-	// внутри Start, когда слушать ещё некому, и экран навсегда остаётся с
-	// надписью «подключение…», хотя всё уже работает. Именно так и вышло при
-	// первом запуске на телефоне.
 	bus := events.NewBus()
 	stop := make(chan struct{})
 	ch, unsub := bus.Subscribe()
@@ -179,10 +173,58 @@ func (t *Tunnel) Start(tunFD int, mtu int) error {
 		return err
 	}
 
+	t.mu.Lock()
+	t.core, t.bus, t.stop = tun, bus, stop
+	t.mu.Unlock()
+
+	if cb != nil {
+		cb.OnState(tun.State(), fmt.Sprintf("%s:%d", cfg.Host, cfg.SSHPort))
+	}
+	return nil
+}
+
+// ServerHasIPv6 спрашивает у сервера, может ли он открыть соединение по IPv6.
+//
+// Проверка идёт через сам туннель, на общедоступный DNS-сервер Google: если
+// сервер сумел — значит шестая версия у него работает, и её можно объявлять
+// телефону. Если нет, интерфейс останется четвёртой версии, и приложения
+// пойдут по ней.
+func (t *Tunnel) ServerHasIPv6() bool {
+	t.mu.Lock()
+	tun := t.core
+	t.mu.Unlock()
+	if tun == nil {
+		return false
+	}
+	if !tun.WaitReady(1, 15*time.Second) {
+		return false
+	}
+	c, err := tun.Dial("tcp", "[2001:4860:4860::8888]:53")
+	if err != nil {
+		return false
+	}
+	c.Close()
+	return true
+}
+
+// StartStack достраивает сетевой стек поверх дескриптора от VpnService.
+//
+// tunFD должен быть получен через detachFd(): дальше им распоряжается Go и
+// закрывает его сам. Если отдать getFd(), дескриптор закроют дважды.
+func (t *Tunnel) StartStack(tunFD int, mtu int) error {
+	t.mu.Lock()
+	tun, cfg, direct, cb := t.core, t.cfg, t.direct, t.cb
+	t.mu.Unlock()
+
+	if tun == nil {
+		return fmt.Errorf("сначала нужно поднять туннель")
+	}
+	if mtu <= 0 {
+		mtu = 1500
+	}
+
 	pool, err := core.NewFakePool(fakeNet)
 	if err != nil {
-		close(stop)
-		tun.Stop()
 		return err
 	}
 
@@ -217,20 +259,12 @@ func (t *Tunnel) Start(tunFD int, mtu int) error {
 		},
 	})
 	if err != nil {
-		close(stop)
-		tun.Stop()
 		return err
 	}
 
 	t.mu.Lock()
-	t.core, t.engine, t.bus, t.stop, t.stack = tun, eng, bus, stop, stackStats
+	t.engine, t.stack = eng, stackStats
 	t.mu.Unlock()
-
-	// Ещё и прямо говорим текущее состояние: подписка спасает от гонки, но
-	// приложение не должно зависеть от того, успело ли событие.
-	if cb != nil {
-		cb.OnState(tun.State(), fmt.Sprintf("%s:%d", cfg.Host, cfg.SSHPort))
-	}
 	return nil
 }
 

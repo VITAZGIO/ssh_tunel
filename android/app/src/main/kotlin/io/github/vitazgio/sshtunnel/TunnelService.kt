@@ -109,38 +109,48 @@ class TunnelService : VpnService(), Callbacks {
         }
 
         startForeground(NOTIFICATION_ID, notification("подключение…"))
-
-        val iface = try {
-            buildInterface(settings)
-        } catch (e: Exception) {
-            report("error", "не удалось создать интерфейс: ${e.message}")
-            stopSelf()
-            return
-        }
-        fd = iface
-
-        try {
-            tunnel.setCallbacks(this)
-            tunnel.configure(
-                settings.host,
-                settings.sshPort.toLong(),
-                settings.user,
-                settings.keyFile.absolutePath,
-                settings.knownHostsFile.absolutePath,
-                settings.poolSize.toLong(),
-                settings.directHosts,
-                settings.localViaTunnel,
-            )
-            // detachFd, а не getFd: дальше дескриптором распоряжается Go и
-            // закрывает его сам. Иначе его закрыли бы дважды.
-            tunnel.start(iface.detachFd().toLong(), MTU.toLong())
-        } catch (e: Exception) {
-            report("error", e.message ?: "не удалось запустить туннель")
-            stopTunnel()
-            return
-        }
         report("connecting", "")
-        ticker.post(poll)
+
+        // В отдельном потоке: подключение к серверу и проверка его возможностей
+        // занимают секунды, а держать всё это время главный поток нельзя.
+        Thread {
+            try {
+                tunnel.setCallbacks(this)
+                tunnel.configure(
+                    settings.host,
+                    settings.sshPort.toLong(),
+                    settings.user,
+                    settings.keyFile.absolutePath,
+                    settings.knownHostsFile.absolutePath,
+                    settings.poolSize.toLong(),
+                    settings.directHosts,
+                    settings.localViaTunnel,
+                )
+                tunnel.startCore()
+
+                // Сначала спрашиваем сервер, умеет ли он IPv6, и только потом
+                // создаём интерфейс. Объявить телефону шестую версию и не суметь
+                // её обслужить — худшее из возможного: приложения дружно уходят
+                // туда, и не работает вообще ничего. Ровно это и случилось на
+                // первой живой проверке.
+                val hasIPv6 = tunnel.serverHasIPv6()
+                onLog(
+                    if (hasIPv6) "сервер умеет IPv6 — ведём его через туннель"
+                    else "сервер без IPv6 — приложения пойдут по IPv4"
+                )
+
+                val iface = buildInterface(settings, hasIPv6)
+                fd = iface
+                // detachFd, а не getFd: дальше дескриптором распоряжается Go и
+                // закрывает его сам. Иначе его закрыли бы дважды.
+                tunnel.startStack(iface.detachFd().toLong(), MTU.toLong())
+
+                ticker.post(poll)
+            } catch (e: Exception) {
+                report("error", e.message ?: "не удалось запустить туннель")
+                stopTunnel()
+            }
+        }.start()
     }
 
     /**
@@ -151,7 +161,7 @@ class TunnelService : VpnService(), Callbacks {
      * проверки в коде. Второе — отбор приложений: за него отвечает сама
      * система, и это надёжнее любых наших правил.
      */
-    private fun buildInterface(settings: Settings): ParcelFileDescriptor {
+    private fun buildInterface(settings: Settings, withIPv6: Boolean): ParcelFileDescriptor {
         val builder = Builder()
             .setSession(getString(R.string.app_name))
             .setMtu(MTU)
@@ -159,19 +169,20 @@ class TunnelService : VpnService(), Callbacks {
             // адреса, — настоящих сайтов там нет.
             .addAddress("198.18.0.1", 15)
             .addDnsServer("198.18.0.1")
-            // Адрес IPv6 из диапазона для частных сетей. Сам он не нужен, но
-            // без него система не пустит в туннель трафик шестой версии.
-            .addAddress("fd00:c0de:7075::1", 64)
 
         // Весь трафик — в туннель. Дальше из него вычитается локальная сеть.
         builder.addRoute("0.0.0.0", 0)
-        // IPv6 заводится сюда же и отвергается ядром.
+
+        // IPv6 объявляем ровно тогда, когда сервер умеет его обслужить.
         //
-        // Оставить его снаружи было ошибкой: приложения, которые ищут адреса
-        // своими силами (Google и подобные), получали адрес шестой версии и
-        // уходили напрямую, мимо сервера. Выглядело это так, что YouTube не
-        // работает, а Telegram работает.
-        builder.addRoute("::", 0)
+        // Если не объявлять, Android сам блокирует шестую версию и приложения
+        // выбирают четвёртую — она через туннель работает. Если объявить, не
+        // умея, получается наоборот: приложения уходят в IPv6 и упираются в
+        // «open failed» на каждом соединении.
+        if (withIPv6) {
+            builder.addAddress("fd00:c0de:7075::1", 64)
+            builder.addRoute("::", 0)
+        }
 
         if (!settings.localViaTunnel) {
             excludeLocalNetworks(builder)
