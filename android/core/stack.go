@@ -53,6 +53,10 @@ type Stats struct {
 	dnsAsked  int
 	v6Blocked int
 	targets   []string
+
+	// seenUDP помнит, о каких адресах уже сообщили: QUIC шлёт пакеты пачками,
+	// и без этого журнал состоял бы из одной строки, повторённой сто раз.
+	seenUDP map[string]bool
 }
 
 func (s *Stats) tcp(target string) {
@@ -236,21 +240,30 @@ func Start(fd int, mtu uint32, h *Handler) (*Engine, error) {
 	return &Engine{dev: dev, stack: s}, nil
 }
 
-// logUDP сообщает об отвергнутом UDP, но не про каждый пакет: QUIC шлёт их
-// пачками, и журнал превратился бы в кашу.
+// logUDP сообщает о каждом новом адресе, куда ломился UDP, — но только один
+// раз про каждый. Иначе журнал состоял бы из одной строки, повторённой сто раз.
 func (h *Handler) logUDP(id stack.TransportEndpointID) {
+	where := net.JoinHostPort(id.LocalAddress.String(), strconv.Itoa(int(id.LocalPort)))
+
 	h.Stats.mu.Lock()
-	first := h.Stats.udpDrop <= 5 || h.Stats.udpDrop%50 == 0
+	if h.Stats.seenUDP == nil {
+		h.Stats.seenUDP = make(map[string]bool)
+	}
+	// Предел на случай, если приложение перебирает адреса без конца.
+	fresh := !h.Stats.seenUDP[where] && len(h.Stats.seenUDP) < 60
+	if fresh {
+		h.Stats.seenUDP[where] = true
+	}
 	h.Stats.mu.Unlock()
-	if !first {
+
+	if !fresh {
 		return
 	}
 	what := "UDP"
 	if id.LocalPort == 443 {
 		what = "QUIC"
 	}
-	h.logf("%s %s — через SSH не проходит",
-		what, net.JoinHostPort(id.LocalAddress.String(), strconv.Itoa(int(id.LocalPort))))
+	h.logf("%s %s — через SSH не проходит", what, where)
 }
 
 // serveTCP восстанавливает адрес назначения и передаёт соединение в ядро.

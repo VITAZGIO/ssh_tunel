@@ -76,9 +76,10 @@ class TunnelService : VpnService(), Callbacks {
         val links = o.optInt("links")
         val udp = o.optInt("udpDropped")
         val v6 = o.optInt("v6Blocked")
+        val dns = o.optInt("dnsAsked")
         buildString {
             append("отправлено $up, получено $down · каналов $healthy из $links")
-            if (udp > 0 || v6 > 0) append("\nотклонено: UDP $udp, IPv6 $v6")
+            append("\nимён разрешено $dns · отклонено: UDP $udp, IPv6 $v6")
         }
     } catch (e: Exception) {
         ""
