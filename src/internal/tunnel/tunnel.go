@@ -19,6 +19,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -28,6 +29,7 @@ import (
 
 	"sshtunnel/internal/events"
 	"sshtunnel/internal/hostkey"
+	"sshtunnel/internal/procinfo"
 	"sshtunnel/internal/routing"
 )
 
@@ -227,13 +229,35 @@ func (t *Tunnel) startListeners() error {
 		}
 		ln, err := net.Listen("tcp", s.addr)
 		if err != nil {
-			return fmt.Errorf("не могу занять локальный адрес %s (%s): %w — возможно, программа уже запущена", s.addr, s.name, err)
+			return fmt.Errorf("не могу занять локальный адрес %s (%s): %w%s",
+				s.addr, s.name, err, whoHolds(s.addr))
 		}
 		t.listeners = append(t.listeners, ln)
 		t.wg.Add(1)
 		go t.acceptLoop(ln, s.handler)
 	}
 	return nil
+}
+
+// whoHolds пытается назвать программу, которая уже держит этот порт.
+//
+// Без этого сообщение об ошибке заставляет гадать: своя же копия висит в трее
+// или посторонняя программа заняла порт. Ответ у системы есть, и спросить его
+// стоит ровно один раз — в момент, когда занять порт не вышло.
+func whoHolds(addr string) string {
+	_, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		return ""
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return ""
+	}
+	name, pid := procinfo.Lookup(uint16(port))
+	if name == "" {
+		return " — возможно, программа уже запущена"
+	}
+	return fmt.Sprintf(" — порт занят программой %s (%d)", name, pid)
 }
 
 func (t *Tunnel) acceptLoop(ln net.Listener, handle func(net.Conn)) {
