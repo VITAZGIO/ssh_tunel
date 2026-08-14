@@ -42,6 +42,21 @@
             android:label="@string/apps_title" />
 
         <!--
+            Кнопка в шторке быстрых настроек. Разрешение выдаёт система: с ним
+            запускать её может только она сама.
+        -->
+        <service
+            android:name=".TunnelTile"
+            android:exported="true"
+            android:icon="@drawable/ic_notify"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!--
             Служба туннеля. Разрешение BIND_VPN_SERVICE выдаёт система, и
             благодаря ему запустить службу может только она сама — после того,
             как человек подтвердил запрос на создание VPN-подключения.

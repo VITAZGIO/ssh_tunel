@@ -35,8 +35,8 @@
     <string name="log">Журнал</string>
     <string name="log_hint">Куда ходят приложения. Имя вместо адреса означает, что его разрешил сервер, а не телефон.</string>
     <string name="tab_settings">Настройки</string>
-    <string name="tile_down">ПРИЁМ</string>
-    <string name="tile_up">ОТДАЧА</string>
+    <string name="tile_down">ПРИЁМ, МБИТ/С</string>
+    <string name="tile_up">ОТДАЧА, МБИТ/С</string>
     <string name="tile_conns">СОЕДИНЕНИЙ</string>
     <string name="tile_links">КАНАЛОВ SSH</string>
     <string name="pool_hint">каналов SSH</string>

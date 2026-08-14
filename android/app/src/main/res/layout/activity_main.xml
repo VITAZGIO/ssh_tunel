@@ -142,24 +142,34 @@
                 android:fontFamily="monospace"
                 android:textSize="12.5sp" />
 
-            <!-- Результат теста скорости живёт здесь и через десять секунд
-                 исчезает: он интересен сразу после замера, а потом только
-                 занимает место и вводит в заблуждение — цифры уже старые. -->
-            <TextView
-                android:id="@+id/speedResult"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:gravity="center"
-                android:fontFamily="monospace"
-                android:textSize="13sp"
-                android:textColor="@color/accent"
-                android:visibility="gone" />
-
             <Space
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_weight="1" />
+
+            <!-- Приём и отдача появляются после замера скорости и через десять
+                 секунд исчезают: сразу после теста цифры интересны, а через
+                 минуту они уже неправда — связь меняется. -->
+            <LinearLayout
+                android:id="@+id/rowSpeed"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="14dp"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <LinearLayout style="@style/Tile">
+                    <TextView style="@style/TileKey" android:text="@string/tile_down" />
+                    <TextView android:id="@+id/tileDown" style="@style/TileValue" />
+                </LinearLayout>
+
+                <Space android:layout_width="14dp" android:layout_height="1dp" />
+
+                <LinearLayout style="@style/Tile">
+                    <TextView style="@style/TileKey" android:text="@string/tile_up" />
+                    <TextView android:id="@+id/tileUp" style="@style/TileValue" />
+                </LinearLayout>
+            </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"

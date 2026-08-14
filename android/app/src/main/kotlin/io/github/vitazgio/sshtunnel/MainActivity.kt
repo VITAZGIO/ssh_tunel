@@ -50,7 +50,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var speedButton: Button
 
     private lateinit var pingView: TextView
-    private lateinit var speedResult: TextView
+    private lateinit var rowSpeed: View
+    private lateinit var tileDown: TextView
+    private lateinit var tileUp: TextView
     private lateinit var tileConns: TextView
     private lateinit var tileLinks: TextView
 
@@ -91,7 +93,9 @@ class MainActivity : AppCompatActivity() {
         speedButton = findViewById(R.id.speedtest)
 
         pingView = findViewById(R.id.ping)
-        speedResult = findViewById(R.id.speedResult)
+        rowSpeed = findViewById(R.id.rowSpeed)
+        tileDown = findViewById(R.id.tileDown)
+        tileUp = findViewById(R.id.tileUp)
         tileConns = findViewById(R.id.tileConns)
         tileLinks = findViewById(R.id.tileLinks)
 
@@ -254,17 +258,14 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, err, Toast.LENGTH_LONG).show()
             return
         }
-        speedResult.text = getString(
-            R.string.speed_result,
-            "%.1f Мбит/с".format(o.optDouble("downMbps", 0.0)),
-            "%.1f Мбит/с".format(o.optDouble("upMbps", 0.0)),
-        )
-        speedResult.visibility = View.VISIBLE
-        speedResult.removeCallbacks(hideSpeed)
-        speedResult.postDelayed(hideSpeed, 10_000)
+        tileDown.text = "%.1f".format(o.optDouble("downMbps", 0.0))
+        tileUp.text = "%.1f".format(o.optDouble("upMbps", 0.0))
+        rowSpeed.visibility = View.VISIBLE
+        rowSpeed.removeCallbacks(hideSpeed)
+        rowSpeed.postDelayed(hideSpeed, 10_000)
     }
 
-    private val hideSpeed = Runnable { speedResult.visibility = View.GONE }
+    private val hideSpeed = Runnable { rowSpeed.visibility = View.GONE }
 
     /** Задержка до сервера. Цвет важнее числа: зелёный, жёлтый, красный. */
     private fun showPing(ms: Long) {
@@ -359,8 +360,8 @@ class MainActivity : AppCompatActivity() {
 
         showPing(if (state == "connected") o.optLong("pingMs") else 0L)
         if (!running) {
-            speedResult.visibility = View.GONE
-            speedResult.removeCallbacks(hideSpeed)
+            rowSpeed.visibility = View.GONE
+            rowSpeed.removeCallbacks(hideSpeed)
         }
     }
 }
