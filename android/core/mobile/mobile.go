@@ -210,6 +210,11 @@ func (t *Tunnel) Start(tunFD int, mtu int) error {
 		Resolve: pool.Resolver(),
 		DNS:     dns,
 		Stats:   stackStats,
+		Log: func(line string) {
+			if cb != nil {
+				cb.OnLog(line)
+			}
+		},
 	})
 	if err != nil {
 		close(stop)

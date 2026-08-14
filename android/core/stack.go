@@ -103,6 +103,16 @@ type Handler struct {
 	// DNS отвечает на запросы приложений. Если не задан, запросы к 53-му порту
 	// отбиваются вместе с остальным UDP.
 	DNS *DNS
+
+	// Log показывает человеку то, что отвергнуто. Без этого отказы невидимы:
+	// приложение просто «не работает», а причина остаётся только в счётчике.
+	Log func(line string)
+}
+
+func (h *Handler) logf(format string, a ...any) {
+	if h.Log != nil {
+		h.Log(fmt.Sprintf(format, a...))
+	}
 }
 
 // Engine — собранный стек поверх дескриптора от VpnService.
@@ -159,18 +169,14 @@ func Start(fd int, mtu uint32, h *Handler) (*Engine, error) {
 		// и обращение к ID после него роняет процесс.
 		id := r.ID()
 
-		// IPv6 через туннель не ходит: подставные адреса у нас четвёртой
-		// версии, да и SSH пришлось бы просить адрес, которого приложение не
-		// спрашивало. Поэтому соединение сразу отвергается.
+		// Соединения IPv6 ведём через сервер наравне с остальными.
 		//
-		// Отвергается, а не отбрасывается: приложение должно узнать об отказе
-		// немедленно и попробовать IPv4, который через туннель пройдёт. Если
-		// промолчать, оно будет ждать, и получится ровно то, что вышло на
-		// первом телефоне: YouTube грузится вечно, а Telegram работает.
+		// Сначала мы их отвергали, рассчитывая, что приложение попробует IPv4.
+		// На живом телефоне выяснилось, что не пробует: YouTube упирался в
+		// отказ и переставал делать что бы то ни было. Пусть лучше сервер сам
+		// откроет соединение — SSH умеет и шестую версию.
 		if id.LocalAddress.Len() == 16 {
 			h.Stats.v6()
-			r.Complete(true)
-			return
 		}
 
 		var wq waiter.Queue
@@ -206,6 +212,7 @@ func Start(fd int, mtu uint32, h *Handler) (*Engine, error) {
 				return udpFwd.HandlePacket(id, pkt)
 			}
 			h.Stats.udp()
+			h.logUDP(id)
 			return false
 		})
 
@@ -227,6 +234,23 @@ func Start(fd int, mtu uint32, h *Handler) (*Engine, error) {
 	})
 
 	return &Engine{dev: dev, stack: s}, nil
+}
+
+// logUDP сообщает об отвергнутом UDP, но не про каждый пакет: QUIC шлёт их
+// пачками, и журнал превратился бы в кашу.
+func (h *Handler) logUDP(id stack.TransportEndpointID) {
+	h.Stats.mu.Lock()
+	first := h.Stats.udpDrop <= 5 || h.Stats.udpDrop%50 == 0
+	h.Stats.mu.Unlock()
+	if !first {
+		return
+	}
+	what := "UDP"
+	if id.LocalPort == 443 {
+		what = "QUIC"
+	}
+	h.logf("%s %s — через SSH не проходит",
+		what, net.JoinHostPort(id.LocalAddress.String(), strconv.Itoa(int(id.LocalPort))))
 }
 
 // serveTCP восстанавливает адрес назначения и передаёт соединение в ядро.
