@@ -1,17 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    Передний слой иконки. Знак уменьшен и отодвинут от краёв: система обрезает
-    иконку по своей форме, и то, что близко к краю, теряется.
--->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <group android:scaleX="0.0958" android:scaleY="0.0958"
-        android:translateX="24" android:translateY="29">
-        <path android:fillColor="#2de2ff" android:pathData="M0,0 L137,449 L180,308 L86,0 Z" />
-        <path android:fillColor="#2de2ff" android:pathData="M159,520 L221,520 L246,437 L354,83 L379,0 L293,0 L190,338 L146,479 Z" />
-        <path android:fillColor="#2de2ff" android:pathData="M468,520 L524,337 L437,337 L406,437 L264,437 L239,520 Z" />
-        <path android:fillColor="#2de2ff" android:pathData="M554,236 L394,236 L368,319 L442,319 L529,319 Z" />
-        <path android:fillColor="#2de2ff" android:pathData="M373,83 L601,83 L626,0 L398,0 Z" />
+    <!-- Щит уменьшен и отодвинут от краёв: система обрезает иконку по своей
+         форме, и то, что близко к краю, теряется. -->
+    <group android:scaleX="0.135" android:scaleY="0.135"
+        android:translateX="19.4" android:translateY="19.4">
+        <path android:fillColor="#2de2ff" android:pathData="M43.52,28.16 L468.48,28.16 L468.48,215.04 Q453.12,409.6 256,494.08 Q58.88,409.6 43.52,215.04 Z" />
+    <path android:fillColor="#000000" android:pathData="M202.24,179.2 a53.76,53.76 0 1,0 107.52,0 a53.76,53.76 0 1,0 -107.52,0 Z" />
+    <path android:fillColor="#000000" android:pathData="M234.5,179.2 L277.5,179.2 L301.06,286.72 L210.94,286.72 Z" />
     </group>
 </vector>

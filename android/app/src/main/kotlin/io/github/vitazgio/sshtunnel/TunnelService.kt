@@ -34,6 +34,12 @@ class TunnelService : VpnService(), Callbacks {
 
         var onUpdate: (() -> Unit)? = null
 
+        /** Работающая служба — через неё экран запускает тест скорости. */
+        @Volatile private var current: TunnelService? = null
+
+        fun speedTest(): String =
+            current?.tunnel?.speedTest() ?: """{"error":"туннель выключен"}"""
+
         private const val TAG = "ssh_tunnel"
         private const val CHANNEL = "tunnel"
         private const val NOTIFICATION_ID = 1
@@ -66,6 +72,11 @@ class TunnelService : VpnService(), Callbacks {
             onUpdate?.invoke()
             ticker.postDelayed(this, 1500)
         }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        current = this
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -272,6 +283,7 @@ class TunnelService : VpnService(), Callbacks {
     }
 
     override fun onDestroy() {
+        current = null
         stopTunnel()
         super.onDestroy()
     }
@@ -354,7 +366,7 @@ class TunnelService : VpnService(), Callbacks {
         return Notification.Builder(this, CHANNEL)
             .setContentTitle(getString(R.string.app_name))
             .setContentText(text)
-            .setSmallIcon(R.drawable.ic_tunnel)
+            .setSmallIcon(R.drawable.ic_notify)
             .setContentIntent(open)
             .setOngoing(true)
             .addAction(

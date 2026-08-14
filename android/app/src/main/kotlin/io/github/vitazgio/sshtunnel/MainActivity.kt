@@ -17,17 +17,22 @@ import android.widget.Toast
 import android.widget.ViewFlipper
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import com.google.android.material.bottomnavigation.BottomNavigationView
 import org.json.JSONObject
 
 /**
- * Три экрана: главный, журнал и настройки — как в окне на компьютере.
+ * Экран приложения — повторяет окно на компьютере.
  *
- * Экран ничем не управляет напрямую: он просит службу включиться или
- * выключиться и показывает то, что она сообщает. Поэтому туннель продолжает
- * работать, даже когда приложение закрыто.
+ * Сам он ничем не управляет: просит службу включиться или выключиться и
+ * показывает то, что она сообщает. Поэтому туннель продолжает работать, даже
+ * когда приложение закрыто.
  */
 class MainActivity : AppCompatActivity() {
+
+    private companion object {
+        const val MAIN = 0
+        const val LOG = 1
+        const val SETTINGS = 2
+    }
 
     private lateinit var settings: Settings
 
@@ -37,11 +42,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var powerCap: TextView
     private lateinit var stateView: TextView
     private lateinit var detailView: TextView
-    private lateinit var rejectedView: TextView
+    private lateinit var errorView: TextView
     private lateinit var logView: TextView
     private lateinit var logScroll: ScrollView
     private lateinit var keyStateView: TextView
+    private lateinit var appsSummary: TextView
+    private lateinit var speedButton: Button
 
+    private lateinit var rowSpeed: View
     private lateinit var tileDown: TextView
     private lateinit var tileUp: TextView
     private lateinit var tileConns: TextView
@@ -76,11 +84,14 @@ class MainActivity : AppCompatActivity() {
         powerCap = findViewById(R.id.powerCap)
         stateView = findViewById(R.id.state)
         detailView = findViewById(R.id.detail)
-        rejectedView = findViewById(R.id.rejected)
+        errorView = findViewById(R.id.error)
         logView = findViewById(R.id.log)
         logScroll = findViewById(R.id.logScroll)
         keyStateView = findViewById(R.id.keyState)
+        appsSummary = findViewById(R.id.appsSummary)
+        speedButton = findViewById(R.id.speedtest)
 
+        rowSpeed = findViewById(R.id.rowSpeed)
         tileDown = findViewById(R.id.tileDown)
         tileUp = findViewById(R.id.tileUp)
         tileConns = findViewById(R.id.tileConns)
@@ -97,19 +108,30 @@ class MainActivity : AppCompatActivity() {
         loadSettings()
 
         power.setOnClickListener { onToggle() }
+        speedButton.setOnClickListener { runSpeedTest() }
         findViewById<Button>(R.id.save).setOnClickListener { saveSettings() }
-        findViewById<Button>(R.id.apps).setOnClickListener {
+        findViewById<View>(R.id.apps).setOnClickListener {
             startActivity(Intent(this, AppsActivity::class.java))
         }
 
-        findViewById<BottomNavigationView>(R.id.nav).setOnItemSelectedListener { item ->
-            flipper.displayedChild = when (item.itemId) {
-                R.id.navLog -> 1
-                R.id.navSettings -> 2
-                else -> 0
-            }
-            true
-        }
+        findViewById<View>(R.id.btnLog).setOnClickListener { flipper.displayedChild = LOG }
+        findViewById<View>(R.id.btnSettings).setOnClickListener { flipper.displayedChild = SETTINGS }
+        findViewById<View>(R.id.backFromLog).setOnClickListener { flipper.displayedChild = MAIN }
+        findViewById<View>(R.id.backFromSettings).setOnClickListener { flipper.displayedChild = MAIN }
+
+        // Кнопка «назад» возвращает на главную, а не закрывает приложение:
+        // выйти из настроек хочется чаще, чем выйти совсем.
+        onBackPressedDispatcher.addCallback(this,
+            object : androidx.activity.OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    if (flipper.displayedChild != MAIN) {
+                        flipper.displayedChild = MAIN
+                    } else {
+                        isEnabled = false
+                        onBackPressedDispatcher.onBackPressed()
+                    }
+                }
+            })
 
         askNotificationPermission()
     }
@@ -160,7 +182,7 @@ class MainActivity : AppCompatActivity() {
         }
         if (!settings.ready()) {
             Toast.makeText(this, R.string.need_settings, Toast.LENGTH_LONG).show()
-            flipper.displayedChild = 2
+            flipper.displayedChild = SETTINGS
             return
         }
         // Разрешение на VPN-подключение спрашивает сама система; без её
@@ -171,6 +193,45 @@ class MainActivity : AppCompatActivity() {
 
     private fun start() {
         startService(Intent(this, TunnelService::class.java).setAction(TunnelService.ACTION_START))
+    }
+
+    /** Тест скорости идёт секунд двадцать, поэтому в отдельном потоке. */
+    private fun runSpeedTest() {
+        if (TunnelService.state != "connected") {
+            Toast.makeText(this, R.string.need_connected, Toast.LENGTH_SHORT).show()
+            return
+        }
+        speedButton.isEnabled = false
+        speedButton.setText(R.string.speedtest_running)
+        Thread {
+            val out = try {
+                TunnelService.speedTest()
+            } catch (e: Exception) {
+                """{"error":"${e.message}"}"""
+            }
+            runOnUiThread {
+                speedButton.isEnabled = true
+                speedButton.setText(R.string.speedtest)
+                showSpeed(out)
+            }
+        }.start()
+    }
+
+    private fun showSpeed(json: String) {
+        val o = try {
+            JSONObject(json)
+        } catch (e: Exception) {
+            JSONObject()
+        }
+        val err = o.optString("error")
+        val text = if (err.isNotBlank()) {
+            err
+        } else {
+            "приём %.1f Мбит/с · отдача %.1f Мбит/с".format(
+                o.optDouble("downMbps", 0.0), o.optDouble("upMbps", 0.0)
+            )
+        }
+        Toast.makeText(this, text, Toast.LENGTH_LONG).show()
     }
 
     private fun askNotificationPermission() {
@@ -208,33 +269,46 @@ class MainActivity : AppCompatActivity() {
         powerCap.setTextColor(color)
         powerCap.setText(if (state == "stopped") R.string.start else R.string.stop)
 
-        detailView.text = TunnelService.detail
-        keyStateView.setText(if (settings.hasKey) R.string.key_saved else R.string.key_missing)
+        if (state == "error" && TunnelService.detail.isNotBlank()) {
+            errorView.text = TunnelService.detail
+            errorView.visibility = View.VISIBLE
+            detailView.text = ""
+        } else {
+            errorView.visibility = View.GONE
+            detailView.text = TunnelService.detail
+        }
 
-        showStats()
+        keyStateView.setText(if (settings.hasKey) R.string.key_saved else R.string.key_missing)
+        appsSummary.text = appsSummaryText()
+
+        showStats(state)
 
         val lines = synchronized(TunnelService.log) { TunnelService.log.toList() }
         logView.text = lines.joinToString("\n")
         logScroll.post { logScroll.fullScroll(View.FOCUS_DOWN) }
     }
 
-    private fun showStats() {
+    private fun appsSummaryText(): String = when (settings.filterMode) {
+        "only" -> getString(R.string.mode_only) + ", " +
+            getString(R.string.apps_chosen, settings.filterApps.size)
+        "except" -> getString(R.string.mode_except) + ", " +
+            getString(R.string.apps_chosen, settings.filterApps.size)
+        else -> getString(R.string.mode_all)
+    }
+
+    private fun showStats(state: String) {
         val o = try {
             JSONObject(TunnelService.statsJson)
         } catch (e: Exception) {
             JSONObject()
         }
-        tileDown.text = size(o.optLong("bytesDown"))
-        tileUp.text = size(o.optLong("bytesUp"))
-        tileConns.text = o.optLong("total").toString()
-        tileLinks.text = "${o.optInt("healthy")} / ${o.optInt("links")}"
+        val running = state != "stopped"
+        rowSpeed.visibility = if (running) View.VISIBLE else View.GONE
 
-        rejectedView.text = if (TunnelService.state == "stopped") {
-            ""
-        } else {
-            "имён разрешено ${o.optInt("dnsAsked")} · отклонено: " +
-                "UDP ${o.optInt("udpDropped")}, IPv6 ${o.optInt("v6Blocked")}"
-        }
+        tileDown.text = if (running) size(o.optLong("bytesDown")) else "—"
+        tileUp.text = if (running) size(o.optLong("bytesUp")) else "—"
+        tileConns.text = if (running) o.optLong("total").toString() else "—"
+        tileLinks.text = if (running) "${o.optInt("healthy")} / ${o.optInt("links")}" else "—"
     }
 
     private fun size(bytes: Long): String = when {

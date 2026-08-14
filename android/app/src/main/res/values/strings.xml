@@ -34,15 +34,20 @@
 
     <string name="log">Журнал</string>
     <string name="log_hint">Куда ходят приложения. Имя вместо адреса означает, что его разрешил сервер, а не телефон.</string>
-    <string name="tab_main">Главная</string>
-    <string name="tab_log">Журнал</string>
     <string name="tab_settings">Настройки</string>
-    <string name="tile_down">Принято</string>
-    <string name="tile_up">Отдано</string>
-    <string name="tile_conns">Соединений</string>
-    <string name="tile_links">Каналов SSH</string>
+    <string name="tile_down">ПРИЁМ</string>
+    <string name="tile_up">ОТДАЧА</string>
+    <string name="tile_conns">СОЕДИНЕНИЙ</string>
+    <string name="tile_links">КАНАЛОВ SSH</string>
     <string name="pool_hint">каналов SSH</string>
     <string name="direct_note">Адреса и сети, которым туннель не нужен. Локальная сеть и так идёт напрямую.</string>
     <string name="need_settings">Заполните адрес сервера, пользователя и ключ</string>
     <string name="saved">Сохранено</string>
+    <string name="back">Назад</string>
+    <string name="need_connected">Сначала включите туннель</string>
+    <string name="speedtest">Тест скорости</string>
+    <string name="speedtest_running">Идёт тест…</string>
+    <string name="apps_row">Какие программы вести через туннель</string>
+    <string name="pool_note">Несколько параллельных каналов заметно поднимают скорость. 4 — разумное значение.</string>
+    <string name="apps_chosen">выбрано %1$d</string>
 </resources>

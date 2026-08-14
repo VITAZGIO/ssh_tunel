@@ -6,9 +6,15 @@
     android:background="@color/bg"
     android:padding="16dp">
 
-    <TextView
-        style="@style/Head"
-        android:text="@string/apps_title" />
+    <LinearLayout style="@style/HeadRow">
+        <ImageView
+            android:id="@+id/backFromApps"
+            style="@style/HeadIcon"
+            android:src="@drawable/ic_back"
+            android:contentDescription="@string/back" />
+
+        <TextView style="@style/HeadTitle" android:text="@string/apps_title" />
+    </LinearLayout>
 
     <TextView
         android:layout_width="match_parent"

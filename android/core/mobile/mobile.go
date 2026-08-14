@@ -7,6 +7,7 @@
 package mobile
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -18,6 +19,7 @@ import (
 	"sshtunnel/android/core"
 	"sshtunnel/internal/events"
 	"sshtunnel/internal/routing"
+	"sshtunnel/internal/speedtest"
 	"sshtunnel/internal/tunnel"
 )
 
@@ -328,6 +330,41 @@ func (t *Tunnel) Stop() {
 	if tun != nil {
 		tun.Stop()
 	}
+}
+
+// SpeedTest мерит скорость через туннель — тот же тест, что в окне на
+// компьютере. Возвращает результат строкой JSON.
+//
+// Идёт он секунд двадцать, поэтому вызывать только из отдельного потока.
+func (t *Tunnel) SpeedTest() string {
+	t.mu.Lock()
+	tun, cb := t.core, t.cb
+	t.mu.Unlock()
+	if tun == nil {
+		return `{"error":"туннель выключен"}`
+	}
+
+	res, err := speedtest.Run(context.Background(), speedtest.Options{
+		Dial: tun.Dial,
+		OnProgress: func(phase string, mbps float64) {
+			if cb == nil {
+				return
+			}
+			what := "приём"
+			if phase == "up" {
+				what = "отдача"
+			}
+			cb.OnLog(fmt.Sprintf("тест скорости, %s: %.1f Мбит/с", what, mbps))
+		},
+	})
+	if err != nil {
+		return fmt.Sprintf(`{"error":%q}`, err.Error())
+	}
+	b, err := json.Marshal(res)
+	if err != nil {
+		return `{"error":"не удалось разобрать результат"}`
+	}
+	return string(b)
 }
 
 // State — состояние одним словом, для экрана.
