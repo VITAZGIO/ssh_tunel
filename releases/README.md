@@ -13,6 +13,7 @@
 | `ssh_tunnel.exe` | Windows, версия с окном |
 | `ssh_tunnel_linux` | Linux amd64 — обычные серверы и компьютеры |
 | `ssh_tunnel_linux_arm64` | Linux ARM — Raspberry Pi, ARM-облако |
+| `ssh_tunnel_windows.zip` | тот же exe в архиве |
 | `SHA256SUMS.txt` | контрольные суммы |
 
 Ссылки, которые всегда ведут на свежую версию:
@@ -21,6 +22,10 @@
 https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe
 https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
 ```
+
+Архив с exe нужен не для экономии места (он почти ничего не экономит), а ради
+браузеров: неподписанный `.exe` многие помечают как опасный прямо при
+скачивании, а к `.zip` не придираются. Внутри тот же файл.
 
 ## Собрать самому
 

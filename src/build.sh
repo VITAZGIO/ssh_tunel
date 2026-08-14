@@ -46,6 +46,18 @@ GOOS=linux GOARCH=arm64 go build \
   -ldflags="-s -w" \
   -o "$OUT/linux/ssh_tunnel_linux_arm64" ./cmd/ssh_tunnel_linux
 
+# Архив для Windows. Браузеры почти не придираются к .zip, тогда как
+# неподписанный .exe многие помечают как опасный уже при скачивании. Внутри тот
+# же файл — это способ отдать его человеку без спора с браузером.
+echo "Windows: архив..."
+if command -v zip >/dev/null 2>&1; then
+  ( cd "$OUT/windows" && rm -f ssh_tunnel_windows.zip && zip -q ssh_tunnel_windows.zip ssh_tunnel.exe )
+elif command -v python3 >/dev/null 2>&1; then
+  ( cd "$OUT/windows" && rm -f ssh_tunnel_windows.zip && python3 -m zipfile -c ssh_tunnel_windows.zip ssh_tunnel.exe )
+else
+  echo "  нет ни zip, ни python3 — архив не собран"
+fi
+
 # Файлы прошлых сборок могли остаться от предыдущих версий и прежних имён —
 # иначе они попадут в контрольные суммы, а в релиз нет.
 rm -f "$OUT/windows/ssh_tunnel_cli.exe" "$OUT/windows/ssh_tunel.exe" "$OUT/windows/ssh_tunnel-cli.exe" \
