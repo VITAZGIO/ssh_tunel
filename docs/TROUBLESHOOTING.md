@@ -314,12 +314,18 @@ Get-FileHash "$env:USERPROFILE\Desktop\ssh_tunnel.exe" -Algorithm SHA256
 там другой стек TLS, и эта ошибка не возникает:
 
 ```powershell
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $ProgressPreference = 'SilentlyContinue'
 Invoke-WebRequest -Uri https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe -OutFile "$env:USERPROFILE\Desktop\ssh_tunnel.exe"
 ```
 
-Первая строка не украшательство: без неё Invoke-WebRequest рисует полосу
-загрузки и на больших файлах работает в разы медленнее.
+Обе первые строки нужны, это не украшательство:
+
+- без `SecurityProtocol` Windows PowerShell 5.1 (тот, что открывается по
+  умолчанию) пробует устаревшие версии TLS, а GitHub такие соединения просто
+  рвёт — получаешь «Запрос был прерван: соединение было неожиданно закрыто»;
+- без `ProgressPreference` команда рисует полосу загрузки и на больших файлах
+  работает в разы медленнее.
 
 Если файл уже скачан браузером, метку можно снять:
 
