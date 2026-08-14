@@ -74,7 +74,12 @@ class TunnelService : VpnService(), Callbacks {
         val down = size(o.optLong("bytesDown"))
         val healthy = o.optInt("healthy")
         val links = o.optInt("links")
-        "отправлено $up, получено $down · каналов $healthy из $links"
+        val udp = o.optInt("udpDropped")
+        val v6 = o.optInt("v6Blocked")
+        buildString {
+            append("отправлено $up, получено $down · каналов $healthy из $links")
+            if (udp > 0 || v6 > 0) append("\nотклонено: UDP $udp, IPv6 $v6")
+        }
     } catch (e: Exception) {
         ""
     }
@@ -154,10 +159,19 @@ class TunnelService : VpnService(), Callbacks {
             // адреса, — настоящих сайтов там нет.
             .addAddress("198.18.0.1", 15)
             .addDnsServer("198.18.0.1")
-            .allowFamily(android.system.OsConstants.AF_INET)
+            // Адрес IPv6 из диапазона для частных сетей. Сам он не нужен, но
+            // без него система не пустит в туннель трафик шестой версии.
+            .addAddress("fd00:c0de:7075::1", 64)
 
-        // Весь трафик IPv4 — в туннель. Дальше из него вычитается локальная сеть.
+        // Весь трафик — в туннель. Дальше из него вычитается локальная сеть.
         builder.addRoute("0.0.0.0", 0)
+        // IPv6 заводится сюда же и отвергается ядром.
+        //
+        // Оставить его снаружи было ошибкой: приложения, которые ищут адреса
+        // своими силами (Google и подобные), получали адрес шестой версии и
+        // уходили напрямую, мимо сервера. Выглядело это так, что YouTube не
+        // работает, а Telegram работает.
+        builder.addRoute("::", 0)
 
         if (!settings.localViaTunnel) {
             excludeLocalNetworks(builder)

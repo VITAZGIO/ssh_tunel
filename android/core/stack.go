@@ -47,11 +47,12 @@ type Resolver func(ip string) (host string, ok bool)
 
 // Stats — счётчики для проверок.
 type Stats struct {
-	mu       sync.Mutex
-	tcpOpen  int
-	udpDrop  int
-	dnsAsked int
-	targets  []string
+	mu        sync.Mutex
+	tcpOpen   int
+	udpDrop   int
+	dnsAsked  int
+	v6Blocked int
+	targets   []string
 }
 
 func (s *Stats) tcp(target string) {
@@ -67,6 +68,12 @@ func (s *Stats) udp() {
 	s.udpDrop++
 }
 
+func (s *Stats) v6() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.v6Blocked++
+}
+
 func (s *Stats) dns() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -78,6 +85,13 @@ func (s *Stats) Snapshot() (tcpOpen, udpDrop, dnsAsked int, targets []string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.tcpOpen, s.udpDrop, s.dnsAsked, append([]string(nil), s.targets...)
+}
+
+// Counts — счётчики для показа человеку.
+func (s *Stats) Counts() (tcpOpen, udpDrop, dnsAsked, v6Blocked int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.tcpOpen, s.udpDrop, s.dnsAsked, s.v6Blocked
 }
 
 // Handler — мост между сетевым стеком и ядром туннеля.
@@ -144,6 +158,20 @@ func Start(fd int, mtu uint32, h *Handler) (*Engine, error) {
 		// Адрес назначения забираем до Complete: тот освобождает запрос,
 		// и обращение к ID после него роняет процесс.
 		id := r.ID()
+
+		// IPv6 через туннель не ходит: подставные адреса у нас четвёртой
+		// версии, да и SSH пришлось бы просить адрес, которого приложение не
+		// спрашивало. Поэтому соединение сразу отвергается.
+		//
+		// Отвергается, а не отбрасывается: приложение должно узнать об отказе
+		// немедленно и попробовать IPv4, который через туннель пройдёт. Если
+		// промолчать, оно будет ждать, и получится ровно то, что вышло на
+		// первом телефоне: YouTube грузится вечно, а Telegram работает.
+		if id.LocalAddress.Len() == 16 {
+			h.Stats.v6()
+			r.Complete(true)
+			return
+		}
 
 		var wq waiter.Queue
 		ep, epErr := r.CreateEndpoint(&wq)

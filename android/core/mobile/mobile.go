@@ -53,6 +53,7 @@ type Tunnel struct {
 
 	core   *tunnel.Tunnel
 	engine *core.Engine
+	stack  *core.Stats
 	bus    *events.Bus
 	stop   chan struct{}
 }
@@ -203,10 +204,12 @@ func (t *Tunnel) Start(tunFD int, mtu int) error {
 		},
 	}
 
+	stackStats := &core.Stats{}
 	eng, err := core.Start(tunFD, uint32(mtu), &core.Handler{
 		Core:    tun,
 		Resolve: pool.Resolver(),
 		DNS:     dns,
+		Stats:   stackStats,
 	})
 	if err != nil {
 		close(stop)
@@ -215,7 +218,7 @@ func (t *Tunnel) Start(tunFD int, mtu int) error {
 	}
 
 	t.mu.Lock()
-	t.core, t.engine, t.bus, t.stop = tun, eng, bus, stop
+	t.core, t.engine, t.bus, t.stop, t.stack = tun, eng, bus, stop, stackStats
 	t.mu.Unlock()
 
 	// Ещё и прямо говорим текущее состояние: подписка спасает от гонки, но
@@ -274,7 +277,7 @@ func describeConn(ev events.Event) string {
 func (t *Tunnel) Stop() {
 	t.mu.Lock()
 	tun, eng, stop := t.core, t.engine, t.stop
-	t.core, t.engine, t.bus, t.stop = nil, nil, nil, nil
+	t.core, t.engine, t.bus, t.stop, t.stack = nil, nil, nil, nil, nil
 	t.mu.Unlock()
 
 	if stop != nil {
@@ -299,15 +302,29 @@ func (t *Tunnel) State() string {
 	return tun.State()
 }
 
-// StatsJSON — счётчики для экрана: байты, соединения, живые каналы.
+// StatsJSON — счётчики для экрана: байты, соединения, живые каналы, а также
+// то, что стек отверг. Последнее важно человеку не меньше: по нему видно, что
+// приложение ломится туда, куда через SSH хода нет.
 func (t *Tunnel) StatsJSON() string {
 	t.mu.Lock()
-	tun := t.core
+	tun, st := t.core, t.stack
 	t.mu.Unlock()
 	if tun == nil {
 		return "{}"
 	}
-	b, err := json.Marshal(tun.Stats())
+
+	out := struct {
+		events.Stats
+		UDPDropped int `json:"udpDropped"`
+		DNSAsked   int `json:"dnsAsked"`
+		V6Blocked  int `json:"v6Blocked"`
+	}{Stats: tun.Stats()}
+
+	if st != nil {
+		_, out.UDPDropped, out.DNSAsked, out.V6Blocked = st.Counts()
+	}
+
+	b, err := json.Marshal(out)
 	if err != nil {
 		return "{}"
 	}
