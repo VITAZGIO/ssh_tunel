@@ -9,7 +9,7 @@
 локальный прокси.
 
 [![Лицензия: MIT](https://img.shields.io/badge/лицензия-MIT-4c8dff)](LICENSE)
-[![Версия](https://img.shields.io/badge/версия-1.0.1-4c8dff)](https://github.com/VITAZGIO/ssh_tunel/releases)
+[![Версия](https://img.shields.io/badge/версия-1.0.2-4c8dff)](https://github.com/VITAZGIO/ssh_tunel/releases)
 [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
 [![Linux](https://img.shields.io/badge/Linux-amd64%20%7C%20arm64-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
 [![Go](https://img.shields.io/badge/Go-1.22+-2de2ff)](src)

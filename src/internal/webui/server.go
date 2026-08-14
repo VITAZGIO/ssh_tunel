@@ -181,7 +181,11 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, s.app.Config())
 		return
 	}
-	var cfg config.Config
+	// Начинаем с текущих настроек, а не с пустой структуры: страница шлёт
+	// только те поля, что показаны на экране, и отсутствующий ключ означает
+	// «не трогай», а не «выключи». Пустая структура молча гасила системный
+	// прокси и переменные среды — туннель работал, но трафик шёл мимо него.
+	cfg := s.app.Config()
 	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
 		writeJSON(w, map[string]string{"error": "не разобрал настройки: " + err.Error()})
 		return
