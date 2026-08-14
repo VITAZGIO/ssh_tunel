@@ -57,8 +57,11 @@ type Config struct {
 
 func Default() Config {
 	return Config{
-		SSHPort:    22,
-		User:       "root",
+		SSHPort: 22,
+		// Не root: у пользователя, заведённого только для туннеля, нет прав
+		// ни на что, кроме проброса соединений. Если такого пользователя на
+		// сервере нет, его создаст команда из подсказки у поля с ключом.
+		User:       "tunnel",
 		KeyPath:    DetectKeyPath(),
 		SocksPort:  1080,
 		HTTPPort:   1081,
@@ -69,10 +72,10 @@ func Default() Config {
 	}
 }
 
-// Dir — папка с настройками: %APPDATA%\ssh_tunel на Windows,
-// ~/.config/ssh_tunel на остальных системах.
+// Dir — папка с настройками: %APPDATA%\ssh_tunnel на Windows,
+// ~/.config/ssh_tunnel на остальных системах.
 func Dir() string {
-	return filepath.Join(baseDir(), "ssh_tunel")
+	return filepath.Join(baseDir(), "ssh_tunnel")
 }
 
 func baseDir() string {
@@ -92,11 +95,17 @@ func migrateOldDir() {
 	if _, err := os.Stat(newDir); err == nil {
 		return // уже переехали
 	}
-	oldDir := filepath.Join(baseDir(), "vpstunnel")
-	if _, err := os.Stat(oldDir); err != nil {
-		return // и не было ничего
+	// Программа успела дважды сменить имя: vpstunnel -> ssh_tunel -> ssh_tunnel.
+	// Настройки надо подобрать от любого из прежних, начиная с самого свежего.
+	for _, old := range []string{"ssh_tunel", "vpstunnel"} {
+		oldDir := filepath.Join(baseDir(), old)
+		if _, err := os.Stat(oldDir); err != nil {
+			continue
+		}
+		if os.Rename(oldDir, newDir) == nil {
+			return
+		}
 	}
-	os.Rename(oldDir, newDir)
 }
 
 func Path() string { return filepath.Join(Dir(), "config.json") }

@@ -7,8 +7,8 @@ releases/SHA256SUMS.txt
 
 # Сборочный мусор
 src/*.exe
-src/vpstunnel
-src/vpstunnel-cli
+src/ssh_tunnel
+src/ssh_tunnel-cli
 *.test
 *.out
 

@@ -106,7 +106,7 @@ func (m *Manager) writeEnvFile(httpAddr string, bypassLocal bool, extra []string
 	}
 	url := "http://" + httpAddr
 	noProxy := noProxyList(bypassLocal, extra...)
-	body := fmt.Sprintf(`# Создано ssh_tunel. Подключить в текущую оболочку:
+	body := fmt.Sprintf(`# Создано ssh_tunnel. Подключить в текущую оболочку:
 #   source %s
 # Отключить: unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY no_proxy NO_PROXY
 export http_proxy=%s

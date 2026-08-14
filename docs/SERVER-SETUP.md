@@ -127,8 +127,8 @@ else
   # Старая система без Include — дописываем в основной файл, убрав прошлый
   # хвост от этого же скрипта, чтобы повторный запуск не плодил копии.
   SSHD_CONF=/etc/ssh/sshd_config
-  sed -i '/^# --- ssh_tunel hardening ---$/,$d' "$SSHD_CONF"
-  echo "# --- ssh_tunel hardening ---" >> "$SSHD_CONF"
+  sed -i '/^# --- ssh_tunnel hardening ---$/,$d' "$SSHD_CONF"
+  echo "# --- ssh_tunnel hardening ---" >> "$SSHD_CONF"
 fi
 
 # По той же причине (первое значение выигрывает) гасим все прежние объявления
@@ -142,7 +142,7 @@ DIRECTIVES="$DIRECTIVES|PermitEmptyPasswords|AllowTcpForwarding|Port|X11Forwardi
 # Include старый "Port 22" из основного файла остался бы выше нашего и выиграл.
 for f in /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf; do
   [ -f "$f" ] || continue
-  sed -ri "s/^([[:space:]]*($DIRECTIVES)[[:space:]])/# выключено ssh_tunel: \\1/I" "$f"
+  sed -ri "s/^([[:space:]]*($DIRECTIVES)[[:space:]])/# выключено ssh_tunnel: \\1/I" "$f"
 done
 
 cat >> "$SSHD_CONF" <<EOF
@@ -158,7 +158,7 @@ X11Forwarding no
 ClientAliveInterval 60
 ClientAliveCountMax 3
 
-# Проброс TCP нужен для SSH-туннеля (ssh -D, ssh -L и ssh_tunel).
+# Проброс TCP нужен для SSH-туннеля (ssh -D, ssh -L и ssh_tunnel).
 # Многие "гайды по безопасности" его выключают — тогда туннель не работает.
 AllowTcpForwarding yes
 EOF
@@ -270,7 +270,7 @@ bash /root/harden.sh
 | Включил firewall | Наружу открыт один порт SSH. Всё, что случайно поднимется на сервере, снаружи не видно |
 | Поставил fail2ban | Банит на час после трёх неудачных попыток |
 | Включил автообновления | Обновления безопасности ставятся сами, без тебя |
-| Разрешил проброс TCP | Нужно для `ssh_tunel`, `ssh -D` и `ssh -L`. Многие гайды это ломают |
+| Разрешил проброс TCP | Нужно для `ssh_tunnel`, `ssh -D` и `ssh -L`. Многие гайды это ломают |
 
 Отдельно про последнюю строчку: типовые «чеклисты по харденингу» советуют
 `AllowTcpForwarding no`. После такого туннель перестаёт работать, а сообщение об
@@ -299,7 +299,7 @@ ss -tlnp                    # кто слушает; наружу должен �
 
 ## Шаг 3. Отдельный пользователь только для туннеля
 
-Необязательно, но правильно. Сейчас `ssh_tunel` ходит на сервер под `root` — то
+Необязательно, но правильно. Сейчас `ssh_tunnel` ходит на сервер под `root` — то
 есть ключ, который лежит на твоём компьютере, открывает полный доступ к серверу.
 Утёк ноутбук — утёк сервер.
 
@@ -365,8 +365,8 @@ else
   # На старых системах без Include блок дописывается в конец основного файла:
   # Match действует до конца файла, поэтому он обязан быть последним.
   MATCH_CONF=/etc/ssh/sshd_config
-  sed -i "/^# --- ssh_tunel: $TUNNEL_USER ---\$/,\$d" "$MATCH_CONF"
-  echo "# --- ssh_tunel: $TUNNEL_USER ---" >> "$MATCH_CONF"
+  sed -i "/^# --- ssh_tunnel: $TUNNEL_USER ---\$/,\$d" "$MATCH_CONF"
+  echo "# --- ssh_tunnel: $TUNNEL_USER ---" >> "$MATCH_CONF"
 fi
 cat >> "$MATCH_CONF" <<EOF
 Match User $TUNNEL_USER
@@ -427,7 +427,7 @@ EOF
 fi
 
 say "Готово"
-echo "В настройках ssh_tunel поменяй пользователя: root -> $TUNNEL_USER"
+echo "В настройках ssh_tunnel поменяй пользователя: root -> $TUNNEL_USER"
 echo "Ключ остаётся тот же, если TUNNEL_KEY был пустым."
 echo
 echo "Проверить со своего компьютера — проброс должен работать:"
@@ -447,7 +447,7 @@ bash /root/tunnel-user.sh
 
 | Действие | Результат |
 |---|---|
-| Проброс порта (`ssh -L`), то есть работа `ssh_tunel` | **работает** |
+| Проброс порта (`ssh -L`), то есть работа `ssh_tunnel` | **работает** |
 | SOCKS-прокси (`ssh -D`) | **работает** |
 | Выполнить команду: `ssh tunnel@сервер id` | `This account is currently not available.` |
 | Интерактивная оболочка | `PTY allocation request failed` |
@@ -505,7 +505,7 @@ fail2ban-client set sshd unbanip ТВОЙ_АДРЕС
 **Менять ли SSH-порт.** От целенаправленной атаки не спасает: порт находится
 сканированием за минуту. От массовых ботов — избавляет почти полностью, в логах
 станет тихо. Если решил менять, в скрипте есть `SSH_PORT`; после этого
-подключаться надо с `-p НОВЫЙ_ПОРТ`, а в `ssh_tunel` указать его в поле
+подключаться надо с `-p НОВЫЙ_ПОРТ`, а в `ssh_tunnel` указать его в поле
 «SSH-порт». **Сначала проверь вход на новом порту вторым окном** и только потом
 закрывай сессию.
 
@@ -516,7 +516,7 @@ fail2ban-client set sshd unbanip ТВОЙ_АДРЕС
 ufw allow 443/tcp comment 'что это'
 ```
 
-Для самого `ssh_tunel` открывать ничего не нужно: он ходит только по SSH.
+Для самого `ssh_tunnel` открывать ничего не нужно: он ходит только по SSH.
 
 **Ключ с паролем.** `ssh-keygen` спрашивает пароль на ключ. С паролем украденный
 файл ключа бесполезен, без пароля — это готовый вход на сервер. На Windows

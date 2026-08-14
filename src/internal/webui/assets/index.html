@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ssh_tunel</title>
+<title>ssh_tunnel</title>
 <style>
   :root{
     --bg:#0d1017; --card:#161a23; --card2:#1d222d; --line:#272d3a;
@@ -200,8 +200,15 @@
        padding:8px 0;border-top:1px solid var(--line)}
   .chk input{margin-top:2px;flex:none;accent-color:var(--accent)}
   .chk .lbl{font-size:13px}
-  .chk .sub{display:block;margin-top:3px;font-size:11px;color:var(--dim);
-       line-height:1.35}
+  .chk-row{display:flex;align-items:center;gap:8px;border-top:1px solid var(--line)}
+  .chk-row .chk{border-top:none;flex:1}
+  .help .step{margin:11px 0 5px;font-weight:600;color:var(--text)}
+  .help .note{margin:5px 0 0;color:var(--dim)}
+  .netline{display:flex;gap:7px;align-items:flex-start;padding:3px 0}
+  .netline .mark{flex:none;width:14px;text-align:center}
+  .netline.bad .mark{color:#ff8a5c}
+  .netline.ok .mark{color:#4bd07a}
+  .netline .cidr{font-family:ui-monospace,Consolas,monospace}
   textarea{width:100%;box-sizing:border-box;resize:vertical;
        background:var(--card);border:1px solid var(--line);border-radius:8px;
        padding:7px 10px;color:var(--text);font:inherit;line-height:1.4}
@@ -318,25 +325,44 @@
     </div>
 
     <div class="help" id="keyHelp" hidden>
-      <p>Быстрая настройка на новом компьютере. Команда создаёт ключ (если его
-        ещё нет) и сразу кладёт его на сервер — пароль от сервера спросят один раз,
-        больше он не понадобится.</p>
-      <ol>
-        <li>Нажми «Открыть PowerShell» — команда уже будет в буфере обмена.</li>
-        <li>Вставь её (Ctrl+V) и нажми Enter.</li>
-        <li>Введи пароль от сервера.</li>
-      </ol>
-      <div class="cmdbox" id="setupCmd">
-        <button class="cp" id="copyCmd" title="Скопировать">
+      <p>Ключ создаётся на этом компьютере, а на сервер добавляется вручную —
+        одной командой это больше не делается: пользователю туннеля запрещено
+        выполнять команды, в том и смысл.</p>
+
+      <p class="step">1. На этом компьютере — создать ключ</p>
+      <div class="cmdbox">
+        <button class="cp" data-cmd="cmd1" title="Скопировать">
           <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/>
             <path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
         </button>
-        <span id="setupCmdText"></span>
+        <span id="cmd1"></span>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;margin-top:9px">
+
+      <p class="step">2. На этом компьютере — показать открытый ключ</p>
+      <div class="cmdbox">
+        <button class="cp" data-cmd="cmd2" title="Скопировать">
+          <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/>
+            <path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+        </button>
+        <span id="cmd2"></span>
+      </div>
+      <p class="note">Команда напечатает одну длинную строку — скопируй её целиком,
+        она понадобится в шаге 3.</p>
+
+      <div style="display:flex;gap:8px;align-items:center;margin:9px 0">
         <button class="btn" id="openPs" style="font-size:12.5px;padding:6px 12px">Открыть PowerShell</button>
         <span class="hint" id="keyHelpNote" style="margin:0"></span>
       </div>
+
+      <p class="step">3. На сервере, зайдя под root — добавить этот ключ</p>
+      <div class="cmdbox">
+        <button class="cp" data-cmd="cmd3" title="Скопировать">
+          <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/>
+            <path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+        </button>
+        <span id="cmd3"></span>
+      </div>
+      <p class="note" id="cmd3note"></p>
     </div>
 
     <div class="two">
@@ -365,21 +391,43 @@
     <label class="chk"><input type="checkbox" id="autoStart">
       <span class="lbl">Подключаться сразу при запуске</span></label>
 
-    <label class="chk"><input type="checkbox" id="localViaTunnel">
-      <span class="lbl">Локальную сеть тоже вести через сервер
-        <span class="sub">Обычно не нужно: домашние адреса (роутер, NAS,
-        Home&nbsp;Assistant) идут напрямую и остаются доступны. Включи, если
-        нужна внутренняя сеть самого сервера.</span></span></label>
+    <div class="chk-row">
+      <label class="chk"><input type="checkbox" id="localViaTunnel">
+        <span class="lbl">Локальную сеть тоже вести через сервер</span></label>
+      <button class="qmark" id="localHelpBtn" title="Подробнее">?</button>
+    </div>
+    <div class="help" id="localHelp" hidden>
+      <p>Обычно не нужно. Домашние и офисные адреса (роутер, NAS,
+        Home&nbsp;Assistant, рабочие сервисы) и так идут напрямую и остаются
+        доступны при включённом туннеле.</p>
+      <p>Включать стоит в одном случае: когда нужна внутренняя сеть <b>самого
+        сервера</b> — например, дотянуться до того, что слушает у него на
+        localhost.</p>
+    </div>
 
     <div class="field" style="margin-top:12px">
-      <label for="directHosts">Всегда напрямую</label>
+      <div class="lbl-row">
+        <label for="directHosts">Всегда напрямую</label>
+        <button class="qmark" id="directHelpBtn" title="Подробнее">?</button>
+      </div>
       <textarea id="directHosts" rows="2" spellcheck="false"
         placeholder="100.64.0.0/10, 10.8.*, .netbird.cloud"></textarea>
-      <div class="hint">Адреса и сети чужих VPN, которые не надо вести через
-        сервер. Домашняя сеть и mesh-VPN (NetBird, Tailscale) уже учтены —
-        сюда вписывают всё остальное. Через запятую: сеть
-        (<code>10.8.0.0/16</code> или <code>10.8.*</code>), адрес или окончание
-        имени (<code>.corp.local</code>).</div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:7px">
+        <button class="btn" id="scanNet" style="font-size:12.5px;padding:6px 12px">Проверить сеть</button>
+        <span class="hint" id="scanNote" style="margin:0"></span>
+      </div>
+      <div class="help" id="scanResult" hidden></div>
+    </div>
+    <div class="help" id="directHelp" hidden>
+      <p>Сети, которые не надо вести через сервер. Домашняя и офисная сеть,
+        а также mesh-VPN (NetBird, Tailscale) уже учтены — сюда вписывают
+        только то, что в них не попало: корпоративный VPN, самодельный
+        WireGuard, Hamachi.</p>
+      <p>Через запятую, в любом виде: сеть (<code>10.8.0.0/16</code> или
+        <code>10.8.*</code>), отдельный адрес или окончание имени
+        (<code>.corp.local</code>).</p>
+      <p>Не знаешь, что вписать — нажми «Проверить сеть»: программа посмотрит
+        адаптеры этого компьютера и скажет, сломается что-нибудь или нет.</p>
     </div>
 
     <label class="chk"><input type="checkbox" id="verbose">
@@ -904,37 +952,115 @@ function showSpeed(v){
 }
 
 /* ---------- подсказка «как получить ключ» ---------- */
-/* Команда собирается из полей формы: адрес сервера и пользователь берутся
-   оттуда, чтобы не подставлять их руками. Пока адрес не введён — на его месте
-   заметная заглушка, а не пустое место. */
-function setupCommand(){
-  const host = ($('host').value || '').trim() || 'IP_ТВОЕГО_СЕРВЕРА';
-  const user = ($('user').value || '').trim() || 'root';
-  const key = '$env:USERPROFILE\\.ssh\\id_ed25519';
-  return 'if (!(Test-Path "' + key + '")) { ssh-keygen -t ed25519 -f "' + key +
-    '" -N \'""\' }; type "' + key + '.pub" | ssh ' + user + '@' + host +
-    ' "mkdir -p ~/.ssh; chmod 700 ~/.ssh; cat >> ~/.ssh/authorized_keys; chmod 600 ~/.ssh/authorized_keys"';
+/* Команды собираются из полей формы: адрес сервера и пользователь берутся
+   оттуда, чтобы не подставлять их руками. Раньше это была одна команда,
+   которая сама клала ключ на сервер, — она перестала работать, как только
+   пользователю туннеля запретили выполнять команды. Поэтому теперь шаги
+   раздельные: два на своей машине, один на сервере под root. */
+const KEYFILE = '$env:USERPROFILE\\.ssh\\id_ed25519';
+
+function cmdCreateKey(){
+  return 'if (!(Test-Path "' + KEYFILE + '")) { ssh-keygen -t ed25519 -f "' +
+    KEYFILE + '" -N \'""\' }';
+}
+function cmdShowKey(){ return 'type "' + KEYFILE + '.pub"'; }
+
+function cmdServer(){
+  const user = ($('user').value || '').trim() || 'tunnel';
+  if(user === 'root'){
+    return 'mkdir -p ~/.ssh; chmod 700 ~/.ssh; ' +
+      'echo \'ВСТАВЬ_СЮДА_КЛЮЧ_ИЗ_ШАГА_2\' >> ~/.ssh/authorized_keys; ' +
+      'chmod 600 ~/.ssh/authorized_keys';
+  }
+  const u = user.replace(/'/g, '');
+  return 'id -u ' + u + ' >/dev/null 2>&1 || useradd -m -s /usr/sbin/nologin ' + u + '; ' +
+    'usermod -p \'*\' ' + u + '; install -d -m 700 -o ' + u + ' -g ' + u + ' /home/' + u + '/.ssh; ' +
+    'echo \'restrict,port-forwarding ВСТАВЬ_СЮДА_КЛЮЧ_ИЗ_ШАГА_2\' >> /home/' + u + '/.ssh/authorized_keys; ' +
+    'chown ' + u + ':' + u + ' /home/' + u + '/.ssh/authorized_keys; ' +
+    'chmod 600 /home/' + u + '/.ssh/authorized_keys';
 }
 
-function renderSetupCmd(){ $('setupCmdText').textContent = setupCommand(); }
+function renderSetupCmd(){
+  $('cmd1').textContent = cmdCreateKey();
+  $('cmd2').textContent = cmdShowKey();
+  $('cmd3').textContent = cmdServer();
+  const user = ($('user').value || '').trim() || 'tunnel';
+  $('cmd3note').textContent = user === 'root'
+    ? 'Замени ВСТАВЬ_СЮДА_КЛЮЧ_ИЗ_ШАГА_2 на строку из шага 2.'
+    : 'Замени ВСТАВЬ_СЮДА_КЛЮЧ_ИЗ_ШАГА_2 на строку из шага 2. Команда заодно '
+      + 'создаст пользователя «' + user + '», если его ещё нет: он умеет только '
+      + 'пробрасывать соединения, ни команд, ни файлов.';
+}
 
-// Подсказка закрывается тем же вопросительным знаком и не переживает уход с
+/* Одна кнопка копирования на все команды: какая именно — написано на самой
+   кнопке в data-cmd. */
+document.querySelectorAll('.cp[data-cmd]').forEach(b => {
+  b.onclick = async () => {
+    const ok = await copyToClipboard($(b.dataset.cmd).textContent);
+    $('keyHelpNote').textContent = ok ? 'скопировано' : 'скопируй вручную';
+    setTimeout(() => $('keyHelpNote').textContent = '', 2500);
+  };
+});
+
+// Подсказки закрываются тем же вопросительным знаком и не переживают уход с
 // экрана: вернувшись в настройки, человек видит их в обычном виде.
-$('keyHelpBtn').onclick = () => {
-  const show = $('keyHelp').hidden;
-  $('keyHelp').hidden = !show;
-  $('keyHelpBtn').classList.toggle('on', show);
-  if(show) renderSetupCmd();
-};
+function toggleHelp(btnId, boxId, onShow){
+  $(btnId).onclick = () => {
+    const show = $(boxId).hidden;
+    $(boxId).hidden = !show;
+    $(btnId).classList.toggle('on', show);
+    if(show && onShow) onShow();
+  };
+}
+toggleHelp('keyHelpBtn', 'keyHelp', renderSetupCmd);
+toggleHelp('localHelpBtn', 'localHelp');
+toggleHelp('directHelpBtn', 'directHelp');
+
 function hideKeyHelp(){
-  $('keyHelp').hidden = true;
-  $('keyHelpBtn').classList.remove('on');
+  ['keyHelp','localHelp','directHelp','scanResult'].forEach(id => $(id).hidden = true);
+  ['keyHelpBtn','localHelpBtn','directHelpBtn'].forEach(id => $(id).classList.remove('on'));
   $('keyHelpNote').textContent = '';
+  $('scanNote').textContent = '';
 }
 
 ['host','user'].forEach(f => $(f).addEventListener('input', () => {
   if(!$('keyHelp').hidden) renderSetupCmd();
 }));
+
+/* ---------- проверка сетей ---------- */
+/* Спрашивать у человека, какие у него сети, бессмысленно — он их обычно не
+   знает. Зато их знает его компьютер. */
+$('scanNet').onclick = async () => {
+  $('scanNote').textContent = 'смотрю…';
+  const r = await api('/api/scannet');
+  if(r.error){ $('scanNote').textContent = r.error; return; }
+  const nets = r.nets || [];
+  const box = $('scanResult');
+  box.hidden = false;
+  const bad = nets.filter(n => !n.ok);
+  let html = bad.length
+    ? '<p><b>Эти сети пойдут через сервер и станут недоступны:</b></p>'
+    : '<p><b>Всё в порядке.</b> Ни одна твоя сеть не сломается.</p>';
+  html += nets.map(n =>
+    '<div class="netline ' + (n.ok ? 'ok' : 'bad') + '">' +
+    '<span class="mark">' + (n.ok ? '✓' : '!') + '</span>' +
+    '<span><span class="cidr">' + n.cidr + '</span> — ' + n.name +
+    '<br><span class="hint" style="margin:0">' + n.why + '</span></span></div>').join('');
+  if(bad.length){
+    html += '<div style="margin-top:9px"><button class="btn" id="addBad" ' +
+      'style="font-size:12.5px;padding:6px 12px">Добавить их в список</button></div>';
+  }
+  box.innerHTML = html;
+  $('scanNote').textContent = bad.length ? 'найдено: ' + bad.length : '';
+  if(bad.length){
+    $('addBad').onclick = () => {
+      const cur = ($('directHosts').value || '').trim();
+      $('directHosts').value = cur ? cur + ', ' + r.problems : r.problems;
+      formDirty = true;
+      $('scanNote').textContent = 'добавлено — не забудь «Сохранить»';
+    };
+  }
+};
 
 async function copyToClipboard(text){
   try {
@@ -953,17 +1079,13 @@ async function copyToClipboard(text){
   }
 }
 
-$('copyCmd').onclick = async () => {
-  const ok = await copyToClipboard(setupCommand());
-  $('keyHelpNote').textContent = ok ? 'команда скопирована' : 'скопируй вручную';
-  setTimeout(() => $('keyHelpNote').textContent = '', 2500);
-};
-
+// PowerShell открывается с уже скопированной командой первого шага —
+// остальное человек копирует кнопками рядом с каждой командой.
 $('openPs').onclick = async () => {
-  const ok = await copyToClipboard(setupCommand());
+  const ok = await copyToClipboard(cmdCreateKey());
   const r = await api('/api/openterminal', {});
   if(r.error){ $('keyHelpNote').textContent = r.error; return; }
-  $('keyHelpNote').textContent = ok ? 'вставь Ctrl+V и нажми Enter'
+  $('keyHelpNote').textContent = ok ? 'команда шага 1 в буфере: Ctrl+V и Enter'
                                     : 'скопируй команду вручную';
 };
 

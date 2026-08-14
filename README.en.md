@@ -1,6 +1,6 @@
 <div align="center">
 
-# ssh_tunel
+# ssh_tunnel
 
 **Routes application traffic through your own Linux server over plain SSH.**
 
@@ -9,7 +9,7 @@ An educational project: it shows how a working local proxy is built out of a
 standard SSH mechanism.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-4c8dff)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.2-4c8dff)](https://github.com/VITAZGIO/ssh_tunel/releases)
+[![Version](https://img.shields.io/badge/version-1.1.0-4c8dff)](https://github.com/VITAZGIO/ssh_tunel/releases)
 [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
 [![Linux](https://img.shields.io/badge/Linux-amd64%20%7C%20arm64-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
 [![Go](https://img.shields.io/badge/Go-1.22+-2de2ff)](src)
@@ -20,8 +20,8 @@ standard SSH mechanism.
 
 | System | File | |
 |---|---|---|
-| **Windows** | [**ssh_tunel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunel.exe) | window with a button, tray icon |
-| **Linux** | [**ssh_tunel-linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunel-linux) | console + web interface, systemd service |
+| **Windows** | [**ssh_tunnel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe) | window with a button, tray icon |
+| **Linux** | [**ssh_tunnel-linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel-linux) | console + web interface, systemd service |
 
 The ARM build and the checksums are on the
 [release page](https://github.com/VITAZGIO/ssh_tunel/releases/latest).
@@ -36,7 +36,7 @@ The ARM build and the checksums are on the
 ## What this is
 
 SSH has a standard feature — forwarding TCP connections (`direct-tcpip`, the
-same thing `ssh -D` does). `ssh_tunel` opens an SSH connection to **your** server
+same thing `ssh -D` does). `ssh_tunnel` opens an SSH connection to **your** server
 and runs a local proxy on top of it: an application talks to a proxy on its own
 machine, and the connection to the destination is opened by the server.
 
@@ -89,11 +89,11 @@ reach, and with your local law, is your responsibility.
   application
       │  SOCKS4/4a/5 (1080)   HTTP CONNECT (1081)
       ▼
-  ssh_tunel  ──── encrypted SSH (22) ────►  your server  ──►  network
+  ssh_tunnel  ──── encrypted SSH (22) ────►  your server  ──►  network
 ```
 
 1. The application thinks it is talking to an ordinary proxy on its own machine.
-2. `ssh_tunel` parses the request, learns the destination and opens a
+2. `ssh_tunnel` parses the request, learns the destination and opens a
    `direct-tcpip` channel to it over SSH.
 3. Host names are resolved by the server, not by your computer: the connection
    leaves from the server's address in full, DNS lookup included.
@@ -119,7 +119,7 @@ firewall on first — a ready-to-paste block of commands is in
 
 ## Windows
 
-1. Download [**ssh_tunel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunel.exe)
+1. Download [**ssh_tunnel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe)
    and put it in a permanent folder.
 2. Run it. Windows will warn about an unknown publisher — «More info» → «Run
    anyway» (the binary is not signed with a certificate: that costs money and
@@ -133,7 +133,7 @@ The close button hides the program in the tray, the tunnel keeps running. To
 quit for real: right-click the tray icon → «Exit».
 
 If you want a console build for Windows, it is in the sources and takes one
-command: `GOOS=windows go build -o ssh_tunel-cli.exe ./cmd/ssh_tunel-cli`.
+command: `GOOS=windows go build -o ssh_tunnel-cli.exe ./cmd/ssh_tunnel-cli`.
 
 ---
 
@@ -143,17 +143,17 @@ For servers and workstations, amd64 and arm64.
 
 ```bash
 # download and make executable
-curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunel-linux
-chmod +x ssh_tunel-linux
+curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel-linux
+chmod +x ssh_tunnel-linux
 
 # set the server once
-./ssh_tunel-linux -host YOUR_SERVER -user root -save
+./ssh_tunnel-linux -host YOUR_SERVER -user tunnel -save
 
 # run: tunnel only...
-./ssh_tunel-linux
+./ssh_tunnel-linux
 
 # ...or with the web interface
-./ssh_tunel-linux -web
+./ssh_tunnel-linux -web
 ```
 
 The web interface is the very same one the Windows build shows in its window,
@@ -166,22 +166,22 @@ answer. It does not expose itself to the outside — that needs the separate
 Wire the proxy into the current shell (curl, git, apt, docker, pip, npm):
 
 ```bash
-source ~/.config/ssh_tunel/proxy.env
+source ~/.config/ssh_tunnel/proxy.env
 ```
 
 As a systemd service — see [packaging/linux](packaging/linux):
 
 ```bash
-./packaging/linux/install.sh ./ssh_tunel-linux
-systemctl --user enable --now ssh_tunel
+./packaging/linux/install.sh ./ssh_tunnel-linux
+systemctl --user enable --now ssh_tunnel
 ```
 
 ---
 
 ## Configuration
 
-Settings live in `%APPDATA%\ssh_tunel\config.json` on Windows and in
-`~/.config/ssh_tunel/config.json` on Linux. The GUI writes the same file the
+Settings live in `%APPDATA%\ssh_tunnel\config.json` on Windows and in
+`~/.config/ssh_tunnel/config.json` on Linux. The GUI writes the same file the
 flags do.
 
 | Key | Meaning |

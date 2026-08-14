@@ -10,16 +10,16 @@
 
 | Файл | Для чего |
 |---|---|
-| `ssh_tunel.exe` | Windows, версия с окном |
-| `ssh_tunel-linux` | Linux amd64 — обычные серверы и компьютеры |
-| `ssh_tunel-linux-arm64` | Linux ARM — Raspberry Pi, ARM-облако |
+| `ssh_tunnel.exe` | Windows, версия с окном |
+| `ssh_tunnel-linux` | Linux amd64 — обычные серверы и компьютеры |
+| `ssh_tunnel-linux-arm64` | Linux ARM — Raspberry Pi, ARM-облако |
 | `SHA256SUMS.txt` | контрольные суммы |
 
 Ссылки, которые всегда ведут на свежую версию:
 
 ```
-https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunel.exe
-https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunel-linux
+https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe
+https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel-linux
 ```
 
 ## Собрать самому
@@ -35,7 +35,7 @@ cd src
 Консольная версия для Windows в релиз не входит, но собирается отдельно:
 
 ```bash
-cd src && GOOS=windows go build -o ../releases/windows/ssh_tunel-cli.exe ./cmd/ssh_tunel-cli
+cd src && GOOS=windows go build -o ../releases/windows/ssh_tunnel-cli.exe ./cmd/ssh_tunnel-cli
 ```
 
 ## Проверить целостность
@@ -43,7 +43,7 @@ cd src && GOOS=windows go build -o ../releases/windows/ssh_tunel-cli.exe ./cmd/s
 Windows:
 
 ```powershell
-Get-FileHash .\ssh_tunel.exe -Algorithm SHA256
+Get-FileHash .\ssh_tunnel.exe -Algorithm SHA256
 ```
 
 Linux:

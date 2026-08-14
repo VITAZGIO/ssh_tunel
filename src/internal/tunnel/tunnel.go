@@ -25,9 +25,9 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"sshtunel/internal/events"
-	"sshtunel/internal/hostkey"
-	"sshtunel/internal/routing"
+	"sshtunnel/internal/events"
+	"sshtunnel/internal/hostkey"
+	"sshtunnel/internal/routing"
 )
 
 type Config struct {

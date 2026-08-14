@@ -1,26 +1,26 @@
-# Служба ssh_tunel для systemd.
+# Служба ssh_tunnel для systemd.
 #
 # Ставится для пользователя, а не для всей системы: программе не нужны права
 # администратора, и настройки с ключами лежат в домашней папке.
 #
 #   mkdir -p ~/.config/systemd/user
-#   cp ssh_tunel.service ~/.config/systemd/user/
+#   cp ssh_tunnel.service ~/.config/systemd/user/
 #   systemctl --user daemon-reload
-#   systemctl --user enable --now ssh_tunel
+#   systemctl --user enable --now ssh_tunnel
 #
-# Журнал:  journalctl --user -u ssh_tunel -f
+# Журнал:  journalctl --user -u ssh_tunnel -f
 #
 # Путь поправь под себя, если положил программу не в /usr/local/bin.
 
 [Unit]
-Description=ssh_tunel — SSH-туннель до собственного сервера
+Description=ssh_tunnel — SSH-туннель до собственного сервера
 Documentation=https://github.com/VITAZGIO/ssh_tunel
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/ssh_tunel-linux -web
+ExecStart=/usr/local/bin/ssh_tunnel-linux -web
 Restart=always
 RestartSec=5
 

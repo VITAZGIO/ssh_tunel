@@ -55,7 +55,7 @@ func (t *Tunnel) httpConnect(conn net.Conn, br *bufio.Reader, req *http.Request)
 		// в буфере bufio — при чтении напрямую из conn они бы потерялись.
 		src: br,
 		writeErr: func(err error) {
-			fmt.Fprintf(conn, "HTTP/1.1 502 Bad Gateway\r\nContent-Type: text/plain; charset=utf-8\r\nConnection: close\r\n\r\nvpstunnel: %s\r\n", shortErr(err))
+			fmt.Fprintf(conn, "HTTP/1.1 502 Bad Gateway\r\nContent-Type: text/plain; charset=utf-8\r\nConnection: close\r\n\r\nssh_tunnel: %s\r\n", shortErr(err))
 		},
 		writeOK: func(c net.Conn) error {
 			_, err := io.WriteString(c, "HTTP/1.1 200 Connection established\r\n\r\n")
@@ -83,7 +83,7 @@ func (t *Tunnel) httpForward(conn net.Conn, br *bufio.Reader, req *http.Request)
 	remote, direct, err := t.dialFor(proc, target)
 	if err != nil {
 		t.bus.Publish(eventConn(proc, pid, target, "http", false, direct, err))
-		fmt.Fprintf(conn, "HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\nvpstunnel: %s\r\n", shortErr(err))
+		fmt.Fprintf(conn, "HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\nssh_tunnel: %s\r\n", shortErr(err))
 		return
 	}
 	defer remote.Close()

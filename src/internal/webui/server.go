@@ -31,12 +31,12 @@ import (
 	"sync"
 	"time"
 
-	"sshtunel/internal/app"
-	"sshtunel/internal/config"
-	"sshtunel/internal/events"
-	"sshtunel/internal/filedialog"
-	"sshtunel/internal/procinfo"
-	"sshtunel/internal/sysproxy"
+	"sshtunnel/internal/app"
+	"sshtunnel/internal/config"
+	"sshtunnel/internal/events"
+	"sshtunnel/internal/filedialog"
+	"sshtunnel/internal/procinfo"
+	"sshtunnel/internal/sysproxy"
 )
 
 //go:embed assets/*
@@ -89,6 +89,7 @@ func (s *Server) Serve() error {
 	mux.HandleFunc("/api/processes", s.guard(s.handleProcesses))
 	mux.HandleFunc("/api/pickfile", s.guard(s.handlePickFile))
 	mux.HandleFunc("/api/openterminal", s.guard(s.handleOpenTerminal))
+	mux.HandleFunc("/api/scannet", s.guard(s.handleScanNet))
 
 	srv := &http.Server{
 		Handler:           mux,
@@ -196,6 +197,17 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]any{"ok": true, "config": s.app.Config(), "note": note})
+}
+
+// handleScanNet отвечает на вопрос «что сломается, если включить туннель»:
+// перечисляет сети этого компьютера и говорит по каждой, пойдёт ли она мимо
+// туннеля.
+func (s *Server) handleScanNet(w http.ResponseWriter, r *http.Request) {
+	checks := s.app.ScanNetworks()
+	writeJSON(w, map[string]any{
+		"nets":     checks,
+		"problems": app.Problems(checks),
+	})
 }
 
 func (s *Server) handleCheckIP(w http.ResponseWriter, r *http.Request) {

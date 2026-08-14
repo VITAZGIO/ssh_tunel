@@ -9,7 +9,7 @@
          │  HTTP CONNECT (порт 1081)   ← браузеры, Node.js, Python, curl
          ▼
   ┌──────────────────────┐
-  │  ssh_tunel.exe       │   пул из N SSH-соединений,
+  │  ssh_tunnel.exe       │   пул из N SSH-соединений,
   │  локальные прокси    │   keepalive, автопереподключение
   └──────────┬───────────┘
              │  один зашифрованный поток SSH (порт 22)
@@ -98,11 +98,11 @@ Python, Go, curl, npm, pip. Эти программы системный про�
 ```
 src/
 ├── cmd/
-│   ├── ssh_tunel/          приложение с окном (-H windowsgui, без консоли)
+│   ├── ssh_tunnel/          приложение с окном (-H windowsgui, без консоли)
 │   │   ├── app.manifest    нет UAC, осведомлённость о масштабе экрана
 │   │   └── *.syso          вшитые иконка и манифест (создаёт build.sh)
-│   ├── ssh_tunel-cli/      консольная версия для Windows (в релиз не входит)
-│   └── ssh_tunel-linux/    версия для Linux: консоль + веб-интерфейс
+│   ├── ssh_tunnel-cli/      консольная версия для Windows (в релиз не входит)
+│   └── ssh_tunnel-linux/    версия для Linux: консоль + веб-интерфейс
 ├── tools/mkicon/           собирает .ico из картинки
 ├── tools/mkshield/         рисует заготовки иконки
 └── internal/

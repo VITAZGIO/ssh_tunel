@@ -1,4 +1,4 @@
-module sshtunel
+module sshtunnel
 
 go 1.22
 

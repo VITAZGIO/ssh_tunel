@@ -20,8 +20,8 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"sshtunel/internal/events"
-	"sshtunel/internal/routing"
+	"sshtunnel/internal/events"
+	"sshtunnel/internal/routing"
 )
 
 // Тесты поднимают настоящий SSH-сервер прямо в процессе и прогоняют через него

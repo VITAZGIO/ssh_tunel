@@ -15,12 +15,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"sshtunel/internal/config"
-	"sshtunel/internal/events"
-	"sshtunel/internal/routing"
-	"sshtunel/internal/speedtest"
-	"sshtunel/internal/sysproxy"
-	"sshtunel/internal/tunnel"
+	"sshtunnel/internal/config"
+	"sshtunnel/internal/events"
+	"sshtunnel/internal/routing"
+	"sshtunnel/internal/speedtest"
+	"sshtunnel/internal/sysproxy"
+	"sshtunnel/internal/tunnel"
 )
 
 type App struct {

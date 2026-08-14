@@ -1,6 +1,6 @@
 <div align="center">
 
-# ssh_tunel
+# ssh_tunnel
 
 **Пропускает трафик приложений через твой собственный Linux-сервер по обычному SSH.**
 
@@ -9,7 +9,7 @@
 локальный прокси.
 
 [![Лицензия: MIT](https://img.shields.io/badge/лицензия-MIT-4c8dff)](LICENSE)
-[![Версия](https://img.shields.io/badge/версия-1.0.2-4c8dff)](https://github.com/VITAZGIO/ssh_tunel/releases)
+[![Версия](https://img.shields.io/badge/версия-1.1.0-4c8dff)](https://github.com/VITAZGIO/ssh_tunel/releases)
 [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
 [![Linux](https://img.shields.io/badge/Linux-amd64%20%7C%20arm64-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
 [![Go](https://img.shields.io/badge/Go-1.22+-2de2ff)](src)
@@ -20,8 +20,8 @@
 
 | Система | Файл | |
 |---|---|---|
-| **Windows** | [**ssh_tunel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunel.exe) | окно с кнопкой, значок у часов |
-| **Linux** | [**ssh_tunel-linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunel-linux) | консоль + веб-интерфейс, служба systemd |
+| **Windows** | [**ssh_tunnel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe) | окно с кнопкой, значок у часов |
+| **Linux** | [**ssh_tunnel-linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel-linux) | консоль + веб-интерфейс, служба systemd |
 
 Сборка под ARM и контрольные суммы — на
 [странице релиза](https://github.com/VITAZGIO/ssh_tunel/releases/latest).
@@ -36,7 +36,7 @@
 ## Что это
 
 У SSH есть штатная возможность — проброс TCP-соединений (`direct-tcpip`, то же
-самое, что делает `ssh -D`). `ssh_tunel` поднимает SSH-соединение с **твоим**
+самое, что делает `ssh -D`). `ssh_tunnel` поднимает SSH-соединение с **твоим**
 сервером и разворачивает поверх него локальный прокси: приложение обращается к
 прокси на своей же машине, а соединение до нужного адреса открывает сервер.
 
@@ -85,7 +85,7 @@ HTTP CONNECT, каналы SSH и определение процесса по �
   приложение
       │  SOCKS4/4a/5 (1080)   HTTP CONNECT (1081)
       ▼
-  ssh_tunel  ──── зашифрованный SSH (22) ────►  твой сервер  ──►  сеть
+  ssh_tunnel  ──── зашифрованный SSH (22) ────►  твой сервер  ──►  сеть
 ```
 
 1. Приложение думает, что говорит с обычным прокси на своей же машине.
@@ -115,7 +115,7 @@ HTTP CONNECT, каналы SSH и определение процесса по �
 
 ## Windows
 
-1. Скачай [**ssh_tunel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunel.exe)
+1. Скачай [**ssh_tunnel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe)
    и положи в постоянную папку.
 2. Запусти двойным щелчком. Windows предупредит о неизвестном издателе —
    «Подробнее» → «Выполнить в любом случае» (программа не подписана
@@ -129,7 +129,7 @@ HTTP CONNECT, каналы SSH и определение процесса по �
 правый щелчок по значку у часов → «Выход».
 
 Нужна консольная версия для Windows — она есть в исходниках, собирается одной
-командой: `GOOS=windows go build -o ssh_tunel-cli.exe ./cmd/ssh_tunel-cli`.
+командой: `GOOS=windows go build -o ssh_tunnel-cli.exe ./cmd/ssh_tunnel-cli`.
 
 ---
 
@@ -139,17 +139,17 @@ HTTP CONNECT, каналы SSH и определение процесса по �
 
 ```bash
 # скачать и сделать исполняемым
-curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunel-linux
-chmod +x ssh_tunel-linux
+curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel-linux
+chmod +x ssh_tunnel-linux
 
 # задать сервер один раз
-./ssh_tunel-linux -host ТВОЙ_СЕРВЕР -user root -save
+./ssh_tunnel-linux -host ТВОЙ_СЕРВЕР -user tunnel -save
 
 # запустить: только туннель...
-./ssh_tunel-linux
+./ssh_tunnel-linux
 
 # ...или сразу с веб-интерфейсом
-./ssh_tunel-linux -web
+./ssh_tunnel-linux -web
 ```
 
 Веб-интерфейс — тот же самый, что и в версии для Windows, на
@@ -161,22 +161,22 @@ chmod +x ssh_tunel-linux
 Подключить прокси в текущую оболочку (curl, git, apt, docker, pip, npm):
 
 ```bash
-source ~/.config/ssh_tunel/proxy.env
+source ~/.config/ssh_tunnel/proxy.env
 ```
 
 Как служба systemd — [packaging/linux](packaging/linux):
 
 ```bash
-./packaging/linux/install.sh ./ssh_tunel-linux
-systemctl --user enable --now ssh_tunel
+./packaging/linux/install.sh ./ssh_tunnel-linux
+systemctl --user enable --now ssh_tunnel
 ```
 
 ---
 
 ## Настройки
 
-Лежат в `%APPDATA%\ssh_tunel\config.json` на Windows и в
-`~/.config/ssh_tunel/config.json` на Linux. Окно и флаги пишут один и тот же файл.
+Лежат в `%APPDATA%\ssh_tunnel\config.json` на Windows и в
+`~/.config/ssh_tunnel/config.json` на Linux. Окно и флаги пишут один и тот же файл.
 
 | Ключ | Назначение |
 |---|---|

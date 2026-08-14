@@ -1,5 +1,5 @@
-// vpstunnel-cli — консольная версия. Запускается флагами, пишет компактный
-// лог в окно. Тем, кому нужны кнопки, а не команды, предназначен vpstunnel.exe
+// ssh_tunnel-cli — консольная версия. Запускается флагами, пишет компактный
+// лог в окно. Тем, кому нужны кнопки, а не команды, предназначен ssh_tunnel.exe
 // с обычным окном — логика у них общая.
 package main
 
@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"sshtunel/internal/app"
-	"sshtunel/internal/config"
-	"sshtunel/internal/events"
-	"sshtunel/internal/routing"
-	"sshtunel/internal/shutdown"
+	"sshtunnel/internal/app"
+	"sshtunnel/internal/config"
+	"sshtunnel/internal/events"
+	"sshtunnel/internal/routing"
+	"sshtunnel/internal/shutdown"
 )
 
 func main() {
@@ -178,10 +178,10 @@ func trim(s string, n int) string {
 }
 
 func usage() {
-	fmt.Print(`ssh_tunel — SSH-туннель до своего сервера (SOCKS4/5 + HTTP-прокси)
+	fmt.Print(`ssh_tunnel — SSH-туннель до своего сервера (SOCKS4/5 + HTTP-прокси)
 
 Использование:
-  vpstunnel-cli -host <IP сервера> [-user root] [-key путь-к-ключу]
+  ssh_tunnel-cli -host <IP сервера> [-user root] [-key путь-к-ключу]
 
 Основные флаги:
   -host       адрес сервера (обязателен при первом запуске)
@@ -202,10 +202,10 @@ func usage() {
   -v          подробный лог
 
 Пример первого запуска:
-  ssh_tunel-cli -host ТВОЙ_СЕРВЕР -user root -save
+  ssh_tunnel-cli -host ТВОЙ_СЕРВЕР -user root -save
 
 Дальше достаточно просто:
-  vpstunnel-cli
+  ssh_tunnel-cli
 `)
 	waitEnter()
 }

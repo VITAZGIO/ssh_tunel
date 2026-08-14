@@ -1,10 +1,10 @@
-// ssh_tunel для Linux — версия для серверов и рабочих станций.
+// ssh_tunnel для Linux — версия для серверов и рабочих станций.
 //
 // Одна и та же программа умеет два режима работы:
 //
-//	ssh_tunel-linux              — просто поднимает туннель и пишет журнал
+//	ssh_tunnel-linux              — просто поднимает туннель и пишет журнал
 //	                               в стандартный вывод (годится для systemd);
-//	ssh_tunel-linux -web         — плюс веб-интерфейс, тот же самый, что и в
+//	ssh_tunnel-linux -web         — плюс веб-интерфейс, тот же самый, что и в
 //	                               версии для Windows.
 //
 // Веб-интерфейс по умолчанию слушает 127.0.0.1:47821 — порт выбран
@@ -24,12 +24,12 @@ import (
 	"strings"
 	"time"
 
-	"sshtunel/internal/app"
-	"sshtunel/internal/config"
-	"sshtunel/internal/events"
-	"sshtunel/internal/routing"
-	"sshtunel/internal/shutdown"
-	"sshtunel/internal/webui"
+	"sshtunnel/internal/app"
+	"sshtunnel/internal/config"
+	"sshtunnel/internal/events"
+	"sshtunnel/internal/routing"
+	"sshtunnel/internal/shutdown"
+	"sshtunnel/internal/webui"
 )
 
 // Порт веб-интерфейса. Нестандартный, чтобы не конфликтовать с тем, что уже
@@ -237,14 +237,14 @@ func fatal(format string, args ...any) {
 }
 
 func usage() {
-	fmt.Printf(`ssh_tunel — SSH-туннель до своего сервера (SOCKS4/5 + HTTP-прокси)
+	fmt.Printf(`ssh_tunnel — SSH-туннель до своего сервера (SOCKS4/5 + HTTP-прокси)
 
 Первый запуск:
-  ssh_tunel-linux -host ТВОЙ_СЕРВЕР -user root -save
+  ssh_tunnel-linux -host ТВОЙ_СЕРВЕР -user root -save
 
 Дальше достаточно:
-  ssh_tunel-linux            # только туннель, журнал в вывод
-  ssh_tunel-linux -web       # плюс веб-интерфейс на %s
+  ssh_tunnel-linux            # только туннель, журнал в вывод
+  ssh_tunnel-linux -web       # плюс веб-интерфейс на %s
 
 Полезное:
   -env        напечатать строки для подключения прокси в оболочке
@@ -254,6 +254,6 @@ func usage() {
   -pool       число SSH-соединений, больше — выше скорость (по умолчанию 4)
   -v          подробный журнал
 
-Все флаги: ssh_tunel-linux -h
+Все флаги: ssh_tunnel-linux -h
 `, defaultWebAddr)
 }

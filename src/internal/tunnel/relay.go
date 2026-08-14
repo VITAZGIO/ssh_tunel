@@ -7,9 +7,9 @@ import (
 	"syscall"
 	"time"
 
-	"sshtunel/internal/events"
-	"sshtunel/internal/procinfo"
-	"sshtunel/internal/routing"
+	"sshtunnel/internal/events"
+	"sshtunnel/internal/procinfo"
+	"sshtunnel/internal/routing"
 )
 
 const syscallECONNRESET = syscall.ECONNRESET

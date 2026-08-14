@@ -186,7 +186,7 @@ var active *ui // окно в программе одно, поэтому гло
 // второй копии надо просто показать окно первой. Мьютекс намеренно не
 // освобождается — он живёт до конца процесса.
 func AlreadyRunning(title string) bool {
-	name, _ := windows.UTF16PtrFromString("Local\\ssh_tunel-single-instance")
+	name, _ := windows.UTF16PtrFromString("Local\\ssh_tunnel-single-instance")
 	_, _, err := pCreateMutex.Call(0, 0, uintptr(unsafe.Pointer(name)))
 	if errno, ok := err.(windows.Errno); ok && uintptr(errno) == errAlreadyExists {
 		showExistingWindow(title)
@@ -437,7 +437,7 @@ func (u *ui) addTrayIcon() {
 		UCallbackMessage: wmTrayCallby,
 		HIcon:            u.icon,
 	}
-	copyTip(&u.nid, "vpstunnel")
+	copyTip(&u.nid, "ssh_tunnel")
 	pShellNotifyIcon.Call(nimAdd, uintptr(unsafe.Pointer(&u.nid)))
 }
 
@@ -469,7 +469,7 @@ func SetStatus(text string) {
 		return
 	}
 	u.tipMu.Lock()
-	copyTip(&u.nid, "vpstunnel — "+text)
+	copyTip(&u.nid, "ssh_tunnel — "+text)
 	pShellNotifyIcon.Call(nimModify, uintptr(unsafe.Pointer(&u.nid)))
 	u.tipMu.Unlock()
 }

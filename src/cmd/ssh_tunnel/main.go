@@ -1,4 +1,4 @@
-// vpstunnel — приложение с окном. Запускается двойным щелчком, никаких команд
+// ssh_tunnel — приложение с окном. Запускается двойным щелчком, никаких команд
 // и флагов: всё настраивается в окне и запоминается.
 //
 // Собирается с -H windowsgui, поэтому чёрного окна консоли за ним не
@@ -15,15 +15,15 @@ import (
 	"runtime"
 	"time"
 
-	"sshtunel/internal/app"
-	"sshtunel/internal/config"
-	"sshtunel/internal/events"
-	"sshtunel/internal/nativeui"
-	"sshtunel/internal/shutdown"
-	"sshtunel/internal/webui"
+	"sshtunnel/internal/app"
+	"sshtunnel/internal/config"
+	"sshtunnel/internal/events"
+	"sshtunnel/internal/nativeui"
+	"sshtunnel/internal/shutdown"
+	"sshtunnel/internal/webui"
 )
 
-const windowTitle = "ssh_tunel"
+const windowTitle = "ssh_tunnel"
 
 func main() {
 	// Единственный флаг — на случай, если окно почему-то не открывается:
@@ -84,7 +84,7 @@ func main() {
 			"Обычно он уже есть в Windows 10 и 11 вместе с Edge. Если его нет,\n" +
 			"поставь «Microsoft Edge WebView2 Runtime» с сайта Microsoft.\n\n" +
 			"Пока его нет, интерфейс можно открыть в браузере — запусти так:\n" +
-			"ssh_tunel.exe -nowindow")
+			"ssh_tunnel.exe -nowindow")
 	}
 
 	err = nativeui.Run(nativeui.Options{

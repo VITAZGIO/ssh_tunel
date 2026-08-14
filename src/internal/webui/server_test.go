@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"sshtunel/internal/app"
-	"sshtunel/internal/config"
+	"sshtunnel/internal/app"
+	"sshtunnel/internal/config"
 )
 
 // Страница настроек шлёт только те поля, которые показаны на экране.
