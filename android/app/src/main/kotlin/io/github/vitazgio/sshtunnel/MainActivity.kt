@@ -265,7 +265,9 @@ class MainActivity : AppCompatActivity() {
         rowSpeed.postDelayed(hideSpeed, 10_000)
     }
 
-    private val hideSpeed = Runnable { rowSpeed.visibility = View.GONE }
+    // INVISIBLE, а не GONE: место под плитками остаётся занятым, и экран не
+    // дёргается при каждом появлении результата.
+    private val hideSpeed = Runnable { rowSpeed.visibility = View.INVISIBLE }
 
     /** Задержка до сервера. Цвет важнее числа: зелёный, жёлтый, красный. */
     private fun showPing(ms: Long) {
@@ -360,7 +362,7 @@ class MainActivity : AppCompatActivity() {
 
         showPing(if (state == "connected") o.optLong("pingMs") else 0L)
         if (!running) {
-            rowSpeed.visibility = View.GONE
+            rowSpeed.visibility = View.INVISIBLE
             rowSpeed.removeCallbacks(hideSpeed)
         }
     }

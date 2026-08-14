@@ -149,14 +149,16 @@
 
             <!-- Приём и отдача появляются после замера скорости и через десять
                  секунд исчезают: сразу после теста цифры интересны, а через
-                 минуту они уже неправда — связь меняется. -->
+                 минуту они уже неправда — связь меняется.
+                 Скрываются они с сохранением места: если убирать совсем, при
+                 каждом появлении и исчезновении вся середина экрана прыгает. -->
             <LinearLayout
                 android:id="@+id/rowSpeed"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="14dp"
                 android:orientation="horizontal"
-                android:visibility="gone">
+                android:visibility="invisible">
 
                 <LinearLayout style="@style/Tile">
                     <TextView style="@style/TileKey" android:text="@string/tile_down" />
