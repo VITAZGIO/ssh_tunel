@@ -3,13 +3,19 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="12dp">
+    android:background="@color/bg"
+    android:padding="16dp">
+
+    <TextView
+        style="@style/Head"
+        android:text="@string/apps_title" />
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingBottom="8dp"
-        android:textSize="13sp"
+        android:paddingBottom="10dp"
+        android:textSize="12sp"
+        android:textColor="@color/dim"
         android:text="@string/apps_hint" />
 
     <RadioGroup
@@ -21,18 +27,21 @@
             android:id="@+id/modeAll"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:textColor="@color/text"
             android:text="@string/mode_all" />
 
         <RadioButton
             android:id="@+id/modeOnly"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:textColor="@color/text"
             android:text="@string/mode_only" />
 
         <RadioButton
             android:id="@+id/modeExcept"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:textColor="@color/text"
             android:text="@string/mode_except" />
     </RadioGroup>
 
@@ -41,5 +50,8 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:choiceMode="multipleChoice" />
+        android:layout_marginTop="8dp"
+        android:choiceMode="multipleChoice"
+        android:divider="@color/line"
+        android:dividerHeight="1dp" />
 </LinearLayout>

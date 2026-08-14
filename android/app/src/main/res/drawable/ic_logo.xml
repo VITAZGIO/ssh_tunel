@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Тот же знак, что в окне на компьютере. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="62dp" android:height="52dp"
+    android:viewportWidth="626" android:viewportHeight="520">
+    <path android:fillColor="@color/logo" android:pathData="M0,0 L137,449 L180,308 L86,0 Z" />
+    <path android:fillColor="@color/logo" android:pathData="M159,520 L221,520 L246,437 L354,83 L379,0 L293,0 L190,338 L146,479 Z" />
+    <path android:fillColor="@color/logo" android:pathData="M468,520 L524,337 L437,337 L406,437 L264,437 L239,520 Z" />
+    <path android:fillColor="@color/logo" android:pathData="M554,236 L394,236 L368,319 L442,319 L529,319 Z" />
+    <path android:fillColor="@color/logo" android:pathData="M373,83 L601,83 L626,0 L398,0 Z" />
+</vector>

@@ -39,4 +39,5 @@ dependencies {
 	// core.aar собирается из ../core перед сборкой приложения.
 	implementation(fileTree("libs") { include("*.aar") })
 	implementation("androidx.appcompat:appcompat:1.7.0")
+	implementation("com.google.android.material:material:1.12.0")
 }

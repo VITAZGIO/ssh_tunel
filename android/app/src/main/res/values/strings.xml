@@ -33,6 +33,16 @@
     <string name="apps_hint">Звонкам и играм нужен UDP, который через SSH не проходит. Вынесите их сюда, и они пойдут мимо туннеля.</string>
 
     <string name="log">Журнал</string>
+    <string name="log_hint">Куда ходят приложения. Имя вместо адреса означает, что его разрешил сервер, а не телефон.</string>
+    <string name="tab_main">Главная</string>
+    <string name="tab_log">Журнал</string>
+    <string name="tab_settings">Настройки</string>
+    <string name="tile_down">Принято</string>
+    <string name="tile_up">Отдано</string>
+    <string name="tile_conns">Соединений</string>
+    <string name="tile_links">Каналов SSH</string>
+    <string name="pool_hint">каналов SSH</string>
+    <string name="direct_note">Адреса и сети, которым туннель не нужен. Локальная сеть и так идёт напрямую.</string>
     <string name="need_settings">Заполните адрес сервера, пользователя и ключ</string>
     <string name="saved">Сохранено</string>
 </resources>

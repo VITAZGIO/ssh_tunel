@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Передний слой иконки. Знак уменьшен и отодвинут от краёв: система обрезает
+    иконку по своей форме, и то, что близко к краю, теряется.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <group android:scaleX="0.0958" android:scaleY="0.0958"
+        android:translateX="24" android:translateY="29">
+        <path android:fillColor="#2de2ff" android:pathData="M0,0 L137,449 L180,308 L86,0 Z" />
+        <path android:fillColor="#2de2ff" android:pathData="M159,520 L221,520 L246,437 L354,83 L379,0 L293,0 L190,338 L146,479 Z" />
+        <path android:fillColor="#2de2ff" android:pathData="M468,520 L524,337 L437,337 L406,437 L264,437 L239,520 Z" />
+        <path android:fillColor="#2de2ff" android:pathData="M554,236 L394,236 L368,319 L442,319 L529,319 Z" />
+        <path android:fillColor="#2de2ff" android:pathData="M373,83 L601,83 L626,0 L398,0 Z" />
+    </group>
+</vector>

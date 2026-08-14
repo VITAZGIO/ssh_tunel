@@ -29,7 +29,7 @@ class TunnelService : VpnService(), Callbacks {
         /** Состояние и журнал для экрана: служба живёт отдельно от него. */
         @Volatile var state: String = "stopped"
         @Volatile var detail: String = ""
-        @Volatile var stats: String = ""
+        @Volatile var statsJson: String = "{}"
         val log = ArrayDeque<String>()
 
         var onUpdate: (() -> Unit)? = null
@@ -62,34 +62,10 @@ class TunnelService : VpnService(), Callbacks {
             if (now != state) {
                 report(now, detail)
             }
-            stats = describeStats()
+            statsJson = try { tunnel.statsJSON() } catch (e: Exception) { "{}" }
             onUpdate?.invoke()
             ticker.postDelayed(this, 1500)
         }
-    }
-
-    private fun describeStats(): String = try {
-        val o = org.json.JSONObject(tunnel.statsJSON())
-        val up = size(o.optLong("bytesUp"))
-        val down = size(o.optLong("bytesDown"))
-        val healthy = o.optInt("healthy")
-        val links = o.optInt("links")
-        val udp = o.optInt("udpDropped")
-        val v6 = o.optInt("v6Blocked")
-        val dns = o.optInt("dnsAsked")
-        buildString {
-            append("отправлено $up, получено $down · каналов $healthy из $links")
-            append("\nимён разрешено $dns · отклонено: UDP $udp, IPv6 $v6")
-        }
-    } catch (e: Exception) {
-        ""
-    }
-
-    private fun size(bytes: Long): String = when {
-        bytes >= 1024L * 1024 * 1024 -> String.format("%.1f ГБ", bytes / 1024.0 / 1024 / 1024)
-        bytes >= 1024L * 1024 -> String.format("%.1f МБ", bytes / 1024.0 / 1024)
-        bytes >= 1024L -> String.format("%.0f КБ", bytes / 1024.0)
-        else -> "$bytes Б"
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -278,7 +254,7 @@ class TunnelService : VpnService(), Callbacks {
 
     private fun stopTunnel() {
         ticker.removeCallbacks(poll)
-        stats = ""
+        statsJson = "{}"
         try {
             tunnel.stop()
         } catch (e: Exception) {
