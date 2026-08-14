@@ -358,7 +358,17 @@ echo "ключей записано: $(wc -l < "$AK")"
 # чего port-forwarding возвращает ровно одну нужную возможность.
 
 say "Ограничиваю его в настройках SSH"
-cat > /etc/ssh/sshd_config.d/01-tunnel-user.conf <<EOF
+if grep -q '^Include /etc/ssh/sshd_config.d/\*.conf' /etc/ssh/sshd_config; then
+  MATCH_CONF=/etc/ssh/sshd_config.d/01-tunnel-user.conf
+  : > "$MATCH_CONF"
+else
+  # На старых системах без Include блок дописывается в конец основного файла:
+  # Match действует до конца файла, поэтому он обязан быть последним.
+  MATCH_CONF=/etc/ssh/sshd_config
+  sed -i "/^# --- ssh_tunel: $TUNNEL_USER ---\$/,\$d" "$MATCH_CONF"
+  echo "# --- ssh_tunel: $TUNNEL_USER ---" >> "$MATCH_CONF"
+fi
+cat >> "$MATCH_CONF" <<EOF
 Match User $TUNNEL_USER
     PermitTTY no
     AllowAgentForwarding no
