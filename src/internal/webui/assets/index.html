@@ -411,7 +411,7 @@
         <button class="qmark" id="directHelpBtn" title="Подробнее">?</button>
       </div>
       <textarea id="directHosts" rows="2" spellcheck="false"
-        placeholder="100.64.0.0/10, 10.8.*, .netbird.cloud"></textarea>
+        placeholder="10.8.0.0/16, 172.30.*, .corp.local"></textarea>
       <div style="display:flex;gap:8px;align-items:center;margin-top:7px">
         <button class="btn" id="scanNet" style="font-size:12.5px;padding:6px 12px">Проверить сеть</button>
         <span class="hint" id="scanNote" style="margin:0"></span>
@@ -419,10 +419,9 @@
       <div class="help" id="scanResult" hidden></div>
     </div>
     <div class="help" id="directHelp" hidden>
-      <p>Сети, которые не надо вести через сервер. Домашняя и офисная сеть,
-        а также mesh-VPN (NetBird, Tailscale) уже учтены — сюда вписывают
-        только то, что в них не попало: корпоративный VPN, самодельный
-        WireGuard, Hamachi.</p>
+      <p>Сети, которые не надо вести через сервер. Домашние и офисные адреса,
+        а также сети mesh-VPN уже учтены — сюда вписывают только то, что в них
+        не попало: например, корпоративный VPN со своим диапазоном адресов.</p>
       <p>Через запятую, в любом виде: сеть (<code>10.8.0.0/16</code> или
         <code>10.8.*</code>), отдельный адрес или окончание имени
         (<code>.corp.local</code>).</p>
@@ -1030,7 +1029,20 @@ function hideKeyHelp(){
 /* ---------- проверка сетей ---------- */
 /* Спрашивать у человека, какие у него сети, бессмысленно — он их обычно не
    знает. Зато их знает его компьютер. */
+/* Результат убирается сам через 10 секунд — как плитки скорости: он нужен
+   в момент проверки, а потом только занимает экран. Таймер отменяется, пока
+   курсор над списком: иначе кнопка «Добавить» исчезала бы из-под руки. */
+let scanTimer = null;
+function hideScanLater(){
+  clearTimeout(scanTimer);
+  scanTimer = setTimeout(() => {
+    $('scanResult').hidden = true;
+    $('scanNote').textContent = '';
+  }, 10000);
+}
+
 $('scanNet').onclick = async () => {
+  clearTimeout(scanTimer);
   $('scanNote').textContent = 'смотрю…';
   const r = await api('/api/scannet');
   if(r.error){ $('scanNote').textContent = r.error; return; }
@@ -1057,9 +1069,13 @@ $('scanNet').onclick = async () => {
       const cur = ($('directHosts').value || '').trim();
       $('directHosts').value = cur ? cur + ', ' + r.problems : r.problems;
       formDirty = true;
+      clearTimeout(scanTimer);
       $('scanNote').textContent = 'добавлено — не забудь «Сохранить»';
     };
   }
+  box.onmouseenter = () => clearTimeout(scanTimer);
+  box.onmouseleave = hideScanLater;
+  hideScanLater();
 };
 
 async function copyToClipboard(text){
