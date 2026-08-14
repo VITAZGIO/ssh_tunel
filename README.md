@@ -124,7 +124,7 @@ HTTP CONNECT, каналы SSH и определение процесса по �
    PowerShell — заодно файл не получит метку «загружено из интернета»:
 
    ```powershell
-   curl.exe -L -o "$env:USERPROFILE\Desktop\ssh_tunnel.exe" https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe
+   curl.exe -fL --ssl-no-revoke -o "$env:USERPROFILE\Desktop\ssh_tunnel.exe" https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe
    Get-FileHash "$env:USERPROFILE\Desktop\ssh_tunnel.exe" -Algorithm SHA256
    ```
 

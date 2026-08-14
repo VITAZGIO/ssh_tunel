@@ -289,13 +289,37 @@ Defender придираются по умолчанию — это не приз
 (из-за которой потом ругается SmartScreen) файл тоже не получает:
 
 ```powershell
-curl.exe -L -o "$env:USERPROFILE\Desktop\ssh_tunnel.exe" https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe
+curl.exe -fL --ssl-no-revoke -o "$env:USERPROFILE\Desktop\ssh_tunnel.exe" https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe
 Get-FileHash "$env:USERPROFILE\Desktop\ssh_tunnel.exe" -Algorithm SHA256
 ```
 
 Вторая команда печатает контрольную сумму. Сверь её с `SHA256SUMS.txt` со
 страницы релиза — это и есть настоящая проверка подлинности, а не то, что о
 файле думает браузер.
+
+Про два флага, без которых наступают на грабли:
+
+- `-f` — при ошибке (например, файла с таким именем в релизе нет) curl честно
+  ругается, а не сохраняет страницу с ошибкой под именем `.exe`. Без него
+  получаешь «скачанную программу», которая не запускается.
+- `--ssl-no-revoke` — лечит ошибку
+  `schannel: CRYPT_E_REVOCATION_OFFLINE`. Windows перед загрузкой проверяет, не
+  отозван ли сертификат сайта, а если сервер этой проверки недоступен (при
+  включённом туннеле, за корпоративным фильтром, при капризном DNS) — обрывает
+  соединение. Флаг отключает только проверку отзыва; сам сертификат сайта
+  по-прежнему проверяется, а подлинность файла ты всё равно сверяешь по
+  контрольной сумме.
+
+Если curl упрямится, тот же файл берётся встроенными средствами PowerShell —
+там другой стек TLS, и эта ошибка не возникает:
+
+```powershell
+$ProgressPreference = 'SilentlyContinue'
+Invoke-WebRequest -Uri https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe -OutFile "$env:USERPROFILE\Desktop\ssh_tunnel.exe"
+```
+
+Первая строка не украшательство: без неё Invoke-WebRequest рисует полосу
+загрузки и на больших файлах работает в разы медленнее.
 
 Если файл уже скачан браузером, метку можно снять:
 
