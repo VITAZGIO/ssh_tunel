@@ -74,7 +74,7 @@ func TestЦепочкаЦеликом(t *testing.T) {
 		t.Fatalf("пришло не то: %q", body)
 	}
 
-	tcpOpen, _, targets := st.Snapshot()
+	tcpOpen, _, _, targets := st.Snapshot()
 	if tcpOpen == 0 {
 		t.Fatal("стек не передал наверх ни одного соединения")
 	}

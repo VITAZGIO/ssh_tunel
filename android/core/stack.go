@@ -12,6 +12,7 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/xjasonlyu/tun2socks/v2/core/device"
 	"github.com/xjasonlyu/tun2socks/v2/core/device/fdbased"
@@ -46,10 +47,11 @@ type Resolver func(ip string) (host string, ok bool)
 
 // Stats — счётчики для проверок.
 type Stats struct {
-	mu      sync.Mutex
-	tcpOpen int
-	udpDrop int
-	targets []string
+	mu       sync.Mutex
+	tcpOpen  int
+	udpDrop  int
+	dnsAsked int
+	targets  []string
 }
 
 func (s *Stats) tcp(target string) {
@@ -65,11 +67,17 @@ func (s *Stats) udp() {
 	s.udpDrop++
 }
 
-// Snapshot — копия счётчиков без гонок.
-func (s *Stats) Snapshot() (tcpOpen, udpDrop int, targets []string) {
+func (s *Stats) dns() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.tcpOpen, s.udpDrop, append([]string(nil), s.targets...)
+	s.dnsAsked++
+}
+
+// Snapshot — копия счётчиков без гонок.
+func (s *Stats) Snapshot() (tcpOpen, udpDrop, dnsAsked int, targets []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.tcpOpen, s.udpDrop, s.dnsAsked, append([]string(nil), s.targets...)
 }
 
 // Handler — мост между сетевым стеком и ядром туннеля.
@@ -77,6 +85,10 @@ type Handler struct {
 	Core    Core
 	Resolve Resolver
 	Stats   *Stats
+
+	// DNS отвечает на запросы приложений. Если не задан, запросы к 53-му порту
+	// отбиваются вместе с остальным UDP.
+	DNS *DNS
 }
 
 // Engine — собранный стек поверх дескриптора от VpnService.
@@ -144,14 +156,27 @@ func Start(fd int, mtu uint32, h *Handler) (*Engine, error) {
 	})
 	s.SetTransportProtocolHandler(tcp.ProtocolNumber, tcpFwd.HandlePacket)
 
-	// UDP: SSH переносить его не умеет, поэтому здесь он заканчивается.
+	// UDP: единственное, что мы по нему обслуживаем, — это DNS. Всё остальное
+	// через SSH пронести нечем, и здесь оно заканчивается.
 	//
 	// Ответ «не обработано» — не небрежность, а способ заставить стек послать
 	// ICMP «порт недоступен». Если промолчать, отправитель ждёт до таймаута:
 	// браузер вместо быстрого отката с QUIC на TCP выдаёт ошибку. С отказом
 	// он переключается за доли миллисекунды.
+	udpFwd := udp.NewForwarder(s, func(r *udp.ForwarderRequest) bool {
+		var wq waiter.Queue
+		ep, epErr := r.CreateEndpoint(&wq)
+		if epErr != nil {
+			return false
+		}
+		go h.serveDNS(gonet.NewUDPConn(&wq, ep))
+		return true
+	})
 	s.SetTransportProtocolHandler(udp.ProtocolNumber,
 		func(id stack.TransportEndpointID, pkt *stack.PacketBuffer) bool {
+			if id.LocalPort == 53 && h.DNS != nil {
+				return udpFwd.HandlePacket(id, pkt)
+			}
 			h.Stats.udp()
 			return false
 		})
@@ -190,6 +215,28 @@ func (h *Handler) serveTCP(conn net.Conn, id stack.TransportEndpointID) {
 	target := net.JoinHostPort(host, strconv.Itoa(int(id.LocalPort)))
 	h.Stats.tcp(target)
 	h.Core.ServeConn(conn, target, byIP)
+}
+
+// serveDNS обслуживает один запрос и закрывает соединение: DNS по UDP
+// устроен как «вопрос — ответ», держать канал открытым незачем.
+func (h *Handler) serveDNS(conn net.Conn) {
+	defer conn.Close()
+
+	conn.SetDeadline(time.Now().Add(5 * time.Second))
+	// 512 байт — предел обычного запроса по UDP; с EDNS бывает больше,
+	// поэтому берём с запасом.
+	buf := make([]byte, 1500)
+	n, err := conn.Read(buf)
+	if err != nil {
+		return
+	}
+	h.Stats.dns()
+
+	reply, err := h.DNS.Answer(buf[:n])
+	if err != nil {
+		return
+	}
+	conn.Write(reply)
 }
 
 func (e *Engine) Close() {

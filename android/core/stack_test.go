@@ -129,7 +129,7 @@ func TestПакетыСтановятсяСоединением(t *testing.T) {
 		t.Fatalf("данные исказились: %q", got)
 	}
 
-	tcpOpen, _, targets := st.Snapshot()
+	tcpOpen, _, _, targets := st.Snapshot()
 	if tcpOpen != 1 {
 		t.Fatalf("стек передал наверх %d соединений, ожидалось 1", tcpOpen)
 	}
@@ -161,7 +161,7 @@ func TestUDPОтбрасываетсяБыстро(t *testing.T) {
 	_, err = conn.Read(buf)
 	elapsed := time.Since(start)
 
-	_, udpDrop, _ := st.Snapshot()
+	_, udpDrop, _, _ := st.Snapshot()
 	t.Logf("UDP: отброшено=%d, ответ через %v, ошибка=%v", udpDrop, elapsed, err)
 	if udpDrop == 0 {
 		t.Fatal("пакет UDP не дошёл до обработчика")
