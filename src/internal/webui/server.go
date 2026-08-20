@@ -90,6 +90,7 @@ func (s *Server) Serve() error {
 	mux.HandleFunc("/api/pickfile", s.guard(s.handlePickFile))
 	mux.HandleFunc("/api/openterminal", s.guard(s.handleOpenTerminal))
 	mux.HandleFunc("/api/scannet", s.guard(s.handleScanNet))
+	mux.HandleFunc("/api/checksites", s.guard(s.handleCheckSites))
 
 	srv := &http.Server{
 		Handler:           mux,
@@ -207,6 +208,20 @@ func (s *Server) handleScanNet(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{
 		"nets":     checks,
 		"problems": app.Problems(checks),
+	})
+}
+
+// handleCheckSites отвечает на вопрос «это туннель не может или программа
+// ходит мимо него»: открывает несколько сайтов своими руками, через туннель.
+func (s *Server) handleCheckSites(w http.ResponseWriter, r *http.Request) {
+	checks, err := s.app.CheckSites()
+	if err != nil {
+		writeJSON(w, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, map[string]any{
+		"sites":   checks,
+		"verdict": app.SitesVerdict(checks),
 	})
 }
 
