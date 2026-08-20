@@ -40,6 +40,14 @@ type testSSHServer struct {
 	// channels считает открытые через сервер соединения — по нему видно,
 	// действительно ли трафик пошёл через туннель.
 	channels atomic.Int64
+
+	// silentFrom превращает сервер в «чёрную дыру», начиная с указанного по
+	// счёту соединения: оно принимается и держится открытым, но рукопожатие не
+	// начинается никогда. Именно так выглядит фильтрация у провайдера и
+	// мобильный интернет на одном делении — и именно на этом клиент раньше
+	// зависал насмерть. Ноль означает «сервер отвечает всегда».
+	silentFrom atomic.Int64
+	accepted   atomic.Int64
 }
 
 func newTestSSHServer(t *testing.T, clientPub ssh.PublicKey) *testSSHServer {
@@ -85,11 +93,21 @@ func newTestSSHServer(t *testing.T, clientPub ssh.PublicKey) *testSSHServer {
 			go s.handle(t, c, cfg)
 		}
 	}()
-	t.Cleanup(func() { ln.Close() })
+	t.Cleanup(func() {
+		ln.Close()
+		close(s.closeCh) // отпускает придержанные «чёрной дырой» соединения
+	})
 	return s
 }
 
 func (s *testSSHServer) handle(t *testing.T, c net.Conn, cfg *ssh.ServerConfig) {
+	n := s.accepted.Add(1)
+	if from := s.silentFrom.Load(); from > 0 && n >= from {
+		// Ничего не отвечаем и не закрываем: клиент должен уйти сам, по сроку.
+		<-s.closeCh
+		c.Close()
+		return
+	}
 	sc, chans, reqs, err := ssh.NewServerConn(c, cfg)
 	if err != nil {
 		return
@@ -732,5 +750,92 @@ func TestDirectListSkipsTunnel(t *testing.T) {
 			t.Errorf("%s: сервер открыл %d каналов — цель из списка ушла в туннель",
 				target, got-before)
 		}
+	}
+}
+
+// ---------- поведение при мёртвой связи ----------
+
+// silentServer поднимает туннель, у которого сервер замолкает начиная с
+// соединения номер silentFrom. Первое соединение всегда обслуживается — иначе
+// туннель просто не стартует.
+func silentServerTunnel(t *testing.T, poolSize int, silentFrom int64, dialTimeout time.Duration) (*Tunnel, *testSSHServer) {
+	t.Helper()
+	dir := t.TempDir()
+	keyPath, pub := writeTestKey(t, dir)
+	srv := newTestSSHServer(t, pub)
+	srv.silentFrom.Store(silentFrom)
+
+	host, portStr, _ := net.SplitHostPort(srv.addr)
+	sshPort, _ := strconv.Atoi(portStr)
+
+	tun := New(Config{
+		Host:           host,
+		SSHPort:        sshPort,
+		User:           "test",
+		KeyPath:        keyPath,
+		PoolSize:       poolSize,
+		KnownHostsPath: filepath.Join(dir, "known_hosts"),
+		DialTimeout:    dialTimeout,
+	}, events.NewBus())
+	return tun, srv
+}
+
+// Рукопожатие с сервером, который принял соединение и замолчал, обязано
+// прерваться по сроку.
+//
+// Timeout в настройках SSH ограничивает только установку TCP-соединения, а
+// дальше срока нет вовсе. Провайдер, который «подвешивает» соединение вместо
+// того, чтобы его сбросить, оставлял бы горутину висеть навсегда — а вместе с
+// ней и остановку туннеля.
+func TestHandshakeGivesUpOnSilentServer(t *testing.T) {
+	tun, srv := silentServerTunnel(t, 1, 1, 300*time.Millisecond)
+
+	key, err := os.ReadFile(tun.cfg.KeyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := ssh.ParsePrivateKey(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tun.signer = signer
+
+	start := time.Now()
+	if _, err := tun.dialSSH(srv.addr); err == nil {
+		t.Fatal("молчащий сервер принят за рабочий")
+	}
+	if d := time.Since(start); d > 3*time.Second {
+		t.Fatalf("рукопожатие висело %v — срок не сработал", d)
+	}
+}
+
+// Остановка не должна ждать горутину, застрявшую в попытке подключиться.
+//
+// Ровно это и выглядело на телефоне как зависшее приложение: нажатие на кнопку
+// уходило в ядро и упиралось в ожидание фоновых задач, а главный поток стоял.
+func TestStopReturnsWhileConnectionHangs(t *testing.T) {
+	// Первое соединение обслуживается — туннель поднимается. Второй слот пула
+	// упирается в молчание и застревает в рукопожатии на полминуты.
+	tun, _ := silentServerTunnel(t, 2, 2, 30*time.Second)
+	if err := tun.Start(); err != nil {
+		t.Fatalf("туннель не запустился: %v", err)
+	}
+	// Даём второму слоту дойти до рукопожатия.
+	time.Sleep(300 * time.Millisecond)
+
+	done := make(chan time.Duration, 1)
+	go func() {
+		start := time.Now()
+		tun.Stop()
+		done <- time.Since(start)
+	}()
+
+	select {
+	case d := <-done:
+		if d > stopGrace+2*time.Second {
+			t.Fatalf("остановка заняла %v", d)
+		}
+	case <-time.After(stopGrace + 5*time.Second):
+		t.Fatal("остановка не вернулась — приложение на телефоне в этот момент висит")
 	}
 }

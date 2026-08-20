@@ -49,6 +49,9 @@ class TunnelService : VpnService(), Callbacks {
     private var fd: ParcelFileDescriptor? = null
     private val tunnel = Mobile.newTunnel()
 
+    /** Гашение уже идёт: второй раз ядро останавливать не надо. */
+    @Volatile private var stopping = false
+
     private val ticker = android.os.Handler(android.os.Looper.getMainLooper())
 
     /**
@@ -96,6 +99,7 @@ class TunnelService : VpnService(), Callbacks {
             return
         }
 
+        stopping = false
         startForeground(NOTIFICATION_ID, notification("подключение…"))
         report("connecting", "")
 
@@ -135,8 +139,11 @@ class TunnelService : VpnService(), Callbacks {
 
                 ticker.post(poll)
             } catch (e: Exception) {
-                report("error", e.message ?: "не удалось запустить туннель")
-                stopTunnel()
+                // Нажали «стоп», не дождавшись подключения, — это не ошибка, и
+                // красной надписи здесь быть не должно.
+                if (stopping) return@Thread
+                val why = e.message ?: "не удалось запустить туннель"
+                ticker.post { stopTunnel("error", why) }
             }
         }.start()
     }
@@ -263,23 +270,47 @@ class TunnelService : VpnService(), Callbacks {
         }
     }
 
-    private fun stopTunnel() {
+    /**
+     * Останавливает туннель, не занимая главный поток.
+     *
+     * Разделено надвое намеренно. Всё, что видит человек — надпись, цвет
+     * кнопки, уведомление, — делается сразу. А вот погасить ядро может занять
+     * секунды: оно ждёт свои фоновые задачи, и одна из них в этот момент
+     * пытается достучаться до сервера. Именно так это и ломалось: при плохой
+     * связи нажатие на кнопку останавливало главный поток целиком, и
+     * приложение выглядело зависшим — жёлтый круг, который не реагирует.
+     *
+     * finalState нужен для несостоявшегося подключения: туннель гасится так же,
+     * но на экране должно остаться «ошибка» и её причина. Раньше причина
+     * затиралась сразу же, и человек видел просто «выключен» — без объяснения,
+     * почему.
+     */
+    private fun stopTunnel(finalState: String = "stopped", finalDetail: String = "") {
         ticker.removeCallbacks(poll)
         statsJson = "{}"
-        try {
-            tunnel.stop()
-        } catch (e: Exception) {
-            Log.w(TAG, "остановка: ${e.message}")
-        }
-        try {
-            fd?.close()
-        } catch (e: Exception) {
-            // Дескриптор уже отдан в Go и закрыт там — это нормально.
-        }
-        fd = null
-        report("stopped", "")
+        report(finalState, finalDetail)
         stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
+
+        val iface = fd
+        fd = null
+        // onDestroy вызывает нас повторно после stopSelf — второй раз гасить
+        // нечего.
+        if (stopping) return
+        stopping = true
+
+        Thread {
+            try {
+                tunnel.stop()
+            } catch (e: Exception) {
+                Log.w(TAG, "остановка: ${e.message}")
+            }
+            try {
+                iface?.close()
+            } catch (e: Exception) {
+                // Дескриптор уже отдан в Go и закрыт там — это нормально.
+            }
+            stopSelf()
+        }.start()
     }
 
     override fun onDestroy() {

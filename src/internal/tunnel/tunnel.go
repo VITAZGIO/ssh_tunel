@@ -46,6 +46,10 @@ type Config struct {
 	KnownHostsPath string
 	Verbose        bool
 
+	// DialTimeout — сколько ждать соединения с сервером, считая рукопожатие.
+	// Ноль означает пятнадцать секунд.
+	DialTimeout time.Duration
+
 	// Policy решает по имени программы, вести соединение через сервер или
 	// выпустить напрямую. nil означает «всё через туннель».
 	Policy *routing.Policy
@@ -194,15 +198,18 @@ func (t *Tunnel) Start() error {
 	if n < 1 {
 		n = 1
 	}
-	t.links = make([]*link, n)
-	for i := range t.links {
-		t.links[i] = &link{}
+	links := make([]*link, n)
+	for i := range links {
+		links[i] = &link{}
 	}
-	t.links[0].set(first)
+	links[0].set(first)
+	t.mu.Lock()
+	t.links = links
+	t.mu.Unlock()
 
-	for i := range t.links {
+	for i := range links {
 		t.wg.Add(1)
-		go t.keepLinkAlive(t.links[i], i)
+		go t.keepLinkAlive(links[i], i)
 	}
 
 	if err := t.startListeners(); err != nil {
@@ -260,7 +267,12 @@ func (t *Tunnel) pingLoop() {
 		case <-time.After(4 * time.Second):
 		}
 
-		client := t.links[0].get()
+		links := t.snapLinks()
+		if len(links) == 0 {
+			t.stats.pingMs.Store(0)
+			continue
+		}
+		client := links[0].get()
 		if client == nil {
 			t.stats.pingMs.Store(0)
 			continue
@@ -328,6 +340,14 @@ func (t *Tunnel) acceptLoop(ln net.Listener, handle func(net.Conn)) {
 	}
 }
 
+// stopGrace — сколько ждать фоновые горутины при остановке.
+//
+// Ждать их бесконечно нельзя: горутина может стоять в попытке достучаться до
+// сервера, которого нет. Слушатели к этому моменту уже закрыты, а соединения
+// разорваны, поэтому опоздавшая горутина ничего не сломает — она увидит
+// отменённый контекст и выйдет сама, просто чуть позже.
+const stopGrace = 3 * time.Second
+
 // Stop гасит слушатели и пул. Безопасно вызывать повторно.
 func (t *Tunnel) Stop() {
 	if t.cancel == nil {
@@ -338,12 +358,42 @@ func (t *Tunnel) Stop() {
 		ln.Close()
 	}
 	t.listeners = nil
-	for _, l := range t.links {
+	for _, l := range t.snapLinks() {
 		l.set(nil)
 	}
-	t.wg.Wait()
+
+	done := make(chan struct{})
+	go func() {
+		t.wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(stopGrace):
+	}
+
+	t.mu.Lock()
 	t.links = nil
+	t.mu.Unlock()
 	t.setState(events.StateStopped, "")
+}
+
+// snapLinks отдаёт срез пула под замком.
+//
+// Пул создаётся при старте и обнуляется при остановке, а читают его счётчики и
+// замер задержки — то есть из других горутин и в любой момент. Без этого
+// остановка и обращение к пулу пересекались бы на одном поле.
+func (t *Tunnel) snapLinks() []*link {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.links
+}
+
+func (t *Tunnel) dialTimeout() time.Duration {
+	if t.cfg.DialTimeout > 0 {
+		return t.cfg.DialTimeout
+	}
+	return 15 * time.Second
 }
 
 func (t *Tunnel) clientConfig() *ssh.ClientConfig {
@@ -354,7 +404,7 @@ func (t *Tunnel) clientConfig() *ssh.ClientConfig {
 		User:            t.cfg.User,
 		Auth:            []ssh.AuthMethod{ssh.PublicKeys(t.signer)},
 		HostKeyCallback: cb,
-		Timeout:         15 * time.Second,
+		Timeout:         t.dialTimeout(),
 		Config: ssh.Config{
 			// Порядок задаёт предпочтения клиента. AES-GCM первым, потому что
 			// на любом современном процессоре есть AES-NI и он заметно быстрее
@@ -393,9 +443,26 @@ func (t *Tunnel) dialSSH(addr string) (*ssh.Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	// У рукопожатия своего срока нет: Timeout в настройках ограничивает только
+	// установку TCP-соединения. Сервер, который соединение принял и замолчал —
+	// а именно так выглядит фильтрация у провайдера и мобильный интернет на
+	// одном делении, — подвесил бы этот вызов навсегда. Вместе с ним повисает и
+	// остановка туннеля, которая ждёт эту горутину: на телефоне это выглядит
+	// как намертво зависшая кнопка.
+	if err := conn.SetDeadline(time.Now().Add(cfg.Timeout)); err != nil {
+		conn.Close()
+		return nil, err
+	}
 	c, chans, reqs, err := ssh.NewClientConn(conn, addr, cfg)
 	if err != nil {
 		conn.Close()
+		return nil, err
+	}
+	// Срок снимаем: дальше по этому соединению идут переносы данных без всякого
+	// ограничения по времени, и общий дедлайн оборвал бы их через пятнадцать
+	// секунд после подключения.
+	if err := conn.SetDeadline(time.Time{}); err != nil {
+		c.Close()
 		return nil, err
 	}
 	return ssh.NewClient(c, chans, reqs), nil
@@ -518,7 +585,7 @@ func (t *Tunnel) Dial(network, target string) (net.Conn, error) {
 // tryDial делает один проход по пулу. hadLink=false означает, что ни одного
 // живого соединения не нашлось и есть смысл подождать.
 func (t *Tunnel) tryDial(network, target string) (conn net.Conn, err error, hadLink bool) {
-	links := t.links
+	links := t.snapLinks()
 	if len(links) == 0 {
 		return nil, ErrNotConnected, false
 	}
@@ -599,8 +666,9 @@ func isLinkDead(err error) bool {
 }
 
 func (t *Tunnel) Stats() events.Stats {
+	links := t.snapLinks()
 	healthy := 0
-	for _, l := range t.links {
+	for _, l := range links {
 		if l.get() != nil {
 			healthy++
 		}
@@ -610,7 +678,7 @@ func (t *Tunnel) Stats() events.Stats {
 		BytesDown: t.stats.down.Load(),
 		Active:    t.stats.active.Load(),
 		Total:     t.stats.total.Load(),
-		Links:     len(t.links),
+		Links:     len(links),
 		Healthy:   healthy,
 		PingMs:    t.stats.pingMs.Load(),
 	}

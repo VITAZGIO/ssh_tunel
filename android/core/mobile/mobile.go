@@ -59,6 +59,15 @@ type Tunnel struct {
 	stack  *core.Stats
 	bus    *events.Bus
 	stop   chan struct{}
+
+	// gen растёт на каждой остановке.
+	//
+	// Подключение занимает секунды, и всё это время человек может передумать и
+	// нажать «стоп». Раньше такое нажатие проходило вхолостую — гасить было
+	// ещё нечего, — а поднявшееся следом ядро оставалось работать, и выключить
+	// его было уже нечем. Поколение отвечает на вопрос «пока я подключался,
+	// меня не выключили?».
+	gen int64
 }
 
 // NewTunnel создаёт выключенный туннель.
@@ -157,7 +166,7 @@ func (t *Tunnel) StartCore() error {
 		t.mu.Unlock()
 		return fmt.Errorf("туннель уже запущен")
 	}
-	cfg, cb := t.cfg, t.cb
+	cfg, cb, gen := t.cfg, t.cb, t.gen
 	t.mu.Unlock()
 
 	if cfg.Host == "" {
@@ -176,6 +185,14 @@ func (t *Tunnel) StartCore() error {
 	}
 
 	t.mu.Lock()
+	if t.gen != gen {
+		// Пока мы подключались, нажали «стоп». Поднятое ядро никому не нужно —
+		// гасим и уходим, не запоминая его.
+		t.mu.Unlock()
+		close(stop)
+		go tun.Stop()
+		return fmt.Errorf("остановлено")
+	}
 	t.core, t.bus, t.stop = tun, bus, stop
 	t.mu.Unlock()
 
@@ -319,6 +336,7 @@ func (t *Tunnel) Stop() {
 	t.mu.Lock()
 	tun, eng, stop := t.core, t.engine, t.stop
 	t.core, t.engine, t.bus, t.stop, t.stack = nil, nil, nil, nil, nil
+	t.gen++
 	t.mu.Unlock()
 
 	if stop != nil {
