@@ -12,6 +12,7 @@
 [![Версия](https://img.shields.io/badge/версия-1.0.0-4c8dff)](https://github.com/VITAZGIO/ssh_tunel/releases)
 [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
 [![Linux](https://img.shields.io/badge/Linux-amd64%20%7C%20arm64-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
+[![Android](https://img.shields.io/badge/Android-8.0+-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
 [![Go](https://img.shields.io/badge/Go-1.22+-2de2ff)](src)
 
 🇷🇺 Русский · [🇬🇧 English](README.en.md)
@@ -22,6 +23,7 @@
 |---|---|---|
 | **Windows** | [**ssh_tunnel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe) | окно с кнопкой, значок у часов |
 | **Linux** | [**ssh_tunnel_linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux) | консоль + веб-интерфейс, служба systemd |
+| **Android** | [**ssh_tunnel.apk**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.apk) | VPN-подключение, кнопка в шторке |
 
 Сборка под ARM и контрольные суммы — на
 [странице релиза](https://github.com/VITAZGIO/ssh_tunel/releases/latest).
@@ -184,6 +186,47 @@ source ~/.config/ssh_tunnel/proxy.env
 ./packaging/linux/install.sh ./ssh_tunnel_linux
 systemctl --user enable --now ssh_tunnel
 ```
+
+---
+
+## Android
+
+Android 8.0 и новее. Устроено иначе, чем на компьютере, и это принципиально:
+локального прокси, который надо прописывать в настройках, здесь нет.
+
+Приложение поднимает **VPN-подключение** средствами самой системы, забирает
+из неё сырые IP-пакеты и разбирает их своим сетевым стеком, а наружу выпускает
+всё тем же SSH-соединением. Приложениям настраивать нечего — они просто ходят
+в интернет, а система отдаёт их трафик нам.
+
+1. Скачай [**ssh_tunnel.apk**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.apk).
+2. Открой файл. Android спросит разрешение ставить приложения из этого
+   источника — оно нужно один раз.
+3. Шестерёнка → адрес сервера, пользователь `tunnel`, закрытый ключ. Ключ
+   вставляется целиком, вместе со строками `-----BEGIN...` и `-----END...`.
+   После сохранения поле очищается: на экране ему не место.
+4. Кнопка на главном экране. Первый раз система спросит подтверждение
+   VPN-подключения — это её собственный запрос, не наш.
+
+Ключ для телефона делай **отдельный**, а не тот же, что на компьютере: тогда
+потеря одного устройства не тянет за собой второе.
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/phone -C "phone"
+```
+
+Открытую часть (`phone.pub`) добавь на сервере в
+`/home/tunnel/.ssh/authorized_keys` — с теми же ограничениями, что и остальные,
+см. [docs/SERVER_SETUP.md](docs/SERVER_SETUP.md).
+
+**Что есть:** выбор приложений (какие вести через туннель, какие мимо) —
+отбором занимается сама система; кнопка в шторке быстрых настроек; журнал
+соединений; тест скорости; задержка до сервера.
+
+**Чего нет:** UDP. Через SSH он не проходит, поэтому звонки и игры, которым
+нужен UDP, надо выносить в исключения — они пойдут напрямую. Веб и
+мессенджеры работают: приложение отбивает UDP сразу, и они за доли секунды
+переключаются на TCP.
 
 ---
 
