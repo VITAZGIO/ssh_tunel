@@ -12,6 +12,7 @@ standard SSH mechanism.
 [![Version](https://img.shields.io/badge/version-1.0.0-4c8dff)](https://github.com/VITAZGIO/ssh_tunel/releases)
 [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
 [![Linux](https://img.shields.io/badge/Linux-amd64%20%7C%20arm64-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
+[![Android](https://img.shields.io/badge/Android-8.0+-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
 [![Go](https://img.shields.io/badge/Go-1.22+-2de2ff)](src)
 
 [🇷🇺 Русский](README.md) · 🇬🇧 English
@@ -22,6 +23,7 @@ standard SSH mechanism.
 |---|---|---|
 | **Windows** | [**ssh_tunnel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe) | window with a button, tray icon |
 | **Linux** | [**ssh_tunnel_linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux) | console + web interface, systemd service |
+| **Android** | [**ssh_tunnel.apk**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.apk) | VPN connection, quick-settings tile |
 
 The ARM build and the checksums are on the
 [release page](https://github.com/VITAZGIO/ssh_tunel/releases/latest).
@@ -77,6 +79,8 @@ reach, and with your local law, is your responsibility.
   tunnel.
 - 👀 **Shows who is going online** — a live list of programs and addresses, with
   a mark when a DNS lookup went around the tunnel.
+- 📱 **Android app** — a system-level VPN connection, no per-app proxy setup
+  needed.
 
 > A detailed technical write-up is in [ARCHITECTURE.md](docs/ARCHITECTURE.md)
 > (in Russian).
@@ -178,6 +182,47 @@ systemctl --user enable --now ssh_tunnel
 
 ---
 
+## Android
+
+Android 8.0 and newer. It works differently from the desktop, and deliberately
+so: there is no local proxy to point apps at.
+
+The app brings up a **VPN connection** using the system's own mechanism, pulls
+raw IP packets out of it, parses them with its own network stack, and sends
+them out over the same SSH connection. Apps have nothing to configure — they
+just go online, and the system hands their traffic to us.
+
+1. Download [**ssh_tunnel.apk**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.apk).
+2. Open the file. Android will ask for permission to install from this
+   source — needed once.
+3. Gear icon → server address, user `tunnel`, private key. Paste the key in
+   full, including the `-----BEGIN...` and `-----END...` lines. The field
+   clears itself after saving — it should not stay on screen.
+4. The button on the main screen. The first time, the system will ask you to
+   confirm the VPN connection — that is its own prompt, not ours.
+
+Use a **separate** key for the phone, not the same one as your computer:
+losing one device then does not compromise the other.
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/phone -C "phone"
+```
+
+Add the public half (`phone.pub`) to
+`/home/tunnel/.ssh/authorized_keys` on the server, with the same restrictions
+as everything else — see [SERVER_SETUP.md](docs/SERVER_SETUP.md) (in Russian).
+
+**What's there:** per-app selection (which apps go through the tunnel, which
+do not) — the system itself handles the picker; a quick-settings tile;
+connection log; speed test; latency to the server.
+
+**What's not:** UDP. It does not pass through SSH, so calls and games that
+need UDP have to be added to the exceptions and will go direct. The web and
+messaging apps work fine: the app rejects UDP immediately, and they fall back
+to TCP within a fraction of a second.
+
+---
+
 ## Configuration
 
 Settings live in `%APPDATA%\ssh_tunnel\config.json` on Windows and in
@@ -255,9 +300,15 @@ go test ./... -race     # check that everything works
 
 ```
 src/          source code (a Go module)
+android/      the app (Kotlin) and its network stack (Go)
 packaging/    systemd service and installer for Linux
 docs/         architecture, security, troubleshooting
 ```
+
+The Android app cannot be built locally: it needs the Android SDK and NDK.
+It is built on GitHub's servers — the `android` workflow on every push, and
+`release` when cutting a release. The signing key is set up once, see
+[docs/ANDROID_SIGNING.md](docs/ANDROID_SIGNING.md) (in Russian).
 
 Binaries are not kept in the repository — they are published in
 [releases](https://github.com/VITAZGIO/ssh_tunel/releases) so the history does
