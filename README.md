@@ -305,9 +305,15 @@ go test ./... -race     # проверить, что всё работает
 
 ```
 src/          исходный код (модуль Go)
+android/      приложение (Kotlin) и сетевой стек к нему (Go)
 packaging/    служба systemd и установщик для Linux
 docs/         архитектура, безопасность, диагностика
 ```
+
+Приложение для Android локально не собрать: нужны Android SDK и NDK. Оно
+собирается на серверах GitHub — workflow `android` на каждый пуш и `release`
+при выпуске. Ключ подписи заводится один раз, см.
+[docs/ANDROID_SIGNING.md](docs/ANDROID_SIGNING.md).
 
 Готовые файлы в репозитории не лежат — они публикуются в
 [релизах](https://github.com/VITAZGIO/ssh_tunel/releases), чтобы история не
