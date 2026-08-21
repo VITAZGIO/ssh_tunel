@@ -61,10 +61,13 @@ func NewManager(configDir string) *Manager {
 
 // Enable прописывает системный прокси и переменные среды.
 //
-// httpAddr указывается и для http, и для https: WinINET умеет CONNECT, а через
-// него имя хоста уходит на сервер и не разрешается локально.
-// socksAddr прописывается дополнительно — для приложений, которые ходят
-// только по SOCKS.
+// В реестр идёт ОДИН адрес без разбивки по протоколам — то есть «этот прокси
+// для всего». Так его понимают и WinINET, и браузеры, и окно параметров
+// Windows.
+//
+// socksAddr здесь намеренно не участвует, хотя SOCKS-прокси и работает: см.
+// комментарий к записи ниже. Порт остаётся доступен, его просто не предлагают
+// системе.
 //
 // bypassLocal=true добавляет в исключения всю локальную сеть, чтобы домашние
 // сервисы оставались доступны при включённом туннеле. extra — то же самое из
@@ -92,8 +95,8 @@ func (m *Manager) Enable(httpAddr, socksAddr string, setEnv, bypassLocal bool, e
 		snap.ProxyOverride, snap.HadOverride = v, true
 	}
 
-	value := fmt.Sprintf("http=%s;https=%s;socks=%s", httpAddr, httpAddr, socksAddr)
-	if err := k.SetStringValue("ProxyServer", value); err != nil {
+	// Почему один адрес, а не разбивка по протоколам — см. winProxyServer.
+	if err := k.SetStringValue("ProxyServer", winProxyServer(httpAddr)); err != nil {
 		return err
 	}
 	// Локальные адреса обязаны идти мимо прокси. Раньше здесь была пустая
