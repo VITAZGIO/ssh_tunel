@@ -14,6 +14,13 @@ on:
       tag:
         description: "Метка версии, например v1.1.0"
         required: true
+      notes:
+        description: "Описание релиза (пусто — сгенерировать из истории коммитов)"
+        required: false
+      delete_existing:
+        description: "Удалить все существующие релизы перед публикацией"
+        type: boolean
+        default: false
 
 permissions:
   contents: write # нужно, чтобы создать релиз и приложить файлы
@@ -136,6 +143,18 @@ jobs:
     needs: [desktop, android]
     runs-on: ubuntu-latest
     steps:
+      # По умолчанию выключено: разово стирать историю релизов должно быть
+      # осознанным выбором при запуске, а не поведением по умолчанию.
+      - name: Удалить существующие релизы
+        if: ${{ inputs.delete_existing == true }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for t in $(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName -q '.[].tagName'); do
+            echo "Удаляю релиз $t"
+            gh release delete "$t" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
+          done
+
       - uses: actions/download-artifact@v4
         with:
           name: desktop
@@ -164,5 +183,6 @@ jobs:
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
           name: ${{ inputs.tag || github.ref_name }}
-          generate_release_notes: true
+          body: ${{ inputs.notes }}
+          generate_release_notes: ${{ inputs.notes == '' }}
           files: dist/*
