@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Иконка приложения: тот же щит с замочной скважиной, что и в версии для
+    Windows. Шершавая фактура из исходника здесь опущена — на значке размером
+    в ноготь её всё равно не видно, а разметка от неё раздувается вдвое.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp" android:height="48dp"
+    android:viewportWidth="512" android:viewportHeight="512">
+    <path android:fillColor="#2de2ff" android:pathData="M43.52,28.16 L468.48,28.16 L468.48,215.04 Q453.12,409.6 256,494.08 Q58.88,409.6 43.52,215.04 Z" />
+    <path android:fillColor="#000000" android:pathData="M202.24,179.2 a53.76,53.76 0 1,0 107.52,0 a53.76,53.76 0 1,0 -107.52,0 Z" />
+    <path android:fillColor="#000000" android:pathData="M234.5,179.2 L277.5,179.2 L301.06,286.72 L210.94,286.72 Z" />
+</vector>

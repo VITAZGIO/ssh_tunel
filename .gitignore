@@ -15,3 +15,15 @@ src/ssh_tunnel-cli
 # Личное: сюда попадают адрес сервера и путь к ключу
 config.json
 known_hosts
+
+# Ключ подписи приложения. В репозиторий не кладётся никогда: кто им владеет,
+# тот может выпустить обновление от твоего имени. Живёт в секретах сборки,
+# см. docs/ANDROID_SIGNING.md.
+*.jks
+*.keystore
+
+# Сборка приложения для Android
+android/app/build/
+android/app/libs/
+android/.gradle/
+android/build/

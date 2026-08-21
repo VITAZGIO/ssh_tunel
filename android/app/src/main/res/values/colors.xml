@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Те же цвета, что в окне на компьютере: приложение должно узнаваться, а не
+    выглядеть роднёй по случайному совпадению.
+-->
+<resources>
+    <color name="bg">#0d1017</color>
+    <color name="card">#161a23</color>
+    <color name="card2">#1d222d</color>
+    <color name="line">#272d3a</color>
+    <color name="text">#e8ebf2</color>
+    <color name="dim">#828b9e</color>
+    <color name="accent">#4c8dff</color>
+    <color name="ok">#2fbf71</color>
+    <color name="warn">#e8b339</color>
+    <color name="err">#e5484d</color>
+    <color name="logo">#2de2ff</color>
+</resources>

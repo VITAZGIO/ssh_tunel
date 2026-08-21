@@ -19,14 +19,17 @@ import (
 	"io"
 	"net"
 	"os"
+	"strconv"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"golang.org/x/crypto/ssh"
 
 	"sshtunnel/internal/events"
 	"sshtunnel/internal/hostkey"
+	"sshtunnel/internal/procinfo"
 	"sshtunnel/internal/routing"
 )
 
@@ -43,6 +46,10 @@ type Config struct {
 	KnownHostsPath string
 	Verbose        bool
 
+	// DialTimeout — сколько ждать соединения с сервером, считая рукопожатие.
+	// Ноль означает пятнадцать секунд.
+	DialTimeout time.Duration
+
 	// Policy решает по имени программы, вести соединение через сервер или
 	// выпустить напрямую. nil означает «всё через туннель».
 	Policy *routing.Policy
@@ -50,6 +57,17 @@ type Config struct {
 	// Direct — собственный список адресов и сетей, которые всегда идут
 	// напрямую. nil означает «список пуст».
 	Direct *routing.DirectList
+
+	// ProtectSocket вызывается для каждого сокета, который открывает сама
+	// программа: соединения с сервером и прямых соединений мимо туннеля.
+	//
+	// Нужно это только на Android и там обязательно. Система заворачивает в
+	// туннель весь трафик, включая наш собственный, — соединение с сервером
+	// пошло бы внутрь самого себя и зациклилось. VpnService.protect() помечает
+	// сокет как «этот мимо», и обращение к нему разрывает петлю.
+	//
+	// nil означает «ничего помечать не надо» — так на Windows и Linux.
+	ProtectSocket func(network, address string, c syscall.RawConn) error
 
 	// LocalViaTunnel — вести ли в туннель и адреса локальной сети.
 	//
@@ -108,6 +126,9 @@ type Tunnel struct {
 }
 
 type stats struct {
+	// pingMs — задержка до сервера, миллисекунды.
+	pingMs atomic.Int64
+
 	up     atomic.Int64
 	down   atomic.Int64
 	active atomic.Int64
@@ -177,15 +198,18 @@ func (t *Tunnel) Start() error {
 	if n < 1 {
 		n = 1
 	}
-	t.links = make([]*link, n)
-	for i := range t.links {
-		t.links[i] = &link{}
+	links := make([]*link, n)
+	for i := range links {
+		links[i] = &link{}
 	}
-	t.links[0].set(first)
+	links[0].set(first)
+	t.mu.Lock()
+	t.links = links
+	t.mu.Unlock()
 
-	for i := range t.links {
+	for i := range links {
 		t.wg.Add(1)
-		go t.keepLinkAlive(t.links[i], i)
+		go t.keepLinkAlive(links[i], i)
 	}
 
 	if err := t.startListeners(); err != nil {
@@ -196,6 +220,8 @@ func (t *Tunnel) Start() error {
 	t.setState(events.StateConnected, fmt.Sprintf("%s:%d", t.cfg.Host, t.cfg.SSHPort))
 	t.wg.Add(1)
 	go t.publishStats()
+	t.wg.Add(1)
+	go t.pingLoop()
 	return nil
 }
 
@@ -215,13 +241,88 @@ func (t *Tunnel) startListeners() error {
 		}
 		ln, err := net.Listen("tcp", s.addr)
 		if err != nil {
-			return fmt.Errorf("не могу занять локальный адрес %s (%s): %w — возможно, программа уже запущена", s.addr, s.name, err)
+			return fmt.Errorf("не могу занять локальный адрес %s (%s): %w%s",
+				s.addr, s.name, err, whoHolds(s.addr))
 		}
 		t.listeners = append(t.listeners, ln)
 		t.wg.Add(1)
 		go t.acceptLoop(ln, s.handler)
 	}
 	return nil
+}
+
+// pingLoop меряет задержку до сервера.
+//
+// Keepalive для этого не годится: он ходит раз в двадцать секунд, и число на
+// экране было бы почти всегда несвежим. Свой замер стоит копейки — служебный
+// запрос без нагрузки по уже открытому соединению, — зато показывает связь
+// такой, какая она сейчас.
+func (t *Tunnel) pingLoop() {
+	defer t.wg.Done()
+
+	for {
+		select {
+		case <-t.ctx.Done():
+			return
+		case <-time.After(4 * time.Second):
+		}
+
+		links := t.snapLinks()
+		if len(links) == 0 {
+			t.stats.pingMs.Store(0)
+			continue
+		}
+		client := links[0].get()
+		if client == nil {
+			t.stats.pingMs.Store(0)
+			continue
+		}
+
+		start := time.Now()
+		done := make(chan error, 1)
+		go func() {
+			_, _, err := client.SendRequest("keepalive@openssh.com", true, nil)
+			done <- err
+		}()
+
+		select {
+		case err := <-done:
+			if err != nil {
+				t.stats.pingMs.Store(0)
+				continue
+			}
+			ms := time.Since(start).Milliseconds()
+			if ms < 1 {
+				ms = 1 // ноль означает «нет замера», а не «мгновенно»
+			}
+			t.stats.pingMs.Store(ms)
+		case <-time.After(5 * time.Second):
+			t.stats.pingMs.Store(0)
+		case <-t.ctx.Done():
+			return
+		}
+	}
+}
+
+// whoHolds пытается назвать программу, которая уже держит этот порт.
+//
+// Без этого сообщение об ошибке заставляет гадать: своя же копия висит в трее
+// или посторонняя программа заняла порт. Ответ у системы есть, и спросить его
+// стоит ровно один раз — в момент, когда занять порт не вышло.
+func whoHolds(addr string) string {
+	_, portStr, err := net.SplitHostPort(addr)
+	if err != nil {
+		return ""
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return ""
+	}
+	name, pid := procinfo.Lookup(uint16(port))
+	if name == "" {
+		return " — возможно, программа уже запущена"
+	}
+	return fmt.Sprintf(" — порт занят программой %s (%d)", name, pid)
 }
 
 func (t *Tunnel) acceptLoop(ln net.Listener, handle func(net.Conn)) {
@@ -239,6 +340,14 @@ func (t *Tunnel) acceptLoop(ln net.Listener, handle func(net.Conn)) {
 	}
 }
 
+// stopGrace — сколько ждать фоновые горутины при остановке.
+//
+// Ждать их бесконечно нельзя: горутина может стоять в попытке достучаться до
+// сервера, которого нет. Слушатели к этому моменту уже закрыты, а соединения
+// разорваны, поэтому опоздавшая горутина ничего не сломает — она увидит
+// отменённый контекст и выйдет сама, просто чуть позже.
+const stopGrace = 3 * time.Second
+
 // Stop гасит слушатели и пул. Безопасно вызывать повторно.
 func (t *Tunnel) Stop() {
 	if t.cancel == nil {
@@ -249,12 +358,42 @@ func (t *Tunnel) Stop() {
 		ln.Close()
 	}
 	t.listeners = nil
-	for _, l := range t.links {
+	for _, l := range t.snapLinks() {
 		l.set(nil)
 	}
-	t.wg.Wait()
+
+	done := make(chan struct{})
+	go func() {
+		t.wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(stopGrace):
+	}
+
+	t.mu.Lock()
 	t.links = nil
+	t.mu.Unlock()
 	t.setState(events.StateStopped, "")
+}
+
+// snapLinks отдаёт срез пула под замком.
+//
+// Пул создаётся при старте и обнуляется при остановке, а читают его счётчики и
+// замер задержки — то есть из других горутин и в любой момент. Без этого
+// остановка и обращение к пулу пересекались бы на одном поле.
+func (t *Tunnel) snapLinks() []*link {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.links
+}
+
+func (t *Tunnel) dialTimeout() time.Duration {
+	if t.cfg.DialTimeout > 0 {
+		return t.cfg.DialTimeout
+	}
+	return 15 * time.Second
 }
 
 func (t *Tunnel) clientConfig() *ssh.ClientConfig {
@@ -265,7 +404,7 @@ func (t *Tunnel) clientConfig() *ssh.ClientConfig {
 		User:            t.cfg.User,
 		Auth:            []ssh.AuthMethod{ssh.PublicKeys(t.signer)},
 		HostKeyCallback: cb,
-		Timeout:         15 * time.Second,
+		Timeout:         t.dialTimeout(),
 		Config: ssh.Config{
 			// Порядок задаёт предпочтения клиента. AES-GCM первым, потому что
 			// на любом современном процессоре есть AES-NI и он заметно быстрее
@@ -284,7 +423,7 @@ func (t *Tunnel) clientConfig() *ssh.ClientConfig {
 
 func (t *Tunnel) dial() (*ssh.Client, error) {
 	addr := net.JoinHostPort(t.cfg.Host, fmt.Sprint(t.cfg.SSHPort))
-	client, err := ssh.Dial("tcp", addr, t.clientConfig())
+	client, err := t.dialSSH(addr)
 	if err != nil {
 		var changed *hostkey.ErrChanged
 		if errors.As(err, &changed) {
@@ -293,6 +432,47 @@ func (t *Tunnel) dial() (*ssh.Client, error) {
 		return nil, fmt.Errorf("не удалось подключиться к %s: %w", addr, err)
 	}
 	return client, nil
+}
+
+// dialSSH — то же, что ssh.Dial, но соединение открывается своим диалером.
+// Иначе некуда вставить пометку сокета, без которой на Android соединение с
+// сервером ушло бы в собственный туннель.
+func (t *Tunnel) dialSSH(addr string) (*ssh.Client, error) {
+	cfg := t.clientConfig()
+	conn, err := t.directDialer(cfg.Timeout).Dial("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	// У рукопожатия своего срока нет: Timeout в настройках ограничивает только
+	// установку TCP-соединения. Сервер, который соединение принял и замолчал —
+	// а именно так выглядит фильтрация у провайдера и мобильный интернет на
+	// одном делении, — подвесил бы этот вызов навсегда. Вместе с ним повисает и
+	// остановка туннеля, которая ждёт эту горутину: на телефоне это выглядит
+	// как намертво зависшая кнопка.
+	if err := conn.SetDeadline(time.Now().Add(cfg.Timeout)); err != nil {
+		conn.Close()
+		return nil, err
+	}
+	c, chans, reqs, err := ssh.NewClientConn(conn, addr, cfg)
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+	// Срок снимаем: дальше по этому соединению идут переносы данных без всякого
+	// ограничения по времени, и общий дедлайн оборвал бы их через пятнадцать
+	// секунд после подключения.
+	if err := conn.SetDeadline(time.Time{}); err != nil {
+		c.Close()
+		return nil, err
+	}
+	return ssh.NewClient(c, chans, reqs), nil
+}
+
+// directDialer — диалер для соединений, которые программа открывает сама.
+// На Android каждое такое соединение должно быть помечено как идущее мимо
+// туннеля, иначе оно вернётся в него же.
+func (t *Tunnel) directDialer(timeout time.Duration) *net.Dialer {
+	return &net.Dialer{Timeout: timeout, Control: t.cfg.ProtectSocket}
 }
 
 // keepLinkAlive держит один слот пула живым: шлёт keepalive, замечает смерть
@@ -405,7 +585,7 @@ func (t *Tunnel) Dial(network, target string) (net.Conn, error) {
 // tryDial делает один проход по пулу. hadLink=false означает, что ни одного
 // живого соединения не нашлось и есть смысл подождать.
 func (t *Tunnel) tryDial(network, target string) (conn net.Conn, err error, hadLink bool) {
-	links := t.links
+	links := t.snapLinks()
 	if len(links) == 0 {
 		return nil, ErrNotConnected, false
 	}
@@ -486,8 +666,9 @@ func isLinkDead(err error) bool {
 }
 
 func (t *Tunnel) Stats() events.Stats {
+	links := t.snapLinks()
 	healthy := 0
-	for _, l := range t.links {
+	for _, l := range links {
 		if l.get() != nil {
 			healthy++
 		}
@@ -497,8 +678,9 @@ func (t *Tunnel) Stats() events.Stats {
 		BytesDown: t.stats.down.Load(),
 		Active:    t.stats.active.Load(),
 		Total:     t.stats.total.Load(),
-		Links:     len(t.links),
+		Links:     len(links),
 		Healthy:   healthy,
+		PingMs:    t.stats.pingMs.Load(),
 	}
 }
 

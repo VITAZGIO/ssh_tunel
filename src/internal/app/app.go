@@ -194,7 +194,7 @@ func (a *App) Start() error {
 			a.mu.Lock()
 			a.sysOn = true
 			a.mu.Unlock()
-			a.Bus.Infof("Системный прокси включён: http=%s, socks=%s", httpAddr, socksAddr)
+			a.Bus.Infof("Системный прокси включён: %s (SOCKS доступен на %s)", httpAddr, socksAddr)
 			if cfg.SetEnvVars {
 				a.Bus.Infof("HTTPS_PROXY прописан в переменные среды — программы вроде Claude Code подхватят его при следующем запуске")
 			}

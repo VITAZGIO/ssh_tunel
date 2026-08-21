@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ssh_tunnel</string>
+
+    <string name="state_stopped">Выключено</string>
+    <string name="state_connecting">Подключение…</string>
+    <string name="state_connected">Подключено</string>
+    <string name="state_reconnecting">Переподключение…</string>
+    <string name="state_error">Ошибка</string>
+
+    <string name="start">Включить</string>
+    <string name="stop">Выключить</string>
+    <string name="save">Сохранить</string>
+
+    <string name="server">Сервер</string>
+    <string name="host_hint">адрес сервера</string>
+    <string name="port_hint">порт SSH (обычно 22)</string>
+    <string name="user_hint">пользователь</string>
+
+    <string name="key">Закрытый ключ</string>
+    <string name="key_hint">вставьте содержимое файла ключа</string>
+    <string name="key_missing">Ключ не задан</string>
+    <string name="key_saved">Ключ сохранён</string>
+
+    <string name="direct">Всегда напрямую</string>
+    <string name="direct_hint">10.8.0.0/16, 172.30.*, .corp.local</string>
+    <string name="local_via_tunnel">Локальную сеть тоже вести через сервер</string>
+
+    <string name="apps_title">Приложения</string>
+    <string name="mode_all">Все через сервер</string>
+    <string name="mode_only">Только выбранные</string>
+    <string name="mode_except">Все, кроме выбранных</string>
+    <string name="apps_hint">Звонкам и играм нужен UDP, который через SSH не проходит. Вынесите их сюда, и они пойдут мимо туннеля.</string>
+
+    <string name="log">Журнал</string>
+    <string name="log_hint">Куда ходят приложения. Имя вместо адреса означает, что его разрешил сервер, а не телефон.</string>
+    <string name="tab_settings">Настройки</string>
+    <string name="tile_down">ПРИЁМ, МБИТ/С</string>
+    <string name="tile_up">ОТДАЧА, МБИТ/С</string>
+    <string name="tile_conns">СОЕДИНЕНИЙ</string>
+    <string name="tile_links">КАНАЛОВ SSH</string>
+    <string name="pool_hint">каналов SSH</string>
+    <string name="direct_note">Адреса и сети, которым туннель не нужен. Локальная сеть и так идёт напрямую.</string>
+    <string name="need_settings">Заполните адрес сервера, пользователя и ключ</string>
+    <string name="saved">Сохранено</string>
+    <string name="back">Назад</string>
+    <string name="need_connected">Сначала включите туннель</string>
+    <string name="speedtest">Тест скорости</string>
+    <string name="speedtest_running">Идёт тест…</string>
+    <string name="apps_row">Какие программы вести через туннель</string>
+    <string name="pool_note">Несколько параллельных каналов заметно поднимают скорость. 4 — разумное значение.</string>
+    <string name="apps_chosen">выбрано %1$d</string>
+    <string name="speed_result">приём %1$s · отдача %2$s</string>
+</resources>

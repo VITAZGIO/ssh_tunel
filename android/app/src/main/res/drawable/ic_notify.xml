@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Значок в строке состояния: система перекрашивает его в один цвет, поэтому
+     здесь только силуэт щита, без скважины — она бы всё равно залилась. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="512" android:viewportHeight="512">
+    <path android:fillColor="#ffffff"
+        android:pathData="M43.52,28.16 L468.48,28.16 L468.48,215.04 Q453.12,409.6 256,494.08 Q58.88,409.6 43.52,215.04 Z" />
+</vector>

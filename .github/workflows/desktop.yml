@@ -1,0 +1,54 @@
+# Сборка ssh_tunnel для Windows и Linux.
+#
+# Тот же build.sh, что и на своей машине, — только запускается на серверах
+# GitHub, и результат прикладывается к запуску файлом, а не остаётся собирать
+# руками. В релиз (страница «Releases») ничего не публикуется само: это
+# отдельное, осознанное действие, а не следствие каждого пуша.
+
+name: desktop
+
+on:
+  push:
+    branches: ["claude/**"]
+    paths:
+      - "src/**"
+      - ".github/workflows/desktop.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+
+      - name: Собрать
+        working-directory: src
+        run: ./build.sh
+
+      - name: Выложить Windows
+        uses: actions/upload-artifact@v4
+        with:
+          name: ssh_tunnel_windows
+          path: |
+            releases/windows/ssh_tunnel.exe
+            releases/windows/ssh_tunnel_windows.zip
+
+      - name: Выложить Linux
+        uses: actions/upload-artifact@v4
+        with:
+          name: ssh_tunnel_linux
+          path: |
+            releases/linux/ssh_tunnel_linux
+            releases/linux/ssh_tunnel_linux_arm64
+
+      - name: Выложить контрольные суммы
+        uses: actions/upload-artifact@v4
+        with:
+          name: ssh_tunnel_checksums
+          path: releases/SHA256SUMS.txt
