@@ -306,8 +306,6 @@
     </div>
 
     <button class="btn speed" id="speedtest">Тест скорости</button>
-    <button class="btn speed" id="checkSites" style="margin-top:8px">Проверить сайты</button>
-    <div class="help" id="sitesResult" hidden></div>
   </div>
 
   <!-- НАСТРОЙКИ -->
@@ -777,8 +775,6 @@ function setState(s, detail){
   running = (s === 'connected' || s === 'reconnecting' || s === 'connecting');
   if(s !== 'connected') showPing(0);
   $('speedtest').disabled = !running || speedRunning;
-  $('checkSites').disabled = !running;
-  if(!running) $('sitesResult').hidden = true;
 }
 function showError(msg, where){
   const box = $(where || 'error');
@@ -896,31 +892,6 @@ $('stateDetail').onclick = async () => {
   }
   $('stateDetail').textContent = r.ip === shown ? shown + '  ✓' : r.ip;
   setTimeout(() => { if(running) $('stateDetail').textContent = r.ip; }, 4000);
-};
-
-/* ---------- проверка сайтов ---------- */
-/* Отвечает на вопрос, который иначе не разрешить: сайт не открылся потому, что
-   его не пускает сервер, или потому, что программа вообще не пошла в туннель.
-   Проверка идёт нашими руками, мимо системных настроек прокси, — значит её
-   результат от настроек браузера не зависит. */
-$('checkSites').onclick = async () => {
-  const btn = $('checkSites');
-  const box = $('sitesResult');
-  btn.disabled = true;
-  btn.textContent = 'Проверяю…';
-  const r = await api('/api/checksites');
-  btn.disabled = !running;
-  btn.textContent = 'Проверить сайты';
-  if(r.error){ showError(r.error); return; }
-
-  const sites = r.sites || [];
-  box.hidden = false;
-  box.innerHTML = '<p><b>' + r.verdict + '</b></p>' + sites.map(s =>
-    '<div class="netline ' + (s.ok ? 'ok' : 'bad') + '">' +
-    '<span class="mark">' + (s.ok ? '✓' : '!') + '</span>' +
-    '<span><span class="cidr">' + s.name + '</span>' +
-    (s.ok ? ' — ' + s.ms + ' мс' : '') +
-    '<br><span class="hint" style="margin:0">' + s.why + '</span></span></div>').join('');
 };
 
 /* ---------- тест скорости ---------- */
