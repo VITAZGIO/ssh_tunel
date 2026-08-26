@@ -312,6 +312,10 @@
         <div class="k">Приём</div><div class="v" id="dn">—</div></div>
       <div class="tile" id="tileUp" hidden>
         <div class="k">Отдача</div><div class="v" id="up">—</div></div>
+      <!-- Приём мимо туннеля. Без этой цифры первая ничего не значит:
+           непонятно, туннель тормозит или интернет такой. -->
+      <div class="tile" id="tileDirect" hidden>
+        <div class="k">Напрямую</div><div class="v" id="dir">—</div></div>
       <div class="tile"><div class="k">Соединений</div><div class="v" id="act">—</div></div>
       <div class="tile"><div class="k">Каналов SSH</div><div class="v" id="links">—</div></div>
     </div>
@@ -915,12 +919,15 @@ function onSpeed(e){
     $('speedtest').innerHTML = 'Тест скорости';
     return;
   }
-  const tile = e.phase === 'up' ? 'tileUp' : 'tileDown';
-  const val  = e.phase === 'up' ? 'up' : 'dn';
+  const tiles = {down:'tileDown', up:'tileUp', direct:'tileDirect'};
+  const vals  = {down:'dn',       up:'up',     direct:'dir'};
+  const names = {down:'приём',    up:'отдача', direct:'напрямую'};
+  const tile = tiles[e.phase] || 'tileDown';
+  const val  = vals[e.phase]  || 'dn';
   $(tile).hidden = false;
   $(val).textContent = fmtMbps(e.mbps);
   $('speedtest').innerHTML = 'Измеряю…<span class="ph">' +
-    (e.phase === 'up' ? 'отдача' : 'приём') + '</span>';
+    (names[e.phase] || 'приём') + '</span>';
 }
 
 // Последний удачный результат держим отдельно: если следующий тест сорвётся,
@@ -948,12 +955,16 @@ $('speedtest').onclick = async () => {
     hideSpeedLater();
     return;
   }
-  lastSpeed = { down: r.downMbps, up: r.upMbps };
+  lastSpeed = { down: r.downMbps, up: r.upMbps, direct: r.directDownMbps || 0,
+                verdict: r.verdict || '' };
   showSpeed(lastSpeed);
   hideSpeedLater();
   // Приём мог измериться, а отдача — нет. Это не ошибка целиком, поэтому
-  // говорим об этом отдельно и результат оставляем.
-  if(r.note) showError(r.note);
+  // говорим об этом отдельно и результат оставляем. Вывод сравнения с прямым
+  // каналом — это и есть ответ на вопрос «почему медленно», ради которого
+  // тест запускают, поэтому он важнее замечания про отдачу.
+  if(r.verdict) showError(r.verdict);
+  else if(r.note) showError(r.note);
 };
 
 // Плитки со скоростью убираются сами через десять секунд: результат нужен
@@ -965,6 +976,7 @@ function hideSpeedLater(){
   hideTimer = setTimeout(() => {
     $('tileDown').hidden = true;
     $('tileUp').hidden = true;
+    $('tileDirect').hidden = true;
   }, 10000);
 }
 
@@ -974,9 +986,11 @@ function showSpeed(v){
   const has = v !== null;
   $('tileDown').hidden = !has;
   $('tileUp').hidden = !has;
+  $('tileDirect').hidden = !has || !(v.direct > 0);
   if(!has) return;
   $('dn').textContent = fmtMbps(v.down);
   $('up').textContent = v.up > 0 ? fmtMbps(v.up) : '—';
+  if(v.direct > 0) $('dir').textContent = fmtMbps(v.direct);
 }
 
 /* ---------- подсказка «как получить ключ» ---------- */

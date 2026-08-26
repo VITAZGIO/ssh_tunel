@@ -296,6 +296,10 @@ func (a *App) SpeedTest() (speedtest.Result, error) {
 	a.Bus.Infof("Тест скорости запущен")
 	res, err := speedtest.Run(context.Background(), speedtest.Options{
 		Dial: tun.Dial,
+		// Тот же замер мимо туннеля. Без него цифра «через туннель» не с чем
+		// сравнить, и вопрос «медленно из-за туннеля или интернет такой»
+		// остаётся без ответа.
+		DirectDial: tun.DialDirect,
 		// Потоков столько же, сколько соединений в пуле: меряем ровно то,
 		// чем пользуются приложения.
 		Streams: cfg.PoolSize,
@@ -310,6 +314,9 @@ func (a *App) SpeedTest() (speedtest.Result, error) {
 	}
 	a.Bus.Speed("", 0, true)
 	a.Bus.Infof("Тест скорости: приём %.1f Мбит/с, отдача %.1f Мбит/с", res.DownMbps, res.UpMbps)
+	if res.DirectDownMbps > 0 {
+		a.Bus.Infof("Тот же файл мимо туннеля: %.1f Мбит/с — %s", res.DirectDownMbps, res.Verdict)
+	}
 	return res, nil
 }
 

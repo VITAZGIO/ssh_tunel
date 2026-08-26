@@ -184,3 +184,73 @@ func TestUploadFailureKeepsDownload(t *testing.T) {
 	}
 	t.Logf("приём %.0f Мбит/с, пометка: %s", res.DownMbps, res.Note)
 }
+
+// Замер мимо туннеля — отдельная фаза с отдельной цифрой. Без неё результат
+// теста не с чем сравнить, ради чего сравнение и добавлено.
+func TestDirectComparisonRuns(t *testing.T) {
+	base := testServer(t)
+
+	var sawDirect bool
+	res, err := Run(context.Background(), Options{
+		Dial:       directDial,
+		DirectDial: directDial,
+		Streams:    2,
+		Duration:   700 * time.Millisecond,
+		WarmUp:     150 * time.Millisecond,
+		DownURLs:   []string{base + "/down"},
+		UpURLs:     []string{base + "/up"},
+		OnProgress: func(phase string, mbps float64) {
+			sawDirect = sawDirect || phase == PhaseDirect
+		},
+	})
+	if err != nil {
+		t.Fatalf("тест скорости не прошёл: %v", err)
+	}
+	if !sawDirect {
+		t.Fatal("фаза замера мимо туннеля не сообщалась")
+	}
+	if res.DirectDownMbps <= 0 {
+		t.Fatalf("прямой приём измерен как %v", res.DirectDownMbps)
+	}
+	if res.Verdict == "" {
+		t.Fatal("сравнение есть, а вывода из него нет")
+	}
+}
+
+// Без DirectDial поведение прежнее: лишней фазы нет и вывода тоже.
+func TestDirectComparisonOptional(t *testing.T) {
+	base := testServer(t)
+
+	res, err := Run(context.Background(), Options{
+		Dial:     directDial,
+		Streams:  2,
+		Duration: 500 * time.Millisecond,
+		WarmUp:   100 * time.Millisecond,
+		DownURLs: []string{base + "/down"},
+		UpURLs:   []string{base + "/up"},
+	})
+	if err != nil {
+		t.Fatalf("тест скорости не прошёл: %v", err)
+	}
+	if res.DirectDownMbps != 0 || res.Verdict != "" {
+		t.Fatalf("сравнения не просили, а оно есть: %.1f %q", res.DirectDownMbps, res.Verdict)
+	}
+}
+
+func TestVerdictThresholds(t *testing.T) {
+	cases := []struct {
+		name           string
+		tunnel, direct float64
+		want           string
+	}{
+		{"нечего сравнивать", 50, 0, ""},
+		{"туннель не мешает", 90, 100, "туннель почти не мешает — это потолок самого интернета"},
+		{"половина канала", 50, 100, "туннель забирает примерно половину — обычная плата за шифрование и лишний путь"},
+		{"узкое место сервер", 1, 100, "напрямую канал заметно быстрее: узкое место — сервер или путь до него, а не провайдер"},
+	}
+	for _, c := range cases {
+		if got := verdict(c.tunnel, c.direct); got != c.want {
+			t.Errorf("%s: получили %q, ждали %q", c.name, got, c.want)
+		}
+	}
+}

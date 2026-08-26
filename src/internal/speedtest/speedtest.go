@@ -57,6 +57,15 @@ type Options struct {
 	// иначе тест измерит обычный канал, а не туннель.
 	Dial func(network, addr string) (net.Conn, error)
 
+	// DirectDial — тот же замер, но мимо туннеля. Необязателен, и без него
+	// тест работает как раньше.
+	//
+	// Одна цифра «через туннель» не отвечает на единственный вопрос, который
+	// человек на самом деле задаёт: медленно — это из-за туннеля или интернет
+	// такой? Замер по тому же маршруту и к тому же серверу, но напрямую, даёт
+	// вторую точку, и разница между ними уже указывает на виноватого.
+	DirectDial func(network, addr string) (net.Conn, error)
+
 	Streams  int           // сколько потоков лить параллельно
 	Duration time.Duration // сколько времени мерить каждое направление
 	WarmUp   time.Duration // сколько времени в начале не учитывать
@@ -72,6 +81,15 @@ type Options struct {
 type Result struct {
 	DownMbps float64 `json:"downMbps"`
 	UpMbps   float64 `json:"upMbps"`
+
+	// DirectDownMbps — приём мимо туннеля, к тому же серверу измерения.
+	// Ноль означает, что сравнение не проводилось или не удалось.
+	DirectDownMbps float64 `json:"directDownMbps,omitempty"`
+
+	// Verdict — вывод из сравнения, человеческими словами. Пусто, если
+	// сравнивать было не с чем.
+	Verdict string `json:"verdict,omitempty"`
+
 	// Note заполняется, когда измерить удалось не всё. Приём важнее отдачи,
 	// поэтому неудача с отдачей не отменяет весь результат.
 	Note string `json:"note,omitempty"`
@@ -98,7 +116,15 @@ func (o *Options) applyDefaults() {
 	}
 }
 
-// Run прогоняет оба направления по очереди: сначала приём, затем отдача.
+// Фазы замера — они же метки в событиях для интерфейса.
+const (
+	PhaseDown   = "down"
+	PhaseUp     = "up"
+	PhaseDirect = "direct"
+)
+
+// Run прогоняет направления по очереди: приём через туннель, отдача через
+// туннель и, если задан DirectDial, приём мимо туннеля для сравнения.
 // Одновременно их мерить нельзя — они делят один канал и мешали бы друг другу.
 func Run(ctx context.Context, o Options) (Result, error) {
 	o.applyDefaults()
@@ -106,19 +132,7 @@ func Run(ctx context.Context, o Options) (Result, error) {
 		return Result{}, errors.New("не задан способ подключения")
 	}
 
-	client := &http.Client{
-		Transport: &http.Transport{
-			DialContext: func(_ context.Context, network, addr string) (net.Conn, error) {
-				return o.Dial(network, addr)
-			},
-			// Каждый поток должен идти своим соединением, иначе они
-			// выстроятся в очередь и тест покажет скорость одного.
-			MaxConnsPerHost:       o.Streams,
-			MaxIdleConnsPerHost:   o.Streams,
-			ResponseHeaderTimeout: 20 * time.Second,
-			DisableCompression:    true,
-		},
-	}
+	client := o.clientVia(o.Dial)
 	defer client.CloseIdleConnections()
 
 	var res Result
@@ -127,7 +141,7 @@ func Run(ctx context.Context, o Options) (Result, error) {
 	if err != nil {
 		return res, fmt.Errorf("ни один сервер измерения не отвечает: %w", err)
 	}
-	res.DownMbps, err = o.measure(ctx, "down", func(ctx context.Context, counted *atomic.Int64) error {
+	res.DownMbps, err = o.measure(ctx, PhaseDown, func(ctx context.Context, counted *atomic.Int64) error {
 		return download(ctx, client, downURL, counted)
 	})
 	if err != nil {
@@ -139,16 +153,84 @@ func Run(ctx context.Context, o Options) (Result, error) {
 	upURL, err := pickWorking(ctx, client, o.UpURLs, probeUpload)
 	if err != nil {
 		res.Note = "отдачу измерить не удалось: сервер не принимает данные"
-		return res, nil
+	} else {
+		res.UpMbps, err = o.measure(ctx, PhaseUp, func(ctx context.Context, counted *atomic.Int64) error {
+			return upload(ctx, client, upURL, counted)
+		})
+		if err != nil {
+			res.UpMbps = 0
+			res.Note = "отдачу измерить не удалось: " + err.Error()
+		}
 	}
-	res.UpMbps, err = o.measure(ctx, "up", func(ctx context.Context, counted *atomic.Int64) error {
-		return upload(ctx, client, upURL, counted)
+
+	// Сравнение с прямым каналом. Мерим тем же файлом с того же сервера —
+	// иначе разница говорила бы о разных серверах, а не о туннеле. Неудача
+	// здесь ничего не отменяет: это дополнение к замеру, а не сам замер.
+	res.DirectDownMbps = o.measureDirect(ctx, downURL)
+	res.Verdict = verdict(res.DownMbps, res.DirectDownMbps)
+	return res, nil
+}
+
+// measureDirect повторяет замер приёма мимо туннеля. Возвращает ноль, если
+// сравнивать нечем или не получилось.
+func (o *Options) measureDirect(ctx context.Context, downURL string) float64 {
+	if o.DirectDial == nil {
+		return 0
+	}
+	client := o.clientVia(o.DirectDial)
+	defer client.CloseIdleConnections()
+
+	if err := pingURL(ctx, client, downURL); err != nil {
+		return 0
+	}
+	v, err := o.measure(ctx, PhaseDirect, func(ctx context.Context, counted *atomic.Int64) error {
+		return download(ctx, client, downURL, counted)
 	})
 	if err != nil {
-		res.UpMbps = 0
-		res.Note = "отдачу измерить не удалось: " + err.Error()
+		return 0
 	}
-	return res, nil
+	return v
+}
+
+func pingURL(ctx context.Context, client *http.Client, url string) error {
+	pctx, cancel := context.WithTimeout(ctx, 12*time.Second)
+	defer cancel()
+	return probeDownload(pctx, client, url)
+}
+
+// verdict переводит две цифры в одну фразу. Пороги грубые намеренно: разница
+// в десяток процентов на такой мерке — шум, и делать из неё выводы нельзя.
+func verdict(tunnelMbps, directMbps float64) string {
+	if directMbps <= 0 || tunnelMbps <= 0 {
+		return ""
+	}
+	share := tunnelMbps / directMbps
+	switch {
+	case share >= 0.7:
+		return "туннель почти не мешает — это потолок самого интернета"
+	case share >= 0.35:
+		return "туннель забирает примерно половину — обычная плата за шифрование и лишний путь"
+	default:
+		return "напрямую канал заметно быстрее: узкое место — сервер или путь до него, а не провайдер"
+	}
+}
+
+// clientVia собирает клиента поверх заданного способа дозвона. Клиентов у
+// теста два — через туннель и мимо, — и различаются они только этим.
+func (o *Options) clientVia(dial func(network, addr string) (net.Conn, error)) *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(_ context.Context, network, addr string) (net.Conn, error) {
+				return dial(network, addr)
+			},
+			// Каждый поток должен идти своим соединением, иначе они
+			// выстроятся в очередь и тест покажет скорость одного.
+			MaxConnsPerHost:       o.Streams,
+			MaxIdleConnsPerHost:   o.Streams,
+			ResponseHeaderTimeout: 20 * time.Second,
+			DisableCompression:    true,
+		},
+	}
 }
 
 // pickWorking возвращает первый адрес, который реально отвечает. Пробы идут

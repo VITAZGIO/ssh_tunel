@@ -46,6 +46,36 @@ func putBuf(b []byte) {
 	}
 }
 
+// copyBuf — то же, что io.Copy, но буфер действительно тот, что дали.
+//
+// Через io.CopyBuffer это не работает, и незаметно: тот сначала спрашивает у
+// сторон io.WriterTo/io.ReaderFrom и, если находит, переданный буфер просто
+// выбрасывает. Здесь такие стороны есть всегда — и net.TCPConn, и bufio.Reader
+// умеют оба интерфейса, — так что весь пул буферов лежал без дела, а перекачка
+// шла чужими кусками по 32 КБ, каждый раз заново выделенными на соединение.
+func copyBuf(dst io.Writer, src io.Reader, buf []byte) (int64, error) {
+	var total int64
+	for {
+		n, rerr := src.Read(buf)
+		if n > 0 {
+			w, werr := dst.Write(buf[:n])
+			total += int64(w)
+			if werr != nil {
+				return total, werr
+			}
+			if w != n {
+				return total, io.ErrShortWrite
+			}
+		}
+		if rerr != nil {
+			if rerr == io.EOF {
+				return total, nil
+			}
+			return total, rerr
+		}
+	}
+}
+
 // request описывает разобранный запрос от локального приложения, независимо
 // от того, каким протоколом он пришёл.
 type request struct {
@@ -114,7 +144,7 @@ func (t *Tunnel) pump(local net.Conn, localSrc io.Reader, remote net.Conn) {
 
 	go func() {
 		buf := getBuf()
-		n, _ := io.CopyBuffer(remote, localSrc, buf)
+		n, _ := copyBuf(remote, localSrc, buf)
 		putBuf(buf)
 		t.stats.up.Add(n)
 		closeWrite(remote)
@@ -122,7 +152,7 @@ func (t *Tunnel) pump(local net.Conn, localSrc io.Reader, remote net.Conn) {
 	}()
 	go func() {
 		buf := getBuf()
-		n, _ := io.CopyBuffer(local, remote, buf)
+		n, _ := copyBuf(local, remote, buf)
 		putBuf(buf)
 		t.stats.down.Add(n)
 		closeWrite(local)

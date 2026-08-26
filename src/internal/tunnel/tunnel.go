@@ -475,6 +475,19 @@ func (t *Tunnel) directDialer(timeout time.Duration) *net.Dialer {
 	return &net.Dialer{Timeout: timeout, Control: t.cfg.ProtectSocket}
 }
 
+// DialDirect открывает соединение мимо туннеля — тем же способом, каким
+// программа ходит к серверу.
+//
+// Нужно это замеру скорости: цифра «через туннель» сама по себе ни о чём не
+// говорит. Медленно — это медленно по сравнению с чем? Только замер по тому же
+// маршруту, но без туннеля, отвечает на вопрос, кто виноват: наш сервер или
+// канал у провайдера. Своим net.Dial здесь не обойтись — на Android сокет
+// обязан быть помечен, иначе «прямое» соединение уйдёт в туннель и сравнивать
+// будет нечего.
+func (t *Tunnel) DialDirect(network, target string) (net.Conn, error) {
+	return t.directDialer(15*time.Second).Dial(network, target)
+}
+
 // keepLinkAlive держит один слот пула живым: шлёт keepalive, замечает смерть
 // соединения и переподключается с нарастающей паузой.
 //

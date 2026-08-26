@@ -364,25 +364,40 @@ func (t *Tunnel) SpeedTest() string {
 
 	res, err := speedtest.Run(context.Background(), speedtest.Options{
 		Dial: tun.Dial,
+		// Тот же файл, но мимо туннеля. Сокет при этом помечен через
+		// VpnService.protect, иначе «прямой» замер ушёл бы в туннель и мерил
+		// бы то же самое второй раз.
+		DirectDial: tun.DialDirect,
 		OnProgress: func(phase string, mbps float64) {
 			if cb == nil {
 				return
 			}
-			what := "приём"
-			if phase == "up" {
-				what = "отдача"
-			}
-			cb.OnLog(fmt.Sprintf("тест скорости, %s: %.1f Мбит/с", what, mbps))
+			cb.OnLog(fmt.Sprintf("тест скорости, %s: %.1f Мбит/с", phaseName(phase), mbps))
 		},
 	})
 	if err != nil {
 		return fmt.Sprintf(`{"error":%q}`, err.Error())
+	}
+	if res.DirectDownMbps > 0 && cb != nil {
+		cb.OnLog(fmt.Sprintf("мимо туннеля: %.1f Мбит/с — %s", res.DirectDownMbps, res.Verdict))
 	}
 	b, err := json.Marshal(res)
 	if err != nil {
 		return `{"error":"не удалось разобрать результат"}`
 	}
 	return string(b)
+}
+
+// phaseName переводит метку фазы замера в слово для журнала.
+func phaseName(phase string) string {
+	switch phase {
+	case speedtest.PhaseUp:
+		return "отдача"
+	case speedtest.PhaseDirect:
+		return "напрямую"
+	default:
+		return "приём"
+	}
 }
 
 // State — состояние одним словом, для экрана.

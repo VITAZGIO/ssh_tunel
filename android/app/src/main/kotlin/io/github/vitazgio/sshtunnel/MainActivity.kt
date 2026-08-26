@@ -263,6 +263,20 @@ class MainActivity : AppCompatActivity() {
         rowSpeed.visibility = View.VISIBLE
         rowSpeed.removeCallbacks(hideSpeed)
         rowSpeed.postDelayed(hideSpeed, 10_000)
+
+        // Цифра через туннель сама по себе ни о чём не говорит: медленно — это
+        // из-за туннеля или интернет такой? Ответ даёт замер того же файла
+        // мимо туннеля. Плиток под него на экране нет, поэтому показываем
+        // сообщением — читают его один раз и по делу.
+        val direct = o.optDouble("directDownMbps", 0.0)
+        val verdict = o.optString("verdict")
+        if (direct > 0 && verdict.isNotBlank()) {
+            Toast.makeText(
+                this,
+                "Мимо туннеля %.1f Мбит/с — %s".format(direct, verdict),
+                Toast.LENGTH_LONG,
+            ).show()
+        }
     }
 
     // INVISIBLE, а не GONE: место под плитками остаётся занятым, и экран не
