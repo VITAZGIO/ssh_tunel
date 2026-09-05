@@ -347,32 +347,47 @@
         одной командой это больше не делается: пользователю туннеля запрещено
         выполнять команды, в том и смысл.</p>
 
-      <p class="step">1. На этом компьютере — создать ключ</p>
-      <div class="cmdbox">
-        <button class="cp" data-cmd="cmd1" title="Скопировать">
-          <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/>
-            <path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
-        </button>
-        <span id="cmd1"></span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:9px 0 4px">
+        <button class="btn" id="autoKeyBtn" style="font-size:12.5px;padding:6px 12px">
+          Создать ключ и собрать команду</button>
+        <span class="hint" id="autoKeyNote" style="margin:0"></span>
+      </div>
+      <p class="note" style="margin-top:0">Ключ создастся на этом компьютере, если его ещё
+        нет, а ниже сразу появится готовая команда с уже подставленным ключом — она же
+        скопируется в буфер. Останется вставить её на сервере под root.</p>
+
+      <button class="btn" id="manualToggle"
+        style="font-size:12px;padding:5px 10px;margin:2px 0 10px;background:transparent">
+        Сделать вручную, по шагам ›</button>
+
+      <div id="manualSteps" hidden>
+        <p class="step">1. На этом компьютере — создать ключ</p>
+        <div class="cmdbox">
+          <button class="cp" data-cmd="cmd1" title="Скопировать">
+            <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/>
+              <path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          </button>
+          <span id="cmd1"></span>
+        </div>
+
+        <p class="step">2. На этом компьютере — показать открытый ключ</p>
+        <div class="cmdbox">
+          <button class="cp" data-cmd="cmd2" title="Скопировать">
+            <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/>
+              <path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          </button>
+          <span id="cmd2"></span>
+        </div>
+        <p class="note">Команда напечатает одну длинную строку — скопируй её целиком,
+          она понадобится в шаге 3.</p>
+
+        <div style="display:flex;gap:8px;align-items:center;margin:9px 0" id="openPsRow">
+          <button class="btn" id="openPs" style="font-size:12.5px;padding:6px 12px">Открыть PowerShell</button>
+          <span class="hint" id="keyHelpNote" style="margin:0"></span>
+        </div>
       </div>
 
-      <p class="step">2. На этом компьютере — показать открытый ключ</p>
-      <div class="cmdbox">
-        <button class="cp" data-cmd="cmd2" title="Скопировать">
-          <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/>
-            <path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
-        </button>
-        <span id="cmd2"></span>
-      </div>
-      <p class="note">Команда напечатает одну длинную строку — скопируй её целиком,
-        она понадобится в шаге 3.</p>
-
-      <div style="display:flex;gap:8px;align-items:center;margin:9px 0">
-        <button class="btn" id="openPs" style="font-size:12.5px;padding:6px 12px">Открыть PowerShell</button>
-        <span class="hint" id="keyHelpNote" style="margin:0"></span>
-      </div>
-
-      <p class="step">3. На сервере, зайдя под root — добавить этот ключ</p>
+      <p class="step" id="cmd3step">3. На сервере, зайдя под root — добавить этот ключ</p>
       <div class="cmdbox">
         <button class="cp" data-cmd="cmd3" title="Скопировать">
           <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/>
@@ -449,6 +464,29 @@
 
     <label class="chk"><input type="checkbox" id="verbose">
       <span class="lbl">Подробный журнал</span></label>
+
+    <div id="bootBlock" hidden>
+      <label class="chk"><input type="checkbox" id="bootStart">
+        <span class="lbl">Запускать при старте системы</span></label>
+      <p class="note" id="bootNote" style="margin-top:-2px">Программа сама поставит
+        службу systemd и разрешит ей работать без входа в систему — после
+        перезагрузки туннель поднимется сам.</p>
+
+      <label class="chk" id="bootDockerRow" hidden><input type="checkbox" id="bootDocker">
+        <span class="lbl">Заодно запускать Docker при старте системы</span></label>
+
+      <div id="sudoRow" hidden>
+        <p class="note" style="margin-bottom:4px">Этот шаг требует прав администратора.
+          Введи пароль sudo — он используется один раз и нигде не сохраняется.
+          Учти: до программы он идёт по локальной сети без шифрования.</p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="password" id="sudoPass" placeholder="пароль sudo" spellcheck="false"
+                 autocomplete="off" style="flex:1;min-width:180px">
+          <button class="btn" id="sudoApply" style="font-size:12.5px;padding:6px 12px">Применить</button>
+        </div>
+      </div>
+      <span class="hint" id="bootStatus" style="display:block;margin:4px 0 0"></span>
+    </div>
 
     <div style="display:flex;gap:9px;align-items:center;margin-top:14px">
       <button class="btn primary" id="save">Сохранить</button>
@@ -985,25 +1023,44 @@ function showSpeed(v){
    которая сама клала ключ на сервер, — она перестала работать, как только
    пользователю туннеля запретили выполнять команды. Поэтому теперь шаги
    раздельные: два на своей машине, один на сервере под root. */
-const KEYFILE = '$env:USERPROFILE\\.ssh\\id_ed25519';
+// На Windows программа работает на компьютере пользователя — оба шага
+// выполняются в PowerShell. На сервере (Linux) программа работает на самом
+// сервере — те же шаги, но в обычном bash: другой путь по умолчанию и другие
+// команды создания/показа ключа. Пока первый ответ /api/status не пришёл,
+// считаем Windows — так было исторически, и это безопасный запасной вариант.
+let OS = 'windows';
+function isWindows(){ return OS !== 'linux' && OS !== 'darwin'; }
+function keyfile(){ return isWindows() ? '$env:USERPROFILE\\.ssh\\id_ed25519' : '~/.ssh/id_ed25519'; }
 
 function cmdCreateKey(){
-  return 'if (!(Test-Path "' + KEYFILE + '")) { ssh-keygen -t ed25519 -f "' +
-    KEYFILE + '" -N \'""\' }';
+  const f = keyfile();
+  if(isWindows()){
+    return 'if (!(Test-Path "' + f + '")) { ssh-keygen -t ed25519 -f "' + f + '" -N \'""\' }';
+  }
+  return 'test -f ' + f + ' || ssh-keygen -t ed25519 -f ' + f + ' -N ""';
 }
-function cmdShowKey(){ return 'type "' + KEYFILE + '.pub"'; }
+function cmdShowKey(){
+  const f = keyfile();
+  return isWindows() ? 'type "' + f + '.pub"' : 'cat ' + f + '.pub';
+}
+
+// genKeyPub — открытый ключ, который принесла кнопка «Создать ключ и собрать
+// команду». Пока её не нажали (или путь к ключу поменяли вручную) — здесь
+// null, и команда для сервера собирается с плейсхолдером, как раньше.
+let genKeyPub = null;
 
 function cmdServer(){
   const user = ($('user').value || '').trim() || 'tunnel';
+  const key = genKeyPub || 'ВСТАВЬ_СЮДА_КЛЮЧ_ИЗ_ШАГА_2';
   if(user === 'root'){
     return 'mkdir -p ~/.ssh; chmod 700 ~/.ssh; ' +
-      'echo \'ВСТАВЬ_СЮДА_КЛЮЧ_ИЗ_ШАГА_2\' >> ~/.ssh/authorized_keys; ' +
+      'echo \'' + key + '\' >> ~/.ssh/authorized_keys; ' +
       'chmod 600 ~/.ssh/authorized_keys';
   }
   const u = user.replace(/'/g, '');
   return 'id -u ' + u + ' >/dev/null 2>&1 || useradd -m -s /usr/sbin/nologin ' + u + '; ' +
     'usermod -p \'*\' ' + u + '; install -d -m 700 -o ' + u + ' -g ' + u + ' /home/' + u + '/.ssh; ' +
-    'echo \'restrict,port-forwarding ВСТАВЬ_СЮДА_КЛЮЧ_ИЗ_ШАГА_2\' >> /home/' + u + '/.ssh/authorized_keys; ' +
+    'echo \'restrict,port-forwarding ' + key + '\' >> /home/' + u + '/.ssh/authorized_keys; ' +
     'chown ' + u + ':' + u + ' /home/' + u + '/.ssh/authorized_keys; ' +
     'chmod 600 /home/' + u + '/.ssh/authorized_keys';
 }
@@ -1013,12 +1070,116 @@ function renderSetupCmd(){
   $('cmd2').textContent = cmdShowKey();
   $('cmd3').textContent = cmdServer();
   const user = ($('user').value || '').trim() || 'tunnel';
-  $('cmd3note').textContent = user === 'root'
-    ? 'Замени ВСТАВЬ_СЮДА_КЛЮЧ_ИЗ_ШАГА_2 на строку из шага 2.'
-    : 'Замени ВСТАВЬ_СЮДА_КЛЮЧ_ИЗ_ШАГА_2 на строку из шага 2. Команда заодно '
-      + 'создаст пользователя «' + user + '», если его ещё нет: он умеет только '
-      + 'пробрасывать соединения, ни команд, ни файлов.';
+  if(genKeyPub){
+    $('cmd3note').textContent = 'Ключ уже подставлен — просто скопируй эту команду'
+      + ' и вставь на сервере под root.';
+  } else {
+    $('cmd3note').textContent = user === 'root'
+      ? 'Замени ВСТАВЬ_СЮДА_КЛЮЧ_ИЗ_ШАГА_2 на строку из шага 2.'
+      : 'Замени ВСТАВЬ_СЮДА_КЛЮЧ_ИЗ_ШАГА_2 на строку из шага 2. Команда заодно '
+        + 'создаст пользователя «' + user + '», если его ещё нет: он умеет только '
+        + 'пробрасывать соединения, ни команд, ни файлов.';
+  }
+
+  // На PowerShell её открыть можно самой программой. На Linux у программы
+  // такой возможности нет — там первые два шага выполняются в том же
+  // терминале, откуда обычно и заходят на сервер по SSH.
+  // (у блока свой инлайновый display:flex, поэтому переключаем именно его,
+  // а не атрибут hidden — иначе инлайновый стиль перебивает [hidden])
+  $('openPsRow').style.display = isWindows() ? 'flex' : 'none';
+  $('cmd3step').textContent = isWindows()
+    ? '3. На сервере, зайдя под root — добавить этот ключ'
+    : '3. На сервере-адресате (' + (($('host').value || '').trim() || 'куда подключаемся') +
+      '), зайдя под root — добавить этот ключ';
 }
+
+// Одна кнопка вместо шагов 1 и 2: ключ создаётся на этом компьютере (если
+// его ещё нет), а готовая команда для сервера — с уже подставленным ключом —
+// сама уходит в буфер обмена.
+async function autoGenKey(){
+  $('autoKeyNote').textContent = 'создаю…';
+  const r = await api('/api/genkey', { keyPath: ($('keyPath').value || '').trim() });
+  if(r.error){ $('autoKeyNote').textContent = r.error; return; }
+  genKeyPub = r.pubKey;
+  if(r.keyPath && $('keyPath').value !== r.keyPath) $('keyPath').value = r.keyPath;
+  renderSetupCmd();
+  const copied = await copyToClipboard($('cmd3').textContent);
+  $('autoKeyNote').textContent = (r.created ? 'Ключ создан. ' : 'Ключ уже был на месте. ')
+    + (copied ? 'Команда для сервера скопирована — вставь её там под root.'
+               : 'скопируй команду ниже вручную');
+}
+$('autoKeyBtn').onclick = autoGenKey;
+
+// Путь к ключу поменяли руками — прежний подставленный ключ мог уже не
+// соответствовать новому пути, возвращаемся к плейсхолдеру.
+$('keyPath').addEventListener('input', () => {
+  if(genKeyPub){
+    genKeyPub = null;
+    if(!$('keyHelp').hidden) renderSetupCmd();
+  }
+});
+
+/* ---------- автозапуск при старте системы ---------- */
+/* Галочка не из настроек: она не сохраняется в config.json, а прямо сейчас
+   ставит службу systemd и включает её. Поэтому и ведёт себя как действие —
+   срабатывает сразу, а не по кнопке «Сохранить». */
+
+// Показываем состояние словами: «включено» само по себе ещё не значит, что
+// туннель поднимется до входа в систему — за это отвечает отдельная штука
+// (linger), и если её нет, честнее так и сказать.
+function renderBootState(st){
+  if(!st || !st.supported){ $('bootBlock').hidden = true; return; }
+  $('bootBlock').hidden = false;
+  $('bootStart').checked = !!st.enabled;
+  $('bootDockerRow').hidden = !st.dockerFound;
+  $('bootDocker').checked = !!st.dockerEnabled;
+
+  if(!st.enabled){
+    $('bootStatus').textContent = '';
+  } else if(st.linger){
+    $('bootStatus').textContent = 'Включено: туннель поднимется сам при загрузке машины.';
+  } else {
+    $('bootStatus').textContent = 'Включено, но только после входа в систему — '
+      + 'чтобы поднимался при загрузке, нужен пароль sudo.';
+  }
+}
+
+async function applyBoot(password){
+  $('bootStatus').textContent = 'настраиваю…';
+  const r = await api('/api/bootstart', {
+    enabled: $('bootStart').checked,
+    docker: $('bootDocker').checked,
+    password: password || ''
+  });
+  if(r.state) renderBootState(r.state);
+  if(r.needRoot){
+    $('sudoRow').hidden = false;
+    $('sudoPass').focus();
+    $('bootStatus').textContent = 'Нужен пароль sudo — служба включена, но пока '
+      + 'стартует только после входа в систему.';
+    return;
+  }
+  $('sudoRow').hidden = true;
+  $('sudoPass').value = '';
+  if(r.error){ $('bootStatus').textContent = r.error; return; }
+}
+
+$('bootStart').onchange = () => applyBoot('');
+$('bootDocker').onchange = () => applyBoot('');
+$('sudoApply').onclick = () => {
+  const pass = $('sudoPass').value;
+  $('sudoPass').value = '';
+  applyBoot(pass);
+};
+$('sudoPass').addEventListener('keydown', e => { if(e.key === 'Enter') $('sudoApply').click(); });
+
+api('/api/bootstart').then(renderBootState);
+
+$('manualToggle').onclick = () => {
+  const show = $('manualSteps').hidden;
+  $('manualSteps').hidden = !show;
+  $('manualToggle').textContent = show ? 'Скрыть шаги вручную' : 'Сделать вручную, по шагам ›';
+};
 
 /* Одна кнопка копирования на все команды: какая именно — написано на самой
    кнопке в data-cmd. */
@@ -1186,6 +1347,10 @@ async function refresh(){
   // иначе набранный, но ещё не сохранённый адрес затирался бы.
   seenApps = (st.seenApps || []);
   if(!formDirty) fillConfig(st.config);
+  if(st.os && st.os !== OS){
+    OS = st.os;
+    if(!$('keyHelp').hidden) renderSetupCmd();
+  }
 }
 
 connectEvents();

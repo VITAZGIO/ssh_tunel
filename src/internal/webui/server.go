@@ -13,6 +13,13 @@
 // генерируется случайный токен, он же передаётся в адресе окна, и без него
 // API не отвечает. Плюс проверяется заголовок Origin — чтобы запрос не мог
 // прийти со стороннего сайта.
+//
+// Режим «открыт для локальной сети» (OpenLocal) снимает требование токена для
+// тех, кто пришёл с адреса локальной сети: панель тогда открывается просто по
+// адресу машины, как у домашних сервисов вроде Home Assistant. Проверка Origin
+// при этом остаётся и делает основную работу — именно она отсекает чужой сайт,
+// открытый во вкладке браузера. Запросы с публичных адресов без токена не
+// проходят в любом режиме.
 package webui
 
 import (
@@ -25,6 +32,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -46,6 +54,13 @@ type Server struct {
 	app   *App
 	token string
 	ln    net.Listener
+	// openLocal — пускать без токена тех, кто пришёл из локальной сети.
+	openLocal bool
+	// bootFlags — с какими флагами программа должна подняться при загрузке
+	// машины. Записываются в файл службы по галочке «Запускать при старте
+	// системы», чтобы после перезагрузки панель работала в том же режиме, а
+	// не в угаданном.
+	bootFlags []string
 }
 
 // App — то, что интерфейс умеет делать с программой.
@@ -68,12 +83,73 @@ func NewOn(a *App, addr string) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("не могу занять адрес %s: %w", addr, err)
 	}
-	return &Server{app: a, token: hex.EncodeToString(tok), ln: ln}, nil
+	s := &Server{app: a, token: hex.EncodeToString(tok), ln: ln, bootFlags: []string{"-web"}}
+	// Порт 0 означает «любой свободный» — такой адрес в файл службы писать
+	// нечего, он всё равно будет другим при следующем запуске.
+	if !strings.HasSuffix(addr, ":0") {
+		s.bootFlags = append(s.bootFlags, "-web-listen", addr)
+	}
+	return s, nil
+}
+
+// NewOpenLocalOn — то же, но без ключа в адресе для гостей из локальной сети.
+// Панель открывается по адресу машины и постоянному порту, как домашние
+// сервисы: ссылку можно положить в закладки, она не меняется от запуска к
+// запуску.
+func NewOpenLocalOn(a *App, addr string) (*Server, error) {
+	s, err := NewOn(a, addr)
+	if err != nil {
+		return nil, err
+	}
+	s.openLocal = true
+	s.bootFlags = append([]string{"-web", "-web-lan"}, s.bootFlags[1:]...)
+	return s, nil
 }
 
 // URL — адрес, который надо открыть в браузере.
 func (s *Server) URL() string {
-	return fmt.Sprintf("http://%s/?t=%s", s.ln.Addr().String(), s.token)
+	addr := s.ln.Addr().String()
+	if s.openLocal {
+		return fmt.Sprintf("http://%s/", displayAddr(addr))
+	}
+	return fmt.Sprintf("http://%s/?t=%s", addr, s.token)
+}
+
+// displayAddr заменяет 0.0.0.0 на реальный адрес машины в локальной сети:
+// «0.0.0.0» в браузер не вставишь, а ради этого адреса всё и затевалось.
+func displayAddr(addr string) string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return addr
+	}
+	if ip := net.ParseIP(host); ip == nil || !ip.IsUnspecified() {
+		return addr
+	}
+	if local := localIP(); local != "" {
+		return net.JoinHostPort(local, port)
+	}
+	return net.JoinHostPort("127.0.0.1", port)
+}
+
+// localIP — первый адрес машины в локальной сети. Их может быть несколько
+// (docker, wireguard), поэтому предпочитаем обычные домашние и офисные сети.
+func localIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ""
+	}
+	for _, a := range addrs {
+		n, ok := a.(*net.IPNet)
+		if !ok {
+			continue
+		}
+		ip := n.IP.To4()
+		if ip == nil || ip.IsLoopback() || !ip.IsPrivate() {
+			continue
+		}
+		return ip.String()
+	}
+	return ""
 }
 
 func (s *Server) Serve() error {
@@ -89,6 +165,8 @@ func (s *Server) Serve() error {
 	mux.HandleFunc("/api/processes", s.guard(s.handleProcesses))
 	mux.HandleFunc("/api/pickfile", s.guard(s.handlePickFile))
 	mux.HandleFunc("/api/openterminal", s.guard(s.handleOpenTerminal))
+	mux.HandleFunc("/api/genkey", s.guard(s.handleGenKey))
+	mux.HandleFunc("/api/bootstart", s.guard(s.handleBootStart))
 	mux.HandleFunc("/api/scannet", s.guard(s.handleScanNet))
 
 	srv := &http.Server{
@@ -100,27 +178,70 @@ func (s *Server) Serve() error {
 
 func (s *Server) Close() { s.ln.Close() }
 
-// guard пропускает только запросы с правильным токеном и без чужого Origin.
+// guard пропускает только свои запросы: с правильным токеном либо, в открытом
+// режиме, из локальной сети — и в любом случае без чужого Origin.
 func (s *Server) guard(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		tok := r.Header.Get("X-Token")
-		if tok == "" {
-			tok = r.URL.Query().Get("t")
-		}
-		if subtle.ConstantTimeCompare([]byte(tok), []byte(s.token)) != 1 {
+		if !s.allowed(r) {
 			http.Error(w, "запрещено", http.StatusForbidden)
 			return
 		}
-		// Origin ставит браузер, подделать его со страницы нельзя. Свой
-		// собственный Origin разрешаем, чужой — нет.
-		if origin := r.Header.Get("Origin"); origin != "" {
-			if !strings.HasSuffix(origin, s.ln.Addr().String()) {
-				http.Error(w, "запрещено", http.StatusForbidden)
-				return
-			}
-		}
 		next(w, r)
 	}
+}
+
+func (s *Server) allowed(r *http.Request) bool {
+	// Origin ставит браузер, подделать его со страницы нельзя: это и есть
+	// защита от чужого сайта, открытого в соседней вкладке.
+	if !sameOrigin(r) {
+		return false
+	}
+	tok := r.Header.Get("X-Token")
+	if tok == "" {
+		tok = r.URL.Query().Get("t")
+	}
+	if subtle.ConstantTimeCompare([]byte(tok), []byte(s.token)) == 1 {
+		return true
+	}
+	return s.openLocal && isLocalClient(r.RemoteAddr)
+}
+
+// sameOrigin сверяет Origin с адресом, по которому пришёл сам запрос. Так
+// проверка работает при любом адресе панели — 127.0.0.1, имя машины или адрес
+// в локальной сети, — а не только при том, на котором она слушает.
+func sameOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		// Заголовка нет — запрос пришёл не со страницы: curl, приложение.
+		// Такие проходят по токену, отдельная проверка тут ничего не даёт.
+		return true
+	}
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	return u.Host == r.Host
+}
+
+// isLocalClient — пришёл ли запрос из локальной сети: домашней, офисной или
+// mesh-VPN (100.64.0.0/10 — NetBird, Tailscale). Публичные адреса сюда не
+// попадают, им токен нужен всегда.
+func isLocalClient(remoteAddr string) bool {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		host = remoteAddr
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() {
+		return true
+	}
+	if v4 := ip.To4(); v4 != nil {
+		return v4[0] == 100 && v4[1] >= 64 && v4[1] <= 127
+	}
+	return false
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
@@ -146,6 +267,10 @@ type statusResp struct {
 	SysProxy string        `json:"sysProxy"`
 	EnvHint  []string      `json:"envHint"`
 	ProxyURL string        `json:"proxyUrl"`
+	// OS — на чём крутится сама программа (runtime.GOOS). Страница одна и та
+	// же на Windows и на сервере под Linux, а команды создания ключа у них
+	// разные (PowerShell против bash) — переключаются по этому полю.
+	OS string `json:"os"`
 	// SeenApps — программы, замеченные за этот запуск: из них удобно
 	// собирать список фильтра, не вспоминая имена вручную.
 	SeenApps []string `json:"seenApps"`
@@ -161,6 +286,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		EnvHint:  s.app.EnvHint(),
 		ProxyURL: s.app.ProxyURL(),
 		SeenApps: s.app.SeenApps(),
+		OS:       runtime.GOOS,
 	})
 }
 
@@ -268,6 +394,63 @@ func (s *Server) handleOpenTerminal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]bool{"ok": true})
+}
+
+// handleGenKey — «одна кнопка» вместо двух шагов из терминала: создаёт SSH-
+// ключ по указанному пути, если его там ещё нет, и в любом случае отдаёт
+// открытую часть. Дальше страница сама подставляет её в готовую команду для
+// сервера, так что человеку остаётся только вставить эту команду там.
+func (s *Server) handleGenKey(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		KeyPath string `json:"keyPath"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, map[string]string{"error": "не разобрал запрос: " + err.Error()})
+		return
+	}
+	path := strings.TrimSpace(req.KeyPath)
+	if path == "" {
+		path = config.DetectKeyPath()
+	}
+	pub, created, err := ensureKey(path)
+	if err != nil {
+		writeJSON(w, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true, "keyPath": path, "pubKey": pub, "created": created})
+}
+
+// handleBootStart — галочка «Запускать при старте системы». GET отдаёт, как
+// сейчас обстоят дела, POST включает или выключает. Пароль, если он вообще
+// понадобился, живёт ровно на время одной команды sudo: он не сохраняется, не
+// попадает в журнал и не возвращается обратно на страницу.
+func (s *Server) handleBootStart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, currentBootState())
+		return
+	}
+	var req struct {
+		Enabled  bool   `json:"enabled"`
+		Docker   bool   `json:"docker"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, map[string]any{"error": "не разобрал запрос: " + err.Error()})
+		return
+	}
+	err := applyBoot(req.Enabled, req.Docker, req.Password, s.bootFlags)
+	if errors.Is(err, errNeedRoot) {
+		// Служба к этому моменту уже включена — не хватает только права
+		// стартовать без входа в систему. Так и говорим, вместе с просьбой
+		// ввести пароль.
+		writeJSON(w, map[string]any{"needRoot": true, "state": currentBootState()})
+		return
+	}
+	if err != nil {
+		writeJSON(w, map[string]any{"error": err.Error(), "state": currentBootState()})
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true, "state": currentBootState()})
 }
 
 // handleEvents — поток событий в окно (Server-Sent Events). Проще вебсокетов
