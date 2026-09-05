@@ -79,6 +79,8 @@ func (s *Server) URL() string {
 func (s *Server) Serve() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handleIndex)
+	mux.HandleFunc("/style.css", s.handleAsset("assets/style.css", "text/css; charset=utf-8"))
+	mux.HandleFunc("/app.js", s.handleAsset("assets/app.js", "text/javascript; charset=utf-8"))
 	mux.HandleFunc("/events", s.guard(s.handleEvents))
 	mux.HandleFunc("/api/status", s.guard(s.handleStatus))
 	mux.HandleFunc("/api/start", s.guard(s.handleStart))
@@ -136,6 +138,21 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Write(data)
+}
+
+// handleAsset отдаёт статический файл интерфейса (CSS, JS) — вынесенный из
+// index.html, чтобы не тащить его целиком при каждой правке разметки.
+func (s *Server) handleAsset(name, contentType string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		data, err := assets.ReadFile(name)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		w.Header().Set("Content-Type", contentType)
+		w.Header().Set("Cache-Control", "no-store")
+		w.Write(data)
+	}
 }
 
 type statusResp struct {
