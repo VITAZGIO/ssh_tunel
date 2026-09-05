@@ -347,29 +347,44 @@
         одной командой это больше не делается: пользователю туннеля запрещено
         выполнять команды, в том и смысл.</p>
 
-      <p class="step">1. На этом компьютере — создать ключ</p>
-      <div class="cmdbox">
-        <button class="cp" data-cmd="cmd1" title="Скопировать">
-          <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/>
-            <path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
-        </button>
-        <span id="cmd1"></span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:9px 0 4px">
+        <button class="btn" id="autoKeyBtn" style="font-size:12.5px;padding:6px 12px">
+          Создать ключ и собрать команду</button>
+        <span class="hint" id="autoKeyNote" style="margin:0"></span>
       </div>
+      <p class="note" style="margin-top:0">Ключ создастся на этом компьютере, если его ещё
+        нет, а ниже сразу появится готовая команда с уже подставленным ключом — она же
+        скопируется в буфер. Останется вставить её на сервере под root.</p>
 
-      <p class="step">2. На этом компьютере — показать открытый ключ</p>
-      <div class="cmdbox">
-        <button class="cp" data-cmd="cmd2" title="Скопировать">
-          <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/>
-            <path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
-        </button>
-        <span id="cmd2"></span>
-      </div>
-      <p class="note">Команда напечатает одну длинную строку — скопируй её целиком,
-        она понадобится в шаге 3.</p>
+      <button class="btn" id="manualToggle"
+        style="font-size:12px;padding:5px 10px;margin:2px 0 10px;background:transparent">
+        Сделать вручную, по шагам ›</button>
 
-      <div style="display:flex;gap:8px;align-items:center;margin:9px 0" id="openPsRow">
-        <button class="btn" id="openPs" style="font-size:12.5px;padding:6px 12px">Открыть PowerShell</button>
-        <span class="hint" id="keyHelpNote" style="margin:0"></span>
+      <div id="manualSteps" hidden>
+        <p class="step">1. На этом компьютере — создать ключ</p>
+        <div class="cmdbox">
+          <button class="cp" data-cmd="cmd1" title="Скопировать">
+            <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/>
+              <path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          </button>
+          <span id="cmd1"></span>
+        </div>
+
+        <p class="step">2. На этом компьютере — показать открытый ключ</p>
+        <div class="cmdbox">
+          <button class="cp" data-cmd="cmd2" title="Скопировать">
+            <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/>
+              <path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          </button>
+          <span id="cmd2"></span>
+        </div>
+        <p class="note">Команда напечатает одну длинную строку — скопируй её целиком,
+          она понадобится в шаге 3.</p>
+
+        <div style="display:flex;gap:8px;align-items:center;margin:9px 0" id="openPsRow">
+          <button class="btn" id="openPs" style="font-size:12.5px;padding:6px 12px">Открыть PowerShell</button>
+          <span class="hint" id="keyHelpNote" style="margin:0"></span>
+        </div>
       </div>
 
       <p class="step" id="cmd3step">3. На сервере, зайдя под root — добавить этот ключ</p>
@@ -1006,17 +1021,23 @@ function cmdShowKey(){
   return isWindows() ? 'type "' + f + '.pub"' : 'cat ' + f + '.pub';
 }
 
+// genKeyPub — открытый ключ, который принесла кнопка «Создать ключ и собрать
+// команду». Пока её не нажали (или путь к ключу поменяли вручную) — здесь
+// null, и команда для сервера собирается с плейсхолдером, как раньше.
+let genKeyPub = null;
+
 function cmdServer(){
   const user = ($('user').value || '').trim() || 'tunnel';
+  const key = genKeyPub || 'ВСТАВЬ_СЮДА_КЛЮЧ_ИЗ_ШАГА_2';
   if(user === 'root'){
     return 'mkdir -p ~/.ssh; chmod 700 ~/.ssh; ' +
-      'echo \'ВСТАВЬ_СЮДА_КЛЮЧ_ИЗ_ШАГА_2\' >> ~/.ssh/authorized_keys; ' +
+      'echo \'' + key + '\' >> ~/.ssh/authorized_keys; ' +
       'chmod 600 ~/.ssh/authorized_keys';
   }
   const u = user.replace(/'/g, '');
   return 'id -u ' + u + ' >/dev/null 2>&1 || useradd -m -s /usr/sbin/nologin ' + u + '; ' +
     'usermod -p \'*\' ' + u + '; install -d -m 700 -o ' + u + ' -g ' + u + ' /home/' + u + '/.ssh; ' +
-    'echo \'restrict,port-forwarding ВСТАВЬ_СЮДА_КЛЮЧ_ИЗ_ШАГА_2\' >> /home/' + u + '/.ssh/authorized_keys; ' +
+    'echo \'restrict,port-forwarding ' + key + '\' >> /home/' + u + '/.ssh/authorized_keys; ' +
     'chown ' + u + ':' + u + ' /home/' + u + '/.ssh/authorized_keys; ' +
     'chmod 600 /home/' + u + '/.ssh/authorized_keys';
 }
@@ -1026,11 +1047,16 @@ function renderSetupCmd(){
   $('cmd2').textContent = cmdShowKey();
   $('cmd3').textContent = cmdServer();
   const user = ($('user').value || '').trim() || 'tunnel';
-  $('cmd3note').textContent = user === 'root'
-    ? 'Замени ВСТАВЬ_СЮДА_КЛЮЧ_ИЗ_ШАГА_2 на строку из шага 2.'
-    : 'Замени ВСТАВЬ_СЮДА_КЛЮЧ_ИЗ_ШАГА_2 на строку из шага 2. Команда заодно '
-      + 'создаст пользователя «' + user + '», если его ещё нет: он умеет только '
-      + 'пробрасывать соединения, ни команд, ни файлов.';
+  if(genKeyPub){
+    $('cmd3note').textContent = 'Ключ уже подставлен — просто скопируй эту команду'
+      + ' и вставь на сервере под root.';
+  } else {
+    $('cmd3note').textContent = user === 'root'
+      ? 'Замени ВСТАВЬ_СЮДА_КЛЮЧ_ИЗ_ШАГА_2 на строку из шага 2.'
+      : 'Замени ВСТАВЬ_СЮДА_КЛЮЧ_ИЗ_ШАГА_2 на строку из шага 2. Команда заодно '
+        + 'создаст пользователя «' + user + '», если его ещё нет: он умеет только '
+        + 'пробрасывать соединения, ни команд, ни файлов.';
+  }
 
   // На PowerShell её открыть можно самой программой. На Linux у программы
   // такой возможности нет — там первые два шага выполняются в том же
@@ -1043,6 +1069,38 @@ function renderSetupCmd(){
     : '3. На сервере-адресате (' + (($('host').value || '').trim() || 'куда подключаемся') +
       '), зайдя под root — добавить этот ключ';
 }
+
+// Одна кнопка вместо шагов 1 и 2: ключ создаётся на этом компьютере (если
+// его ещё нет), а готовая команда для сервера — с уже подставленным ключом —
+// сама уходит в буфер обмена.
+async function autoGenKey(){
+  $('autoKeyNote').textContent = 'создаю…';
+  const r = await api('/api/genkey', { keyPath: ($('keyPath').value || '').trim() });
+  if(r.error){ $('autoKeyNote').textContent = r.error; return; }
+  genKeyPub = r.pubKey;
+  if(r.keyPath && $('keyPath').value !== r.keyPath) $('keyPath').value = r.keyPath;
+  renderSetupCmd();
+  const copied = await copyToClipboard($('cmd3').textContent);
+  $('autoKeyNote').textContent = (r.created ? 'Ключ создан. ' : 'Ключ уже был на месте. ')
+    + (copied ? 'Команда для сервера скопирована — вставь её там под root.'
+               : 'скопируй команду ниже вручную');
+}
+$('autoKeyBtn').onclick = autoGenKey;
+
+// Путь к ключу поменяли руками — прежний подставленный ключ мог уже не
+// соответствовать новому пути, возвращаемся к плейсхолдеру.
+$('keyPath').addEventListener('input', () => {
+  if(genKeyPub){
+    genKeyPub = null;
+    if(!$('keyHelp').hidden) renderSetupCmd();
+  }
+});
+
+$('manualToggle').onclick = () => {
+  const show = $('manualSteps').hidden;
+  $('manualSteps').hidden = !show;
+  $('manualToggle').textContent = show ? 'Скрыть шаги вручную' : 'Сделать вручную, по шагам ›';
+};
 
 /* Одна кнопка копирования на все команды: какая именно — написано на самой
    кнопке в data-cmd. */

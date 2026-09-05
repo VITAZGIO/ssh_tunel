@@ -35,6 +35,7 @@ import (
 	"net/url"
 	"os/exec"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -152,6 +153,7 @@ func (s *Server) Serve() error {
 	mux.HandleFunc("/api/processes", s.guard(s.handleProcesses))
 	mux.HandleFunc("/api/pickfile", s.guard(s.handlePickFile))
 	mux.HandleFunc("/api/openterminal", s.guard(s.handleOpenTerminal))
+	mux.HandleFunc("/api/genkey", s.guard(s.handleGenKey))
 	mux.HandleFunc("/api/scannet", s.guard(s.handleScanNet))
 
 	srv := &http.Server{
@@ -379,6 +381,30 @@ func (s *Server) handleOpenTerminal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]bool{"ok": true})
+}
+
+// handleGenKey — «одна кнопка» вместо двух шагов из терминала: создаёт SSH-
+// ключ по указанному пути, если его там ещё нет, и в любом случае отдаёт
+// открытую часть. Дальше страница сама подставляет её в готовую команду для
+// сервера, так что человеку остаётся только вставить эту команду там.
+func (s *Server) handleGenKey(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		KeyPath string `json:"keyPath"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, map[string]string{"error": "не разобрал запрос: " + err.Error()})
+		return
+	}
+	path := strings.TrimSpace(req.KeyPath)
+	if path == "" {
+		path = config.DetectKeyPath()
+	}
+	pub, created, err := ensureKey(path)
+	if err != nil {
+		writeJSON(w, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true, "keyPath": path, "pubKey": pub, "created": created})
 }
 
 // handleEvents — поток событий в окно (Server-Sent Events). Проще вебсокетов
