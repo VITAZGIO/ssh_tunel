@@ -398,7 +398,14 @@
       </select>
     </div>
 
-    <div class="tabbar" id="profileTabs"></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="tabbar" id="profileTabs" style="flex:1;margin-bottom:0"></div>
+      <button class="btn" id="importBtn" title="Импортировать сервер из файла"
+        data-i18n-title="import_title" style="font-size:12.5px;padding:8px 12px;flex:none">
+        <span data-i18n="import_short">Импорт</span></button>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+    </div>
+    <div style="margin-bottom:12px"></div>
 
     <div class="panel">
       <p class="ptitle" data-i18n="server_settings">Настройки сервера</p>
@@ -420,6 +427,16 @@
         <button class="btn" id="removeServerBtn" style="margin-left:auto" hidden
           data-i18n="remove_server">Удалить сервер</button>
       </div>
+
+      <div class="rowbtns" style="margin-top:0">
+        <button class="btn" id="exportBtn" data-i18n="export_server">Экспортировать сервер</button>
+      </div>
+      <label class="chk" style="padding:4px 0 6px;border-top:none">
+        <input type="checkbox" id="exportIncludeKey" checked>
+        <span class="lbl" data-i18n="export_include_key">Включить приватный ключ в файл</span></label>
+      <p class="note" style="margin:-4px 0 12px" data-i18n="export_key_warn">С ключом внутри файл равносилен
+        паролю от сервера — передавай только тем, кому доверяешь, и удали после того, как человек импортирует
+        его. Без ключа файл несёт только адрес и настройки: доступ на сервере нужно будет выдать отдельно.</p>
 
     <div class="field"><label for="host" data-i18n="host_label">Адрес сервера</label>
       <input type="text" id="host" placeholder="адрес или домен сервера" spellcheck="false"
@@ -733,6 +750,15 @@ const I18N = {
     who_is_online:'Кто ходит в интернет', clear:'Очистить',
     pick_app:'Выбери программу', close:'Закрыть', search_app:'Поиск по имени или пути…',
     custom_flag_name:'Свой (без флага)',
+    import_title:'Импортировать сервер из файла', import_short:'Импорт',
+    export_server:'Экспортировать сервер', export_include_key:'Включить приватный ключ в файл',
+    export_key_warn:'С ключом внутри файл равносилен паролю от сервера — передавай только тем, '+
+      'кому доверяешь, и удали после того, как человек импортирует его. Без ключа файл несёт только '+
+      'адрес и настройки: доступ на сервере нужно будет выдать отдельно.',
+    import_ok_with_key:'сервер импортирован вместе с ключом — можно нажимать «Подключить»',
+    import_ok_no_key:'сервер импортирован без ключа — укажи свой приватный ключ перед подключением',
+    import_bad_file:'этот файл не похож на экспорт ssh_tunnel',
+    exported:'файл сохранён',
   },
   en: {
     log:'Log', settings:'Settings', back:'Back', back_to_settings:'Back to settings',
@@ -769,6 +795,15 @@ const I18N = {
     who_is_online:'Who is online', clear:'Clear',
     pick_app:'Pick an app', close:'Close', search_app:'Search by name or path…',
     custom_flag_name:'Custom (no flag)',
+    import_title:'Import a server from a file', import_short:'Import',
+    export_server:'Export server', export_include_key:'Include the private key in the file',
+    export_key_warn:'With the key inside, the file is as good as a password to the server — only share it '+
+      'with people you trust, and delete it once they\'ve imported it. Without the key, the file only '+
+      'carries the address and settings: access on the server side has to be granted separately.',
+    import_ok_with_key:'server imported along with its key — you can hit "Connect"',
+    import_ok_no_key:'server imported without a key — point it at your own private key before connecting',
+    import_bad_file:'this file doesn\'t look like an ssh_tunnel export',
+    exported:'file saved',
   },
 };
 function tr(key){ return (I18N[LANG] && I18N[LANG][key]) || (I18N.ru[key] || key); }
@@ -1853,6 +1888,51 @@ $('removeServerBtn').onclick = async () => {
   applyDoc(r.config, /*keepEditing*/false);
   if(r.note){ $('savedNote').textContent = r.note; setTimeout(() => $('savedNote').textContent = '', 6000); }
 };
+
+/* ---------- экспорт и импорт сервера файлом ---------- */
+/* Экспортируется тот сервер, что сейчас показан в форме (editingProfileId).
+   Несохранённые правки в файл не попадают — только то, что уже лежит на
+   диске, поэтому перед экспортом стоит сперва нажать «Сохранить». */
+$('exportBtn').onclick = async () => {
+  const r = await api('/api/profile/export', {
+    id: editingProfileId,
+    includeKey: $('exportIncludeKey').checked,
+  });
+  if(r.error){ showError(r.error, 'setError'); return; }
+  const blob = new Blob([r.data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = r.filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  $('savedNote').textContent = tr('exported');
+  setTimeout(() => $('savedNote').textContent = '', 4000);
+};
+
+$('importBtn').onclick = () => $('importFile').click();
+$('importFile').addEventListener('change', async () => {
+  const file = $('importFile').files[0];
+  $('importFile').value = ''; // чтобы повторный выбор того же файла тоже сработал
+  if(!file) return;
+
+  let doc;
+  try {
+    doc = JSON.parse(await file.text());
+  } catch(e) {
+    showError(tr('import_bad_file'), 'setError');
+    return;
+  }
+  const r = await api('/api/profile/import', doc);
+  if(r.error){ showError(r.error, 'setError'); return; }
+  showError('', 'setError');
+  editingProfileId = r.profile.id;
+  applyDoc(r.config);
+  $('savedNote').textContent = r.keyImported ? tr('import_ok_with_key') : tr('import_ok_no_key');
+  setTimeout(() => $('savedNote').textContent = '', 8000);
+});
 
 /* ---------- виджет выбора сервера на главном экране ---------- */
 function renderHomePicker(){

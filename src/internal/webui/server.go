@@ -163,6 +163,8 @@ func (s *Server) Serve() error {
 	mux.HandleFunc("/api/profile/add", s.guard(s.handleProfileAdd))
 	mux.HandleFunc("/api/profile/remove", s.guard(s.handleProfileRemove))
 	mux.HandleFunc("/api/profile/select", s.guard(s.handleProfileSelect))
+	mux.HandleFunc("/api/profile/export", s.guard(s.handleProfileExport))
+	mux.HandleFunc("/api/profile/import", s.guard(s.handleProfileImport))
 	mux.HandleFunc("/api/checkip", s.guard(s.handleCheckIP))
 	mux.HandleFunc("/api/speedtest", s.guard(s.handleSpeedTest))
 	mux.HandleFunc("/api/processes", s.guard(s.handleProcesses))

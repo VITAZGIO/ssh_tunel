@@ -162,6 +162,17 @@ func (a *App) AddProfile(name, flag string) (config.Profile, error) {
 	return p, nil
 }
 
+// UpdateProfile перезаписывает один профиль (по его ID) и сохраняет — не
+// трогая ни туннель, ни политику фильтра: используется при импорте, когда
+// правится необязательно тот сервер, что сейчас подключён.
+func (a *App) UpdateProfile(p config.Profile) error {
+	a.mu.Lock()
+	a.cfg.SetProfile(p)
+	cfg := a.cfg
+	a.mu.Unlock()
+	return cfg.Save()
+}
+
 // RemoveProfile удаляет сервер из списка. Если это был активный (и, значит,
 // возможно, подключённый прямо сейчас) — туннель останавливается: он остался
 // бы работать по адресу, которого в настройках больше нет.
