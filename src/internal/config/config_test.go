@@ -6,6 +6,26 @@ import (
 	"testing"
 )
 
+// Старые конфиги, сохранённые до появления AutoConnect, не должны молча
+// переставать подключаться сами: JSON без этого ключа даёт AutoConnect == nil,
+// а это должно читаться как «включено», а не как «выключено».
+func TestAutoConnectEnabledDefaultsWhenUnset(t *testing.T) {
+	var cfg Config
+	if !cfg.AutoConnectEnabled() {
+		t.Error("AutoConnect не задан явно — должен считаться включённым")
+	}
+
+	on, off := true, false
+	cfg.AutoConnect = &on
+	if !cfg.AutoConnectEnabled() {
+		t.Error("AutoConnect = true должен давать true")
+	}
+	cfg.AutoConnect = &off
+	if cfg.AutoConnectEnabled() {
+		t.Error("AutoConnect = false должен давать false")
+	}
+}
+
 // Программа дважды меняла имя, и вместе с ним — папку настроек. Человек не
 // должен из-за этого потерять адрес сервера и путь к ключу: старая папка
 // переезжает под новое имя при первом запуске.
