@@ -726,9 +726,16 @@
 
     <!-- Android: свой ключ для телефона + QR с настройками -->
     <div id="wzAndroid">
-      <p class="note" style="margin-top:0" data-i18n="wizard_android_intro">У телефона будет свой ключ,
-        отдельный от того, что на этом компьютере — так утеря одного устройства не подставляет
-        под удар второе. Ключ создаётся для текущего выбранного сервера.</p>
+      <p class="note" style="margin-top:0" data-i18n="wizard_android_intro">Выбери, какой ключ отдать
+        телефону, и получишь QR с готовыми настройками для текущего выбранного сервера.</p>
+
+      <label class="chk"><input type="radio" name="wzKeyMode" id="wzKeyModeLocal" checked>
+        <span class="lbl" data-i18n="wizard_key_mode_local">Взять ключ этого компьютера</span></label>
+
+      <label class="chk"><input type="radio" name="wzKeyMode" id="wzKeyModeOwn">
+        <span class="lbl" data-i18n="wizard_key_mode_own">Сделать отдельный ключ для телефона</span>
+        <span class="infoq" onclick="event.preventDefault();event.stopPropagation();this.classList.toggle('show')">?<span class="tip" data-i18n="wizard_key_mode_own_note">Отдельный ключ можно потом отозвать на
+          сервере, не трогая ключ компьютера.</span></span></label>
 
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0">
         <button class="btn" id="wzGenBtn" data-i18n="wizard_generate">Сгенерировать</button>
@@ -736,13 +743,17 @@
       </div>
 
       <div id="wzAndroidResult" hidden>
-        <p class="step" id="wzAuthStep">Добавить этот ключ на сервере</p>
-        <div class="cmdbox">
-          <button class="cp" data-cmd="wzAuthCmd" data-note="wzGenNote" title="Скопировать">
-            <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/>
-              <path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
-          </button>
-          <span id="wzAuthCmd"></span>
+        <p class="step" id="wzAlreadyAllowed" data-i18n="wizard_key_mode_local_ready">Ключ уже разрешён
+          на сервере — просто отсканируй код.</p>
+        <div id="wzAuthBlock" hidden>
+          <p class="step" id="wzAuthStep">Добавить этот ключ на сервере</p>
+          <div class="cmdbox">
+            <button class="cp" data-cmd="wzAuthCmd" data-note="wzGenNote" title="Скопировать">
+              <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/>
+                <path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+            </button>
+            <span id="wzAuthCmd"></span>
+          </div>
         </div>
 
         <p class="step" style="margin-top:16px" data-i18n="wizard_qr_step">Отсканируй на телефоне
@@ -901,7 +912,11 @@ const I18N = {
     apps_imported:'список программ импортирован',
     wizard_title:'Мастер настройки', wizard_sub:'Подключить телефон или новый сервер',
     wizard_android:'Android', wizard_vps:'VPS',
-    wizard_android_intro:'У телефона будет свой ключ, отдельный от того, что на этом компьютере — так утеря одного устройства не подставляет под удар второе. Ключ создаётся для текущего выбранного сервера.',
+    wizard_android_intro:'Выбери, какой ключ отдать телефону, и получишь QR с готовыми настройками для текущего выбранного сервера.',
+    wizard_key_mode_local:'Взять ключ этого компьютера',
+    wizard_key_mode_own:'Сделать отдельный ключ для телефона',
+    wizard_key_mode_own_note:'Отдельный ключ можно потом отозвать на сервере, не трогая ключ компьютера.',
+    wizard_key_mode_local_ready:'Ключ уже разрешён на сервере — просто отсканируй код.',
     wizard_generate:'Сгенерировать', wizard_generating:'создаю…',
     wizard_need_host:'сначала укажи адрес сервера в настройках',
     wizard_qr_step:'Отсканируй на телефоне или нажми на код, чтобы скопировать настройки текстом',
@@ -968,7 +983,11 @@ const I18N = {
     apps_imported:'app list imported',
     wizard_title:'Setup wizard', wizard_sub:'Connect a phone or a new server',
     wizard_android:'Android', wizard_vps:'VPS',
-    wizard_android_intro:'The phone gets its own key, separate from the one on this computer — losing one device doesn\'t put the other at risk. The key is generated for the currently selected server.',
+    wizard_android_intro:'Pick which key to hand the phone, and get a QR with ready-made settings for the currently selected server.',
+    wizard_key_mode_local:'Use this computer\'s key',
+    wizard_key_mode_own:'Make a separate key for the phone',
+    wizard_key_mode_own_note:'A separate key can later be revoked on the server without touching the computer\'s key.',
+    wizard_key_mode_local_ready:'The key is already allowed on the server — just scan the code.',
     wizard_generate:'Generate', wizard_generating:'generating…',
     wizard_need_host:'set the server address in settings first',
     wizard_qr_step:'Scan it on the phone, or click the code to copy the settings as text',
@@ -2475,11 +2494,14 @@ $('wzGenBtn').onclick = async () => {
     $('wzGenNote').textContent = tr('wizard_need_host');
     return;
   }
+  const own = $('wzKeyModeOwn').checked;
   $('wzGenNote').textContent = tr('wizard_generating');
-  const r = await api('/api/androidkey', { id: p.id });
+  const r = await api('/api/androidkey', { id: p.id, mode: own ? 'own' : 'local' });
   if(r.error){ $('wzGenNote').textContent = r.error; return; }
   $('wzGenNote').textContent = '';
-  $('wzAuthCmd').textContent = buildAuthCmd(r.user, r.pubKey);
+  $('wzAuthBlock').hidden = !own;
+  $('wzAlreadyAllowed').hidden = own;
+  if(own) $('wzAuthCmd').textContent = buildAuthCmd(r.user, r.pubKey);
   $('wzInfoHost').textContent = r.host + ':' + r.sshPort;
   $('wzInfoUser').textContent = r.user;
   let doc = {};

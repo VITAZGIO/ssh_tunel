@@ -1,7 +1,9 @@
-// Вкладка «Android» в мастере настройки: у телефона должен быть свой ключ,
-// отдельный от того, что лежит на компьютере — компрометация одного не
-// должна тянуть за собой второй. Ключ отдаётся один раз, сразу в формате
-// exportDoc (том же, что у экспорта сервера файлом), чтобы будущее
+// Вкладка «Android» в мастере настройки: телефону нужен ключ, которым можно
+// подключиться к серверу. Два варианта: взять ключ этого компьютера (он уже
+// разрешён на сервере — команду для authorized_keys показывать не нужно) или
+// сделать для телефона отдельный ключ (прежнее поведение — новая пара, и
+// команду для сервера придётся выполнить под root). Ключ отдаётся сразу в
+// формате exportDoc (том же, что у экспорта сервера файлом), чтобы будущее
 // приложение на телефоне могло разобрать его тем же кодом, что уже умеет
 // читать этот формат — здесь он просто уходит через QR вместо файла.
 package webui
@@ -10,13 +12,15 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"os"
 
 	qrcode "github.com/skip2/go-qrcode"
 )
 
 func (s *Server) handleAndroidKey(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		ID string `json:"id"`
+		ID   string `json:"id"`
+		Mode string `json:"mode"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, map[string]string{"error": "не разобрал запрос: " + err.Error()})
@@ -28,10 +32,22 @@ func (s *Server) handleAndroidKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pub, priv, err := generateKeyPair()
-	if err != nil {
-		writeJSON(w, map[string]string{"error": "не удалось создать ключ: " + err.Error()})
-		return
+	own := req.Mode == "own"
+	var pub, priv string
+	if own {
+		var err error
+		pub, priv, err = generateKeyPair()
+		if err != nil {
+			writeJSON(w, map[string]string{"error": "не удалось создать ключ: " + err.Error()})
+			return
+		}
+	} else {
+		data, err := os.ReadFile(p.KeyPath)
+		if err != nil {
+			writeJSON(w, map[string]string{"error": "не могу прочитать ключ этого компьютера: " + err.Error()})
+			return
+		}
+		priv = string(data)
 	}
 
 	doc := exportDoc{
@@ -53,7 +69,7 @@ func (s *Server) handleAndroidKey(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, map[string]any{
 		"ok": true, "host": p.Host, "sshPort": p.SSHPort, "user": p.User,
-		"pubKey": pub, "payload": string(payload),
+		"pubKey": pub, "own": own, "payload": string(payload),
 		"qrPng": base64.StdEncoding.EncodeToString(png),
 	})
 }
