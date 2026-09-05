@@ -252,6 +252,10 @@ type statusResp struct {
 	SysProxy string        `json:"sysProxy"`
 	EnvHint  []string      `json:"envHint"`
 	ProxyURL string        `json:"proxyUrl"`
+	// OS — на чём крутится сама программа (runtime.GOOS). Страница одна и та
+	// же на Windows и на сервере под Linux, а команды создания ключа у них
+	// разные (PowerShell против bash) — переключаются по этому полю.
+	OS string `json:"os"`
 	// SeenApps — программы, замеченные за этот запуск: из них удобно
 	// собирать список фильтра, не вспоминая имена вручную.
 	SeenApps []string `json:"seenApps"`
@@ -267,6 +271,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		EnvHint:  s.app.EnvHint(),
 		ProxyURL: s.app.ProxyURL(),
 		SeenApps: s.app.SeenApps(),
+		OS:       runtime.GOOS,
 	})
 }
 

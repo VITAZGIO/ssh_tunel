@@ -367,12 +367,12 @@
       <p class="note">Команда напечатает одну длинную строку — скопируй её целиком,
         она понадобится в шаге 3.</p>
 
-      <div style="display:flex;gap:8px;align-items:center;margin:9px 0">
+      <div style="display:flex;gap:8px;align-items:center;margin:9px 0" id="openPsRow">
         <button class="btn" id="openPs" style="font-size:12.5px;padding:6px 12px">Открыть PowerShell</button>
         <span class="hint" id="keyHelpNote" style="margin:0"></span>
       </div>
 
-      <p class="step">3. На сервере, зайдя под root — добавить этот ключ</p>
+      <p class="step" id="cmd3step">3. На сервере, зайдя под root — добавить этот ключ</p>
       <div class="cmdbox">
         <button class="cp" data-cmd="cmd3" title="Скопировать">
           <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/>
@@ -985,13 +985,26 @@ function showSpeed(v){
    которая сама клала ключ на сервер, — она перестала работать, как только
    пользователю туннеля запретили выполнять команды. Поэтому теперь шаги
    раздельные: два на своей машине, один на сервере под root. */
-const KEYFILE = '$env:USERPROFILE\\.ssh\\id_ed25519';
+// На Windows программа работает на компьютере пользователя — оба шага
+// выполняются в PowerShell. На сервере (Linux) программа работает на самом
+// сервере — те же шаги, но в обычном bash: другой путь по умолчанию и другие
+// команды создания/показа ключа. Пока первый ответ /api/status не пришёл,
+// считаем Windows — так было исторически, и это безопасный запасной вариант.
+let OS = 'windows';
+function isWindows(){ return OS !== 'linux' && OS !== 'darwin'; }
+function keyfile(){ return isWindows() ? '$env:USERPROFILE\\.ssh\\id_ed25519' : '~/.ssh/id_ed25519'; }
 
 function cmdCreateKey(){
-  return 'if (!(Test-Path "' + KEYFILE + '")) { ssh-keygen -t ed25519 -f "' +
-    KEYFILE + '" -N \'""\' }';
+  const f = keyfile();
+  if(isWindows()){
+    return 'if (!(Test-Path "' + f + '")) { ssh-keygen -t ed25519 -f "' + f + '" -N \'""\' }';
+  }
+  return 'test -f ' + f + ' || ssh-keygen -t ed25519 -f ' + f + ' -N ""';
 }
-function cmdShowKey(){ return 'type "' + KEYFILE + '.pub"'; }
+function cmdShowKey(){
+  const f = keyfile();
+  return isWindows() ? 'type "' + f + '.pub"' : 'cat ' + f + '.pub';
+}
 
 function cmdServer(){
   const user = ($('user').value || '').trim() || 'tunnel';
@@ -1018,6 +1031,17 @@ function renderSetupCmd(){
     : 'Замени ВСТАВЬ_СЮДА_КЛЮЧ_ИЗ_ШАГА_2 на строку из шага 2. Команда заодно '
       + 'создаст пользователя «' + user + '», если его ещё нет: он умеет только '
       + 'пробрасывать соединения, ни команд, ни файлов.';
+
+  // На PowerShell её открыть можно самой программой. На Linux у программы
+  // такой возможности нет — там первые два шага выполняются в том же
+  // терминале, откуда обычно и заходят на сервер по SSH.
+  // (у блока свой инлайновый display:flex, поэтому переключаем именно его,
+  // а не атрибут hidden — иначе инлайновый стиль перебивает [hidden])
+  $('openPsRow').style.display = isWindows() ? 'flex' : 'none';
+  $('cmd3step').textContent = isWindows()
+    ? '3. На сервере, зайдя под root — добавить этот ключ'
+    : '3. На сервере-адресате (' + (($('host').value || '').trim() || 'куда подключаемся') +
+      '), зайдя под root — добавить этот ключ';
 }
 
 /* Одна кнопка копирования на все команды: какая именно — написано на самой
@@ -1186,6 +1210,10 @@ async function refresh(){
   // иначе набранный, но ещё не сохранённый адрес затирался бы.
   seenApps = (st.seenApps || []);
   if(!formDirty) fillConfig(st.config);
+  if(st.os && st.os !== OS){
+    OS = st.os;
+    if(!$('keyHelp').hidden) renderSetupCmd();
+  }
 }
 
 connectEvents();
