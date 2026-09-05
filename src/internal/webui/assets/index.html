@@ -227,6 +227,19 @@
   .chk .lbl{font-size:13px}
   .chk-row{display:flex;align-items:center;gap:8px;border-top:1px solid var(--line)}
   .chk-row .chk{border-top:none;flex:1}
+
+  /* Значок «?» вместо всегда открытого пояснения под галочкой — наводишь
+     или нажимаешь, и всплывает текст; остальное время он не занимает места. */
+  .infoq{position:relative;display:inline-flex;align-items:center;justify-content:center;
+         width:15px;height:15px;border-radius:50%;background:var(--card2);
+         border:1px solid var(--line);color:var(--dim);font-size:10px;font-weight:700;
+         cursor:help;flex:none;margin-top:2px}
+  .infoq .tip{display:none;position:absolute;left:0;top:20px;z-index:30;width:240px;
+              max-width:60vw;background:var(--card);border:1px solid var(--line);
+              border-radius:9px;padding:9px 11px;font-size:11.5px;font-weight:400;
+              color:var(--text);line-height:1.4;box-shadow:0 8px 22px rgba(0,0,0,.4);
+              cursor:auto}
+  .infoq:hover .tip, .infoq.show .tip{display:block}
   .help .step{margin:11px 0 5px;font-weight:600;color:var(--text)}
   .help .note{margin:5px 0 0;color:var(--dim)}
   .netline{display:flex;gap:7px;align-items:flex-start;padding:3px 0}
@@ -588,14 +601,14 @@
 
       <div id="bootBlock" hidden>
         <label class="chk"><input type="checkbox" id="bootStart">
-          <span class="lbl" data-i18n="boot_start">Запускать при старте системы</span></label>
-        <p class="note" id="bootNote" style="margin-top:-2px"></p>
+          <span class="lbl" data-i18n="boot_start">Запускать при старте системы</span>
+          <span class="infoq" onclick="event.preventDefault();event.stopPropagation();this.classList.toggle('show')">?<span class="tip" id="bootNote"></span></span></label>
 
-        <label class="chk"><input type="checkbox" id="autoConnect">
-          <span class="lbl" data-i18n="connect_on_launch">Подключаться сразу при запуске</span></label>
-        <p class="note" style="margin-top:-2px" data-i18n="autoconnect_note">Туннель поднимется сам, как только
-          программа стартует (сейчас или после перезагрузки) — жать «Подключить»
-          в панели не придётся. Выключи, если хочешь запускать вручную.</p>
+        <label class="chk" id="autoConnectRow"><input type="checkbox" id="autoConnect">
+          <span class="lbl" data-i18n="connect_on_launch">Подключаться сразу при запуске</span>
+          <span class="infoq" onclick="event.preventDefault();event.stopPropagation();this.classList.toggle('show')">?<span class="tip" data-i18n="autoconnect_note">Туннель поднимется сам, как только
+            программа стартует (сейчас или после перезагрузки) — жать «Подключить»
+            в панели не придётся. Выключи, если хочешь запускать вручную.</span></span></label>
 
         <div id="sudoRow" hidden>
           <p class="note" style="margin-bottom:4px">Этот шаг требует прав администратора.
@@ -999,6 +1012,13 @@ function closeMenu(){ if(menuEl){ menuEl.remove(); menuEl = null; } }
 document.addEventListener('click', ev => {
   if(menuEl && !menuEl.contains(ev.target) && !$('addApp').contains(ev.target) &&
      !$('homePicker').contains(ev.target) && !$('cityBtn').contains(ev.target)) closeMenu();
+});
+
+/* Значки «?» открытые по клику (не по наведению) закрываются щелчком мимо. */
+document.addEventListener('click', ev => {
+  document.querySelectorAll('.infoq.show').forEach(el => {
+    if(!el.contains(ev.target)) el.classList.remove('show');
+  });
 });
 
 $('addApp').onclick = ev => {
@@ -2154,11 +2174,14 @@ async function refresh(){
   }
   if(st.os && st.os !== OS){
     OS = st.os;
-    // Галочка «Подключаться сразу при запуске» в верхней части настроек
-    // относится только к окну на Windows — на Linux она ни на что не влияет,
-    // там за то же самое отвечает пара «Запускать при старте системы» +
-    // «Подключаться сразу при запуске» внизу, у автозапуска.
+    // Галочка «Подключаться сразу при запуске» в верхней части настроек —
+    // для Windows: и обычный запуск двойным щелчком, и запуск из автозагрузки
+    // при входе в систему используют один и тот же exe, так что достаточно
+    // одной галочки. На Linux эта верхняя ни на что не влияет — там то же
+    // самое отвечает нижняя пара «Запускать при старте системы» +
+    // «Подключаться сразу при запуске», у автозапуска.
     $('autoStartRow').style.display = isWindows() ? '' : 'none';
+    $('autoConnectRow').style.display = isWindows() ? 'none' : '';
     if(!$('keyHelp').hidden) renderSetupCmd();
   }
 }
