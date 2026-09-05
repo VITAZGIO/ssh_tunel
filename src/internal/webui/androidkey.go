@@ -15,6 +15,8 @@ import (
 	"os"
 
 	qrcode "github.com/skip2/go-qrcode"
+
+	"sshtunnel/internal/share"
 )
 
 func (s *Server) handleAndroidKey(w http.ResponseWriter, r *http.Request) {
@@ -50,13 +52,13 @@ func (s *Server) handleAndroidKey(w http.ResponseWriter, r *http.Request) {
 		priv = string(data)
 	}
 
-	doc := exportDoc{
-		Format: 1, Name: p.Name, Flag: p.Flag, Host: p.Host, SSHPort: p.SSHPort, User: p.User,
+	doc := share.Doc{
+		Name: p.Name, Flag: p.Flag, Host: p.Host, SSHPort: p.SSHPort, User: p.User,
 		SocksPort: p.SocksPort, HTTPPort: p.HTTPPort, PoolSize: p.PoolSize,
 		FilterMode: p.FilterMode, FilterApps: p.FilterApps, DirectHosts: p.DirectHosts,
 		LocalViaTunnel: p.LocalViaTunnel, KeyIncluded: true, KeyContents: priv,
 	}
-	payload, err := json.Marshal(doc)
+	payload, err := share.Build(doc)
 	if err != nil {
 		writeJSON(w, map[string]string{"error": err.Error()})
 		return

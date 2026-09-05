@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"sshtunnel/internal/app"
+	"sshtunnel/internal/share"
 )
 
 // Оба варианта — «ключ этого компьютера» и «отдельный ключ» — должны отдавать
@@ -67,7 +68,7 @@ func TestAndroidKeyModes(t *testing.T) {
 	if local.PubKey != "" {
 		t.Error(`mode=local не должен создавать новый ключ (pubKey не пуст)`)
 	}
-	var localDoc exportDoc
+	var localDoc share.Doc
 	if err := json.Unmarshal([]byte(local.Payload), &localDoc); err != nil {
 		t.Fatalf("payload для mode=local не валидный JSON: %v", err)
 	}
@@ -83,7 +84,7 @@ func TestAndroidKeyModes(t *testing.T) {
 	if own.PubKey == "" {
 		t.Error(`mode=own должен создать новый ключ и вернуть pubKey`)
 	}
-	var ownDoc exportDoc
+	var ownDoc share.Doc
 	if err := json.Unmarshal([]byte(own.Payload), &ownDoc); err != nil {
 		t.Fatalf("payload для mode=own не валидный JSON: %v", err)
 	}
