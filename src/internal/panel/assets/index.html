@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ssh_tunnel panel</title>
+<style>
+  :root{
+    --bg:#0d1017; --card:#161a23; --card2:#1d222d; --line:#272d3a;
+    --text:#e8ebf2; --dim:#828b9e; --accent:#4c8dff;
+    --ok:#2fbf71; --warn:#e8b339; --err:#e5484d;
+    --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#eef1f6; --card:#fff; --card2:#f3f5f9; --line:#dde2ec;
+           --text:#141821; --dim:#616b7f; }
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:14px/1.45 "Segoe UI",-apple-system,Roboto,sans-serif}
+  .wrap{max-width:520px;margin:0 auto;padding:24px 16px 60px}
+  .bar{display:flex;align-items:center;gap:8px;padding:6px 0 18px}
+  .bar .brand{font-weight:650;font-size:16px}
+  .bar .sp{flex:1}
+  select{background:var(--card);border:1px solid var(--line);border-radius:8px;
+         padding:6px 8px;color:var(--text);font:inherit}
+  select:focus{outline:none;border-color:var(--accent)}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+        padding:18px;margin-bottom:14px}
+  .card h1{font-size:16px;margin:0 0 4px}
+  .card p.note{color:var(--dim);font-size:12.5px;margin:0 0 14px;line-height:1.4}
+
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:12px;color:var(--dim);margin-bottom:4px}
+  input[type=text],input[type=password]{width:100%;background:var(--card2);
+       border:1px solid var(--line);border-radius:8px;padding:9px 10px;
+       color:var(--text);font:inherit}
+  input:focus{outline:none;border-color:var(--accent)}
+
+  button.btn{width:100%;padding:10px;border-radius:9px;border:1px solid var(--line);
+             background:var(--accent);color:#fff;font:inherit;font-weight:600;
+             cursor:pointer}
+  button.btn:hover{filter:brightness(1.08)}
+  button.btn:disabled{opacity:.6;cursor:default}
+  button.btn.ghost{background:transparent;color:var(--text)}
+  button.btn.danger{background:var(--err)}
+
+  .msg{font-size:12.5px;border-radius:8px;padding:9px 10px;margin-bottom:12px}
+  .msg.err{background:rgba(229,72,77,.12);color:var(--err)}
+  .msg.ok{background:rgba(47,191,113,.12);color:var(--ok)}
+
+  .kv{display:flex;justify-content:space-between;gap:12px;padding:7px 0;
+      border-bottom:1px solid var(--line);font-size:13px}
+  .kv:last-child{border-bottom:none}
+  .kv .k{color:var(--dim)}
+  .kv .v{font-family:var(--mono)}
+
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;
+         font-weight:600}
+  .badge.ok{background:rgba(47,191,113,.15);color:var(--ok)}
+
+  .empty{text-align:center;color:var(--dim);padding:26px 10px;font-size:13px}
+
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <span class="brand">ssh_tunnel panel</span>
+    <span class="sp"></span>
+    <select id="lang">
+      <option value="ru">RU</option>
+      <option value="en">EN</option>
+    </select>
+  </div>
+
+  <!-- ---------- вход ---------- -->
+  <section id="viewLogin" class="card" hidden>
+    <h1 data-i18n="login_title">Вход в панель</h1>
+    <p class="note" data-i18n="login_note">Панель управляет этим сервером и клиентами,
+      подключёнными к нему, поэтому доступ защищён паролем.</p>
+    <div id="loginMsg"></div>
+    <div class="field">
+      <label for="loginUser" data-i18n="username_label">Логин</label>
+      <input type="text" id="loginUser" autocomplete="username">
+    </div>
+    <div class="field">
+      <label for="loginPass" data-i18n="password_label">Пароль</label>
+      <input type="password" id="loginPass" autocomplete="current-password">
+    </div>
+    <button class="btn" id="loginBtn" data-i18n="sign_in">Войти</button>
+  </section>
+
+  <!-- ---------- обязательная смена пароля ---------- -->
+  <section id="viewMustChange" class="card" hidden>
+    <h1 data-i18n="must_change_title">Смени пароль</h1>
+    <p class="note" data-i18n="must_change_note">Это одноразовый пароль из журнала
+      программы. Прежде чем продолжить, задай свой.</p>
+    <div id="changeMsg"></div>
+    <div class="field">
+      <label for="curPass" data-i18n="current_password_label">Текущий пароль</label>
+      <input type="password" id="curPass" autocomplete="current-password">
+    </div>
+    <div class="field">
+      <label for="newPass1" data-i18n="new_password_label">Новый пароль</label>
+      <input type="password" id="newPass1" autocomplete="new-password">
+    </div>
+    <div class="field">
+      <label for="newPass2" data-i18n="repeat_password_label">Повтори новый пароль</label>
+      <input type="password" id="newPass2" autocomplete="new-password">
+    </div>
+    <button class="btn" id="changeBtn" data-i18n="set_password">Задать пароль</button>
+  </section>
+
+  <!-- ---------- панель ---------- -->
+  <section id="viewMain" hidden>
+    <div class="card">
+      <h1 data-i18n="server_status">Состояние сервера</h1>
+      <div class="kv"><span class="k" data-i18n="status_label">Статус</span>
+        <span class="v"><span class="badge ok" data-i18n="running">работает</span></span></div>
+      <div class="kv"><span class="k" data-i18n="os_label">Система</span>
+        <span class="v" id="stOS">—</span></div>
+      <div class="kv"><span class="k" data-i18n="uptime_label">Время работы</span>
+        <span class="v" id="stUptime">—</span></div>
+      <div class="kv"><span class="k" data-i18n="version_label">Версия панели</span>
+        <span class="v" id="stVersion">—</span></div>
+    </div>
+
+    <div class="card">
+      <h1 data-i18n="clients_title">Подключённые клиенты</h1>
+      <p class="note" data-i18n="clients_note">Управление клиентами появится отдельно —
+        пока список всегда пуст.</p>
+      <div id="clientsList" class="empty" data-i18n="clients_empty">Клиентов пока нет</div>
+    </div>
+
+    <div class="card">
+      <h1 data-i18n="account_title">Учётная запись</h1>
+      <div id="accountMsg"></div>
+      <div class="field">
+        <label for="curPass2" data-i18n="current_password_label">Текущий пароль</label>
+        <input type="password" id="curPass2" autocomplete="current-password">
+      </div>
+      <div class="field">
+        <label for="newPass21" data-i18n="new_password_label">Новый пароль</label>
+        <input type="password" id="newPass21" autocomplete="new-password">
+      </div>
+      <div class="field">
+        <label for="newPass22" data-i18n="repeat_password_label">Повтори новый пароль</label>
+        <input type="password" id="newPass22" autocomplete="new-password">
+      </div>
+      <button class="btn ghost" id="accountChangeBtn" data-i18n="set_password">Задать пароль</button>
+    </div>
+
+    <button class="btn danger" id="logoutBtn" data-i18n="sign_out">Выйти</button>
+  </section>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const api = (path, body) => fetch(path, {
+  method: body ? 'POST' : 'GET',
+  headers: {'Content-Type': 'application/json'},
+  credentials: 'same-origin',
+  body: body ? JSON.stringify(body) : undefined
+}).then(async r => ({ok: r.ok, status: r.status, data: await r.json().catch(() => ({}))}));
+
+/* ---------- язык интерфейса ---------- */
+let LANG = localStorage.getItem('panelLang') || 'ru';
+const I18N = {
+  ru: {
+    login_title:'Вход в панель', login_note:'Панель управляет этим сервером и клиентами, '+
+      'подключёнными к нему, поэтому доступ защищён паролем.',
+    username_label:'Логин', password_label:'Пароль', sign_in:'Войти',
+    must_change_title:'Смени пароль',
+    must_change_note:'Это одноразовый пароль из журнала программы. Прежде чем продолжить, задай свой.',
+    current_password_label:'Текущий пароль', new_password_label:'Новый пароль',
+    repeat_password_label:'Повтори новый пароль', set_password:'Задать пароль',
+    server_status:'Состояние сервера', status_label:'Статус', running:'работает',
+    os_label:'Система', uptime_label:'Время работы', version_label:'Версия панели',
+    clients_title:'Подключённые клиенты',
+    clients_note:'Управление клиентами появится отдельно — пока список всегда пуст.',
+    clients_empty:'Клиентов пока нет',
+    account_title:'Учётная запись', sign_out:'Выйти',
+    err_bad_credentials:'Неверный логин или пароль',
+    err_locked:'Слишком много попыток — подожди {s} с.',
+    err_bad_request:'Не разобрал запрос', err_internal:'Внутренняя ошибка',
+    err_password_too_short:'Пароль должен быть не короче 8 символов',
+    err_password_mismatch:'Пароли не совпадают',
+    password_changed:'Пароль изменён',
+  },
+  en: {
+    login_title:'Sign in', login_note:'The panel controls this server and the clients '+
+      'connected to it, so access is protected by a password.',
+    username_label:'Username', password_label:'Password', sign_in:'Sign in',
+    must_change_title:'Change your password',
+    must_change_note:'This is the one-time password from the program log. Set your own before continuing.',
+    current_password_label:'Current password', new_password_label:'New password',
+    repeat_password_label:'Repeat new password', set_password:'Set password',
+    server_status:'Server status', status_label:'Status', running:'running',
+    os_label:'OS', uptime_label:'Uptime', version_label:'Panel version',
+    clients_title:'Connected clients',
+    clients_note:'Client management is a separate task — the list is always empty for now.',
+    clients_empty:'No clients yet',
+    account_title:'Account', sign_out:'Sign out',
+    err_bad_credentials:'Wrong username or password',
+    err_locked:'Too many attempts — wait {s}s.',
+    err_bad_request:'Could not parse the request', err_internal:'Internal error',
+    err_password_too_short:'Password must be at least 8 characters',
+    err_password_mismatch:'Passwords do not match',
+    password_changed:'Password changed',
+  },
+};
+function t(key){ return (I18N[LANG] && I18N[LANG][key]) || key; }
+function applyI18N(){
+  document.documentElement.lang = LANG;
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  $('lang').value = LANG;
+}
+$('lang').addEventListener('change', e => {
+  LANG = e.target.value;
+  localStorage.setItem('panelLang', LANG);
+  applyI18N();
+});
+
+function errText(code, extra){
+  let s = t('err_' + code) || code;
+  if (extra && extra.retryAfterSecond) s = s.replace('{s}', extra.retryAfterSecond);
+  return s;
+}
+function showMsg(el, text, kind){
+  el.innerHTML = text ? `<div class="msg ${kind}">${text}</div>` : '';
+}
+
+function showView(name){
+  ['Login','MustChange','Main'].forEach(v => { $('view'+v).hidden = (v !== name); });
+}
+
+function fmtUptime(sec){
+  sec = Math.max(0, sec|0);
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+  return [h,m,s].map(x => String(x).padStart(2,'0')).join(':');
+}
+
+async function loadSession(){
+  const {data} = await api('/api/session');
+  if (!data.authenticated){ showView('Login'); return; }
+  if (data.mustChange){ showView('MustChange'); return; }
+  showView('Main');
+  loadStatus();
+}
+
+async function loadStatus(){
+  const {ok, data} = await api('/api/status');
+  if (!ok) return;
+  $('stOS').textContent = data.os;
+  $('stUptime').textContent = fmtUptime(data.uptimeSeconds);
+  $('stVersion').textContent = data.version;
+}
+
+$('loginBtn').addEventListener('click', async () => {
+  showMsg($('loginMsg'), '', '');
+  const username = $('loginUser').value.trim();
+  const password = $('loginPass').value;
+  $('loginBtn').disabled = true;
+  const {ok, data} = await api('/api/login', {username, password});
+  $('loginBtn').disabled = false;
+  if (!ok){ showMsg($('loginMsg'), errText(data.error, data), 'err'); return; }
+  $('loginPass').value = '';
+  loadSession();
+});
+['loginUser','loginPass'].forEach(id => $(id).addEventListener('keydown', e => {
+  if (e.key === 'Enter') $('loginBtn').click();
+}));
+
+async function doChangePassword(curId, p1Id, p2Id, msgEl, btn, onDone){
+  showMsg(msgEl, '', '');
+  const currentPassword = $(curId).value;
+  const p1 = $(p1Id).value, p2 = $(p2Id).value;
+  if (p1 !== p2){ showMsg(msgEl, errText('password_mismatch'), 'err'); return; }
+  btn.disabled = true;
+  const {ok, data} = await api('/api/change-password', {currentPassword, newPassword: p1});
+  btn.disabled = false;
+  if (!ok){ showMsg(msgEl, errText(data.error, data), 'err'); return; }
+  $(curId).value = ''; $(p1Id).value = ''; $(p2Id).value = '';
+  onDone();
+}
+
+$('changeBtn').addEventListener('click', () => doChangePassword(
+  'curPass','newPass1','newPass2', $('changeMsg'), $('changeBtn'), loadSession));
+
+$('accountChangeBtn').addEventListener('click', () => doChangePassword(
+  'curPass2','newPass21','newPass22', $('accountMsg'), $('accountChangeBtn'),
+  () => showMsg($('accountMsg'), t('password_changed'), 'ok')));
+
+$('logoutBtn').addEventListener('click', async () => {
+  await api('/api/logout', {});
+  loadSession();
+});
+
+applyI18N();
+loadSession();
+</script>
+</body>
+</html>

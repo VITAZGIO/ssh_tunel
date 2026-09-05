@@ -25,6 +25,7 @@
 | **Android** | [**ssh_tunnel.apk**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.apk) | VPN-подключение, кнопка в шторке |
 | **Linux** | [**Установка на Linux**](docs/LINUX_SETUP.md) | консоль + веб-интерфейс, служба systemd, команды под все основные дистрибутивы |
 | **VPS-сервер** | [**Первая настройка**](docs/SERVER_SETUP.md) | что сделать на новом сервере: пользователь `tunnel`, ключи, firewall |
+| **Панель на VPS** | [**ssh_tunnel_panel**](docs/PANEL_SETUP.md) | веб-панель на самом сервере, управляет подключёнными клиентами; работает от root |
 
 Windows и Android — прямые ссылки на файл. Linux и VPS-сервер открывают
 страницу с инструкцией: у Linux слишком много разных систем, чтобы обойтись
