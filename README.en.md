@@ -22,12 +22,15 @@ standard SSH mechanism.
 | System | File | |
 |---|---|---|
 | **Windows** | [**ssh_tunnel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe) | window with a button, tray icon |
-| **Linux** | [**ssh_tunnel_linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux) | console + web interface, systemd service |
+| **Linux** | [**ssh_tunnel_linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux) | console + web interface, systemd service — [commands for your distro](#commands-for-your-distribution) |
 | **Android** | [**ssh_tunnel.apk**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.apk) | VPN connection, quick-settings tile |
-| **VPS server** | [**First-time setup**](docs/SERVER_SETUP.md) | what to do on a fresh server: the `tunnel` user, keys, firewall |
 
 The ARM build and the checksums are on the
 [release page](https://github.com/VITAZGIO/ssh_tunel/releases/latest).
+
+Setting up a **new VPS** to be the server — that's not a file to download but a
+sequence of steps: [first-time server setup](docs/SERVER_SETUP.md) — keys,
+firewall, a dedicated `tunnel` user.
 
 <img src="docs/screenshot.png" width="300" alt="main screen">
 <img src="docs/screenshot_filter.png" width="300" alt="per-app filter">
@@ -346,15 +349,24 @@ rc-service ssh_tunnel start
 
 ### Starting at boot
 
-At the bottom of the settings there is a **"Start at system boot"** checkbox.
-The program writes the systemd unit itself, enables it, and allows it to run
-without the user logging in. That last part needs administrator rights: if the
-system asks for a password, a field for it appears right there — the password is
-used once and stored nowhere.
+At the bottom of the settings there are two checkboxes side by side:
 
-Next to it, if Docker is found on the machine, a second checkbox appears — turn
-on autostart for Docker too, so that after a reboot the containers and the
-tunnel come up together.
+- **"Start at system boot"** — the program writes the systemd unit itself,
+  enables it, and allows it to run without the user logging in. That last part
+  needs administrator rights: if the system asks for a password, a field for it
+  appears right there — the password is used once and stored nowhere.
+- **"Connect immediately on launch"** — the tunnel comes up on its own as soon
+  as the program starts, no need to press "Connect" in the panel. On by
+  default — that's the ordinary behavior; turn it off if you'd rather start the
+  tunnel by hand.
+
+Together they give you "turn the machine on, the tunnel is already up": the
+first checkbox brings the program up at boot, the second connects it right
+away.
+
+If Docker is found on the machine, a third checkbox appears a little further
+down — turn on autostart for Docker too, so that after a reboot the containers
+and the tunnel come up together.
 
 This works anywhere systemd is present. The exceptions are Proxmox under `root`
 and Alpine: there the service is set up by hand, with the commands above.

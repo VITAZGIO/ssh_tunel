@@ -206,12 +206,17 @@ func runRoot(password, name string, args ...string) error {
 	cmd := exec.Command("sudo", append([]string{"-S", "-p", "", name}, args...)...)
 	cmd.Stdin = strings.NewReader(password + "\n")
 	if out, err := cmd.CombinedOutput(); err != nil {
-		// Сообщение sudo наружу не отдаём целиком: в него попадает ввод и
-		// подсказки вида «Sorry, try again», из которых человеку полезно
-		// только одно — пароль не подошёл.
+		// «Пароль не подошёл» — единственное, что стоит сказать человеку
+		// напрямую: остальной вывод sudo — подсказки вида «Sorry, try again»
+		// и приглашение ввести пароль ещё раз, для дела не нужны. Любую
+		// другую ошибку показываем как есть — вместо голого "exit status 1"
+		// в ней настоящая причина (например, не вышло достучаться до systemd).
 		if strings.Contains(string(out), "incorrect password") ||
 			strings.Contains(string(out), "Sorry, try again") {
 			return errors.New("пароль не подошёл")
+		}
+		if msg := firstLine(string(out)); msg != "" {
+			return errors.New(msg)
 		}
 		return fmt.Errorf("%s: %w", name, err)
 	}
