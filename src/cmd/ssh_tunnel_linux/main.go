@@ -13,8 +13,10 @@
 //
 // Наружу интерфейс сам по себе не выставляется: за настройки прокси и за
 // туннель отвечает тот, кто может им управлять, поэтому по умолчанию доступ
-// только с самой машины. Если нужно открыть по сети — есть -web-listen, и
-// программа отдельно предупредит об этом в журнале.
+// только с самой машины. Флаг -web-lan открывает панель для локальной сети —
+// по адресу машины и без ключа в ссылке, как у домашних сервисов; с публичных
+// адресов ключ по-прежнему обязателен. Совсем произвольный адрес задаётся
+// через -web-listen.
 package main
 
 import (
@@ -33,8 +35,12 @@ import (
 )
 
 // Порт веб-интерфейса. Нестандартный, чтобы не конфликтовать с тем, что уже
-// крутится на сервере.
-const defaultWebAddr = "127.0.0.1:47821"
+// крутится на сервере. Постоянный: ссылку на панель кладут в закладки, и она
+// не должна меняться от запуска к запуску.
+const (
+	defaultWebAddr = "127.0.0.1:47821"
+	lanWebAddr     = "0.0.0.0:47821"
+)
 
 func main() {
 	cfg := config.Load()
@@ -59,8 +65,10 @@ func main() {
 	flag.BoolVar(&cfg.Verbose, "v", cfg.Verbose, "подробный журнал")
 
 	web := flag.Bool("web", false, "включить веб-интерфейс")
-	webAddr := flag.String("web-listen", defaultWebAddr,
-		"адрес веб-интерфейса; менять на 0.0.0.0 только осознанно")
+	webLAN := flag.Bool("web-lan", false,
+		"открыть панель для локальной сети: по адресу машины и без ключа в ссылке")
+	webAddr := flag.String("web-listen", "",
+		"свой адрес веб-интерфейса (по умолчанию "+defaultWebAddr+", с -web-lan — "+lanWebAddr+")")
 	save := flag.Bool("save", false, "сохранить настройки и выйти")
 	printEnv := flag.Bool("env", false, "напечатать строки для подключения прокси в оболочке и выйти")
 	flag.Parse()
@@ -91,17 +99,37 @@ func main() {
 	go printEvents(a.Bus, cfg.Verbose)
 
 	if *web {
-		srv, err := webui.NewOn(a, *webAddr)
+		addr := *webAddr
+		if addr == "" {
+			addr = defaultWebAddr
+			if *webLAN {
+				addr = lanWebAddr
+			}
+		}
+
+		newServer := webui.NewOn
+		if *webLAN {
+			newServer = webui.NewOpenLocalOn
+		}
+		srv, err := newServer(a, addr)
 		if err != nil {
 			fatal("%v", err)
 		}
 		go srv.Serve()
-		if !strings.HasPrefix(*webAddr, "127.") && !strings.HasPrefix(*webAddr, "localhost") {
-			a.Bus.Warnf("Веб-интерфейс открыт по сети (%s). Доступ защищён только ключом в адресе — "+
-				"не оставляй его так в чужой сети.", *webAddr)
-		}
+
 		fmt.Println("\nВеб-интерфейс:", srv.URL())
-		fmt.Println("(ключ в адресе обязателен — без него интерфейс не отвечает)")
+		switch {
+		case *webLAN:
+			a.Bus.Warnf("Панель открыта для локальной сети (%s): управлять туннелем может "+
+				"любой, кто до неё дотянется. Для чужой сети так не оставляй.", addr)
+			fmt.Println("(открыт для локальной сети — ключ не нужен)")
+		case !strings.HasPrefix(addr, "127.") && !strings.HasPrefix(addr, "localhost"):
+			a.Bus.Warnf("Веб-интерфейс открыт по сети (%s). Доступ защищён только ключом в адресе — "+
+				"не оставляй его так в чужой сети.", addr)
+			fmt.Println("(ключ в адресе обязателен — без него интерфейс не отвечает)")
+		default:
+			fmt.Println("(ключ в адресе обязателен — без него интерфейс не отвечает)")
+		}
 	}
 
 	fmt.Printf("\nПодключаюсь к %s:%d...\n", cfg.Host, cfg.SSHPort)
@@ -243,8 +271,9 @@ func usage() {
   ssh_tunnel_linux -host ТВОЙ_СЕРВЕР -user root -save
 
 Дальше достаточно:
-  ssh_tunnel_linux            # только туннель, журнал в вывод
-  ssh_tunnel_linux -web       # плюс веб-интерфейс на %s
+  ssh_tunnel_linux              # только туннель, журнал в вывод
+  ssh_tunnel_linux -web         # плюс веб-интерфейс на %s
+  ssh_tunnel_linux -web -web-lan  # панель по адресу машины, без ключа в ссылке
 
 Полезное:
   -env        напечатать строки для подключения прокси в оболочке

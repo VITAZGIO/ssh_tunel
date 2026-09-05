@@ -13,6 +13,13 @@
 // генерируется случайный токен, он же передаётся в адресе окна, и без него
 // API не отвечает. Плюс проверяется заголовок Origin — чтобы запрос не мог
 // прийти со стороннего сайта.
+//
+// Режим «открыт для локальной сети» (OpenLocal) снимает требование токена для
+// тех, кто пришёл с адреса локальной сети: панель тогда открывается просто по
+// адресу машины, как у домашних сервисов вроде Home Assistant. Проверка Origin
+// при этом остаётся и делает основную работу — именно она отсекает чужой сайт,
+// открытый во вкладке браузера. Запросы с публичных адресов без токена не
+// проходят в любом режиме.
 package webui
 
 import (
@@ -25,9 +32,9 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os/exec"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
 
@@ -46,6 +53,8 @@ type Server struct {
 	app   *App
 	token string
 	ln    net.Listener
+	// openLocal — пускать без токена тех, кто пришёл из локальной сети.
+	openLocal bool
 }
 
 // App — то, что интерфейс умеет делать с программой.
@@ -71,9 +80,63 @@ func NewOn(a *App, addr string) (*Server, error) {
 	return &Server{app: a, token: hex.EncodeToString(tok), ln: ln}, nil
 }
 
+// NewOpenLocalOn — то же, но без ключа в адресе для гостей из локальной сети.
+// Панель открывается по адресу машины и постоянному порту, как домашние
+// сервисы: ссылку можно положить в закладки, она не меняется от запуска к
+// запуску.
+func NewOpenLocalOn(a *App, addr string) (*Server, error) {
+	s, err := NewOn(a, addr)
+	if err != nil {
+		return nil, err
+	}
+	s.openLocal = true
+	return s, nil
+}
+
 // URL — адрес, который надо открыть в браузере.
 func (s *Server) URL() string {
-	return fmt.Sprintf("http://%s/?t=%s", s.ln.Addr().String(), s.token)
+	addr := s.ln.Addr().String()
+	if s.openLocal {
+		return fmt.Sprintf("http://%s/", displayAddr(addr))
+	}
+	return fmt.Sprintf("http://%s/?t=%s", addr, s.token)
+}
+
+// displayAddr заменяет 0.0.0.0 на реальный адрес машины в локальной сети:
+// «0.0.0.0» в браузер не вставишь, а ради этого адреса всё и затевалось.
+func displayAddr(addr string) string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return addr
+	}
+	if ip := net.ParseIP(host); ip == nil || !ip.IsUnspecified() {
+		return addr
+	}
+	if local := localIP(); local != "" {
+		return net.JoinHostPort(local, port)
+	}
+	return net.JoinHostPort("127.0.0.1", port)
+}
+
+// localIP — первый адрес машины в локальной сети. Их может быть несколько
+// (docker, wireguard), поэтому предпочитаем обычные домашние и офисные сети.
+func localIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ""
+	}
+	for _, a := range addrs {
+		n, ok := a.(*net.IPNet)
+		if !ok {
+			continue
+		}
+		ip := n.IP.To4()
+		if ip == nil || ip.IsLoopback() || !ip.IsPrivate() {
+			continue
+		}
+		return ip.String()
+	}
+	return ""
 }
 
 func (s *Server) Serve() error {
@@ -100,27 +163,70 @@ func (s *Server) Serve() error {
 
 func (s *Server) Close() { s.ln.Close() }
 
-// guard пропускает только запросы с правильным токеном и без чужого Origin.
+// guard пропускает только свои запросы: с правильным токеном либо, в открытом
+// режиме, из локальной сети — и в любом случае без чужого Origin.
 func (s *Server) guard(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		tok := r.Header.Get("X-Token")
-		if tok == "" {
-			tok = r.URL.Query().Get("t")
-		}
-		if subtle.ConstantTimeCompare([]byte(tok), []byte(s.token)) != 1 {
+		if !s.allowed(r) {
 			http.Error(w, "запрещено", http.StatusForbidden)
 			return
 		}
-		// Origin ставит браузер, подделать его со страницы нельзя. Свой
-		// собственный Origin разрешаем, чужой — нет.
-		if origin := r.Header.Get("Origin"); origin != "" {
-			if !strings.HasSuffix(origin, s.ln.Addr().String()) {
-				http.Error(w, "запрещено", http.StatusForbidden)
-				return
-			}
-		}
 		next(w, r)
 	}
+}
+
+func (s *Server) allowed(r *http.Request) bool {
+	// Origin ставит браузер, подделать его со страницы нельзя: это и есть
+	// защита от чужого сайта, открытого в соседней вкладке.
+	if !sameOrigin(r) {
+		return false
+	}
+	tok := r.Header.Get("X-Token")
+	if tok == "" {
+		tok = r.URL.Query().Get("t")
+	}
+	if subtle.ConstantTimeCompare([]byte(tok), []byte(s.token)) == 1 {
+		return true
+	}
+	return s.openLocal && isLocalClient(r.RemoteAddr)
+}
+
+// sameOrigin сверяет Origin с адресом, по которому пришёл сам запрос. Так
+// проверка работает при любом адресе панели — 127.0.0.1, имя машины или адрес
+// в локальной сети, — а не только при том, на котором она слушает.
+func sameOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		// Заголовка нет — запрос пришёл не со страницы: curl, приложение.
+		// Такие проходят по токену, отдельная проверка тут ничего не даёт.
+		return true
+	}
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	return u.Host == r.Host
+}
+
+// isLocalClient — пришёл ли запрос из локальной сети: домашней, офисной или
+// mesh-VPN (100.64.0.0/10 — NetBird, Tailscale). Публичные адреса сюда не
+// попадают, им токен нужен всегда.
+func isLocalClient(remoteAddr string) bool {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		host = remoteAddr
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() {
+		return true
+	}
+	if v4 := ip.To4(); v4 != nil {
+		return v4[0] == 100 && v4[1] >= 64 && v4[1] <= 127
+	}
+	return false
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {

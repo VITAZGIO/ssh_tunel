@@ -158,14 +158,31 @@ chmod +x ssh_tunnel_linux
 
 # ...or with the web interface
 ./ssh_tunnel_linux -web
+
+# ...or with the panel open to your home network
+./ssh_tunnel_linux -web -web-lan
 ```
 
 The web interface is the very same one the Windows build shows in its window,
-served on `127.0.0.1:47821`. The port is deliberately unusual so it does not
-collide with whatever is already running on a server. The address, together with
-an access token, is printed at startup; without the token the interface does not
-answer. It does not expose itself to the outside — that needs the separate
-`-web-listen` flag, and the program warns you about the risk.
+served on the fixed port `47821`. The port is deliberately unusual so it does not
+collide with whatever is already running on a server.
+
+By default the panel listens on `127.0.0.1` only and the address carries an
+access token, printed at startup. Nothing reaches it from the network, and no
+page that happens to be open in your browser can either.
+
+The **`-web-lan`** flag turns it into a home service like Home Assistant: fixed
+address, no token, opened straight at the machine's address —
+
+```
+http://192.168.1.203:47821
+```
+
+Only your own side gets in: local network addresses (`192.168.x.x`, `10.x.x.x`,
+`172.16–31.x.x`) and mesh VPNs (`100.64.x.x`). A public address still needs the
+token, and the `Origin` check keeps a foreign site in the next browser tab from
+pressing anything on your behalf. Anyone on that network can control the tunnel —
+usually the point at home, not something to leave on in someone else's network.
 
 Wire the proxy into the current shell (curl, git, apt, docker, pip, npm):
 
@@ -176,7 +193,7 @@ source ~/.config/ssh_tunnel/proxy.env
 As a systemd service — see [packaging/linux](packaging/linux):
 
 ```bash
-./packaging/linux/install.sh ./ssh_tunnel_linux
+./packaging/linux/install.sh ./ssh_tunnel_linux --lan   # without --lan: local machine only
 systemctl --user enable --now ssh_tunnel
 ```
 
@@ -245,7 +262,7 @@ flags do.
 
 Linux flags: `-host`, `-sshport`, `-user`, `-key`, `-port`, `-httpport`,
 `-pool`, `-filter`, `-apps`, `-direct`, `-local-via-tunnel`, `-sysproxy`,
-`-setenv`, `-save`, `-env`, `-web`, `-web-listen`, `-v`.
+`-setenv`, `-save`, `-env`, `-web`, `-web-lan`, `-web-listen`, `-v`.
 
 ---
 
