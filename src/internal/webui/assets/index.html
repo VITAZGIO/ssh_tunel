@@ -113,6 +113,8 @@
        color:var(--text);font:inherit}
   input:focus{outline:none;border-color:var(--accent)}
   .two{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .wztab{background:var(--card2);border:1px solid var(--line);color:var(--dim)}
+  .wztab.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
   .hint{font-size:11.5px;color:var(--dim);margin-top:3px;line-height:1.35}
 
   select{width:100%;background:var(--card);border:1px solid var(--line);
@@ -304,8 +306,13 @@
 
   .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;
          padding:13px 13px 3px;margin-bottom:16px}
-  .panel .ptitle{font-size:11.5px;font-weight:700;text-transform:uppercase;
-                 letter-spacing:.5px;color:var(--dim);margin:0 0 11px}
+  .panel .ptitle{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none;
+                 font-size:11.5px;font-weight:700;text-transform:uppercase;
+                 letter-spacing:.5px;color:var(--dim);margin:0 0 11px;padding:2px 0}
+  .panel .ptitle .chev{transition:transform .15s;font-size:10px;flex:none}
+  .panel.collapsed .ptitle{margin-bottom:2px}
+  .panel.collapsed .ptitle .chev{transform:rotate(-90deg)}
+  .panel.collapsed .pbody{display:none}
 
   .rowbtns{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:2px 0 12px}
   .curBadge{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ok);
@@ -424,12 +431,16 @@
       <button class="btn" id="importBtn" title="Импортировать сервер из файла"
         data-i18n-title="import_title" style="font-size:12.5px;padding:8px 12px;flex:none">
         <span data-i18n="import_short">Импорт</span></button>
+      <button class="btn" id="pasteBtn" title="Вставить настройки сервера из буфера обмена"
+        data-i18n-title="paste_title" style="font-size:12.5px;padding:8px 10px;flex:none">📋</button>
       <input type="file" id="importFile" accept=".json,application/json" hidden>
     </div>
     <div style="margin-bottom:12px"></div>
 
-    <div class="panel">
-      <p class="ptitle" data-i18n="server_settings">Настройки сервера</p>
+    <div class="panel" id="serverPanel">
+      <p class="ptitle" id="serverPanelTitle"><span class="chev">▾</span>
+        <span data-i18n="server_settings">Настройки сервера</span></p>
+      <div class="pbody">
 
       <div class="field">
         <label id="cityLabel" data-i18n="location_label">Расположение</label>
@@ -583,10 +594,20 @@
       <p>Не знаешь, что вписать — нажми «Проверить сеть»: программа посмотрит
         адаптеры этого компьютера и скажет, сломается что-нибудь или нет.</p>
     </div>
+      </div><!-- /.pbody -->
     </div><!-- /.panel настроек сервера -->
 
-    <div class="panel">
-      <p class="ptitle" data-i18n="general_settings">Общие настройки приложения</p>
+    <button class="row-link" id="toWizard" style="margin-bottom:16px">
+      <span class="t"><span data-i18n="wizard_title">Мастер настройки</span>
+        <div class="v" data-i18n="wizard_sub">Подключить телефон или новый сервер</div>
+      </span>
+      <span class="arr">›</span>
+    </button>
+
+    <div class="panel" id="generalPanel">
+      <p class="ptitle" id="generalPanelTitle"><span class="chev">▾</span>
+        <span data-i18n="general_settings">Общие настройки приложения</span></p>
+      <div class="pbody">
 
       <label class="chk"><input type="checkbox" id="verbose">
         <span class="lbl" data-i18n="verbose">Подробный журнал</span></label>
@@ -622,6 +643,7 @@
         </div>
         <span class="hint" id="bootStatus" style="display:block;margin:4px 0 0"></span>
       </div>
+      </div><!-- /.pbody -->
     </div><!-- /.panel общих настроек -->
 
     <div style="display:flex;gap:9px;align-items:center;margin-top:14px">
@@ -673,6 +695,8 @@
         <button class="btn" id="exportAppsBtn" data-i18n="export_apps">Экспортировать список</button>
         <button class="btn" id="importAppsBtn" data-i18n="import_apps">Импортировать список</button>
       </div>
+      <button class="btn" id="pasteAppsBtn" style="width:100%;margin-top:8px;font-size:12.5px"
+        data-i18n="paste_apps">Вставить список из буфера</button>
       <input type="file" id="importAppsFile" accept=".json,application/json" hidden>
 
       <div class="hint" style="margin-top:10px" data-i18n="apps_note">Программы, которые вообще не
@@ -683,6 +707,99 @@
     <div style="display:flex;gap:9px;align-items:center;margin-top:16px">
       <button class="btn primary" id="saveFilter" data-i18n="save">Сохранить</button>
       <span class="hint" id="filterNote"></span>
+    </div>
+  </div>
+
+  <!-- МАСТЕР НАСТРОЙКИ -->
+  <div class="view" id="viewWizard">
+    <div class="head">
+      <button class="ico" id="backFromWizard" title="Назад в настройки" data-i18n-title="back_to_settings">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <span class="t" data-i18n="wizard_title">Мастер настройки</span>
+    </div>
+
+    <div class="two" style="margin-bottom:14px">
+      <button class="btn wztab on" id="wzTabAndroid" data-i18n="wizard_android">Android</button>
+      <button class="btn wztab" id="wzTabVPS" data-i18n="wizard_vps">VPS</button>
+    </div>
+
+    <!-- Android: свой ключ для телефона + QR с настройками -->
+    <div id="wzAndroid">
+      <p class="note" style="margin-top:0" data-i18n="wizard_android_intro">У телефона будет свой ключ,
+        отдельный от того, что на этом компьютере — так утеря одного устройства не подставляет
+        под удар второе. Ключ создаётся для текущего выбранного сервера.</p>
+
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0">
+        <button class="btn" id="wzGenBtn" data-i18n="wizard_generate">Сгенерировать</button>
+        <span class="hint" id="wzGenNote"></span>
+      </div>
+
+      <div id="wzAndroidResult" hidden>
+        <p class="step" id="wzAuthStep">Добавить этот ключ на сервере</p>
+        <div class="cmdbox">
+          <button class="cp" data-cmd="wzAuthCmd" data-note="wzGenNote" title="Скопировать">
+            <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/>
+              <path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          </button>
+          <span id="wzAuthCmd"></span>
+        </div>
+
+        <p class="step" style="margin-top:16px" data-i18n="wizard_qr_step">Отсканируй на телефоне
+          или нажми на код, чтобы скопировать настройки текстом</p>
+        <div style="display:flex;justify-content:center;margin:8px 0">
+          <img id="wzQr" style="width:220px;height:220px;border-radius:10px;cursor:pointer;
+               background:#fff;padding:8px" title="Нажми, чтобы скопировать">
+        </div>
+        <span class="hint" id="wzQrNote" style="display:block;text-align:center;margin-bottom:10px"></span>
+
+        <div class="help">
+          <p><b data-i18n="host_label">Адрес сервера</b>: <span id="wzInfoHost"></span></p>
+          <p><b data-i18n="user_label">Пользователь SSH</b>: <span id="wzInfoUser"></span></p>
+          <p><b data-i18n="wizard_key">Приватный ключ</b></p>
+          <pre id="wzInfoKey" style="white-space:pre-wrap;word-break:break-all;font-family:var(--mono);
+               font-size:11px;margin:0"></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- VPS: параметризованный скрипт настройки сервера из docs/SERVER_SETUP.md -->
+    <div id="wzVPS" hidden>
+      <p class="note" style="margin-top:0" data-i18n="wizard_vps_intro">Готовые команды для новго
+        сервера — вставить целиком на нём под root. Что настраивают: ключи вместо паролей,
+        firewall, бан за перебор, автообновления и отдельный пользователь для туннеля.</p>
+
+      <div class="two">
+        <div class="field"><label for="wzNewUser" data-i18n="wizard_admin_user">Обычный пользователь</label>
+          <input type="text" id="wzNewUser" spellcheck="false" value="admin"></div>
+        <div class="field"><label for="wzSshPort" data-i18n="wizard_ssh_port">SSH-порт</label>
+          <input type="number" id="wzSshPort" min="1" max="65535" value="22"></div>
+      </div>
+      <div class="two">
+        <div class="field"><label for="wzTunnelUser" data-i18n="wizard_tunnel_user">Пользователь туннеля</label>
+          <input type="text" id="wzTunnelUser" spellcheck="false" value="tunnel"></div>
+        <div class="field"><label for="wzTimezone" data-i18n="wizard_timezone">Часовой пояс</label>
+          <input type="text" id="wzTimezone" spellcheck="false" value="Europe/Moscow"></div>
+      </div>
+      <div class="field">
+        <label for="wzTunnelKey" data-i18n="wizard_tunnel_key">Открытый ключ туннеля (необязательно)</label>
+        <input type="text" id="wzTunnelKey" spellcheck="false" data-i18n-ph="wizard_tunnel_key_ph">
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 10px">
+        <button class="btn" id="wzVpsBtn" data-i18n="wizard_build">Собрать команды</button>
+        <span class="hint" id="wzVpsNote"></span>
+      </div>
+
+      <div id="wzVpsResult" hidden>
+        <div class="cmdbox" style="max-height:320px;overflow-y:auto">
+          <button class="cp" data-cmd="wzVpsScript" data-note="wzVpsNote" title="Скопировать">
+            <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/>
+              <path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          </button>
+          <span id="wzVpsScript" style="white-space:pre-wrap;word-break:break-all"></span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -782,6 +899,25 @@ const I18N = {
     exported:'файл сохранён',
     export_apps:'Экспортировать список', import_apps:'Импортировать список',
     apps_imported:'список программ импортирован',
+    wizard_title:'Мастер настройки', wizard_sub:'Подключить телефон или новый сервер',
+    wizard_android:'Android', wizard_vps:'VPS',
+    wizard_android_intro:'У телефона будет свой ключ, отдельный от того, что на этом компьютере — так утеря одного устройства не подставляет под удар второе. Ключ создаётся для текущего выбранного сервера.',
+    wizard_generate:'Сгенерировать', wizard_generating:'создаю…',
+    wizard_need_host:'сначала укажи адрес сервера в настройках',
+    wizard_qr_step:'Отсканируй на телефоне или нажми на код, чтобы скопировать настройки текстом',
+    wizard_key:'Приватный ключ',
+    wizard_vps_intro:'Готовые команды для нового сервера — вставить целиком на нём под root. Что настраивают: ключи вместо паролей, firewall, бан за перебор, автообновления и отдельный пользователь для туннеля.',
+    wizard_admin_user:'Обычный пользователь', wizard_ssh_port:'SSH-порт',
+    wizard_tunnel_user:'Пользователь туннеля', wizard_timezone:'Часовой пояс',
+    wizard_tunnel_key:'Открытый ключ туннеля (необязательно)',
+    wizard_tunnel_key_ph:'пусто = взять ключи root',
+    wizard_build:'Собрать команды', wizard_vps_copied:'скопировано — вставь на сервере под root',
+    copied:'скопировано', copy_manually:'скопируй вручную',
+    exported_and_copied:'файл сохранён и скопирован в буфер',
+    paste_title:'Вставить настройки сервера из буфера обмена',
+    paste_apps:'Вставить список из буфера',
+    paste_failed:'не удалось прочитать буфер обмена',
+    paste_not_config:'в буфере не похоже на настройки ssh_tunnel',
   },
   en: {
     log:'Log', settings:'Settings', back:'Back', back_to_settings:'Back to settings',
@@ -830,6 +966,25 @@ const I18N = {
     exported:'file saved',
     export_apps:'Export list', import_apps:'Import list',
     apps_imported:'app list imported',
+    wizard_title:'Setup wizard', wizard_sub:'Connect a phone or a new server',
+    wizard_android:'Android', wizard_vps:'VPS',
+    wizard_android_intro:'The phone gets its own key, separate from the one on this computer — losing one device doesn\'t put the other at risk. The key is generated for the currently selected server.',
+    wizard_generate:'Generate', wizard_generating:'generating…',
+    wizard_need_host:'set the server address in settings first',
+    wizard_qr_step:'Scan it on the phone, or click the code to copy the settings as text',
+    wizard_key:'Private key',
+    wizard_vps_intro:'Ready-made commands for a new server — paste the whole thing on it as root. What they set up: keys instead of passwords, a firewall, a ban after failed logins, automatic updates, and a separate user just for the tunnel.',
+    wizard_admin_user:'Regular user', wizard_ssh_port:'SSH port',
+    wizard_tunnel_user:'Tunnel user', wizard_timezone:'Timezone',
+    wizard_tunnel_key:'Tunnel public key (optional)',
+    wizard_tunnel_key_ph:'empty = reuse root\'s keys',
+    wizard_build:'Build the commands', wizard_vps_copied:'copied — paste it on the server as root',
+    copied:'copied', copy_manually:'copy it by hand',
+    exported_and_copied:'file saved and copied to clipboard',
+    paste_title:'Paste server settings from clipboard',
+    paste_apps:'Paste list from clipboard',
+    paste_failed:'couldn\'t read the clipboard',
+    paste_not_config:'this doesn\'t look like ssh_tunnel settings',
   },
 };
 function tr(key){ return (I18N[LANG] && I18N[LANG][key]) || (I18N.ru[key] || key); }
@@ -943,13 +1098,35 @@ function renderApps(){
    какому серверу он привязан (правила фильтра свои у каждого профиля).
    Пригодится и на Android, когда до него дойдут руки: формат простой и
    ничего специфичного для Windows/Linux в нём нет. */
-$('exportAppsBtn').onclick = () => {
-  const doc = {
+function appsExportDoc(){
+  return {
     sshTunnelAppList: 1,
     filterMode: filterMode,
     apps: filterApps.map(n => ({ name: n, path: appPaths[n] || '' })),
   };
-  const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
+}
+
+// appsListFrom — достаёт список программ из документа, если он вообще похож
+// на экспорт списка: принимаем и наш формат {apps:[...]}, и просто голый
+// массив, но не абы что — иначе долго объяснять, почему список вдруг пуст.
+function appsListFrom(doc){
+  if(doc && Array.isArray(doc.apps)) return doc.apps;
+  if(Array.isArray(doc)) return doc;
+  return null;
+}
+
+function applyAppsDoc(list){
+  list.forEach(item => {
+    if(typeof item === 'string') addApp(item, '');
+    else if(item && item.name) addApp(item.name, item.path || '');
+  });
+  $('filterNote').textContent = tr('apps_imported');
+  setTimeout(() => $('filterNote').textContent = '', 4000);
+}
+
+$('exportAppsBtn').onclick = async () => {
+  const text = JSON.stringify(appsExportDoc(), null, 2);
+  const blob = new Blob([text], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -958,6 +1135,9 @@ $('exportAppsBtn').onclick = () => {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
+  const copied = await copyToClipboard(text);
+  $('filterNote').textContent = copied ? tr('exported_and_copied') : tr('exported');
+  setTimeout(() => $('filterNote').textContent = '', 4000);
 };
 
 $('importAppsBtn').onclick = () => $('importAppsFile').click();
@@ -973,20 +1153,36 @@ $('importAppsFile').addEventListener('change', async () => {
     $('filterNote').textContent = tr('import_bad_file');
     return;
   }
-  // Принимаем и наш формат {apps:[...]}, и просто голый массив — мало ли
-  // откуда файл, лишняя терпимость тут не мешает.
-  const list = Array.isArray(doc.apps) ? doc.apps : (Array.isArray(doc) ? doc : null);
+  const list = appsListFrom(doc);
   if(!list){
     $('filterNote').textContent = tr('import_bad_file');
     return;
   }
-  list.forEach(item => {
-    if(typeof item === 'string') addApp(item, '');
-    else if(item && item.name) addApp(item.name, item.path || '');
-  });
-  $('filterNote').textContent = tr('apps_imported');
-  setTimeout(() => $('filterNote').textContent = '', 4000);
+  applyAppsDoc(list);
 });
+
+$('pasteAppsBtn').onclick = async () => {
+  let text;
+  try {
+    text = await navigator.clipboard.readText();
+  } catch(e) {
+    $('filterNote').textContent = tr('paste_failed');
+    return;
+  }
+  let doc;
+  try {
+    doc = JSON.parse(text);
+  } catch(e) {
+    $('filterNote').textContent = tr('paste_not_config');
+    return;
+  }
+  const list = appsListFrom(doc);
+  if(!list){
+    $('filterNote').textContent = tr('paste_not_config');
+    return;
+  }
+  applyAppsDoc(list);
+};
 
 function addApp(name, path){
   const n = normApp(name);
@@ -1143,7 +1339,7 @@ function docWithProfile(p){
 }
 
 /* ---------- переключение экранов ---------- */
-const VIEWS = ['viewMain','viewSettings','viewFilter','viewLog'];
+const VIEWS = ['viewMain','viewSettings','viewFilter','viewLog','viewWizard'];
 let current = 'viewMain';
 
 function show(name){
@@ -1422,9 +1618,10 @@ function cmdShowKey(){
 // null, и команда для сервера собирается с плейсхолдером, как раньше.
 let genKeyPub = null;
 
-function cmdServer(){
-  const user = ($('user').value || '').trim() || 'tunnel';
-  const key = genKeyPub || 'ВСТАВЬ_СЮДА_КЛЮЧ_ИЗ_ШАГА_2';
+// buildAuthCmd — команда «добавить этот ключ на сервере», в общем виде: тем
+// же кодом пользуются и настройка ключа для этого компьютера (cmdServer), и
+// генерация ключа для телефона в мастере настройки.
+function buildAuthCmd(user, key){
   if(user === 'root'){
     return 'mkdir -p ~/.ssh; chmod 700 ~/.ssh; ' +
       'echo \'' + key + '\' >> ~/.ssh/authorized_keys; ' +
@@ -1436,6 +1633,12 @@ function cmdServer(){
     'echo \'restrict,port-forwarding ' + key + '\' >> /home/' + u + '/.ssh/authorized_keys; ' +
     'chown ' + u + ':' + u + ' /home/' + u + '/.ssh/authorized_keys; ' +
     'chmod 600 /home/' + u + '/.ssh/authorized_keys';
+}
+
+function cmdServer(){
+  const user = ($('user').value || '').trim() || 'tunnel';
+  const key = genKeyPub || 'ВСТАВЬ_СЮДА_КЛЮЧ_ИЗ_ШАГА_2';
+  return buildAuthCmd(user, key);
 }
 
 function renderSetupCmd(){
@@ -1566,8 +1769,9 @@ $('manualToggle').onclick = () => {
 document.querySelectorAll('.cp[data-cmd]').forEach(b => {
   b.onclick = async () => {
     const ok = await copyToClipboard($(b.dataset.cmd).textContent);
-    $('keyHelpNote').textContent = ok ? 'скопировано' : 'скопируй вручную';
-    setTimeout(() => $('keyHelpNote').textContent = '', 2500);
+    const note = $(b.dataset.note || 'keyHelpNote');
+    note.textContent = ok ? 'скопировано' : 'скопируй вручную';
+    setTimeout(() => note.textContent = '', 2500);
   };
 });
 
@@ -2026,9 +2230,27 @@ $('exportBtn').onclick = async () => {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
-  $('savedNote').textContent = tr('exported');
+  const copied = await copyToClipboard(r.data);
+  $('savedNote').textContent = copied ? tr('exported_and_copied') : tr('exported');
   setTimeout(() => $('savedNote').textContent = '', 4000);
 };
+
+// isServerExportDoc — тот же критерий, что и на сервере (config.Host==""):
+// без адреса это не экспорт ssh_tunnel, а что-то другое, случайно
+// оказавшееся в буфере обмена.
+function isServerExportDoc(doc){
+  return !!doc && typeof doc.host === 'string' && doc.host !== '';
+}
+
+async function importProfileDoc(doc){
+  const r = await api('/api/profile/import', doc);
+  if(r.error){ showError(r.error, 'setError'); return; }
+  showError('', 'setError');
+  editingProfileId = r.profile.id;
+  applyDoc(r.config);
+  $('savedNote').textContent = r.keyImported ? tr('import_ok_with_key') : tr('import_ok_no_key');
+  setTimeout(() => $('savedNote').textContent = '', 8000);
+}
 
 $('importBtn').onclick = () => $('importFile').click();
 $('importFile').addEventListener('change', async () => {
@@ -2043,14 +2265,30 @@ $('importFile').addEventListener('change', async () => {
     showError(tr('import_bad_file'), 'setError');
     return;
   }
-  const r = await api('/api/profile/import', doc);
-  if(r.error){ showError(r.error, 'setError'); return; }
-  showError('', 'setError');
-  editingProfileId = r.profile.id;
-  applyDoc(r.config);
-  $('savedNote').textContent = r.keyImported ? tr('import_ok_with_key') : tr('import_ok_no_key');
-  setTimeout(() => $('savedNote').textContent = '', 8000);
+  await importProfileDoc(doc);
 });
+
+$('pasteBtn').onclick = async () => {
+  let text;
+  try {
+    text = await navigator.clipboard.readText();
+  } catch(e) {
+    showError(tr('paste_failed'), 'setError');
+    return;
+  }
+  let doc;
+  try {
+    doc = JSON.parse(text);
+  } catch(e) {
+    showError(tr('paste_not_config'), 'setError');
+    return;
+  }
+  if(!isServerExportDoc(doc)){
+    showError(tr('paste_not_config'), 'setError');
+    return;
+  }
+  await importProfileDoc(doc);
+};
 
 /* ---------- виджет выбора сервера на главном экране ---------- */
 function renderHomePicker(){
@@ -2185,6 +2423,93 @@ async function refresh(){
     if(!$('keyHelp').hidden) renderSetupCmd();
   }
 }
+
+/* ---------- сворачиваемые блоки настроек ---------- */
+/* При первом запуске оба блока открыты — надо всё увидеть и заполнить.
+   Дальше, раз всё уже настроено, они по умолчанию свёрнуты, чтобы не
+   листать то, что и так работает. Ручной выбор запоминается насовсем —
+   это чисто локальное удобство браузера, не часть конфига на диске. */
+function initCollapsible(panelId, titleId){
+  const panel = $(panelId), title = $(titleId);
+  const key = 'ssh_tunnel_collapsed_' + panelId;
+  let collapsed = false;
+  try {
+    if(localStorage.getItem('ssh_tunnel_settings_seen')){
+      const v = localStorage.getItem(key);
+      collapsed = v === null ? true : v === '1';
+    }
+  } catch(e) {}
+  panel.classList.toggle('collapsed', collapsed);
+  title.onclick = () => {
+    const now = panel.classList.toggle('collapsed');
+    try { localStorage.setItem(key, now ? '1' : '0'); } catch(e) {}
+  };
+}
+initCollapsible('serverPanel', 'serverPanelTitle');
+initCollapsible('generalPanel', 'generalPanelTitle');
+try { localStorage.setItem('ssh_tunnel_settings_seen', '1'); } catch(e) {}
+
+/* ---------- мастер настройки: Android + VPS ---------- */
+$('toWizard').onclick = () => {
+  // Открытый ключ туннеля для этого сервера уже мог быть создан на экране
+  // настроек — если да, подставляем его в поле VPS-скрипта, чтобы не
+  // копировать вручную из другого места.
+  if(genKeyPub && !$('wzTunnelKey').value) $('wzTunnelKey').value = genKeyPub;
+  show('viewWizard');
+};
+$('backFromWizard').onclick = () => show('viewSettings');
+
+$('wzTabAndroid').onclick = () => {
+  $('wzTabAndroid').classList.add('on'); $('wzTabVPS').classList.remove('on');
+  $('wzAndroid').hidden = false; $('wzVPS').hidden = true;
+};
+$('wzTabVPS').onclick = () => {
+  $('wzTabVPS').classList.add('on'); $('wzTabAndroid').classList.remove('on');
+  $('wzVPS').hidden = false; $('wzAndroid').hidden = true;
+};
+
+let wzQrPayload = '';
+$('wzGenBtn').onclick = async () => {
+  const p = currentProfile();
+  if(!p.id || !p.host){
+    $('wzGenNote').textContent = tr('wizard_need_host');
+    return;
+  }
+  $('wzGenNote').textContent = tr('wizard_generating');
+  const r = await api('/api/androidkey', { id: p.id });
+  if(r.error){ $('wzGenNote').textContent = r.error; return; }
+  $('wzGenNote').textContent = '';
+  $('wzAuthCmd').textContent = buildAuthCmd(r.user, r.pubKey);
+  $('wzInfoHost').textContent = r.host + ':' + r.sshPort;
+  $('wzInfoUser').textContent = r.user;
+  let doc = {};
+  try { doc = JSON.parse(r.payload); } catch(e) {}
+  $('wzInfoKey').textContent = doc.keyContents || '';
+  $('wzQr').src = 'data:image/png;base64,' + r.qrPng;
+  wzQrPayload = r.payload;
+  $('wzAndroidResult').hidden = false;
+};
+$('wzQr').onclick = async () => {
+  if(!wzQrPayload) return;
+  const ok = await copyToClipboard(wzQrPayload);
+  $('wzQrNote').textContent = ok ? tr('copied') : tr('copy_manually');
+  setTimeout(() => $('wzQrNote').textContent = '', 2500);
+};
+
+$('wzVpsBtn').onclick = async () => {
+  $('wzVpsNote').textContent = tr('wizard_generating');
+  $('wzVpsResult').hidden = true;
+  const r = await api('/api/vpsscript', {
+    newUser: $('wzNewUser').value, sshPort: $('wzSshPort').value,
+    timezone: $('wzTimezone').value, tunnelUser: $('wzTunnelUser').value,
+    tunnelKey: $('wzTunnelKey').value,
+  });
+  if(r.error){ $('wzVpsNote').textContent = r.error; return; }
+  $('wzVpsScript').textContent = r.script;
+  $('wzVpsResult').hidden = false;
+  const copied = await copyToClipboard(r.script);
+  $('wzVpsNote').textContent = copied ? tr('wizard_vps_copied') : tr('copy_manually');
+};
 
 renderCityBtn();
 connectEvents();

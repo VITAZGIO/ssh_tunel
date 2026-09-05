@@ -39,29 +39,41 @@ func ensureKey(path string) (pubLine string, created bool, err error) {
 			"приватный ключ %s уже есть, а файла %s.pub рядом нет — проверь вручную", path, path)
 	}
 
-	pub, priv, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		return "", false, err
-	}
-	block, err := ssh.MarshalPrivateKey(priv, "")
+	line, privPEM, err := generateKeyPair()
 	if err != nil {
 		return "", false, err
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return "", false, fmt.Errorf("не могу создать папку для ключа: %w", err)
 	}
-	if err := os.WriteFile(path, pem.EncodeToMemory(block), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(privPEM), 0o600); err != nil {
 		return "", false, fmt.Errorf("не могу записать приватный ключ: %w", err)
 	}
-	sshPub, err := ssh.NewPublicKey(pub)
-	if err != nil {
-		return "", false, err
-	}
-	line := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(sshPub)))
 	if err := os.WriteFile(path+".pub", []byte(line+"\n"), 0o644); err != nil {
 		return "", false, fmt.Errorf("не могу записать открытый ключ: %w", err)
 	}
 	return line, true, nil
+}
+
+// generateKeyPair — новая пара ed25519 в памяти, без записи на диск: то же
+// самое, что делает ensureKey для файла на компьютере, но для случая, когда
+// ключ создаётся не для этой машины (например, для телефона в мастере
+// настройки) и сохранять его тут незачем — сохранит тот, кому он нужен.
+func generateKeyPair() (pubLine, privPEM string, err error) {
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return "", "", err
+	}
+	block, err := ssh.MarshalPrivateKey(priv, "")
+	if err != nil {
+		return "", "", err
+	}
+	sshPub, err := ssh.NewPublicKey(pub)
+	if err != nil {
+		return "", "", err
+	}
+	line := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(sshPub)))
+	return line, string(pem.EncodeToMemory(block)), nil
 }
 
 // expandHome разворачивает "~" в начале пути — поле в форме принимает любой
