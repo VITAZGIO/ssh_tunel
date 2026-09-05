@@ -211,11 +211,12 @@
   .proclist{overflow-y:auto;margin-top:9px;display:flex;flex-direction:column;gap:5px}
   .proclist::-webkit-scrollbar{width:8px}
   .proclist::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
-  .proc{display:flex;flex-direction:column;gap:1px;background:var(--card2);
+  .proc{display:flex;align-items:center;gap:9px;background:var(--card2);
         border:1px solid transparent;border-radius:8px;padding:7px 10px;
         cursor:pointer;text-align:left;font:inherit;color:var(--text)}
   .proc:hover{border-color:var(--accent)}
   .proc.picked{border-color:var(--ok)}
+  .proc .info{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
   .proc .n{font-family:var(--mono);font-size:12.5px}
   .proc .p{font-size:10.5px;color:var(--dim);overflow:hidden;
            text-overflow:ellipsis;white-space:nowrap}
@@ -1059,12 +1060,27 @@ function renderProcs(){
   list.forEach(p => {
     const b = document.createElement('button');
     b.className = 'proc' + (filterApps.includes(normApp(p.name)) ? ' picked' : '');
+
+    const icon = document.createElement('div');
+    icon.className = 'appicon';
+    icon.textContent = (p.name[0] || '?').toUpperCase();
+    if(p.path){
+      const img = document.createElement('img');
+      img.src = '/api/appicon?path=' + encodeURIComponent(p.path) + '&t=' + encodeURIComponent(T);
+      img.onload = () => { icon.textContent = ''; icon.appendChild(img); };
+      img.onerror = () => {};
+    }
+    b.appendChild(icon);
+
+    const info = document.createElement('div'); info.className = 'info';
     const n = document.createElement('div'); n.className = 'n'; n.textContent = p.name;
-    b.appendChild(n);
+    info.appendChild(n);
     if(p.path){
       const pa = document.createElement('div'); pa.className = 'p'; pa.textContent = p.path;
-      b.appendChild(pa);
+      info.appendChild(pa);
     }
+    b.appendChild(info);
+
     // Повторный щелчок снимает выбор — иначе лишнюю программу пришлось бы
     // убирать, закрыв окно, а это неочевидно.
     b.onclick = () => { toggleApp(p.name, p.path); renderProcs(); };
