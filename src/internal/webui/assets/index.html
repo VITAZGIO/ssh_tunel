@@ -256,6 +256,16 @@
   /* ---------- язык, вкладки серверов, карточки настроек ---------- */
   select#language{margin-bottom:14px}
 
+  /* Кнопка выбора города и пункты в её выпадающем списке — svg-флаги вместо
+     эмодзи: их шрифт для стран есть не у всех систем (например, у Windows 11
+     почти нет флагов в системном эмодзи-шрифте — вместо флага показывает
+     двухбуквенный код страны), а свой SVG выглядит одинаково везде. */
+  .cityBtn{width:100%;display:flex;align-items:center;gap:9px;text-align:left}
+  .cityBtn svg, .menu .flagrow svg, .tab .flagicon svg, #homePicker .flagicon svg{
+    flex:none;border-radius:2px;box-shadow:0 0 0 1px rgba(0,0,0,.15);display:block}
+  .menu.cityMenu{max-height:280px;overflow-y:auto}
+  .menu .flagrow{display:flex;align-items:center;gap:9px}
+
   .tabbar{display:flex;gap:6px;overflow-x:auto;padding-bottom:3px;margin-bottom:12px}
   .tabbar::-webkit-scrollbar{height:6px}
   .tabbar::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
@@ -342,7 +352,7 @@
            «Показывать выбор сервера на главном экране» — до этого просто
            отсутствует в потоке, ничего внизу не сдвигая. -->
       <div id="homePicker" style="display:none">
-        <span class="flag" id="homePickerFlag"></span>
+        <span class="flag flagicon" id="homePickerFlag"></span>
         <span class="nm" id="homePickerName"></span>
         <span class="chev">▾</span>
       </div>
@@ -394,8 +404,12 @@
       <p class="ptitle" data-i18n="server_settings">Настройки сервера</p>
 
       <div class="field">
-        <label for="citySelect" data-i18n="location_label">Расположение</label>
-        <select id="citySelect"></select>
+        <label id="cityLabel" data-i18n="location_label">Расположение</label>
+        <button type="button" class="btn cityBtn" id="cityBtn">
+          <span id="cityBtnIcon"></span>
+          <span id="cityBtnLabel" style="flex:1;text-align:left"></span>
+          <span style="color:var(--dim)">▾</span>
+        </button>
         <input type="text" id="customCityName" spellcheck="false" hidden style="margin-top:7px"
                data-i18n-ph="custom_name_ph">
       </div>
@@ -766,7 +780,7 @@ function applyI18n(){
   document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = tr(el.dataset.i18nPh); });
   renderModes();
   renderApps();
-  if(typeof renderCitySelect === 'function') renderCitySelect();
+  if(typeof renderCityBtn === 'function') renderCityBtn();
   renderTabs();
   renderHomePicker();
   if(typeof setState === 'function') setState(lastState);
@@ -870,7 +884,7 @@ let menuEl = null;
 function closeMenu(){ if(menuEl){ menuEl.remove(); menuEl = null; } }
 document.addEventListener('click', ev => {
   if(menuEl && !menuEl.contains(ev.target) && !$('addApp').contains(ev.target) &&
-     !$('homePicker').contains(ev.target)) closeMenu();
+     !$('homePicker').contains(ev.target) && !$('cityBtn').contains(ev.target)) closeMenu();
 });
 
 $('addApp').onclick = ev => {
@@ -1516,125 +1530,246 @@ function splitEntries(v){
 }
 
 [...FIELDS, ...PROFILE_CHECKS, ...CHECKS, 'directHosts', 'autoConnect',
- 'citySelect', 'customCityName', 'showServerPicker'].forEach(f => {
+ 'customCityName', 'showServerPicker'].forEach(f => {
   const el = $(f);
   if(el) el.addEventListener('input', () => { formDirty = true; });
 });
 
+/* ---------- флаги стран — свои SVG, не системный эмодзи-шрифт ---------- */
+/* Эмодзи-флаги полагаются на шрифт операционной системы, а он есть не
+   везде: у Windows 11 в системном эмодзи-шрифте почти нет флагов стран —
+   вместо флага показывается двухбуквенный код (то, что видно на скриншотах
+   с "NL" вместо флага Нидерландов). Рисуем флаг сами — несколько прямых
+   прямоугольников на страну, узнаваемо и одинаково на любой системе. */
+const FLAG_W = 20, FLAG_H = 14;
+function svgOpen(){ return '<svg viewBox="0 0 ' + FLAG_W + ' ' + FLAG_H + '" width="20" height="14">'; }
+function stripesH(colors){
+  const n = colors.length, sh = FLAG_H / n;
+  return svgOpen() + colors.map((c, i) =>
+    '<rect y="' + (i * sh).toFixed(2) + '" width="' + FLAG_W + '" height="' + (sh + 0.5).toFixed(2) + '" fill="' + c + '"/>'
+  ).join('') + '</svg>';
+}
+function stripesV(colors){
+  const n = colors.length, sw = FLAG_W / n;
+  return svgOpen() + colors.map((c, i) =>
+    '<rect x="' + (i * sw).toFixed(2) + '" width="' + (sw + 0.5).toFixed(2) + '" height="' + FLAG_H + '" fill="' + c + '"/>'
+  ).join('') + '</svg>';
+}
+function nordicCross(bg, fg){
+  return svgOpen() + '<rect width="' + FLAG_W + '" height="' + FLAG_H + '" fill="' + bg + '"/>' +
+    '<rect x="6" width="3" height="' + FLAG_H + '" fill="' + fg + '"/>' +
+    '<rect y="5.5" width="' + FLAG_W + '" height="3" fill="' + fg + '"/></svg>';
+}
+function circleFlag(bg, fg, r){
+  return svgOpen() + '<rect width="' + FLAG_W + '" height="' + FLAG_H + '" fill="' + bg + '"/>' +
+    '<circle cx="' + (FLAG_W / 2) + '" cy="' + (FLAG_H / 2) + '" r="' + (r || 4) + '" fill="' + fg + '"/></svg>';
+}
+// FLAGS — по коду страны либо готовая SVG-строка (сложные флаги — упрощённо,
+// но узнаваемо), либо описание для одного из généric-рисовальщиков выше.
+const FLAGS = {
+  NL: () => stripesH(['#AE1C28', '#FFFFFF', '#21468B']),
+  DE: () => stripesH(['#000000', '#DD0000', '#FFCE00']),
+  FR: () => stripesV(['#0055A4', '#FFFFFF', '#EF4135']),
+  ES: () => stripesH(['#AA151B', '#F1BF00', '#AA151B']),
+  IT: () => stripesV(['#009246', '#FFFFFF', '#CE2B37']),
+  AT: () => stripesH(['#ED2939', '#FFFFFF', '#ED2939']),
+  SE: () => nordicCross('#006AA7', '#FECC00'),
+  NO: () => svgOpen() + '<rect width="20" height="14" fill="#BA0C2F"/>' +
+    '<rect x="5.5" width="4" height="14" fill="#fff"/><rect y="5" width="20" height="4" fill="#fff"/>' +
+    '<rect x="6.5" width="2" height="14" fill="#00205B"/><rect y="6" width="20" height="2" fill="#00205B"/></svg>',
+  FI: () => nordicCross('#FFFFFF', '#002F6C'),
+  PL: () => stripesH(['#FFFFFF', '#DC143C']),
+  CZ: () => svgOpen() + '<rect width="20" height="7" fill="#fff"/><rect y="7" width="20" height="7" fill="#D7141A"/>' +
+    '<polygon points="0,0 0,14 9,7" fill="#11457E"/></svg>',
+  LV: () => stripesH(['#9E3039', '#9E3039', '#FFFFFF', '#9E3039', '#9E3039']),
+  LT: () => stripesH(['#FDB913', '#006A44', '#C1272D']),
+  EE: () => stripesH(['#0072CE', '#000000', '#FFFFFF']),
+  RO: () => stripesV(['#002B7F', '#FCD116', '#CE1126']),
+  BG: () => stripesH(['#FFFFFF', '#00966E', '#D62612']),
+  CH: () => svgOpen() + '<rect width="20" height="14" fill="#D52B1E"/>' +
+    '<rect x="8.5" y="3.5" width="3" height="7" fill="#fff"/><rect x="6.5" y="5.5" width="7" height="3" fill="#fff"/></svg>',
+  TR: () => svgOpen() + '<rect width="20" height="14" fill="#E30A17"/>' +
+    '<circle cx="8" cy="7" r="3.6" fill="#fff"/><circle cx="9" cy="7" r="2.9" fill="#E30A17"/>' +
+    '<polygon points="12,7 14.5,7.9 13.7,5.4 15.3,3.3 12.7,3.5 12,1 11.3,3.5 8.7,3.3 10.3,5.4 9.5,7.9" fill="#fff"/></svg>',
+  AE: () => svgOpen() + '<rect width="20" height="4.7" fill="#00732F"/><rect y="4.7" width="20" height="4.6" fill="#fff"/>' +
+    '<rect y="9.3" width="20" height="4.7" fill="#000"/><rect width="6" height="14" fill="#FF0000"/></svg>',
+  IL: () => svgOpen() + '<rect width="20" height="14" fill="#fff"/>' +
+    '<rect y="2" width="20" height="2" fill="#0038B8"/><rect y="10" width="20" height="2" fill="#0038B8"/>' +
+    '<polygon points="10,4.3 11.2,6.8 14,6.8 11.8,8.3 12.6,10.8 10,9.1 7.4,10.8 8.2,8.3 6,6.8 8.8,6.8" fill="none" stroke="#0038B8" stroke-width="0.6"/></svg>',
+  US: () => svgOpen() +
+    [0,1,2,3,4,5,6].map(i => '<rect y="' + (i * 2) + '" width="20" height="2.1" fill="' +
+      (i % 2 === 0 ? '#B31942' : '#fff') + '"/>').join('') +
+    '<rect width="9" height="7.5" fill="#0A3161"/></svg>',
+  CA: () => svgOpen() + '<rect width="20" height="14" fill="#fff"/><rect width="5" height="14" fill="#FF0000"/>' +
+    '<rect x="15" width="5" height="14" fill="#FF0000"/>' +
+    '<polygon points="10,3 11,6.3 14,5.3 12.3,8 14.5,9 11.5,9.5 12,12.5 10,10.5 8,12.5 8.5,9.5 5.5,9 7.7,8 6,5.3 9,6.3" fill="#FF0000"/></svg>',
+  BR: () => svgOpen() + '<rect width="20" height="14" fill="#009739"/>' +
+    '<polygon points="10,2 18,7 10,12 2,7" fill="#FEDD00"/><circle cx="10" cy="7" r="3" fill="#012169"/></svg>',
+  SG: () => svgOpen() + '<rect width="20" height="7" fill="#EF3340"/><rect y="7" width="20" height="7" fill="#fff"/>' +
+    '<circle cx="5.5" cy="4.5" r="2.4" fill="#fff"/><circle cx="6.3" cy="4.5" r="1.9" fill="#EF3340"/></svg>',
+  JP: () => circleFlag('#FFFFFF', '#BC002D', 4),
+  HK: () => svgOpen() + '<rect width="20" height="14" fill="#DE2910"/>' +
+    '<circle cx="10" cy="7" r="4" fill="#fff"/></svg>',
+  AU: () => svgOpen() + '<rect width="20" height="14" fill="#00247D"/>' +
+    '<rect x="1" y="1" width="6" height="4" fill="none" stroke="#fff" stroke-width="0.6"/>' +
+    '<circle cx="15" cy="4" r="0.8" fill="#fff"/><circle cx="16" cy="8" r="0.8" fill="#fff"/>' +
+    '<circle cx="13" cy="9" r="0.8" fill="#fff"/><circle cx="16" cy="11.5" r="0.8" fill="#fff"/></svg>',
+  GB: () => svgOpen() + '<rect width="20" height="14" fill="#00247D"/>' +
+    '<polygon points="0,0 2,0 20,12.5 20,14 18,14 0,1.5" fill="#fff"/>' +
+    '<polygon points="20,0 18,0 0,12.5 0,14 2,14 20,1.5" fill="#fff"/>' +
+    '<rect x="8" width="4" height="14" fill="#fff"/><rect y="5" width="20" height="4" fill="#fff"/>' +
+    '<rect x="8.8" width="2.4" height="14" fill="#CF142B"/><rect y="5.8" width="20" height="2.4" fill="#CF142B"/></svg>',
+};
+function flagSVG(code){
+  const f = FLAGS[code];
+  return f ? f() : '';
+}
+
 /* ---------- список популярных мест для вкладки сервера ---------- */
 /* Это только подпись и флаг у вкладки — своя личная метка для сервера,
    а не выбор точки выхода: сервер всё равно только твой собственный, по
-   адресу, который указан ниже. Города — просто узнаваемые ориентиры. */
+   адресу, который указан ниже. Города — просто узнаваемые ориентиры.
+   code — ключ во FLAGS; emoji хранился в flag профиля до этой версии,
+   оставлен только чтобы распознать уже сохранённые вкладки. */
 const CITIES = [
-  {name:'Амстердам', en:'Amsterdam', flag:'🇳🇱'},
-  {name:'Франкфурт', en:'Frankfurt', flag:'🇩🇪'},
-  {name:'Берлин', en:'Berlin', flag:'🇩🇪'},
-  {name:'Лондон', en:'London', flag:'🇬🇧'},
-  {name:'Париж', en:'Paris', flag:'🇫🇷'},
-  {name:'Мадрид', en:'Madrid', flag:'🇪🇸'},
-  {name:'Милан', en:'Milan', flag:'🇮🇹'},
-  {name:'Цюрих', en:'Zurich', flag:'🇨🇭'},
-  {name:'Вена', en:'Vienna', flag:'🇦🇹'},
-  {name:'Стокгольм', en:'Stockholm', flag:'🇸🇪'},
-  {name:'Осло', en:'Oslo', flag:'🇳🇴'},
-  {name:'Хельсинки', en:'Helsinki', flag:'🇫🇮'},
-  {name:'Варшава', en:'Warsaw', flag:'🇵🇱'},
-  {name:'Прага', en:'Prague', flag:'🇨🇿'},
-  {name:'Рига', en:'Riga', flag:'🇱🇻'},
-  {name:'Вильнюс', en:'Vilnius', flag:'🇱🇹'},
-  {name:'Таллин', en:'Tallinn', flag:'🇪🇪'},
-  {name:'Бухарест', en:'Bucharest', flag:'🇷🇴'},
-  {name:'София', en:'Sofia', flag:'🇧🇬'},
-  {name:'Стамбул', en:'Istanbul', flag:'🇹🇷'},
-  {name:'Дубай', en:'Dubai', flag:'🇦🇪'},
-  {name:'Тель-Авив', en:'Tel Aviv', flag:'🇮🇱'},
-  {name:'Нью-Йорк', en:'New York', flag:'🇺🇸'},
-  {name:'Лос-Анджелес', en:'Los Angeles', flag:'🇺🇸'},
-  {name:'Торонто', en:'Toronto', flag:'🇨🇦'},
-  {name:'Сан-Паулу', en:'São Paulo', flag:'🇧🇷'},
-  {name:'Сингапур', en:'Singapore', flag:'🇸🇬'},
-  {name:'Токио', en:'Tokyo', flag:'🇯🇵'},
-  {name:'Гонконг', en:'Hong Kong', flag:'🇭🇰'},
-  {name:'Сидней', en:'Sydney', flag:'🇦🇺'},
+  {name:'Амстердам', en:'Amsterdam', code:'NL', emoji:'🇳🇱'},
+  {name:'Франкфурт', en:'Frankfurt', code:'DE', emoji:'🇩🇪'},
+  {name:'Берлин', en:'Berlin', code:'DE', emoji:'🇩🇪'},
+  {name:'Лондон', en:'London', code:'GB', emoji:'🇬🇧'},
+  {name:'Париж', en:'Paris', code:'FR', emoji:'🇫🇷'},
+  {name:'Мадрид', en:'Madrid', code:'ES', emoji:'🇪🇸'},
+  {name:'Милан', en:'Milan', code:'IT', emoji:'🇮🇹'},
+  {name:'Цюрих', en:'Zurich', code:'CH', emoji:'🇨🇭'},
+  {name:'Вена', en:'Vienna', code:'AT', emoji:'🇦🇹'},
+  {name:'Стокгольм', en:'Stockholm', code:'SE', emoji:'🇸🇪'},
+  {name:'Осло', en:'Oslo', code:'NO', emoji:'🇳🇴'},
+  {name:'Хельсинки', en:'Helsinki', code:'FI', emoji:'🇫🇮'},
+  {name:'Варшава', en:'Warsaw', code:'PL', emoji:'🇵🇱'},
+  {name:'Прага', en:'Prague', code:'CZ', emoji:'🇨🇿'},
+  {name:'Рига', en:'Riga', code:'LV', emoji:'🇱🇻'},
+  {name:'Вильнюс', en:'Vilnius', code:'LT', emoji:'🇱🇹'},
+  {name:'Таллин', en:'Tallinn', code:'EE', emoji:'🇪🇪'},
+  {name:'Бухарест', en:'Bucharest', code:'RO', emoji:'🇷🇴'},
+  {name:'София', en:'Sofia', code:'BG', emoji:'🇧🇬'},
+  {name:'Стамбул', en:'Istanbul', code:'TR', emoji:'🇹🇷'},
+  {name:'Дубай', en:'Dubai', code:'AE', emoji:'🇦🇪'},
+  {name:'Тель-Авив', en:'Tel Aviv', code:'IL', emoji:'🇮🇱'},
+  {name:'Нью-Йорк', en:'New York', code:'US', emoji:'🇺🇸'},
+  {name:'Лос-Анджелес', en:'Los Angeles', code:'US', emoji:'🇺🇸'},
+  {name:'Торонто', en:'Toronto', code:'CA', emoji:'🇨🇦'},
+  {name:'Сан-Паулу', en:'São Paulo', code:'BR', emoji:'🇧🇷'},
+  {name:'Сингапур', en:'Singapore', code:'SG', emoji:'🇸🇬'},
+  {name:'Токио', en:'Tokyo', code:'JP', emoji:'🇯🇵'},
+  {name:'Гонконг', en:'Hong Kong', code:'HK', emoji:'🇭🇰'},
+  {name:'Сидней', en:'Sydney', code:'AU', emoji:'🇦🇺'},
 ];
 
-function renderCitySelect(){
-  const sel = $('citySelect');
-  const keep = sel.value;
-  sel.innerHTML = '';
-  CITIES.forEach((c, i) => {
-    const o = document.createElement('option');
-    o.value = String(i);
-    o.textContent = c.flag + ' ' + (LANG === 'en' ? c.en : c.name);
-    sel.appendChild(o);
-  });
-  const custom = document.createElement('option');
-  custom.value = '__custom__';
-  custom.textContent = tr('custom_flag_name');
-  sel.appendChild(custom);
-  if([...sel.options].some(o => o.value === keep)) sel.value = keep;
+// pickedCity — индекс в CITIES, который сейчас выбран в форме (ещё до
+// сохранения), либо null для своего имени без флага.
+let pickedCity = null;
+
+function cityLabel(c){ return LANG === 'en' ? c.en : c.name; }
+
+function renderCityBtn(){
+  if(pickedCity === null){
+    $('cityBtnIcon').innerHTML = '<span class="vg">VG</span>';
+    $('cityBtnLabel').textContent = tr('custom_flag_name');
+  } else {
+    const c = CITIES[pickedCity];
+    $('cityBtnIcon').innerHTML = flagSVG(c.code);
+    $('cityBtnLabel').textContent = cityLabel(c);
+  }
 }
 
-// cityFor — city{name,en,flag} у профиля, если его флаг+имя совпадают с
-// одним из списка. Сравниваем и по русскому, и по английскому названию:
-// человек мог выбрать город при одном языке интерфейса, а открыть настройки
-// при другом.
+function closeCityMenu(){ closeMenu(); }
+$('cityBtn').onclick = ev => {
+  ev.stopPropagation();
+  if(menuEl){ closeMenu(); return; }
+  const r = $('cityBtn').getBoundingClientRect();
+  menuEl = document.createElement('div');
+  menuEl.className = 'menu cityMenu';
+  menuEl.style.left = r.left + 'px';
+  menuEl.style.top = (r.bottom + 4) + 'px';
+  menuEl.style.width = r.width + 'px';
+  CITIES.forEach((c, i) => {
+    const b = document.createElement('button');
+    b.className = 'flagrow';
+    b.innerHTML = flagSVG(c.code) + '<span></span>';
+    b.querySelector('span').textContent = cityLabel(c);
+    b.onclick = () => { closeCityMenu(); pickCity(i); };
+    menuEl.appendChild(b);
+  });
+  const customBtn = document.createElement('button');
+  customBtn.className = 'flagrow';
+  customBtn.innerHTML = '<span class="vg">VG</span><span></span>';
+  customBtn.querySelector('span').textContent = tr('custom_flag_name');
+  customBtn.onclick = () => { closeCityMenu(); pickCity(null); };
+  menuEl.appendChild(customBtn);
+  document.body.appendChild(menuEl);
+};
+
+function pickCity(index){
+  pickedCity = index;
+  formDirty = true;
+  renderCityBtn();
+  $('customCityName').hidden = index !== null;
+  if(index === null) $('customCityName').focus();
+  liveRetitleEditingTab();
+}
+$('customCityName').addEventListener('input', liveRetitleEditingTab);
+
+// cityFor — индекс в CITIES для профиля, если его код/эмодзи+имя совпадают
+// с одним из списка (эмодзи — для вкладок, сохранённых до перехода на свои
+// SVG-флаги). Сравниваем и по русскому, и по английскому названию: человек
+// мог выбрать город при одном языке интерфейса, а открыть настройки при
+// другом.
 function cityFor(p){
-  return CITIES.find(c => c.flag === p.flag && (c.name === p.name || c.en === p.name));
+  return CITIES.findIndex(c =>
+    (c.code === p.flag || c.emoji === p.flag) && (c.name === p.name || c.en === p.name));
 }
 
 function renderCityPicker(p){
-  const c = cityFor(p);
-  if(c){
-    $('citySelect').value = String(CITIES.indexOf(c));
-    $('customCityName').hidden = true;
-  } else {
-    $('citySelect').value = '__custom__';
-    $('customCityName').hidden = false;
-    $('customCityName').value = p.name || '';
-  }
+  const i = cityFor(p);
+  pickedCity = i >= 0 ? i : null;
+  renderCityBtn();
+  $('customCityName').hidden = pickedCity !== null;
+  $('customCityName').value = pickedCity === null ? (p.name || '') : '';
 }
-$('citySelect').addEventListener('change', () => {
-  const custom = $('citySelect').value === '__custom__';
-  $('customCityName').hidden = !custom;
-  if(custom) $('customCityName').focus();
-  liveRetitleEditingTab();
-});
-$('customCityName').addEventListener('input', liveRetitleEditingTab);
 
 // pickedNameFlag — {name, flag}, которые сейчас выбраны в форме, ещё до
 // сохранения. Нужны и для живой подписи вкладки, и для сборки профиля перед
-// отправкой на сервер.
+// отправкой на сервер. flag хранит код страны (например "NL"), не эмодзи.
 function pickedNameFlag(){
-  const sel = $('citySelect').value;
-  if(sel === '__custom__'){
+  if(pickedCity === null){
     return { name: ($('customCityName').value || '').trim() || currentProfile().name || 'Server', flag: '' };
   }
-  const c = CITIES[parseInt(sel, 10)];
-  return c ? { name: (LANG === 'en' ? c.en : c.name), flag: c.flag } : { name: currentProfile().name, flag: currentProfile().flag };
+  const c = CITIES[pickedCity];
+  return c ? { name: cityLabel(c), flag: c.code } : { name: currentProfile().name, flag: currentProfile().flag };
 }
+// resolveFlagCode — код страны для FLAGS. Профиль может хранить и эмодзи
+// (вкладки, заведённые до перехода на свои SVG-флаги) — тогда код ищем по
+// совпадающему городу; пусто, если флага нет вовсе (своё имя).
+function resolveFlagCode(flag){
+  if(!flag) return '';
+  if(FLAGS[flag]) return flag;
+  const c = CITIES.find(x => x.emoji === flag);
+  return c ? c.code : '';
+}
+
 function liveRetitleEditingTab(){
   const tab = document.querySelector('.tab[data-id="' + CSS.escape(editingProfileId || '') + '"]');
   if(!tab) return;
   const { name, flag } = pickedNameFlag();
   const nm = tab.querySelector('.nm');
   if(nm) nm.textContent = name;
-  // Флаг и логотип-заглушка — разные элементы (см. tabFlagHTML), поэтому при
-  // переключении между «есть флаг» и «своё имя» иконку пересоздаём, а не
-  // просто прячем: одно из двух в разметке вообще отсутствует.
-  const icon = tab.querySelector('.flag, .vg');
-  if(icon){
-    const next = document.createElement('span');
-    next.className = flag ? 'flag' : 'vg';
-    next.textContent = flag || 'VG';
-    icon.replaceWith(next);
-  }
+  const icon = tab.querySelector('.flagicon');
+  if(icon) icon.innerHTML = tabFlagHTML(flag);
 }
 
 /* ---------- вкладки серверов ---------- */
-function tabFlagHTML(p){
-  return p.flag ? '<span class="flag">' + p.flag + '</span>'
-                : '<span class="vg">VG</span>';
+// tabFlagHTML принимает код страны (или пусто — тогда логотип-заглушка).
+function tabFlagHTML(code){
+  return code ? flagSVG(code) : '<span class="vg">VG</span>';
 }
 
 function renderTabs(){
@@ -1644,7 +1779,8 @@ function renderTabs(){
     const b = document.createElement('button');
     b.className = 'tab' + (p.id === editingProfileId ? ' editing' : '');
     b.dataset.id = p.id;
-    b.innerHTML = tabFlagHTML(p) + '<span class="nm"></span>' +
+    b.innerHTML = '<span class="flagicon">' + tabFlagHTML(resolveFlagCode(p.flag)) + '</span>' +
+      '<span class="nm"></span>' +
       (p.id === cfg.activeProfile ? '<span class="dot" title="' + tr('current_server') + '"></span>' : '');
     b.querySelector('.nm').textContent = p.name;
     b.onclick = () => selectEditingTab(p.id);
@@ -1726,7 +1862,7 @@ function renderHomePicker(){
   $('homePicker').style.display = show ? 'flex' : 'none';
   if(!show) return;
   const active = (cfg.profiles || []).find(p => p.id === cfg.activeProfile) || {};
-  $('homePickerFlag').innerHTML = active.flag || '<span class="vg">VG</span>';
+  $('homePickerFlag').innerHTML = tabFlagHTML(resolveFlagCode(active.flag));
   $('homePickerName').textContent = active.name || '';
 }
 $('homePicker').onclick = ev => {
@@ -1739,7 +1875,9 @@ $('homePicker').onclick = ev => {
   menuEl.style.top = (r.bottom + 4) + 'px';
   (cfg.profiles || []).forEach(p => {
     const b = document.createElement('button');
-    b.textContent = (p.flag || 'VG') + '  ' + p.name;
+    b.className = 'flagrow';
+    b.innerHTML = tabFlagHTML(resolveFlagCode(p.flag)) + '<span></span>';
+    b.querySelector('span').textContent = p.name;
     b.onclick = async () => {
       closeMenu();
       const rr = await api('/api/profile/select', { id: p.id });
@@ -1847,7 +1985,7 @@ async function refresh(){
   }
 }
 
-renderCitySelect();
+renderCityBtn();
 connectEvents();
 refresh();
 setInterval(() => { if(!running) refresh(); }, 5000);
