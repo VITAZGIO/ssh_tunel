@@ -72,7 +72,16 @@ func main() {
 	if err != nil {
 		fatal("не могу открыть хранилище клиентов: %v", err)
 	}
-	clients := panel.NewClientManager(clientStore, panel.NewSystemProvisioner())
+	accountant := panel.NewNFTAccountant()
+	if err := accountant.EnsureTables(); err != nil {
+		// Не фатально: без nftables панель работает без цифр трафика (см.
+		// TrafficAccountant в internal/panel/nft.go).
+		log.Printf("учёт трафика недоступен: %v", err)
+	}
+	clients := panel.NewClientManager(clientStore, panel.NewSystemProvisioner()).
+		WithTraffic(accountant).
+		WithWarnf(func(format string, args ...any) { log.Printf(format, args...) })
+	go syncClientsLoop(clients, accountant)
 
 	srv := panel.NewServer(store, clients)
 	handler := srv.Handler()
@@ -149,6 +158,25 @@ func serveWithAutocert(handler http.Handler, domain, cacheDir string) error {
 		return fmt.Errorf("https-сервер: %w", err)
 	}
 	return nil
+}
+
+// syncClientsLoop обновляет счётчики трафика и число живых сессий клиентов
+// раз в syncInterval. Ошибки (нет nftables, /proc недоступен) пишутся в
+// журнал один раз за сбой и не останавливают цикл — список клиентов в этом
+// случае просто перестаёт обновлять соответствующие цифры, а не ломает
+// работу панели целиком (см. пакет internal/panel, TrafficAccountant).
+func syncClientsLoop(clients *panel.ClientManager, accountant panel.TrafficAccountant) {
+	const syncInterval = 15 * time.Second
+	tick := time.NewTicker(syncInterval)
+	defer tick.Stop()
+	for range tick.C {
+		if err := clients.SyncTraffic(accountant); err != nil {
+			log.Printf("не удалось обновить трафик клиентов: %v", err)
+		}
+		if err := clients.SyncOnline(panel.ProcRoot); err != nil {
+			log.Printf("не удалось обновить список подключённых клиентов: %v", err)
+		}
+	}
 }
 
 func defaultDataDir() string {

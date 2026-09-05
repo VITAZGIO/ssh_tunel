@@ -16,6 +16,8 @@ type fakeProvisioner struct {
 
 	groupEnsured    bool
 	users           map[string]string // username -> authorized_keys line
+	uids            map[string]int    // username -> поддельный uid
+	nextUID         int
 	killed          []string
 	deleted         []string
 	failCreateUser  string // если совпадает с username, CreateUser вернёт ошибку
@@ -23,7 +25,7 @@ type fakeProvisioner struct {
 }
 
 func newFakeProvisioner() *fakeProvisioner {
-	return &fakeProvisioner{users: map[string]string{}}
+	return &fakeProvisioner{users: map[string]string{}, uids: map[string]int{}, nextUID: 90000}
 }
 
 func (f *fakeProvisioner) EnsureGroup() error {
@@ -49,6 +51,8 @@ func (f *fakeProvisioner) CreateUser(username, pubKeyLine string) error {
 		return fmt.Errorf("пользователь %s уже существует", username)
 	}
 	f.users[username] = pubKeyLine
+	f.nextUID++
+	f.uids[username] = f.nextUID
 	return nil
 }
 
@@ -81,6 +85,16 @@ func (f *fakeProvisioner) ReadAuthorizedKeys(username string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.users[username], nil
+}
+
+func (f *fakeProvisioner) UID(username string) (int, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	uid, ok := f.uids[username]
+	if !ok {
+		return 0, fmt.Errorf("пользователь %s не найден", username)
+	}
+	return uid, nil
 }
 
 func (f *fakeProvisioner) hasUser(username string) bool {

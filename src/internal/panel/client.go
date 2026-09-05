@@ -72,6 +72,33 @@ type Client struct {
 	// не при самом создании клиента. Права на файл хранилища — 0600
 	// (см. NewClientStore), как и на файл пользователей панели.
 	PrivateKey string `json:"privateKey"`
+
+	// UID — числовой uid unix-пользователя, снятый один раз при создании.
+	// Нужен для правил учёта трафика (meta skuid, см. nft.go) и для поиска
+	// живых сессий в /proc (online.go) без похода к системе за именем на
+	// каждый обход — вызывающий код (ClientManager) и так уже знает Username,
+	// но повторный user.Lookup на каждый тик синхронизации был бы лишним
+	// системным вызовом там, где достаточно сравнить число.
+	UID int `json:"uid"`
+
+	// Traffic — учёт байт по nftables (ТЗ-09). LastRawRx/LastRawTx — то, что
+	// было прочитано из счётчика nft в последний раз: разница с новым
+	// значением идёт в RxBytes/TxBytes, а не само значение счётчика, чтобы
+	// пережить перезапуск nftables и обнуление счётчиков (см. AccumulateCounter
+	// в nft.go) — RxBytes/TxBytes только растут, даже когда nft посчитал
+	// заново с нуля.
+	RxBytes   uint64 `json:"rxBytes"`
+	TxBytes   uint64 `json:"txBytes"`
+	LastRawRx uint64 `json:"lastRawRx"`
+	LastRawTx uint64 `json:"lastRawTx"`
+
+	// Sessions и LastSeenAt — «кто сейчас на связи» (ТЗ-09): Sessions
+	// пересчитывается заново на каждом обходе /proc и не хранит историю сам
+	// по себе, а LastSeenAt обновляется, только когда Sessions только что
+	// стал больше нуля — это и есть «время последнего подключения», раз
+	// панель не читает системные логи авторизации.
+	Sessions   int       `json:"sessions"`
+	LastSeenAt time.Time `json:"lastSeenAt,omitempty"`
 }
 
 // ClientStore — клиенты панели одним JSON-файлом, рядом с users.json.

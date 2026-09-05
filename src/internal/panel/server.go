@@ -49,6 +49,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/clients", s.requireAuth(s.handleClients))
 	mux.HandleFunc("/api/clients/create", s.requireAuth(s.handleClientCreate))
 	mux.HandleFunc("/api/clients/delete", s.requireAuth(s.handleClientDelete))
+	mux.HandleFunc("/api/clients/freeze", s.requireAuth(s.handleClientFreeze))
+	mux.HandleFunc("/api/clients/unfreeze", s.requireAuth(s.handleClientUnfreeze))
+	mux.HandleFunc("/api/clients/disconnect", s.requireAuth(s.handleClientDisconnect))
 	return mux
 }
 
@@ -276,6 +279,45 @@ func (s *Server) handleClientDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.clients.DeleteClient(req.ID); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// handleClientFreeze вынимает ключ клиента из authorized_keys и обрывает
+// его живые сессии — заблокированный клиент не может подключиться заново
+// сам, в отличие от handleClientDisconnect.
+func (s *Server) handleClientFreeze(w http.ResponseWriter, r *http.Request) {
+	s.handleClientAction(w, r, s.clients.Freeze)
+}
+
+// handleClientUnfreeze возвращает ключ клиента в authorized_keys.
+func (s *Server) handleClientUnfreeze(w http.ResponseWriter, r *http.Request) {
+	s.handleClientAction(w, r, s.clients.Unfreeze)
+}
+
+// handleClientDisconnect обрывает живые сессии клиента, не трогая его
+// ключ — клиент может подключиться заново сам сразу же.
+func (s *Server) handleClientDisconnect(w http.ResponseWriter, r *http.Request) {
+	s.handleClientAction(w, r, s.clients.Disconnect)
+}
+
+// handleClientAction — общий каркас для ручек, которые принимают только id
+// клиента и не возвращают ничего, кроме успеха или ошибки.
+func (s *Server) handleClientAction(w http.ResponseWriter, r *http.Request, action func(id string) error) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad_request"})
+		return
+	}
+	if err := action(req.ID); err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}

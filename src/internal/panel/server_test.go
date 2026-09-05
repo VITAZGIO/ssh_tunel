@@ -249,3 +249,58 @@ func TestClientCreateRejectsBadDeviceType(t *testing.T) {
 		t.Fatalf("некорректный тип устройства должен отдавать 400, получил %d %v", rec.Code, body)
 	}
 }
+
+func TestClientFreezeUnfreezeDisconnect(t *testing.T) {
+	s, pass := newTestServer(t)
+	h := s.Handler()
+	cookies := loggedInCookies(t, h, pass)
+
+	rec, body := doJSON(t, h, http.MethodPost, "/api/clients/create",
+		map[string]string{"name": "Ноутбук", "deviceType": "linux"}, cookies)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("не удалось создать клиента: %d %v", rec.Code, body)
+	}
+	client := body["client"].(map[string]any)
+	id := client["id"].(string)
+
+	rec, body = doJSON(t, h, http.MethodPost, "/api/clients/freeze", map[string]string{"id": id}, cookies)
+	if rec.Code != http.StatusOK || body["ok"] != true {
+		t.Fatalf("заморозка должна пройти успешно, получил %d %v", rec.Code, body)
+	}
+
+	rec, body = doJSON(t, h, http.MethodGet, "/api/clients", nil, cookies)
+	list, _ := body["clients"].([]any)
+	if len(list) != 1 {
+		t.Fatalf("ожидал одного клиента, получил %d", len(list))
+	}
+	if state := list[0].(map[string]any)["state"]; state != "frozen" {
+		t.Fatalf("состояние в списке должно быть frozen, получил %v", state)
+	}
+
+	rec, body = doJSON(t, h, http.MethodPost, "/api/clients/unfreeze", map[string]string{"id": id}, cookies)
+	if rec.Code != http.StatusOK || body["ok"] != true {
+		t.Fatalf("разморозка должна пройти успешно, получил %d %v", rec.Code, body)
+	}
+
+	rec, body = doJSON(t, h, http.MethodPost, "/api/clients/disconnect", map[string]string{"id": id}, cookies)
+	if rec.Code != http.StatusOK || body["ok"] != true {
+		t.Fatalf("отключение должно пройти успешно, получил %d %v", rec.Code, body)
+	}
+
+	rec, body = doJSON(t, h, http.MethodGet, "/api/clients", nil, cookies)
+	list, _ = body["clients"].([]any)
+	if state := list[0].(map[string]any)["state"]; state != "active" {
+		t.Fatalf("после отключения состояние должно остаться active, получил %v", state)
+	}
+}
+
+func TestClientActionsRequireAuth(t *testing.T) {
+	s, _ := newTestServer(t)
+	h := s.Handler()
+	for _, path := range []string{"/api/clients/freeze", "/api/clients/unfreeze", "/api/clients/disconnect"} {
+		rec, _ := doJSON(t, h, http.MethodPost, path, map[string]string{"id": "tun_0000000000000000"}, nil)
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("%s без сессии должен отдавать 401, получил %d", path, rec.Code)
+		}
+	}
+}

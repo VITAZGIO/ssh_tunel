@@ -44,6 +44,11 @@ type Provisioner interface {
 	// ReadAuthorizedKeys читает текущее содержимое файла. Отсутствующий файл
 	// не ошибка — трактуется как пустой.
 	ReadAuthorizedKeys(username string) (string, error)
+	// UID отдаёт числовой uid пользователя — нужен, чтобы завести правило
+	// учёта трафика (nft.go, ТЗ-09: правила стоят на "meta skuid <uid>") и
+	// чтобы искать процессы клиента в /proc (online.go), не запрашивая его у
+	// системы на каждый обход /proc.
+	UID(username string) (int, error)
 }
 
 // systemProvisioner — настоящая реализация поверх useradd/usermod/userdel и
@@ -160,6 +165,21 @@ func (systemProvisioner) ReadAuthorizedKeys(username string) (string, error) {
 		return "", err
 	}
 	return string(data), nil
+}
+
+func (systemProvisioner) UID(username string) (int, error) {
+	if !ValidUsername(username) {
+		return 0, fmt.Errorf("некорректное имя пользователя: %q", username)
+	}
+	u, err := user.Lookup(username)
+	if err != nil {
+		return 0, err
+	}
+	uid, err := strconv.Atoi(u.Uid)
+	if err != nil {
+		return 0, fmt.Errorf("некорректный uid %q пользователя %s", u.Uid, username)
+	}
+	return uid, nil
 }
 
 func homeDir(username string) string { return filepath.Join("/home", username) }

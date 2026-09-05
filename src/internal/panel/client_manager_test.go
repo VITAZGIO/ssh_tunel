@@ -124,6 +124,213 @@ func TestDeleteUnknownClientIsNotAnError(t *testing.T) {
 	}
 }
 
+func TestFreezeRemovesKeyAndKillsSessions(t *testing.T) {
+	m, prov := newTestClientManager(t)
+	c, err := m.CreateClient("Ноутбук", DeviceLinux)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := m.Freeze(c.ID); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := m.store.Get(c.ID)
+	if got.State != StateFrozen {
+		t.Fatalf("состояние должно стать frozen, получил %q", got.State)
+	}
+	if HasClientKey(prov.users[c.Username], c.ID) {
+		t.Fatal("после заморозки ключа не должно быть в authorized_keys")
+	}
+	found := false
+	for _, k := range prov.killed {
+		if k == c.Username {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("заморозка должна оборвать сессии клиента")
+	}
+
+	// Повторная заморозка уже замороженного клиента — не ошибка и не
+	// повторное действие.
+	if err := m.Freeze(c.ID); err != nil {
+		t.Fatalf("повторная заморозка не должна быть ошибкой: %v", err)
+	}
+}
+
+func TestUnfreezeRestoresKey(t *testing.T) {
+	m, prov := newTestClientManager(t)
+	c, err := m.CreateClient("Ноутбук", DeviceLinux)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Freeze(c.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := m.Unfreeze(c.ID); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := m.store.Get(c.ID)
+	if got.State != StateActive {
+		t.Fatalf("состояние должно вернуться в active, получил %q", got.State)
+	}
+	if !HasClientKey(prov.users[c.Username], c.ID) {
+		t.Fatal("после разморозки ключ должен снова быть в authorized_keys")
+	}
+
+	// Повторная разморозка уже активного клиента — не ошибка.
+	if err := m.Unfreeze(c.ID); err != nil {
+		t.Fatalf("повторная разморозка не должна быть ошибкой: %v", err)
+	}
+}
+
+func TestDisconnectKillsSessionsWithoutTouchingKey(t *testing.T) {
+	m, prov := newTestClientManager(t)
+	c, err := m.CreateClient("Телефон", DeviceAndroid)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := m.Disconnect(c.ID); err != nil {
+		t.Fatal(err)
+	}
+	if !HasClientKey(prov.users[c.Username], c.ID) {
+		t.Fatal("отключение не должно трогать ключ клиента")
+	}
+	got, _ := m.store.Get(c.ID)
+	if got.State != StateActive {
+		t.Fatalf("отключение не должно менять состояние, получил %q", got.State)
+	}
+	found := false
+	for _, k := range prov.killed {
+		if k == c.Username {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("отключение должно оборвать сессии клиента")
+	}
+}
+
+func TestSyncTrafficAccumulatesAndSurvivesReadError(t *testing.T) {
+	dir := t.TempDir()
+	store, err := OpenClientStore(filepath.Join(dir, "clients.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	prov := newFakeProvisioner()
+	acc := newFakeAccountant()
+	m := NewClientManager(store, prov).WithTraffic(acc)
+
+	c, err := m.CreateClient("Ноутбук", DeviceLinux)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := acc.added[c.ID]; !ok {
+		t.Fatal("создание клиента должно завести правило учёта трафика")
+	}
+
+	acc.setCounter(c.ID, RawCounter{RxBytes: 1000, TxBytes: 500})
+	if err := m.SyncTraffic(acc); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := m.store.Get(c.ID)
+	if got.RxBytes != 1000 || got.TxBytes != 500 {
+		t.Fatalf("после первой синхронизации ожидал rx=1000 tx=500, получил rx=%d tx=%d",
+			got.RxBytes, got.TxBytes)
+	}
+
+	// nftables недоступен на этом тике — накопленные значения не должны
+	// обнулиться.
+	acc.failRead = true
+	if err := m.SyncTraffic(acc); err == nil {
+		t.Fatal("ожидал ошибку чтения счётчиков")
+	}
+	got, _ = m.store.Get(c.ID)
+	if got.RxBytes != 1000 || got.TxBytes != 500 {
+		t.Fatalf("накопленные значения не должны меняться при ошибке чтения: rx=%d tx=%d",
+			got.RxBytes, got.TxBytes)
+	}
+
+	acc.failRead = false
+	acc.setCounter(c.ID, RawCounter{RxBytes: 1500, TxBytes: 900})
+	if err := m.SyncTraffic(acc); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = m.store.Get(c.ID)
+	if got.RxBytes != 1500 || got.TxBytes != 900 {
+		t.Fatalf("после роста счётчика ожидал rx=1500 tx=900, получил rx=%d tx=%d",
+			got.RxBytes, got.TxBytes)
+	}
+}
+
+func TestDeleteClientRemovesTrafficRule(t *testing.T) {
+	dir := t.TempDir()
+	store, err := OpenClientStore(filepath.Join(dir, "clients.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	prov := newFakeProvisioner()
+	acc := newFakeAccountant()
+	m := NewClientManager(store, prov).WithTraffic(acc)
+
+	c, err := m.CreateClient("Ноутбук", DeviceLinux)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.DeleteClient(c.ID); err != nil {
+		t.Fatal(err)
+	}
+	if len(acc.removed) != 1 || acc.removed[0] != c.ID {
+		t.Fatalf("удаление клиента должно убрать его правило учёта трафика, получил %v", acc.removed)
+	}
+}
+
+func TestSyncOnlineTracksSessionsAndLastSeen(t *testing.T) {
+	m, prov := newTestClientManager(t)
+	c, err := m.CreateClient("Ноутбук", DeviceLinux)
+	if err != nil {
+		t.Fatal(err)
+	}
+	uid, err := prov.UID(c.Username)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	root := makeFakeProc(t, map[int]struct {
+		uid  int
+		comm string
+	}{500: {uid: uid, comm: "sshd"}})
+
+	if err := m.SyncOnline(root); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := m.store.Get(c.ID)
+	if got.Sessions != 1 {
+		t.Fatalf("ожидал 1 сессию, получил %d", got.Sessions)
+	}
+	if got.LastSeenAt.IsZero() {
+		t.Fatal("LastSeenAt должен обновиться при появлении сессии")
+	}
+	firstSeen := got.LastSeenAt
+
+	// Сессия пропала — Sessions должен обнулиться, а LastSeenAt остаться от
+	// последнего наблюдения.
+	emptyRoot := t.TempDir()
+	if err := m.SyncOnline(emptyRoot); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = m.store.Get(c.ID)
+	if got.Sessions != 0 {
+		t.Fatalf("ожидал 0 сессий, получил %d", got.Sessions)
+	}
+	if !got.LastSeenAt.Equal(firstSeen) {
+		t.Fatalf("LastSeenAt не должен меняться, пока клиент не в сети: было %v, стало %v",
+			firstSeen, got.LastSeenAt)
+	}
+}
+
 func TestListHidesPrivateKey(t *testing.T) {
 	m, _ := newTestClientManager(t)
 	if _, err := m.CreateClient("Ноутбук", DeviceWindows); err != nil {

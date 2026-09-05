@@ -29,8 +29,8 @@ func newLoginLimiter() *loginLimiter {
 // на отказ в обслуживании самому себе, а перебор паролей такая задержка и
 // так делает практически бесполезным.
 const (
-	baseDelay  = 500 * time.Millisecond
-	maxDelay   = 8 * time.Second
+	baseDelay = 500 * time.Millisecond
+	maxDelay  = 8 * time.Second
 	lockAfter = 8               // подряд неудач для блокировки
 	lockFor   = 5 * time.Minute // на сколько блокируется учётка
 )
