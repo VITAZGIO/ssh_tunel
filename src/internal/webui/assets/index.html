@@ -156,6 +156,13 @@
                 font-size:16px;line-height:1;padding:2px 4px}
   .appitem .del:hover{color:var(--err)}
   .empty{color:var(--dim);font-size:12.5px;padding:10px 2px}
+  /* Значок программы — картинка, если её удалось достать (только на
+     Windows), иначе буква первая буква имени на подложке того же размера. */
+  .appicon{position:relative;width:26px;height:26px;border-radius:7px;flex:none;
+           background:var(--card2);border:1px solid var(--line);
+           display:flex;align-items:center;justify-content:center;
+           font-size:11px;font-weight:700;color:var(--dim);overflow:hidden}
+  .appicon img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
 
   /* Подсказка «как получить ключ». */
   .lbl-row{display:flex;align-items:center;gap:6px;margin-bottom:3px}
@@ -428,15 +435,9 @@
           data-i18n="remove_server">Удалить сервер</button>
       </div>
 
-      <div class="rowbtns" style="margin-top:0">
+      <div class="rowbtns" style="margin-top:0;margin-bottom:14px">
         <button class="btn" id="exportBtn" data-i18n="export_server">Экспортировать сервер</button>
       </div>
-      <label class="chk" style="padding:4px 0 6px;border-top:none">
-        <input type="checkbox" id="exportIncludeKey" checked>
-        <span class="lbl" data-i18n="export_include_key">Включить приватный ключ в файл</span></label>
-      <p class="note" style="margin:-4px 0 12px" data-i18n="export_key_warn">С ключом внутри файл равносилен
-        паролю от сервера — передавай только тем, кому доверяешь, и удали после того, как человек импортирует
-        его. Без ключа файл несёт только адрес и настройки: доступ на сервере нужно будет выдать отдельно.</p>
 
     <div class="field"><label for="host" data-i18n="host_label">Адрес сервера</label>
       <input type="text" id="host" placeholder="адрес или домен сервера" spellcheck="false"
@@ -587,9 +588,7 @@
       <div id="bootBlock" hidden>
         <label class="chk"><input type="checkbox" id="bootStart">
           <span class="lbl" data-i18n="boot_start">Запускать при старте системы</span></label>
-        <p class="note" id="bootNote" style="margin-top:-2px" data-i18n="boot_note">Программа сама поставит
-          службу systemd и разрешит ей работать без входа в систему — служба будет
-          подниматься при загрузке машины.</p>
+        <p class="note" id="bootNote" style="margin-top:-2px"></p>
 
         <label class="chk"><input type="checkbox" id="autoConnect">
           <span class="lbl" data-i18n="connect_on_launch">Подключаться сразу при запуске</span></label>
@@ -655,6 +654,13 @@
       </div>
       <div class="applist" id="appList"></div>
       <button class="btn" id="addApp" style="width:100%" data-i18n="add_app">+  Добавить программу</button>
+
+      <div class="two" style="margin-top:8px">
+        <button class="btn" id="exportAppsBtn" data-i18n="export_apps">Экспортировать список</button>
+        <button class="btn" id="importAppsBtn" data-i18n="import_apps">Импортировать список</button>
+      </div>
+      <input type="file" id="importAppsFile" accept=".json,application/json" hidden>
+
       <div class="hint" style="margin-top:10px" data-i18n="apps_note">Программы, которые вообще не
         обращаются к прокси (часть игр, приложения со своим сетевым стеком),
         туннель не видит — они идут мимо в любом случае.</div>
@@ -738,7 +744,11 @@ const I18N = {
     verbose:'Подробный журнал', connect_on_launch:'Подключаться сразу при запуске',
     show_picker:'Показывать выбор сервера на главном экране',
     boot_start:'Запускать при старте системы',
-    boot_note:'Программа сама поставит службу systemd и разрешит ей работать без входа в систему — служба будет подниматься при загрузке машины.',
+    boot_note_linux:'Программа сама поставит службу systemd и разрешит ей работать без входа в систему — служба будет подниматься при загрузке машины.',
+    boot_note_windows:'Программа пропишет себя в автозагрузке Windows (для текущего пользователя, без прав администратора) — запустится сама при следующем входе в систему.',
+    boot_ready:'Включено: туннель поднимется сам при загрузке машины.',
+    boot_need_root:'Включено, но только после входа в систему — чтобы поднимался при загрузке, нужен пароль sudo.',
+    boot_configuring:'настраиваю…',
     autoconnect_note:'Туннель поднимется сам, как только программа стартует (сейчас или после перезагрузки) — жать «Подключить» в панели не придётся. Выключи, если хочешь запускать вручную.',
     save:'Сохранить', saved:'сохранено',
     apps_and_tunnel:'Программы и туннель',
@@ -751,14 +761,13 @@ const I18N = {
     pick_app:'Выбери программу', close:'Закрыть', search_app:'Поиск по имени или пути…',
     custom_flag_name:'Свой (без флага)',
     import_title:'Импортировать сервер из файла', import_short:'Импорт',
-    export_server:'Экспортировать сервер', export_include_key:'Включить приватный ключ в файл',
-    export_key_warn:'С ключом внутри файл равносилен паролю от сервера — передавай только тем, '+
-      'кому доверяешь, и удали после того, как человек импортирует его. Без ключа файл несёт только '+
-      'адрес и настройки: доступ на сервере нужно будет выдать отдельно.',
+    export_server:'Экспортировать сервер',
     import_ok_with_key:'сервер импортирован вместе с ключом — можно нажимать «Подключить»',
     import_ok_no_key:'сервер импортирован без ключа — укажи свой приватный ключ перед подключением',
     import_bad_file:'этот файл не похож на экспорт ssh_tunnel',
     exported:'файл сохранён',
+    export_apps:'Экспортировать список', import_apps:'Импортировать список',
+    apps_imported:'список программ импортирован',
   },
   en: {
     log:'Log', settings:'Settings', back:'Back', back_to_settings:'Back to settings',
@@ -783,7 +792,11 @@ const I18N = {
     verbose:'Verbose log', connect_on_launch:'Connect immediately on launch',
     show_picker:'Show server picker on the home screen',
     boot_start:'Start at system boot',
-    boot_note:'The program will install a systemd service itself and allow it to run without logging in — the service will come up at boot.',
+    boot_note_linux:'The program will install a systemd service itself and allow it to run without logging in — the service will come up at boot.',
+    boot_note_windows:'The program will add itself to Windows startup (for the current user, no administrator rights needed) — it will launch on the next login.',
+    boot_ready:'Enabled: the tunnel will come up on its own at boot.',
+    boot_need_root:'Enabled, but only after logging in — a sudo password is needed for it to come up at boot.',
+    boot_configuring:'configuring…',
     autoconnect_note:'The tunnel comes up on its own as soon as the program starts (now or after a reboot) — no need to press "Connect" in the panel. Turn it off if you\'d rather start it by hand.',
     save:'Save', saved:'saved',
     apps_and_tunnel:'Apps and tunnel',
@@ -796,14 +809,13 @@ const I18N = {
     pick_app:'Pick an app', close:'Close', search_app:'Search by name or path…',
     custom_flag_name:'Custom (no flag)',
     import_title:'Import a server from a file', import_short:'Import',
-    export_server:'Export server', export_include_key:'Include the private key in the file',
-    export_key_warn:'With the key inside, the file is as good as a password to the server — only share it '+
-      'with people you trust, and delete it once they\'ve imported it. Without the key, the file only '+
-      'carries the address and settings: access on the server side has to be granted separately.',
+    export_server:'Export server',
     import_ok_with_key:'server imported along with its key — you can hit "Connect"',
     import_ok_no_key:'server imported without a key — point it at your own private key before connecting',
     import_bad_file:'this file doesn\'t look like an ssh_tunnel export',
     exported:'file saved',
+    export_apps:'Export list', import_apps:'Import list',
+    apps_imported:'app list imported',
   },
 };
 function tr(key){ return (I18N[LANG] && I18N[LANG][key]) || (I18N.ru[key] || key); }
@@ -819,6 +831,7 @@ function applyI18n(){
   renderTabs();
   renderHomePicker();
   if(typeof setState === 'function') setState(lastState);
+  if(typeof renderBootState === 'function' && lastBootState) renderBootState(lastBootState);
 }
 $('language').addEventListener('change', () => {
   LANG = $('language').value === 'en' ? 'en' : 'ru';
@@ -874,14 +887,29 @@ function renderApps(){
   filterApps.forEach(name => {
     const row = document.createElement('div');
     row.className = 'appitem';
+
+    const icon = document.createElement('div');
+    icon.className = 'appicon';
+    icon.textContent = (name[0] || '?').toUpperCase();
+    const path = appPaths[name];
+    if(path){
+      // Значок достаётся только на Windows (там же, где вообще есть путь к
+      // файлу) — если запроса не будет или он не удастся, буква на подложке
+      // просто останется на месте, ничего не сломается.
+      const img = document.createElement('img');
+      img.src = '/api/appicon?path=' + encodeURIComponent(path) + '&t=' + encodeURIComponent(T);
+      img.onload = () => { icon.textContent = ''; icon.appendChild(img); };
+      img.onerror = () => {};
+    }
+
     const info = document.createElement('span');
     info.style.cssText = 'flex:1;min-width:0';
     const nm = document.createElement('div');
     nm.className = 'nm'; nm.textContent = name;
     info.appendChild(nm);
-    if(appPaths[name]){
+    if(path){
       const pt = document.createElement('div');
-      pt.className = 'pt'; pt.textContent = appPaths[name];
+      pt.className = 'pt'; pt.textContent = path;
       info.appendChild(pt);
     }
     const del = document.createElement('button');
@@ -891,10 +919,60 @@ function renderApps(){
       filterDirty = true;
       renderApps(); renderModes();
     };
-    row.appendChild(info); row.appendChild(del);
+    row.appendChild(icon); row.appendChild(info); row.appendChild(del);
     box.appendChild(row);
   });
 }
+
+/* ---------- экспорт и импорт списка программ ---------- */
+/* Тот же список, что редактируется на этом экране — независимо от того, к
+   какому серверу он привязан (правила фильтра свои у каждого профиля).
+   Пригодится и на Android, когда до него дойдут руки: формат простой и
+   ничего специфичного для Windows/Linux в нём нет. */
+$('exportAppsBtn').onclick = () => {
+  const doc = {
+    sshTunnelAppList: 1,
+    filterMode: filterMode,
+    apps: filterApps.map(n => ({ name: n, path: appPaths[n] || '' })),
+  };
+  const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'ssh_tunnel-apps.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+};
+
+$('importAppsBtn').onclick = () => $('importAppsFile').click();
+$('importAppsFile').addEventListener('change', async () => {
+  const file = $('importAppsFile').files[0];
+  $('importAppsFile').value = '';
+  if(!file) return;
+
+  let doc;
+  try {
+    doc = JSON.parse(await file.text());
+  } catch(e) {
+    $('filterNote').textContent = tr('import_bad_file');
+    return;
+  }
+  // Принимаем и наш формат {apps:[...]}, и просто голый массив — мало ли
+  // откуда файл, лишняя терпимость тут не мешает.
+  const list = Array.isArray(doc.apps) ? doc.apps : (Array.isArray(doc) ? doc : null);
+  if(!list){
+    $('filterNote').textContent = tr('import_bad_file');
+    return;
+  }
+  list.forEach(item => {
+    if(typeof item === 'string') addApp(item, '');
+    else if(item && item.name) addApp(item.name, item.path || '');
+  });
+  $('filterNote').textContent = tr('apps_imported');
+  setTimeout(() => $('filterNote').textContent = '', 4000);
+});
 
 function addApp(name, path){
   const n = normApp(name);
@@ -1386,23 +1464,27 @@ $('keyPath').addEventListener('input', () => {
 // Показываем состояние словами: «включено» само по себе ещё не значит, что
 // туннель поднимется до входа в систему — за это отвечает отдельная штука
 // (linger), и если её нет, честнее так и сказать.
+let lastBootState = null;
 function renderBootState(st){
+  if(st) lastBootState = st;
   if(!st || !st.supported){ $('bootBlock').hidden = true; return; }
   $('bootBlock').hidden = false;
   $('bootStart').checked = !!st.enabled;
+  $('bootNote').textContent = tr(isWindows() ? 'boot_note_windows' : 'boot_note_linux');
 
   if(!st.enabled){
     $('bootStatus').textContent = '';
-  } else if(st.linger){
-    $('bootStatus').textContent = 'Включено: туннель поднимется сам при загрузке машины.';
+  } else if(isWindows() || st.linger){
+    // На Windows отдельного понятия "linger" нет — запись в реестре и так
+    // срабатывает сама при следующем входе, без прав администратора.
+    $('bootStatus').textContent = tr('boot_ready');
   } else {
-    $('bootStatus').textContent = 'Включено, но только после входа в систему — '
-      + 'чтобы поднимался при загрузке, нужен пароль sudo.';
+    $('bootStatus').textContent = tr('boot_need_root');
   }
 }
 
 async function applyBoot(password){
-  $('bootStatus').textContent = 'настраиваю…';
+  $('bootStatus').textContent = tr('boot_configuring');
   const r = await api('/api/bootstart', {
     enabled: $('bootStart').checked,
     password: password || ''
@@ -1890,14 +1972,14 @@ $('removeServerBtn').onclick = async () => {
 };
 
 /* ---------- экспорт и импорт сервера файлом ---------- */
-/* Экспортируется тот сервер, что сейчас показан в форме (editingProfileId).
-   Несохранённые правки в файл не попадают — только то, что уже лежит на
-   диске, поэтому перед экспортом стоит сперва нажать «Сохранить». */
+/* Экспортируется тот сервер, что сейчас показан в форме (editingProfileId),
+   вместе с приватным ключом — файл готовится для передачи тому, кому уже
+   доверяешь (другу, знакомому), поэтому лишний вопрос «включать ли ключ»
+   только мешал бы. Несохранённые правки в файл не попадают — только то,
+   что уже лежит на диске, поэтому перед экспортом стоит сперва нажать
+   «Сохранить». */
 $('exportBtn').onclick = async () => {
-  const r = await api('/api/profile/export', {
-    id: editingProfileId,
-    includeKey: $('exportIncludeKey').checked,
-  });
+  const r = await api('/api/profile/export', { id: editingProfileId, includeKey: true });
   if(r.error){ showError(r.error, 'setError'); return; }
   const blob = new Blob([r.data], { type: 'application/json' });
   const url = URL.createObjectURL(blob);

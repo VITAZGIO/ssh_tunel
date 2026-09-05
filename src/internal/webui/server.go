@@ -168,6 +168,7 @@ func (s *Server) Serve() error {
 	mux.HandleFunc("/api/checkip", s.guard(s.handleCheckIP))
 	mux.HandleFunc("/api/speedtest", s.guard(s.handleSpeedTest))
 	mux.HandleFunc("/api/processes", s.guard(s.handleProcesses))
+	mux.HandleFunc("/api/appicon", s.guard(s.handleAppIcon))
 	mux.HandleFunc("/api/pickfile", s.guard(s.handlePickFile))
 	mux.HandleFunc("/api/openterminal", s.guard(s.handleOpenTerminal))
 	mux.HandleFunc("/api/genkey", s.guard(s.handleGenKey))
@@ -423,6 +424,22 @@ func (s *Server) handleSpeedTest(w http.ResponseWriter, r *http.Request) {
 // приложения для фильтра, как в диспетчере задач.
 func (s *Server) handleProcesses(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"processes": procinfo.List()})
+}
+
+// handleAppIcon отдаёт значок программы по пути к её файлу — только на
+// Windows, там же, где вообще есть список запущенных программ. Не нашли или
+// не вышло — обычный 404: страница на это место просто рисует заглушку,
+// без иконки, как было раньше.
+func (s *Server) handleAppIcon(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	data, err := procinfo.IconPNG(path)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "private, max-age=3600")
+	w.Write(data)
 }
 
 // handlePickFile показывает системный диалог выбора программы. Отмена — не
