@@ -56,6 +56,11 @@ type Server struct {
 	ln    net.Listener
 	// openLocal — пускать без токена тех, кто пришёл из локальной сети.
 	openLocal bool
+	// bootFlags — с какими флагами программа должна подняться при загрузке
+	// машины. Записываются в файл службы по галочке «Запускать при старте
+	// системы», чтобы после перезагрузки панель работала в том же режиме, а
+	// не в угаданном.
+	bootFlags []string
 }
 
 // App — то, что интерфейс умеет делать с программой.
@@ -78,7 +83,13 @@ func NewOn(a *App, addr string) (*Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("не могу занять адрес %s: %w", addr, err)
 	}
-	return &Server{app: a, token: hex.EncodeToString(tok), ln: ln}, nil
+	s := &Server{app: a, token: hex.EncodeToString(tok), ln: ln, bootFlags: []string{"-web"}}
+	// Порт 0 означает «любой свободный» — такой адрес в файл службы писать
+	// нечего, он всё равно будет другим при следующем запуске.
+	if !strings.HasSuffix(addr, ":0") {
+		s.bootFlags = append(s.bootFlags, "-web-listen", addr)
+	}
+	return s, nil
 }
 
 // NewOpenLocalOn — то же, но без ключа в адресе для гостей из локальной сети.
@@ -91,6 +102,7 @@ func NewOpenLocalOn(a *App, addr string) (*Server, error) {
 		return nil, err
 	}
 	s.openLocal = true
+	s.bootFlags = append([]string{"-web", "-web-lan"}, s.bootFlags[1:]...)
 	return s, nil
 }
 
@@ -154,6 +166,7 @@ func (s *Server) Serve() error {
 	mux.HandleFunc("/api/pickfile", s.guard(s.handlePickFile))
 	mux.HandleFunc("/api/openterminal", s.guard(s.handleOpenTerminal))
 	mux.HandleFunc("/api/genkey", s.guard(s.handleGenKey))
+	mux.HandleFunc("/api/bootstart", s.guard(s.handleBootStart))
 	mux.HandleFunc("/api/scannet", s.guard(s.handleScanNet))
 
 	srv := &http.Server{
@@ -405,6 +418,39 @@ func (s *Server) handleGenKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]any{"ok": true, "keyPath": path, "pubKey": pub, "created": created})
+}
+
+// handleBootStart — галочка «Запускать при старте системы». GET отдаёт, как
+// сейчас обстоят дела, POST включает или выключает. Пароль, если он вообще
+// понадобился, живёт ровно на время одной команды sudo: он не сохраняется, не
+// попадает в журнал и не возвращается обратно на страницу.
+func (s *Server) handleBootStart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, currentBootState())
+		return
+	}
+	var req struct {
+		Enabled  bool   `json:"enabled"`
+		Docker   bool   `json:"docker"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, map[string]any{"error": "не разобрал запрос: " + err.Error()})
+		return
+	}
+	err := applyBoot(req.Enabled, req.Docker, req.Password, s.bootFlags)
+	if errors.Is(err, errNeedRoot) {
+		// Служба к этому моменту уже включена — не хватает только права
+		// стартовать без входа в систему. Так и говорим, вместе с просьбой
+		// ввести пароль.
+		writeJSON(w, map[string]any{"needRoot": true, "state": currentBootState()})
+		return
+	}
+	if err != nil {
+		writeJSON(w, map[string]any{"error": err.Error(), "state": currentBootState()})
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true, "state": currentBootState()})
 }
 
 // handleEvents — поток событий в окно (Server-Sent Events). Проще вебсокетов

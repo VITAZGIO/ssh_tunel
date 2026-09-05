@@ -465,6 +465,29 @@
     <label class="chk"><input type="checkbox" id="verbose">
       <span class="lbl">Подробный журнал</span></label>
 
+    <div id="bootBlock" hidden>
+      <label class="chk"><input type="checkbox" id="bootStart">
+        <span class="lbl">Запускать при старте системы</span></label>
+      <p class="note" id="bootNote" style="margin-top:-2px">Программа сама поставит
+        службу systemd и разрешит ей работать без входа в систему — после
+        перезагрузки туннель поднимется сам.</p>
+
+      <label class="chk" id="bootDockerRow" hidden><input type="checkbox" id="bootDocker">
+        <span class="lbl">Заодно запускать Docker при старте системы</span></label>
+
+      <div id="sudoRow" hidden>
+        <p class="note" style="margin-bottom:4px">Этот шаг требует прав администратора.
+          Введи пароль sudo — он используется один раз и нигде не сохраняется.
+          Учти: до программы он идёт по локальной сети без шифрования.</p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="password" id="sudoPass" placeholder="пароль sudo" spellcheck="false"
+                 autocomplete="off" style="flex:1;min-width:180px">
+          <button class="btn" id="sudoApply" style="font-size:12.5px;padding:6px 12px">Применить</button>
+        </div>
+      </div>
+      <span class="hint" id="bootStatus" style="display:block;margin:4px 0 0"></span>
+    </div>
+
     <div style="display:flex;gap:9px;align-items:center;margin-top:14px">
       <button class="btn primary" id="save">Сохранить</button>
       <span class="hint" id="savedNote"></span>
@@ -1095,6 +1118,62 @@ $('keyPath').addEventListener('input', () => {
     if(!$('keyHelp').hidden) renderSetupCmd();
   }
 });
+
+/* ---------- автозапуск при старте системы ---------- */
+/* Галочка не из настроек: она не сохраняется в config.json, а прямо сейчас
+   ставит службу systemd и включает её. Поэтому и ведёт себя как действие —
+   срабатывает сразу, а не по кнопке «Сохранить». */
+
+// Показываем состояние словами: «включено» само по себе ещё не значит, что
+// туннель поднимется до входа в систему — за это отвечает отдельная штука
+// (linger), и если её нет, честнее так и сказать.
+function renderBootState(st){
+  if(!st || !st.supported){ $('bootBlock').hidden = true; return; }
+  $('bootBlock').hidden = false;
+  $('bootStart').checked = !!st.enabled;
+  $('bootDockerRow').hidden = !st.dockerFound;
+  $('bootDocker').checked = !!st.dockerEnabled;
+
+  if(!st.enabled){
+    $('bootStatus').textContent = '';
+  } else if(st.linger){
+    $('bootStatus').textContent = 'Включено: туннель поднимется сам при загрузке машины.';
+  } else {
+    $('bootStatus').textContent = 'Включено, но только после входа в систему — '
+      + 'чтобы поднимался при загрузке, нужен пароль sudo.';
+  }
+}
+
+async function applyBoot(password){
+  $('bootStatus').textContent = 'настраиваю…';
+  const r = await api('/api/bootstart', {
+    enabled: $('bootStart').checked,
+    docker: $('bootDocker').checked,
+    password: password || ''
+  });
+  if(r.state) renderBootState(r.state);
+  if(r.needRoot){
+    $('sudoRow').hidden = false;
+    $('sudoPass').focus();
+    $('bootStatus').textContent = 'Нужен пароль sudo — служба включена, но пока '
+      + 'стартует только после входа в систему.';
+    return;
+  }
+  $('sudoRow').hidden = true;
+  $('sudoPass').value = '';
+  if(r.error){ $('bootStatus').textContent = r.error; return; }
+}
+
+$('bootStart').onchange = () => applyBoot('');
+$('bootDocker').onchange = () => applyBoot('');
+$('sudoApply').onclick = () => {
+  const pass = $('sudoPass').value;
+  $('sudoPass').value = '';
+  applyBoot(pass);
+};
+$('sudoPass').addEventListener('keydown', e => { if(e.key === 'Enter') $('sudoApply').click(); });
+
+api('/api/bootstart').then(renderBootState);
 
 $('manualToggle').onclick = () => {
   const show = $('manualSteps').hidden;

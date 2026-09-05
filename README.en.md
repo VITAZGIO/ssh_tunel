@@ -24,6 +24,7 @@ standard SSH mechanism.
 | **Windows** | [**ssh_tunnel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe) | window with a button, tray icon |
 | **Linux** | [**ssh_tunnel_linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux) | console + web interface, systemd service |
 | **Android** | [**ssh_tunnel.apk**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.apk) | VPN connection, quick-settings tile |
+| **VPS server** | [**First-time setup**](docs/SERVER_SETUP.md) | what to do on a fresh server: the `tunnel` user, keys, firewall |
 
 The ARM build and the checksums are on the
 [release page](https://github.com/VITAZGIO/ssh_tunel/releases/latest).
@@ -143,7 +144,9 @@ command: `GOOS=windows go build -o ssh_tunnel_cli.exe ./cmd/ssh_tunnel_cli`.
 
 ## Linux
 
-For servers and workstations, amd64 and arm64.
+For servers and workstations, amd64 and arm64. The binary is built statically:
+it needs no libraries and no particular glibc version — it runs the same on
+Debian, Fedora, Arch, and even on Alpine with musl.
 
 ```bash
 # download and make executable
@@ -162,6 +165,199 @@ chmod +x ssh_tunnel_linux
 # ...or with the panel open to your home network
 ./ssh_tunnel_linux -web -web-lan
 ```
+
+### Commands for your distribution
+
+The program itself is identical everywhere — what differs is how you install
+`curl`, how you open a port in the firewall, and how a service is set up. Open
+your system:
+
+<details>
+<summary><b>Ubuntu · Debian · Linux Mint · Raspberry Pi OS</b></summary>
+
+```bash
+sudo apt update && sudo apt install -y curl
+
+curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
+chmod +x ssh_tunnel_linux
+sudo install -m 755 ssh_tunnel_linux /usr/local/bin/ssh_tunnel_linux
+
+ssh_tunnel_linux -host YOUR_SERVER -user tunnel -save
+ssh_tunnel_linux -web -web-lan
+```
+
+The panel opens at `http://MACHINE_ADDRESS:47821`. If ufw is on, let only your
+home network in:
+
+```bash
+sudo ufw allow from 192.168.0.0/16 to any port 47821 proto tcp
+```
+
+Autostart — the "Start at system boot" checkbox in the panel itself.
+
+On a Raspberry Pi and other ARM machines the file is named
+`ssh_tunnel_linux_arm64`.
+</details>
+
+<details>
+<summary><b>Proxmox VE</b></summary>
+
+Proxmox is Debian, but you normally work there as `root` and with no user
+session. So the service goes in as a **system** one rather than a user one, and
+the autostart checkbox in the panel will not help here — it targets
+`systemctl --user`.
+
+```bash
+apt update && apt install -y curl
+
+curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
+chmod +x ssh_tunnel_linux
+install -m 755 ssh_tunnel_linux /usr/local/bin/ssh_tunnel_linux
+
+ssh_tunnel_linux -host YOUR_SERVER -user root -save
+```
+
+The system service (starts at host boot, before any login):
+
+```bash
+tee /etc/systemd/system/ssh_tunnel.service >/dev/null <<'EOF'
+[Unit]
+Description=ssh_tunnel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/ssh_tunnel_linux -web -web-lan
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable --now ssh_tunnel
+```
+
+Settings then live in `/root/.config/ssh_tunnel/`. If the Proxmox firewall is on
+(Datacenter → Firewall), port `47821` has to be allowed there, in the Proxmox web
+UI — `ufw` plays no part in it.
+</details>
+
+<details>
+<summary><b>Fedora · RHEL · CentOS Stream · Rocky · AlmaLinux</b></summary>
+
+```bash
+sudo dnf install -y curl
+
+curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
+chmod +x ssh_tunnel_linux
+sudo install -m 755 ssh_tunnel_linux /usr/local/bin/ssh_tunnel_linux
+
+ssh_tunnel_linux -host YOUR_SERVER -user tunnel -save
+ssh_tunnel_linux -web -web-lan
+```
+
+The firewall here is `firewalld`, not `ufw`:
+
+```bash
+sudo firewall-cmd --permanent --add-port=47821/tcp
+sudo firewall-cmd --reload
+```
+
+SELinux does not get in the way: the program touches neither system directories
+nor other people's ports — everything of its own stays in the user's home.
+</details>
+
+<details>
+<summary><b>Arch · Manjaro · EndeavourOS</b></summary>
+
+```bash
+sudo pacman -S --needed curl
+
+curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
+chmod +x ssh_tunnel_linux
+sudo install -m 755 ssh_tunnel_linux /usr/local/bin/ssh_tunnel_linux
+
+ssh_tunnel_linux -host YOUR_SERVER -user tunnel -save
+ssh_tunnel_linux -web -web-lan
+```
+
+There is no firewall by default at all — if you installed one, open port `47821`
+there. Everything else is as on Ubuntu, same systemd.
+</details>
+
+<details>
+<summary><b>openSUSE</b></summary>
+
+```bash
+sudo zypper install -y curl
+
+curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
+chmod +x ssh_tunnel_linux
+sudo install -m 755 ssh_tunnel_linux /usr/local/bin/ssh_tunnel_linux
+
+ssh_tunnel_linux -host YOUR_SERVER -user tunnel -save
+ssh_tunnel_linux -web -web-lan
+```
+
+The port is opened through `firewalld`, as on Fedora:
+
+```bash
+sudo firewall-cmd --permanent --add-port=47821/tcp && sudo firewall-cmd --reload
+```
+</details>
+
+<details>
+<summary><b>Alpine Linux</b></summary>
+
+The one system on this list with **no systemd** — it runs OpenRC. The program
+works fine (the binary is static, musl is no obstacle), but autostart is set up
+differently, and the checkbox in the panel will not do it.
+
+```sh
+apk add curl
+
+curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
+chmod +x ssh_tunnel_linux
+install -m 755 ssh_tunnel_linux /usr/local/bin/ssh_tunnel_linux
+
+ssh_tunnel_linux -host YOUR_SERVER -user tunnel -save
+```
+
+The OpenRC service:
+
+```sh
+cat > /etc/init.d/ssh_tunnel <<'EOF'
+#!/sbin/openrc-run
+command="/usr/local/bin/ssh_tunnel_linux"
+command_args="-web -web-lan"
+command_background=true
+pidfile="/run/ssh_tunnel.pid"
+depend() { need net; }
+EOF
+
+chmod +x /etc/init.d/ssh_tunnel
+rc-update add ssh_tunnel default
+rc-service ssh_tunnel start
+```
+</details>
+
+### Starting at boot
+
+At the bottom of the settings there is a **"Start at system boot"** checkbox.
+The program writes the systemd unit itself, enables it, and allows it to run
+without the user logging in. That last part needs administrator rights: if the
+system asks for a password, a field for it appears right there — the password is
+used once and stored nowhere.
+
+Next to it, if Docker is found on the machine, a second checkbox appears — turn
+on autostart for Docker too, so that after a reboot the containers and the
+tunnel come up together.
+
+This works anywhere systemd is present. The exceptions are Proxmox under `root`
+and Alpine: there the service is set up by hand, with the commands above.
 
 The web interface is the very same one the Windows build shows in its window,
 served on the fixed port `47821`. The port is deliberately unusual so it does not
