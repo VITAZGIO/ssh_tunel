@@ -12,15 +12,6 @@ import (
 //go:embed assets/*
 var assets embed.FS
 
-// Client — заготовка на будущее: подключённый к серверу клиент. Само
-// подключение клиентов и обмен данными с ними — отдельная задача; пока
-// панель только показывает, что список есть и он пуст.
-type Client struct {
-	ID     string `json:"id"`
-	Name   string `json:"name"`
-	Online bool   `json:"online"`
-}
-
 // Server — веб-панель управления сервером. В отличие от internal/webui она
 // не полагается на то, что до неё дотянется только владелец машины: доступ
 // разрешает только сессия, полученная логином и паролем.
@@ -28,17 +19,19 @@ type Server struct {
 	store    *Store
 	sessions *sessionManager
 	limiter  *loginLimiter
+	clients  *ClientManager
 
 	// startedAt — с какого момента считать время работы панели на экране
 	// статуса.
 	startedAt time.Time
 }
 
-func NewServer(store *Store) *Server {
+func NewServer(store *Store, clients *ClientManager) *Server {
 	return &Server{
 		store:     store,
 		sessions:  newSessionManager(),
 		limiter:   newLoginLimiter(),
+		clients:   clients,
 		startedAt: time.Now(),
 	}
 }
@@ -54,6 +47,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/change-password", s.handleChangePassword)
 	mux.HandleFunc("/api/status", s.requireAuth(s.handleStatus))
 	mux.HandleFunc("/api/clients", s.requireAuth(s.handleClients))
+	mux.HandleFunc("/api/clients/create", s.requireAuth(s.handleClientCreate))
+	mux.HandleFunc("/api/clients/delete", s.requireAuth(s.handleClientDelete))
 	return mux
 }
 
@@ -231,10 +226,60 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleClients пока всегда отдаёт пустой список — подключение клиентов и
-// работа с ними будет отдельной задачей поверх этого каркаса.
+// handleClients отдаёт список клиентов без приватных ключей — их видно
+// только по отдельной ручке для конкретного клиента (ТЗ-10).
 func (s *Server) handleClients(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"clients": []Client{}})
+	list := s.clients.List()
+	if list == nil {
+		list = []Client{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"clients": list})
+}
+
+// handleClientCreate заводит нового клиента: unix-пользователя, пару
+// ключей, запись в authorized_keys — по одной кнопке в панели, без
+// консоли. Приватный ключ в ответе присутствует только здесь, сразу при
+// создании; дальше он виден лишь по отдельному запросу конкретного клиента.
+func (s *Server) handleClientCreate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Name       string `json:"name"`
+		DeviceType string `json:"deviceType"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad_request"})
+		return
+	}
+	c, err := s.clients.CreateClient(req.Name, DeviceType(req.DeviceType))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "client": c})
+}
+
+// handleClientDelete убирает unix-пользователя вместе с домашним каталогом,
+// обрывает его живые сессии и стирает запись в хранилище панели.
+func (s *Server) handleClientDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad_request"})
+		return
+	}
+	if err := s.clients.DeleteClient(req.ID); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {

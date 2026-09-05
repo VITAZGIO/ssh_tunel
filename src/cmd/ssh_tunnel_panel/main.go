@@ -1,8 +1,8 @@
 // ssh_tunnel_panel — веб-панель, которая ставится НА сам VPS (а не на
 // компьютер клиента, как internal/webui) и управляет подключёнными к нему
-// клиентами. Сейчас — только каркас: вход по логину и паролю, состояние
-// сервера и пустой список клиентов. Подключение самих клиентов и работа с
-// ними — отдельная задача поверх этого каркаса.
+// клиентами. Панель заводит и удаляет клиентов сама (unix-пользователь,
+// пара ключей, ограниченная запись в authorized_keys — см.
+// internal/panel/client_manager.go): консоль на сервере для этого не нужна.
 //
 // Панель смотрит в интернет, поэтому:
 //   - слушает постоянный порт (по умолчанию 47823), на который можно повесить
@@ -65,7 +65,16 @@ func main() {
 		}
 	}
 
-	srv := panel.NewServer(store)
+	if err := panel.EnsureSSHDRestrictions(); err != nil {
+		fatal("не могу подготовить ограничения sshd для клиентов панели: %v", err)
+	}
+	clientStore, err := panel.OpenClientStore(filepath.Join(*dataDir, "clients.json"))
+	if err != nil {
+		fatal("не могу открыть хранилище клиентов: %v", err)
+	}
+	clients := panel.NewClientManager(clientStore, panel.NewSystemProvisioner())
+
+	srv := panel.NewServer(store, clients)
 	handler := srv.Handler()
 
 	if *domain != "" {

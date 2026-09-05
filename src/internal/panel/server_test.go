@@ -19,7 +19,12 @@ func newTestServer(t *testing.T) (*Server, string) {
 	if err := store.CreateWithPassword("admin", "onetimepass", true); err != nil {
 		t.Fatal(err)
 	}
-	return NewServer(store), "onetimepass"
+	clientStore, err := OpenClientStore(filepath.Join(dir, "clients.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	clients := NewClientManager(clientStore, newFakeProvisioner())
+	return NewServer(store, clients), "onetimepass"
 }
 
 func doJSON(t *testing.T, h http.Handler, method, path string, body any, cookies []*http.Cookie) (*httptest.ResponseRecorder, map[string]any) {
@@ -156,5 +161,91 @@ func TestLoginLockoutAfterRepeatedFailures(t *testing.T) {
 		map[string]string{"username": "admin", "password": "wrong"}, nil)
 	if rec.Code != http.StatusTooManyRequests || body["error"] != "locked" {
 		t.Fatalf("ожидал блокировку после %d неудач, получил %d %v", lockAfter, rec.Code, body)
+	}
+}
+
+// loggedInCookies логинится и сразу меняет одноразовый пароль — большинству
+// тестов клиентской ручки сама смена пароля не важна, а без неё requireAuth
+// не пускает дальше logout/change-password.
+func loggedInCookies(t *testing.T, h http.Handler, pass string) []*http.Cookie {
+	t.Helper()
+	rec, _ := doJSON(t, h, http.MethodPost, "/api/login",
+		map[string]string{"username": "admin", "password": pass}, nil)
+	cookies := rec.Result().Cookies()
+	rec, body := doJSON(t, h, http.MethodPost, "/api/change-password",
+		map[string]string{"currentPassword": pass, "newPassword": "brandnewpass1"}, cookies)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("не удалось сменить одноразовый пароль в тестовой обвязке: %d %v", rec.Code, body)
+	}
+	return cookies
+}
+
+func TestClientCreateListDelete(t *testing.T) {
+	s, pass := newTestServer(t)
+	h := s.Handler()
+	cookies := loggedInCookies(t, h, pass)
+
+	rec, body := doJSON(t, h, http.MethodPost, "/api/clients/create",
+		map[string]string{"name": "Ноутбук", "deviceType": "linux"}, cookies)
+	if rec.Code != http.StatusOK || body["ok"] != true {
+		t.Fatalf("ожидал успешное создание клиента, получил %d %v", rec.Code, body)
+	}
+	client, _ := body["client"].(map[string]any)
+	if client == nil {
+		t.Fatalf("ответ должен содержать клиента: %v", body)
+	}
+	id, _ := client["id"].(string)
+	if id == "" {
+		t.Fatal("у созданного клиента должен быть id")
+	}
+	if client["privateKey"] == nil || client["privateKey"] == "" {
+		t.Fatal("ответ на создание должен содержать приватный ключ")
+	}
+
+	rec, body = doJSON(t, h, http.MethodGet, "/api/clients", nil, cookies)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("ожидал 200 от списка клиентов, получил %d", rec.Code)
+	}
+	list, _ := body["clients"].([]any)
+	if len(list) != 1 {
+		t.Fatalf("ожидал одного клиента в списке, получил %d: %v", len(list), list)
+	}
+	first, _ := list[0].(map[string]any)
+	if first["privateKey"] != nil && first["privateKey"] != "" {
+		t.Fatal("список клиентов не должен содержать приватный ключ")
+	}
+
+	rec, body = doJSON(t, h, http.MethodPost, "/api/clients/delete",
+		map[string]string{"id": id}, cookies)
+	if rec.Code != http.StatusOK || body["ok"] != true {
+		t.Fatalf("ожидал успешное удаление клиента, получил %d %v", rec.Code, body)
+	}
+
+	rec, body = doJSON(t, h, http.MethodGet, "/api/clients", nil, cookies)
+	list, _ = body["clients"].([]any)
+	if len(list) != 0 {
+		t.Fatalf("после удаления список клиентов должен быть пуст, получил %v", list)
+	}
+}
+
+func TestClientCreateRequiresAuth(t *testing.T) {
+	s, _ := newTestServer(t)
+	h := s.Handler()
+	rec, _ := doJSON(t, h, http.MethodPost, "/api/clients/create",
+		map[string]string{"name": "Ноутбук", "deviceType": "linux"}, nil)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("без сессии ожидал 401, получил %d", rec.Code)
+	}
+}
+
+func TestClientCreateRejectsBadDeviceType(t *testing.T) {
+	s, pass := newTestServer(t)
+	h := s.Handler()
+	cookies := loggedInCookies(t, h, pass)
+
+	rec, body := doJSON(t, h, http.MethodPost, "/api/clients/create",
+		map[string]string{"name": "Штука", "deviceType": "amiga"}, cookies)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("некорректный тип устройства должен отдавать 400, получил %d %v", rec.Code, body)
 	}
 }

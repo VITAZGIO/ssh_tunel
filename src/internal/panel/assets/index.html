@@ -63,6 +63,15 @@
 
   .empty{text-align:center;color:var(--dim);padding:26px 10px;font-size:13px}
 
+  .client-row{display:flex;align-items:center;gap:10px;padding:10px 0;
+              border-bottom:1px solid var(--line)}
+  .client-row:last-child{border-bottom:none}
+  .client-row .info{flex:1;min-width:0}
+  .client-row .name{font-weight:600;font-size:13.5px;overflow:hidden;
+                     text-overflow:ellipsis;white-space:nowrap}
+  .client-row .meta{font-size:11.5px;color:var(--dim);margin-top:2px}
+  .client-row button.small{width:auto;padding:6px 10px;font-size:12px}
+
   [hidden]{display:none!important}
 </style>
 </head>
@@ -131,9 +140,46 @@
 
     <div class="card">
       <h1 data-i18n="clients_title">Подключённые клиенты</h1>
-      <p class="note" data-i18n="clients_note">Управление клиентами появится отдельно —
-        пока список всегда пуст.</p>
+      <p class="note" data-i18n="clients_note">У каждого клиента свой ключ и своя
+        системная учётная запись — заводится и удаляется прямо здесь, без консоли.</p>
+      <div id="clientsMsg"></div>
       <div id="clientsList" class="empty" data-i18n="clients_empty">Клиентов пока нет</div>
+      <button class="btn" id="addClientBtn" style="margin-top:12px" data-i18n="add_client">+ Добавить клиента</button>
+    </div>
+
+    <!-- ---------- добавление клиента ---------- -->
+    <div class="card" id="addClientForm" hidden>
+      <h1 data-i18n="add_client_title">Новый клиент</h1>
+      <div id="addClientMsg"></div>
+      <div class="field">
+        <label for="newClientName" data-i18n="client_name_label">Имя устройства</label>
+        <input type="text" id="newClientName" placeholder="Ноутбук, Телефон…">
+      </div>
+      <div class="field">
+        <label for="newClientType" data-i18n="client_type_label">Тип устройства</label>
+        <select id="newClientType" style="width:100%">
+          <option value="windows">Windows</option>
+          <option value="linux">Linux</option>
+          <option value="android">Android</option>
+        </select>
+      </div>
+      <button class="btn" id="createClientBtn" data-i18n="create_client">Создать</button>
+      <button class="btn ghost" id="cancelClientBtn" style="margin-top:8px" data-i18n="cancel">Отмена</button>
+    </div>
+
+    <!-- ---------- приватный ключ нового клиента ---------- -->
+    <div class="card" id="newClientKeyCard" hidden>
+      <h1 data-i18n="client_key_title">Ключ клиента готов</h1>
+      <p class="note" data-i18n="client_key_note">Это единственный раз, когда панель
+        показывает приватный ключ сам, без нажатия «Показать настройки» в списке.
+        Сохрани его сейчас — он понадобится, чтобы подключить устройство.</p>
+      <div class="field">
+        <label data-i18n="private_key_label">Приватный ключ</label>
+        <textarea id="newClientKeyText" readonly rows="6"
+          style="width:100%;font-family:var(--mono);font-size:11.5px;background:var(--card2);
+                 border:1px solid var(--line);border-radius:8px;padding:8px;resize:vertical"></textarea>
+      </div>
+      <button class="btn ghost" id="closeClientKeyBtn" data-i18n="close">Закрыть</button>
     </div>
 
     <div class="card">
@@ -181,8 +227,21 @@ const I18N = {
     server_status:'Состояние сервера', status_label:'Статус', running:'работает',
     os_label:'Система', uptime_label:'Время работы', version_label:'Версия панели',
     clients_title:'Подключённые клиенты',
-    clients_note:'Управление клиентами появится отдельно — пока список всегда пуст.',
+    clients_note:'У каждого клиента свой ключ и своя системная учётная запись — '+
+      'заводится и удаляется прямо здесь, без консоли.',
     clients_empty:'Клиентов пока нет',
+    add_client:'+ Добавить клиента', add_client_title:'Новый клиент',
+    client_name_label:'Имя устройства', client_type_label:'Тип устройства',
+    create_client:'Создать', cancel:'Отмена', close:'Закрыть',
+    client_key_title:'Ключ клиента готов',
+    client_key_note:'Это единственный раз, когда панель показывает приватный ключ сам, '+
+      'без нажатия «Показать настройки» в списке. Сохрани его сейчас — он понадобится, '+
+      'чтобы подключить устройство.',
+    private_key_label:'Приватный ключ',
+    delete_client:'Удалить', confirm_delete_client:'Удалить этого клиента? '+
+      'Его ключ перестанет работать, системная учётная запись будет стёрта.',
+    created_on:'создан',
+    device_windows:'Windows', device_linux:'Linux', device_android:'Android',
     account_title:'Учётная запись', sign_out:'Выйти',
     err_bad_credentials:'Неверный логин или пароль',
     err_locked:'Слишком много попыток — подожди {s} с.',
@@ -202,8 +261,21 @@ const I18N = {
     server_status:'Server status', status_label:'Status', running:'running',
     os_label:'OS', uptime_label:'Uptime', version_label:'Panel version',
     clients_title:'Connected clients',
-    clients_note:'Client management is a separate task — the list is always empty for now.',
+    clients_note:'Every client gets its own key and its own system account — '+
+      'created and removed right here, no console needed.',
     clients_empty:'No clients yet',
+    add_client:'+ Add client', add_client_title:'New client',
+    client_name_label:'Device name', client_type_label:'Device type',
+    create_client:'Create', cancel:'Cancel', close:'Close',
+    client_key_title:'Client key ready',
+    client_key_note:'This is the only time the panel shows the private key on its own, '+
+      'without pressing "Show settings" in the list. Save it now — you\'ll need it to '+
+      'connect the device.',
+    private_key_label:'Private key',
+    delete_client:'Delete', confirm_delete_client:'Delete this client? '+
+      'Its key will stop working and the system account will be erased.',
+    created_on:'created',
+    device_windows:'Windows', device_linux:'Linux', device_android:'Android',
     account_title:'Account', sign_out:'Sign out',
     err_bad_credentials:'Wrong username or password',
     err_locked:'Too many attempts — wait {s}s.',
@@ -250,6 +322,7 @@ async function loadSession(){
   if (data.mustChange){ showView('MustChange'); return; }
   showView('Main');
   loadStatus();
+  loadClients();
 }
 
 async function loadStatus(){
@@ -259,6 +332,86 @@ async function loadStatus(){
   $('stUptime').textContent = fmtUptime(data.uptimeSeconds);
   $('stVersion').textContent = data.version;
 }
+
+/* ---------- клиенты ---------- */
+function fmtDate(iso){
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  return d.toLocaleDateString(LANG === 'ru' ? 'ru-RU' : 'en-US');
+}
+
+function renderClients(list){
+  const el = $('clientsList');
+  if (!list || list.length === 0){
+    el.className = 'empty';
+    el.textContent = t('clients_empty');
+    return;
+  }
+  el.className = '';
+  el.innerHTML = '';
+  list.forEach(c => {
+    const row = document.createElement('div');
+    row.className = 'client-row';
+    const info = document.createElement('div');
+    info.className = 'info';
+    const name = document.createElement('div');
+    name.className = 'name';
+    name.textContent = c.name;
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = t('device_' + c.deviceType) + ' · ' + t('created_on') + ' ' + fmtDate(c.createdAt);
+    info.appendChild(name); info.appendChild(meta);
+    const del = document.createElement('button');
+    del.className = 'btn danger small';
+    del.textContent = t('delete_client');
+    del.addEventListener('click', () => deleteClient(c.id));
+    row.appendChild(info); row.appendChild(del);
+    el.appendChild(row);
+  });
+}
+
+async function loadClients(){
+  const {ok, data} = await api('/api/clients');
+  if (!ok) return;
+  renderClients(data.clients);
+}
+
+async function deleteClient(id){
+  if (!confirm(t('confirm_delete_client'))) return;
+  showMsg($('clientsMsg'), '', '');
+  const {ok, data} = await api('/api/clients/delete', {id});
+  if (!ok){ showMsg($('clientsMsg'), errText(data.error, data), 'err'); return; }
+  loadClients();
+}
+
+$('addClientBtn').addEventListener('click', () => {
+  showMsg($('addClientMsg'), '', '');
+  $('newClientName').value = '';
+  $('newClientType').value = 'windows';
+  $('addClientForm').hidden = false;
+  $('newClientName').focus();
+});
+$('cancelClientBtn').addEventListener('click', () => { $('addClientForm').hidden = true; });
+
+$('createClientBtn').addEventListener('click', async () => {
+  showMsg($('addClientMsg'), '', '');
+  const name = $('newClientName').value.trim();
+  const deviceType = $('newClientType').value;
+  if (!name){ showMsg($('addClientMsg'), errText('bad_request'), 'err'); return; }
+  $('createClientBtn').disabled = true;
+  const {ok, data} = await api('/api/clients/create', {name, deviceType});
+  $('createClientBtn').disabled = false;
+  if (!ok){ showMsg($('addClientMsg'), errText(data.error, data), 'err'); return; }
+  $('addClientForm').hidden = true;
+  $('newClientKeyText').value = data.client.privateKey || '';
+  $('newClientKeyCard').hidden = false;
+  loadClients();
+});
+
+$('closeClientKeyBtn').addEventListener('click', () => {
+  $('newClientKeyText').value = '';
+  $('newClientKeyCard').hidden = true;
+});
 
 $('loginBtn').addEventListener('click', async () => {
   showMsg($('loginMsg'), '', '');
