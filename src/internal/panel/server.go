@@ -1,0 +1,245 @@
+package panel
+
+import (
+	"embed"
+	"encoding/json"
+	"net/http"
+	"runtime"
+	"strings"
+	"time"
+)
+
+//go:embed assets/*
+var assets embed.FS
+
+// Client — заготовка на будущее: подключённый к серверу клиент. Само
+// подключение клиентов и обмен данными с ними — отдельная задача; пока
+// панель только показывает, что список есть и он пуст.
+type Client struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Online bool   `json:"online"`
+}
+
+// Server — веб-панель управления сервером. В отличие от internal/webui она
+// не полагается на то, что до неё дотянется только владелец машины: доступ
+// разрешает только сессия, полученная логином и паролем.
+type Server struct {
+	store    *Store
+	sessions *sessionManager
+	limiter  *loginLimiter
+
+	// startedAt — с какого момента считать время работы панели на экране
+	// статуса.
+	startedAt time.Time
+}
+
+func NewServer(store *Store) *Server {
+	return &Server{
+		store:     store,
+		sessions:  newSessionManager(),
+		limiter:   newLoginLimiter(),
+		startedAt: time.Now(),
+	}
+}
+
+// Handler собирает маршруты в http.Handler — вызывающий код сам решает, как
+// его подавать: напрямую (autocert) или за обратным прокси.
+func (s *Server) Handler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", s.handleIndex)
+	mux.HandleFunc("/api/login", s.handleLogin)
+	mux.HandleFunc("/api/logout", s.handleLogout)
+	mux.HandleFunc("/api/session", s.handleSessionInfo)
+	mux.HandleFunc("/api/change-password", s.handleChangePassword)
+	mux.HandleFunc("/api/status", s.requireAuth(s.handleStatus))
+	mux.HandleFunc("/api/clients", s.requireAuth(s.handleClients))
+	return mux
+}
+
+func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	data, err := assets.ReadFile("assets/index.html")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Write(data)
+}
+
+// currentSession достаёт сессию текущего запроса, если она есть и не
+// истекла.
+func (s *Server) currentSession(r *http.Request) (session, bool) {
+	return s.sessions.get(cookieValue(r))
+}
+
+// requireAuth пускает дальше только с действующей сессией. Если у
+// пользователя ещё стоит обязательная смена пароля — на любой другой ручке,
+// кроме logout и change-password, отвечаем отдельной ошибкой: страница по
+// ней покажет форму смены пароля вместо остального интерфейса.
+func (s *Server) requireAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		sess, ok := s.currentSession(r)
+		if !ok {
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "auth_required"})
+			return
+		}
+		if sess.mustChange {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "must_change_password"})
+			return
+		}
+		next(w, r)
+	}
+}
+
+// limiterKey сочетает логин и адрес — так подбор пароля к одной учётке с
+// разных мест и перебор чужих логинов с одного адреса тормозятся одинаково.
+func limiterKey(r *http.Request, username string) string {
+	return strings.ToLower(username) + "|" + clientIP(r)
+}
+
+func clientIP(r *http.Request) string {
+	host := r.RemoteAddr
+	if i := strings.LastIndex(host, ":"); i >= 0 {
+		host = host[:i]
+	}
+	return host
+}
+
+func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad_request"})
+		return
+	}
+
+	key := limiterKey(r, req.Username)
+	if locked, remaining := s.limiter.Before(key); locked {
+		writeJSON(w, http.StatusTooManyRequests, map[string]any{
+			"error":            "locked",
+			"retryAfterSecond": int(remaining.Seconds()) + 1,
+		})
+		return
+	}
+
+	u, ok := s.store.Verify(req.Username, req.Password)
+	if !ok {
+		s.limiter.Fail(key)
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "bad_credentials"})
+		return
+	}
+	s.limiter.Success(key)
+
+	id, err := s.sessions.create(u.Username, u.MustChangePassword)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal"})
+		return
+	}
+	setCookie(w, r, id, sessionTTL)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":         true,
+		"username":   u.Username,
+		"mustChange": u.MustChangePassword,
+	})
+}
+
+func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	if id := cookieValue(r); id != "" {
+		s.sessions.destroy(id)
+	}
+	clearCookie(w, r)
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// handleSessionInfo — есть ли сейчас действующий вход, и не пора ли сменить
+// пароль. Страница спрашивает это при загрузке, чтобы решить, какой экран
+// показать: логин, смену пароля или обычную панель.
+func (s *Server) handleSessionInfo(w http.ResponseWriter, r *http.Request) {
+	sess, ok := s.currentSession(r)
+	if !ok {
+		writeJSON(w, http.StatusOK, map[string]bool{"authenticated": false})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"authenticated": true,
+		"username":      sess.username,
+		"mustChange":    sess.mustChange,
+	})
+}
+
+// handleChangePassword работает и для обычной смены пароля из настроек, и
+// для обязательной смены после первого входа по одноразовому паролю — в
+// обоих случаях нужна действующая сессия, но requireAuth сюда не годится: он
+// как раз блокирует запросы с mustChange, а этой ручке они и нужны.
+func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	sess, ok := s.currentSession(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "auth_required"})
+		return
+	}
+	var req struct {
+		CurrentPassword string `json:"currentPassword"`
+		NewPassword     string `json:"newPassword"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad_request"})
+		return
+	}
+	if len(req.NewPassword) < 8 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "password_too_short"})
+		return
+	}
+	if _, ok := s.store.Verify(sess.username, req.CurrentPassword); !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "bad_credentials"})
+		return
+	}
+	if err := s.store.SetPassword(sess.username, req.NewPassword); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal"})
+		return
+	}
+	s.sessions.clearMustChange(sess.username)
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+type statusResp struct {
+	OS      string `json:"os"`
+	Uptime  int64  `json:"uptimeSeconds"`
+	Version string `json:"version"`
+}
+
+func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, statusResp{
+		OS:      runtime.GOOS,
+		Uptime:  int64(time.Since(s.startedAt).Seconds()),
+		Version: "0.1.0",
+	})
+}
+
+// handleClients пока всегда отдаёт пустой список — подключение клиентов и
+// работа с ними будет отдельной задачей поверх этого каркаса.
+func (s *Server) handleClients(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"clients": []Client{}})
+}
+
+func writeJSON(w http.ResponseWriter, code int, v any) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(v)
+}

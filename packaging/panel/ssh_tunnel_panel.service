@@ -1,0 +1,42 @@
+# Служба ssh_tunnel_panel для systemd — системная (root), а не пользовательская,
+# в отличие от ssh_tunnel.service.
+#
+# Панель работает от root осознанно: заводить и удалять пользователей — а
+# значит и учётные записи в системе — без root-прав нельзя. Юнит сужает, что
+# именно этому root доступно (см. ProtectHome, PrivateTmp и ProtectSystem
+# ниже), но полностью убрать root из уравнения было бы неправдой.
+#
+#   sudo cp ssh_tunnel_panel.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now ssh_tunnel_panel
+#
+# Журнал:  sudo journalctl -u ssh_tunnel_panel -f
+#
+# Путь к бинарю поправь под себя, если положил не в /usr/local/bin.
+
+[Unit]
+Description=ssh_tunnel_panel — веб-панель управления сервером и клиентами
+Documentation=https://github.com/VITAZGIO/ssh_tunel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/ssh_tunnel_panel
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=15
+
+# Панели нужен root ровно для одного — управлять системными учётными
+# записями и правами клиентов; со всем остальным она может быть настолько
+# ограничена, насколько это позволяет systemd для процесса с UID 0.
+NoNewPrivileges=true
+ProtectHome=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/etc/ssh_tunnel_panel
+
+[Install]
+WantedBy=multi-user.target
