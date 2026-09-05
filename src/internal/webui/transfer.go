@@ -13,34 +13,15 @@ package webui
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"sshtunnel/internal/config"
+	"sshtunnel/internal/share"
 )
-
-type exportDoc struct {
-	Format         int      `json:"sshTunnelExport"`
-	Name           string   `json:"name"`
-	Flag           string   `json:"flag,omitempty"`
-	Host           string   `json:"host"`
-	SSHPort        int      `json:"sshPort"`
-	User           string   `json:"user"`
-	SocksPort      int      `json:"socksPort"`
-	HTTPPort       int      `json:"httpPort"`
-	PoolSize       int      `json:"poolSize"`
-	FilterMode     string   `json:"filterMode"`
-	FilterApps     []string `json:"filterApps,omitempty"`
-	DirectHosts    []string `json:"directHosts,omitempty"`
-	LocalViaTunnel bool     `json:"localViaTunnel"`
-	// KeyIncluded — явный флаг, а не просто «есть KeyContents или нет»: так
-	// файл без ключа (человек снял галочку при экспорте) не пытается молча
-	// сойти за файл с ключом из-за пустой строки.
-	KeyIncluded bool   `json:"keyIncluded"`
-	KeyContents string `json:"keyContents,omitempty"`
-}
 
 // handleProfileExport отдаёт сервер файлом: сама программа его не сохраняет и
 // не отправляет — собирает JSON и возвращает странице, а та превращает его в
@@ -61,8 +42,8 @@ func (s *Server) handleProfileExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	doc := exportDoc{
-		Format: 1, Name: p.Name, Flag: p.Flag, Host: p.Host, SSHPort: p.SSHPort, User: p.User,
+	doc := share.Doc{
+		Name: p.Name, Flag: p.Flag, Host: p.Host, SSHPort: p.SSHPort, User: p.User,
 		SocksPort: p.SocksPort, HTTPPort: p.HTTPPort, PoolSize: p.PoolSize,
 		FilterMode: p.FilterMode, FilterApps: p.FilterApps, DirectHosts: p.DirectHosts,
 		LocalViaTunnel: p.LocalViaTunnel,
@@ -77,7 +58,7 @@ func (s *Server) handleProfileExport(w http.ResponseWriter, r *http.Request) {
 		doc.KeyContents = string(data)
 	}
 
-	pretty, err := json.MarshalIndent(doc, "", "  ")
+	pretty, err := share.Build(doc)
 	if err != nil {
 		writeJSON(w, map[string]string{"error": err.Error()})
 		return
@@ -108,13 +89,14 @@ func exportFilename(name string) string {
 // делает его активным — цель ровно в том, чтобы после импорта оставалось
 // только нажать «Подключить», без дополнительных решений.
 func (s *Server) handleProfileImport(w http.ResponseWriter, r *http.Request) {
-	var doc exportDoc
-	if err := json.NewDecoder(r.Body).Decode(&doc); err != nil {
-		writeJSON(w, map[string]string{"error": "не разобрал файл: " + err.Error()})
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeJSON(w, map[string]string{"error": "не удалось прочитать файл: " + err.Error()})
 		return
 	}
-	if doc.Host == "" {
-		writeJSON(w, map[string]string{"error": "в файле нет адреса сервера — это не экспорт из ssh_tunnel"})
+	doc, err := share.Parse(body)
+	if err != nil {
+		writeJSON(w, map[string]string{"error": err.Error()})
 		return
 	}
 
