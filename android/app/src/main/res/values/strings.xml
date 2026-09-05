@@ -51,4 +51,41 @@
     <string name="pool_note">Несколько параллельных каналов заметно поднимают скорость. 4 — разумное значение.</string>
     <string name="apps_chosen">выбрано %1$d</string>
     <string name="speed_result">приём %1$s · отдача %2$s</string>
+
+    <!-- Язык интерфейса -->
+    <string name="language_label">Язык интерфейса</string>
+    <string name="lang_ru">Русский</string>
+    <string name="lang_en">English</string>
+
+    <!-- Сворачиваемые блоки настроек -->
+    <string name="server_settings">Настройки сервера</string>
+    <string name="general_settings">Общие настройки приложения</string>
+
+    <!-- Пояснение под галочкой «Локальную сеть тоже вести через сервер» -->
+    <string name="local_via_tunnel_note">По умолчанию выключено: иначе домашние устройства (принтер, NAS, умный дом) перестали бы открываться, пока туннель включён. Включай, только если тебе нужна внутренняя сеть самого сервера.</string>
+
+    <!-- Список серверов и выбор города -->
+    <string name="add_server">Добавить сервер</string>
+    <string name="pick_city">Выбрать город</string>
+    <string name="custom_flag_name">Свой (без флага)</string>
+    <string name="select_this_server">Выбрать этот сервер</string>
+    <string name="server_switched">Сервер переключён</string>
+    <string name="tunnel_stopped_for_switch">Туннель остановлен: переключаемся на другой сервер</string>
+
+    <!-- Настройка телефона из буфера обмена или сканированием QR -->
+    <string name="paste_config">Вставить из буфера</string>
+    <string name="scan_config">Сканировать код</string>
+    <string name="import_ok">настройки применены — можно подключаться</string>
+    <string name="import_ok_no_key">настройки применены без ключа — импортируй ещё раз файл с ключом</string>
+    <string name="paste_failed">не удалось прочитать буфер обмена</string>
+    <string name="camera_permission_needed">нужен доступ к камере, чтобы отсканировать код</string>
+    <string name="camera_denied">без доступа к камере код не отсканировать</string>
+
+    <!-- Экспорт и импорт списка программ -->
+    <string name="export_apps">Экспортировать список</string>
+    <string name="import_apps">Импортировать список</string>
+    <string name="paste_apps_list">Вставить список из буфера</string>
+    <string name="apps_imported">список программ импортирован</string>
+    <string name="apps_exported">список сохранён и скопирован в буфер</string>
+    <string name="import_bad_apps">это не похоже на список программ ssh_tunnel</string>
 </resources>

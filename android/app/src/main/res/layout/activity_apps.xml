@@ -61,4 +61,55 @@
         android:choiceMode="multipleChoice"
         android:divider="@color/line"
         android:dividerHeight="1dp" />
+
+    <TextView
+        android:id="@+id/appsNote"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="12sp"
+        android:textColor="@color/dim" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/exportAppsBtn"
+            style="@style/SecondaryButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:paddingTop="9dp"
+            android:paddingBottom="9dp"
+            android:text="@string/export_apps" />
+
+        <Space android:layout_width="6dp" android:layout_height="1dp" />
+
+        <Button
+            android:id="@+id/importAppsBtn"
+            style="@style/SecondaryButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:paddingTop="9dp"
+            android:paddingBottom="9dp"
+            android:text="@string/import_apps" />
+
+        <Space android:layout_width="6dp" android:layout_height="1dp" />
+
+        <Button
+            android:id="@+id/pasteAppsBtn"
+            style="@style/SecondaryButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:textSize="12sp"
+            android:paddingTop="9dp"
+            android:paddingBottom="9dp"
+            android:text="@string/paste_apps_list" />
+    </LinearLayout>
 </LinearLayout>

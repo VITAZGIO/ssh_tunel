@@ -17,6 +17,10 @@
     <!-- Список установленных приложений нужен для экрана исключений. -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
+    <!-- Только чтобы отсканировать QR с настройками — приложение не снимает
+         фото и не пишет видео, само разрешение спрашивается по нажатию. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
         android:allowBackup="false"

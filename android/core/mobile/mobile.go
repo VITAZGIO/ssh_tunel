@@ -19,6 +19,7 @@ import (
 	"sshtunnel/android/core"
 	"sshtunnel/internal/events"
 	"sshtunnel/internal/routing"
+	"sshtunnel/internal/share"
 	"sshtunnel/internal/speedtest"
 	"sshtunnel/internal/tunnel"
 )
@@ -441,6 +442,47 @@ const (
 	// работает половина интернета.
 	dnsAddr = "198.18.0.53"
 )
+
+// ParsedConfig — конфиг сервера, разобранный из текста (файл экспорта или
+// содержимое QR-кода) в форму, понятную Kotlin: gomobile умеет отдавать
+// только простые типы, поэтому списки полей (FilterApps, DirectHosts)
+// приходят строками, по одному значению на строку.
+type ParsedConfig struct {
+	Name           string
+	Flag           string
+	Host           string
+	SshPort        int
+	User           string
+	PoolSize       int
+	FilterMode     string
+	FilterApps     string
+	DirectHosts    string
+	LocalViaTunnel bool
+	KeyIncluded    bool
+	KeyContents    string
+}
+
+// ParseConfig разбирает текст, вставленный из буфера обмена или считанный из
+// QR-кода, в ParsedConfig. Тот же формат, что использует экспорт/импорт
+// сервера в панели на компьютере (internal/share), версии 1 и 2 — оба
+// читаются одинаково. Ошибка возвращается такой, какую можно показать
+// человеку на экране как есть — она уже на русском.
+func ParseConfig(text string) (*ParsedConfig, error) {
+	doc, err := share.Parse([]byte(text))
+	if err != nil {
+		return nil, err
+	}
+	return &ParsedConfig{
+		Name: doc.Name, Flag: doc.Flag, Host: doc.Host, SshPort: doc.SSHPort, User: doc.User,
+		PoolSize:       doc.PoolSize,
+		FilterMode:     doc.FilterMode,
+		FilterApps:     strings.Join(doc.FilterApps, "\n"),
+		DirectHosts:    strings.Join(doc.DirectHosts, "\n"),
+		LocalViaTunnel: doc.LocalViaTunnel,
+		KeyIncluded:    doc.KeyIncluded,
+		KeyContents:    doc.KeyContents,
+	}, nil
+}
 
 // FakeNet отдаёт подсеть подставных адресов.
 func FakeNet() string { return fakeNet }
