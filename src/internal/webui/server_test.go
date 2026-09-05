@@ -2,6 +2,7 @@ package webui
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,20 +12,32 @@ import (
 	"sshtunnel/internal/config"
 )
 
-// Страница настроек шлёт только те поля, которые показаны на экране.
-// Переключателей системного прокси и переменных среды там нет, и раньше они
-// приходили пустыми — то есть выключались при каждом «Сохранить». Внешне всё
-// выглядело исправно: туннель поднимался, каналы считались, тест скорости шёл
-// через сервер, а браузер продолжал ходить напрямую.
+// withHost — тестовый помощник: конфиг по умолчанию с адресом сервера у
+// активного профиля.
+func withHost(host string) config.Config {
+	cfg := config.Default()
+	p := cfg.Active()
+	p.Host = host
+	cfg.SetProfile(p)
+	return cfg
+}
+
+// Страница настроек шлёт полный документ целиком (весь список серверов и
+// общие настройки), а не один плоский набор полей, как раньше. Но верхнего
+// уровня это по-прежнему касается: переключателей системного прокси и
+// переменных среды в форме нет, и раньше отсутствие ключа в JSON молча их
+// выключало. Внешне всё выглядело исправно: туннель поднимался, каналы
+// считались, тест скорости шёл через сервер, а браузер продолжал ходить
+// напрямую.
 func TestSaveKeepsFieldsMissingInRequest(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("APPDATA", t.TempDir())
 
-	cfg := config.Default()
-	cfg.Host = "203.0.113.10"
+	cfg := withHost("203.0.113.10")
 	if !cfg.SysProxy || !cfg.SetEnvVars {
 		t.Fatal("в настройках по умолчанию системный прокси должен быть включён")
 	}
+	active := cfg.Active()
 
 	s, err := NewOn(app.New(cfg), "127.0.0.1:0")
 	if err != nil {
@@ -32,11 +45,14 @@ func TestSaveKeepsFieldsMissingInRequest(t *testing.T) {
 	}
 	defer s.Close()
 
-	// Ровно то, что шлёт страница: полей sysProxy и setEnvVars в ней нет.
-	body := `{"host":"203.0.113.10","user":"tunnel","keyPath":"/k","sshPort":22,
+	// Профиль шлётся целиком — иначе непереданные поля (JSON не мержит
+	// вложенные объекты внутри массива) обнулились бы. А вот sysProxy и
+	// setEnvVars — самого верхнего уровня, их в запросе намеренно нет.
+	body := fmt.Sprintf(`{"profiles":[{"id":%q,"name":"Сервер 1","host":"203.0.113.10",
+	          "user":"tunnel","keyPath":"/k","sshPort":22,
 	          "socksPort":1080,"httpPort":1081,"poolSize":4,
-	          "verbose":false,"autoStart":false,"localViaTunnel":false,
-	          "directHosts":[],"filterMode":"all","filterApps":[]}`
+	          "localViaTunnel":false,"directHosts":[],"filterMode":"all","filterApps":[]}],
+	          "activeProfile":%q,"verbose":false,"autoStart":false}`, active.ID, active.ID)
 
 	rec := httptest.NewRecorder()
 	s.handleConfig(rec, httptest.NewRequest(http.MethodPost, "/api/config", strings.NewReader(body)))
@@ -59,8 +75,8 @@ func TestSaveKeepsFieldsMissingInRequest(t *testing.T) {
 		t.Error("переменные среды выключились при сохранении — Claude Code, npm и curl пойдут мимо")
 	}
 	// И то, что страница действительно прислала, должно примениться.
-	if resp.Config.User != "tunnel" {
-		t.Errorf("пользователь не сохранился: %q", resp.Config.User)
+	if resp.Config.Active().User != "tunnel" {
+		t.Errorf("пользователь не сохранился: %q", resp.Config.Active().User)
 	}
 }
 
@@ -70,8 +86,7 @@ func TestOpenLocalAccess(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("APPDATA", t.TempDir())
 
-	cfg := config.Default()
-	cfg.Host = "203.0.113.10"
+	cfg := withHost("203.0.113.10")
 
 	closed, err := NewOn(app.New(cfg), "127.0.0.1:0")
 	if err != nil {
@@ -120,8 +135,7 @@ func TestTokenAlwaysWorks(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("APPDATA", t.TempDir())
 
-	cfg := config.Default()
-	cfg.Host = "203.0.113.10"
+	cfg := withHost("203.0.113.10")
 	s, err := NewOn(app.New(cfg), "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -132,5 +146,69 @@ func TestTokenAlwaysWorks(t *testing.T) {
 	r.RemoteAddr = "203.0.113.7:5000"
 	if !s.allowed(r) {
 		t.Error("запрос с правильным ключом не прошёл")
+	}
+}
+
+// Добавление, переключение и удаление серверов через API — то же самое, что
+// делают кнопки «+», «Выбрать этот сервер» и «Удалить» в панели.
+func TestProfileEndpoints(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("APPDATA", t.TempDir())
+
+	cfg := withHost("203.0.113.10")
+	firstID := cfg.Active().ID
+	s, err := NewOn(app.New(cfg), "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	// Добавить.
+	rec := httptest.NewRecorder()
+	s.handleProfileAdd(rec, httptest.NewRequest(http.MethodPost, "/api/profile/add",
+		strings.NewReader(`{"name":"Амстердам","flag":"🇳🇱"}`)))
+	var addResp struct {
+		OK      bool           `json:"ok"`
+		Profile config.Profile `json:"profile"`
+		Error   string         `json:"error"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &addResp); err != nil || addResp.Error != "" {
+		t.Fatalf("не удалось добавить сервер: %v (%s)", err, rec.Body.String())
+	}
+	if addResp.Profile.Name != "Амстердам" || addResp.Profile.Flag != "🇳🇱" {
+		t.Errorf("новый сервер собрался неправильно: %+v", addResp.Profile)
+	}
+	if s.app.Config().ActiveProfile != firstID {
+		t.Error("добавление сервера не должно само переключать активный")
+	}
+
+	// Выбрать.
+	rec = httptest.NewRecorder()
+	body := fmt.Sprintf(`{"id":%q}`, addResp.Profile.ID)
+	s.handleProfileSelect(rec, httptest.NewRequest(http.MethodPost, "/api/profile/select", strings.NewReader(body)))
+	if s.app.Config().ActiveProfile != addResp.Profile.ID {
+		t.Errorf("выбор сервера не сработал: %s", rec.Body.String())
+	}
+
+	// Удалить активный — активным должен снова стать первый.
+	rec = httptest.NewRecorder()
+	s.handleProfileRemove(rec, httptest.NewRequest(http.MethodPost, "/api/profile/remove", strings.NewReader(body)))
+	if s.app.Config().ActiveProfile != firstID {
+		t.Errorf("после удаления активного сервера активным должен стать оставшийся: %s", rec.Body.String())
+	}
+	if len(s.app.Config().Profiles) != 1 {
+		t.Errorf("ожидался один оставшийся сервер, получилось %d", len(s.app.Config().Profiles))
+	}
+
+	// Последний сервер не удаляется.
+	rec = httptest.NewRecorder()
+	body = fmt.Sprintf(`{"id":%q}`, firstID)
+	s.handleProfileRemove(rec, httptest.NewRequest(http.MethodPost, "/api/profile/remove", strings.NewReader(body)))
+	var rmResp struct {
+		Error string `json:"error"`
+	}
+	json.Unmarshal(rec.Body.Bytes(), &rmResp)
+	if rmResp.Error == "" {
+		t.Error("последний сервер не должен удаляться")
 	}
 }

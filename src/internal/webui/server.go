@@ -160,6 +160,9 @@ func (s *Server) Serve() error {
 	mux.HandleFunc("/api/start", s.guard(s.handleStart))
 	mux.HandleFunc("/api/stop", s.guard(s.handleStop))
 	mux.HandleFunc("/api/config", s.guard(s.handleConfig))
+	mux.HandleFunc("/api/profile/add", s.guard(s.handleProfileAdd))
+	mux.HandleFunc("/api/profile/remove", s.guard(s.handleProfileRemove))
+	mux.HandleFunc("/api/profile/select", s.guard(s.handleProfileSelect))
 	mux.HandleFunc("/api/checkip", s.guard(s.handleCheckIP))
 	mux.HandleFunc("/api/speedtest", s.guard(s.handleSpeedTest))
 	mux.HandleFunc("/api/processes", s.guard(s.handleProcesses))
@@ -325,6 +328,64 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"ok": true, "config": s.app.Config(), "note": note})
 }
 
+// handleProfileAdd заводит новый сервер — как открыть вкладку «+» в браузере.
+// Активным он не становится сам: подключаться к нему или нет — решает
+// отдельная кнопка «Выбрать этот сервер».
+func (s *Server) handleProfileAdd(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Name string `json:"name"`
+		Flag string `json:"flag"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, map[string]string{"error": "не разобрал запрос: " + err.Error()})
+		return
+	}
+	p, err := s.app.AddProfile(req.Name, req.Flag)
+	if err != nil {
+		writeJSON(w, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true, "profile": p, "config": s.app.Config()})
+}
+
+// handleProfileRemove закрывает вкладку сервера. Последний сервер удалить
+// нельзя — подключаться будет не к чему.
+func (s *Server) handleProfileRemove(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, map[string]string{"error": "не разобрал запрос: " + err.Error()})
+		return
+	}
+	note, err := s.app.RemoveProfile(req.ID)
+	if err != nil {
+		writeJSON(w, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true, "note": note, "config": s.app.Config()})
+}
+
+// handleProfileSelect делает сервер активным — это то, к чему подключается
+// «Подключить» на главном экране. Если в этот момент был поднят туннель
+// прежнего сервера, он останавливается: продолжать молча работать со старым
+// адресом после явного переключения было бы неожиданно.
+func (s *Server) handleProfileSelect(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, map[string]string{"error": "не разобрал запрос: " + err.Error()})
+		return
+	}
+	note, err := s.app.SwitchProfile(req.ID)
+	if err != nil {
+		writeJSON(w, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true, "note": note, "config": s.app.Config()})
+}
+
 // handleScanNet отвечает на вопрос «что сломается, если включить туннель»:
 // перечисляет сети этого компьютера и говорит по каждой, пойдёт ли она мимо
 // туннеля.
@@ -431,14 +492,13 @@ func (s *Server) handleBootStart(w http.ResponseWriter, r *http.Request) {
 	}
 	var req struct {
 		Enabled  bool   `json:"enabled"`
-		Docker   bool   `json:"docker"`
 		Password string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, map[string]any{"error": "не разобрал запрос: " + err.Error()})
 		return
 	}
-	err := applyBoot(req.Enabled, req.Docker, req.Password, s.bootFlags)
+	err := applyBoot(req.Enabled, req.Password, s.bootFlags)
 	if errors.Is(err, errNeedRoot) {
 		// Служба к этому моменту уже включена — не хватает только права
 		// стартовать без входа в систему. Так и говорим, вместе с просьбой

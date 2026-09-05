@@ -46,11 +46,12 @@ func TestMigrateFromOldNames(t *testing.T) {
 			}
 
 			cfg := Load()
-			if cfg.Host != "203.0.113.10" {
-				t.Errorf("адрес сервера потерялся при переезде из %q: %q", oldName, cfg.Host)
+			active := cfg.Active()
+			if active.Host != "203.0.113.10" {
+				t.Errorf("адрес сервера потерялся при переезде из %q: %q", oldName, active.Host)
 			}
-			if cfg.User != "tunnel" {
-				t.Errorf("пользователь потерялся при переезде из %q: %q", oldName, cfg.User)
+			if active.User != "tunnel" {
+				t.Errorf("пользователь потерялся при переезде из %q: %q", oldName, active.User)
 			}
 			if _, err := os.Stat(Dir()); err != nil {
 				t.Errorf("новая папка не появилась: %v", err)
@@ -79,7 +80,65 @@ func TestMigrateKeepsExisting(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if cfg := Load(); cfg.Host != "новый" {
-		t.Errorf("старые настройки затёрли новые: %q", cfg.Host)
+	if cfg := Load(); cfg.Active().Host != "новый" {
+		t.Errorf("старые настройки затёрли новые: %q", cfg.Active().Host)
+	}
+}
+
+// Файл, сохранённый до появления нескольких серверов, — плоский, без ключа
+// "profiles". Он должен превратиться в единственный профиль, а не потеряться.
+func TestMigrateLegacyToSingleProfile(t *testing.T) {
+	base := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", base)
+	t.Setenv("APPDATA", base)
+
+	legacy := `{"host":"203.0.113.10","user":"tunnel","sshPort":2222,"poolSize":6,"verbose":true}`
+	if err := os.MkdirAll(Dir(), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(Path(), []byte(legacy), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Load()
+	if len(cfg.Profiles) != 1 {
+		t.Fatalf("ожидался один профиль, получилось %d", len(cfg.Profiles))
+	}
+	active := cfg.Active()
+	if active.Host != "203.0.113.10" || active.SSHPort != 2222 || active.PoolSize != 6 {
+		t.Errorf("данные сервера потерялись при миграции: %+v", active)
+	}
+	if !cfg.Verbose {
+		t.Error("настройка verbose (общая для программы) потерялась при миграции")
+	}
+	if cfg.ActiveProfile != active.ID {
+		t.Error("ActiveProfile не указывает на мигрировавший профиль")
+	}
+}
+
+// Добавление и удаление серверов: список не должен опустеть, а активным
+// после удаления текущего должен становиться кто-то из оставшихся.
+func TestAddRemoveProfile(t *testing.T) {
+	cfg := Default()
+	first := cfg.Profiles[0]
+
+	second := cfg.AddProfile("Амстердам", "🇳🇱")
+	if len(cfg.Profiles) != 2 {
+		t.Fatalf("ожидалось 2 профиля, получилось %d", len(cfg.Profiles))
+	}
+	if second.Name != "Амстердам" || second.Flag != "🇳🇱" {
+		t.Errorf("новый профиль собрался неправильно: %+v", second)
+	}
+
+	cfg.ActiveProfile = second.ID
+	if !cfg.RemoveProfile(second.ID) {
+		t.Fatal("не удалось удалить второй профиль")
+	}
+	if cfg.ActiveProfile != first.ID {
+		t.Errorf("после удаления активного профиля активным должен стать оставшийся: %q != %q",
+			cfg.ActiveProfile, first.ID)
+	}
+	if cfg.RemoveProfile(first.ID) {
+		t.Error("последний профиль удалять нельзя — подключаться будет не к чему")
 	}
 }

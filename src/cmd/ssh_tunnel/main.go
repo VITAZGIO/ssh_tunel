@@ -63,7 +63,7 @@ func main() {
 
 	go showStateInTray(a)
 
-	if cfg.AutoStart && cfg.Host != "" {
+	if cfg.AutoStart && cfg.Active().Host != "" {
 		go func() {
 			time.Sleep(300 * time.Millisecond) // дать окну подписаться на события
 			if err := a.Start(); err != nil {

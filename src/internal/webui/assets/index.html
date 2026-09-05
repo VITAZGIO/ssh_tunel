@@ -253,6 +253,46 @@
   .l.msg{color:var(--dim);white-space:normal}
   .l.msg.warn{color:var(--warn)} .l.msg.err{color:var(--err)}
 
+  /* ---------- язык, вкладки серверов, карточки настроек ---------- */
+  select#language{margin-bottom:14px}
+
+  .tabbar{display:flex;gap:6px;overflow-x:auto;padding-bottom:3px;margin-bottom:12px}
+  .tabbar::-webkit-scrollbar{height:6px}
+  .tabbar::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+  .tab{flex:none;display:flex;align-items:center;gap:6px;background:var(--card);
+       border:1px solid var(--line);border-radius:9px;padding:7px 11px;cursor:pointer;
+       color:var(--dim);font:inherit;font-size:12.5px;white-space:nowrap;position:relative}
+  .tab:hover{border-color:var(--accent)}
+  .tab.editing{color:var(--text);border-color:var(--accent);background:var(--card2)}
+  .tab .flag{font-size:14px;line-height:1}
+  .tab .vg{font-size:9px;font-weight:800;letter-spacing:.3px;color:#2de2ff;
+           border:1px solid currentColor;border-radius:4px;padding:1px 3px}
+  .tab .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none}
+  .tab.tabAdd{color:var(--dim);font-size:16px;font-weight:600;padding:7px 13px}
+  .tab.tabAdd:hover{color:var(--accent)}
+
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;
+         padding:13px 13px 3px;margin-bottom:16px}
+  .panel .ptitle{font-size:11.5px;font-weight:700;text-transform:uppercase;
+                 letter-spacing:.5px;color:var(--dim);margin:0 0 11px}
+
+  .rowbtns{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:2px 0 12px}
+  .curBadge{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ok);
+            font-weight:600;padding:8px 2px}
+
+  /* Виджет выбора сервера на главном экране — плашка между кнопкой питания и
+     статусом подключения. Скрыта по умолчанию и не должна раздвигать плитки
+     снизу: она часть того же центрированного блока, что и кнопка. */
+  #homePicker{display:flex;align-items:center;gap:8px;background:var(--card);
+              border:1px solid var(--line);border-radius:11px;padding:8px 14px;
+              cursor:pointer;flex:none}
+  #homePicker:hover{border-color:var(--accent)}
+  #homePicker .flag{font-size:16px;line-height:1}
+  #homePicker .vg{font-size:9px;font-weight:800;color:#2de2ff;border:1px solid currentColor;
+                  border-radius:4px;padding:1px 3px}
+  #homePicker .nm{font-size:13px;font-weight:600}
+  #homePicker .chev{color:var(--dim);font-size:10px;margin-left:2px}
+
   .err-box{background:rgba(229,72,77,.13);border:1px solid var(--err);
            color:var(--err);border-radius:9px;padding:8px 11px;margin:0 0 11px;
            font-size:12.5px;white-space:pre-wrap;display:none}
@@ -276,10 +316,10 @@
       </svg>
     </div>
     <span class="sp"></span>
-    <button class="ico" id="btnLog" title="Журнал">
+    <button class="ico" id="btnLog" title="Журнал" data-i18n-title="log">
       <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
     </button>
-    <button class="ico" id="btnSettings" title="Настройки">
+    <button class="ico" id="btnSettings" title="Настройки" data-i18n-title="settings">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/>
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
       </svg>
@@ -295,12 +335,22 @@
     <div class="middle">
       <button id="power">
         <svg viewBox="0 0 24 24"><path d="M12 3.2v8.6"/><path d="M6.5 7a8.5 8.5 0 1 0 11 0"/></svg>
-        <span class="cap" id="powerCap">Подключить</span>
+        <span class="cap" id="powerCap" data-i18n="connect">Подключить</span>
       </button>
 
+      <!-- Появляется только когда серверов больше одного и включена галочка
+           «Показывать выбор сервера на главном экране» — до этого просто
+           отсутствует в потоке, ничего внизу не сдвигая. -->
+      <div id="homePicker" style="display:none">
+        <span class="flag" id="homePickerFlag"></span>
+        <span class="nm" id="homePickerName"></span>
+        <span class="chev">▾</span>
+      </div>
+
       <div class="status">
-        <div class="s" id="stateText">Отключено</div>
-        <div class="d" id="stateDetail" title="нажми, чтобы проверить настоящий внешний адрес"></div>
+        <div class="s" id="stateText" data-i18n="state_stopped">Отключено</div>
+        <div class="d" id="stateDetail" title="нажми, чтобы проверить настоящий внешний адрес"
+             data-i18n-title="check_ip_hint"></div>
         <div class="ping" id="ping"></div>
       </div>
     </div>
@@ -309,34 +359,62 @@
       <!-- Плитки со скоростью появляются только после теста: до него
            показывать там нечего. -->
       <div class="tile" id="tileDown" hidden>
-        <div class="k">Приём</div><div class="v" id="dn">—</div></div>
+        <div class="k" data-i18n="down">Приём</div><div class="v" id="dn">—</div></div>
       <div class="tile" id="tileUp" hidden>
-        <div class="k">Отдача</div><div class="v" id="up">—</div></div>
-      <div class="tile"><div class="k">Соединений</div><div class="v" id="act">—</div></div>
-      <div class="tile"><div class="k">Каналов SSH</div><div class="v" id="links">—</div></div>
+        <div class="k" data-i18n="up">Отдача</div><div class="v" id="up">—</div></div>
+      <div class="tile"><div class="k" data-i18n="connections">Соединений</div><div class="v" id="act">—</div></div>
+      <div class="tile"><div class="k" data-i18n="channels">Каналов SSH</div><div class="v" id="links">—</div></div>
     </div>
 
-    <button class="btn speed" id="speedtest">Тест скорости</button>
+    <button class="btn speed" id="speedtest" data-i18n="speedtest">Тест скорости</button>
   </div>
 
   <!-- НАСТРОЙКИ -->
   <div class="view" id="viewSettings">
     <div class="head">
-      <button class="ico" id="backFromSettings" title="Назад">
+      <button class="ico" id="backFromSettings" title="Назад" data-i18n-title="back">
         <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <span class="t">Настройки</span>
+      <span class="t" data-i18n="settings">Настройки</span>
     </div>
 
     <div class="err-box" id="setError"></div>
 
-    <div class="field"><label for="host">Адрес сервера</label>
-      <input type="text" id="host" placeholder="адрес или домен сервера" spellcheck="false"></div>
-    <div class="field"><label for="user">Пользователь SSH</label>
+    <div class="field">
+      <label for="language" data-i18n="language_label">Язык интерфейса</label>
+      <select id="language">
+        <option value="ru">Русский</option>
+        <option value="en">English</option>
+      </select>
+    </div>
+
+    <div class="tabbar" id="profileTabs"></div>
+
+    <div class="panel">
+      <p class="ptitle" data-i18n="server_settings">Настройки сервера</p>
+
+      <div class="field">
+        <label for="citySelect" data-i18n="location_label">Расположение</label>
+        <select id="citySelect"></select>
+        <input type="text" id="customCityName" spellcheck="false" hidden style="margin-top:7px"
+               data-i18n-ph="custom_name_ph">
+      </div>
+
+      <div class="rowbtns">
+        <button class="btn" id="selectServerBtn" data-i18n="select_server">Выбрать этот сервер</button>
+        <span class="curBadge" id="curBadge" style="display:none">✓ <span data-i18n="current_server">Текущий сервер</span></span>
+        <button class="btn" id="removeServerBtn" style="margin-left:auto" hidden
+          data-i18n="remove_server">Удалить сервер</button>
+      </div>
+
+    <div class="field"><label for="host" data-i18n="host_label">Адрес сервера</label>
+      <input type="text" id="host" placeholder="адрес или домен сервера" spellcheck="false"
+             data-i18n-ph="host_ph"></div>
+    <div class="field"><label for="user" data-i18n="user_label">Пользователь SSH</label>
       <input type="text" id="user" spellcheck="false"></div>
     <div class="field">
       <div class="lbl-row">
-        <label for="keyPath">Приватный ключ</label>
+        <label for="keyPath" data-i18n="key_label">Приватный ключ</label>
         <button class="qmark" id="keyHelpBtn" title="Как получить ключ">?</button>
       </div>
       <input type="text" id="keyPath" spellcheck="false">
@@ -415,18 +493,15 @@
     </div>
 
     <button class="row-link" id="toFilter" style="margin-top:14px">
-      <span class="t">Какие программы вести через туннель
+      <span class="t"><span data-i18n="filter_title">Какие программы вести через туннель</span>
         <div class="v" id="filterSummary">Все</div>
       </span>
       <span class="arr">›</span>
     </button>
 
-    <label class="chk" id="autoStartRow"><input type="checkbox" id="autoStart">
-      <span class="lbl">Подключаться сразу при запуске</span></label>
-
     <div class="chk-row">
       <label class="chk"><input type="checkbox" id="localViaTunnel">
-        <span class="lbl">Локальную сеть тоже вести через сервер</span></label>
+        <span class="lbl" data-i18n="local_via_tunnel">Локальную сеть тоже вести через сервер</span></label>
       <button class="qmark" id="localHelpBtn" title="Подробнее">?</button>
     </div>
     <div class="help" id="localHelp" hidden>
@@ -440,13 +515,14 @@
 
     <div class="field" style="margin-top:12px">
       <div class="lbl-row">
-        <label for="directHosts">Всегда напрямую</label>
+        <label for="directHosts" data-i18n="direct_label">Всегда напрямую</label>
         <button class="qmark" id="directHelpBtn" title="Подробнее">?</button>
       </div>
       <textarea id="directHosts" rows="2" spellcheck="false"
         placeholder="10.8.0.0/16, 172.30.*, .corp.local"></textarea>
       <div style="display:flex;gap:8px;align-items:center;margin-top:7px">
-        <button class="btn" id="scanNet" style="font-size:12.5px;padding:6px 12px">Проверить сеть</button>
+        <button class="btn" id="scanNet" style="font-size:12.5px;padding:6px 12px"
+          data-i18n="scan_net">Проверить сеть</button>
         <span class="hint" id="scanNote" style="margin:0"></span>
       </div>
       <div class="help" id="scanResult" hidden></div>
@@ -461,92 +537,100 @@
       <p>Не знаешь, что вписать — нажми «Проверить сеть»: программа посмотрит
         адаптеры этого компьютера и скажет, сломается что-нибудь или нет.</p>
     </div>
+    </div><!-- /.panel настроек сервера -->
 
-    <label class="chk"><input type="checkbox" id="verbose">
-      <span class="lbl">Подробный журнал</span></label>
+    <div class="panel">
+      <p class="ptitle" data-i18n="general_settings">Общие настройки приложения</p>
 
-    <div id="bootBlock" hidden>
-      <label class="chk"><input type="checkbox" id="bootStart">
-        <span class="lbl">Запускать при старте системы</span></label>
-      <p class="note" id="bootNote" style="margin-top:-2px">Программа сама поставит
-        службу systemd и разрешит ей работать без входа в систему — служба будет
-        подниматься при загрузке машины.</p>
+      <label class="chk"><input type="checkbox" id="verbose">
+        <span class="lbl" data-i18n="verbose">Подробный журнал</span></label>
 
-      <label class="chk"><input type="checkbox" id="autoConnect">
-        <span class="lbl">Подключаться сразу при запуске</span></label>
-      <p class="note" style="margin-top:-2px">Туннель поднимется сам, как только
-        программа стартует (сейчас или после перезагрузки) — жать «Подключить»
-        в панели не придётся. Выключи, если хочешь запускать вручную.</p>
+      <label class="chk" id="autoStartRow"><input type="checkbox" id="autoStart">
+        <span class="lbl" data-i18n="connect_on_launch">Подключаться сразу при запуске</span></label>
 
-      <label class="chk" id="bootDockerRow" hidden style="margin-top:10px">
-        <input type="checkbox" id="bootDocker">
-        <span class="lbl">Заодно запускать Docker при старте системы</span></label>
-
-      <div id="sudoRow" hidden>
-        <p class="note" style="margin-bottom:4px">Этот шаг требует прав администратора.
-          Введи пароль sudo — он используется один раз и нигде не сохраняется.
-          Учти: до программы он идёт по локальной сети без шифрования.</p>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <input type="password" id="sudoPass" placeholder="пароль sudo" spellcheck="false"
-                 autocomplete="off" style="flex:1;min-width:180px">
-          <button class="btn" id="sudoApply" style="font-size:12.5px;padding:6px 12px">Применить</button>
-        </div>
+      <div class="chk-row" id="showPickerRow" style="display:none">
+        <label class="chk"><input type="checkbox" id="showServerPicker">
+          <span class="lbl" data-i18n="show_picker">Показывать выбор сервера на главном экране</span></label>
       </div>
-      <span class="hint" id="bootStatus" style="display:block;margin:4px 0 0"></span>
-    </div>
+
+      <div id="bootBlock" hidden>
+        <label class="chk"><input type="checkbox" id="bootStart">
+          <span class="lbl" data-i18n="boot_start">Запускать при старте системы</span></label>
+        <p class="note" id="bootNote" style="margin-top:-2px" data-i18n="boot_note">Программа сама поставит
+          службу systemd и разрешит ей работать без входа в систему — служба будет
+          подниматься при загрузке машины.</p>
+
+        <label class="chk"><input type="checkbox" id="autoConnect">
+          <span class="lbl" data-i18n="connect_on_launch">Подключаться сразу при запуске</span></label>
+        <p class="note" style="margin-top:-2px" data-i18n="autoconnect_note">Туннель поднимется сам, как только
+          программа стартует (сейчас или после перезагрузки) — жать «Подключить»
+          в панели не придётся. Выключи, если хочешь запускать вручную.</p>
+
+        <div id="sudoRow" hidden>
+          <p class="note" style="margin-bottom:4px">Этот шаг требует прав администратора.
+            Введи пароль sudo — он используется один раз и нигде не сохраняется.
+            Учти: до программы он идёт по локальной сети без шифрования.</p>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input type="password" id="sudoPass" placeholder="пароль sudo" spellcheck="false"
+                   autocomplete="off" style="flex:1;min-width:180px">
+            <button class="btn" id="sudoApply" style="font-size:12.5px;padding:6px 12px">Применить</button>
+          </div>
+        </div>
+        <span class="hint" id="bootStatus" style="display:block;margin:4px 0 0"></span>
+      </div>
+    </div><!-- /.panel общих настроек -->
 
     <div style="display:flex;gap:9px;align-items:center;margin-top:14px">
-      <button class="btn primary" id="save">Сохранить</button>
+      <button class="btn primary" id="save" data-i18n="save">Сохранить</button>
       <span class="hint" id="savedNote"></span>
     </div>
-
 
   </div>
 
   <!-- КАКИЕ ПРОГРАММЫ ВЕСТИ ЧЕРЕЗ ТУННЕЛЬ -->
   <div class="view" id="viewFilter">
     <div class="head">
-      <button class="ico" id="backFromFilter" title="Назад в настройки">
+      <button class="ico" id="backFromFilter" title="Назад в настройки" data-i18n-title="back_to_settings">
         <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <span class="t">Программы и туннель</span>
+      <span class="t" data-i18n="apps_and_tunnel">Программы и туннель</span>
     </div>
 
     <div class="modes" id="modes">
       <label class="mode" data-mode="all">
         <span class="dot"></span>
-        <span><span class="ttl">Все</span>
-          <div class="sub">Весь трафик, который попадает в прокси, идёт через сервер.</div>
+        <span><span class="ttl" data-i18n="mode_all">Все</span>
+          <div class="sub" data-i18n="mode_all_sub">Весь трафик, который попадает в прокси, идёт через сервер.</div>
         </span>
       </label>
       <label class="mode" data-mode="only">
         <span class="dot"></span>
-        <span><span class="ttl">Только выбранные</span>
-          <div class="sub">Через туннель идут только программы из списка. Остальные выходят напрямую.</div>
+        <span><span class="ttl" data-i18n="mode_only">Только выбранные</span>
+          <div class="sub" data-i18n="mode_only_sub">Через туннель идут только программы из списка. Остальные выходят напрямую.</div>
         </span>
       </label>
       <label class="mode" data-mode="except">
         <span class="dot"></span>
-        <span><span class="ttl">Все, кроме выбранных</span>
-          <div class="sub">Программы из списка идут напрямую, в обход туннеля. Остальные — через сервер.</div>
+        <span><span class="ttl" data-i18n="mode_except">Все, кроме выбранных</span>
+          <div class="sub" data-i18n="mode_except_sub">Программы из списка идут напрямую, в обход туннеля. Остальные — через сервер.</div>
         </span>
       </label>
     </div>
 
     <div id="appsBox" hidden>
       <div style="display:flex;align-items:center;margin-bottom:8px">
-        <strong style="font-size:13px;flex:1">Выбранные программы</strong>
+        <strong style="font-size:13px;flex:1" data-i18n="selected_apps">Выбранные программы</strong>
         <span class="hint" id="appsCount" style="margin:0"></span>
       </div>
       <div class="applist" id="appList"></div>
-      <button class="btn" id="addApp" style="width:100%">+  Добавить программу</button>
-      <div class="hint" style="margin-top:10px">Программы, которые вообще не
+      <button class="btn" id="addApp" style="width:100%" data-i18n="add_app">+  Добавить программу</button>
+      <div class="hint" style="margin-top:10px" data-i18n="apps_note">Программы, которые вообще не
         обращаются к прокси (часть игр, приложения со своим сетевым стеком),
         туннель не видит — они идут мимо в любом случае.</div>
     </div>
 
     <div style="display:flex;gap:9px;align-items:center;margin-top:16px">
-      <button class="btn primary" id="saveFilter">Сохранить</button>
+      <button class="btn primary" id="saveFilter" data-i18n="save">Сохранить</button>
       <span class="hint" id="filterNote"></span>
     </div>
   </div>
@@ -554,12 +638,12 @@
   <!-- ЖУРНАЛ -->
   <div class="view" id="viewLog">
     <div class="head">
-      <button class="ico" id="backFromLog" title="Назад">
+      <button class="ico" id="backFromLog" title="Назад" data-i18n-title="back">
         <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <span class="t">Кто ходит в интернет</span>
+      <span class="t" data-i18n="who_is_online">Кто ходит в интернет</span>
       <span style="flex:1"></span>
-      <button class="ico" id="clear" title="Очистить">
+      <button class="ico" id="clear" title="Очистить" data-i18n-title="clear">
         <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
       </button>
     </div>
@@ -571,14 +655,14 @@
 <div class="overlay" id="procOverlay" hidden>
   <div class="dialog">
     <div class="dh">
-      <span class="t">Выбери программу</span>
-      <button class="ico" id="closeProc" title="Закрыть">
+      <span class="t" data-i18n="pick_app">Выбери программу</span>
+      <button class="ico" id="closeProc" title="Закрыть" data-i18n-title="close">
         <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>
     <div class="db">
       <input type="text" id="procSearch" spellcheck="false"
-             placeholder="Поиск по имени или пути…">
+             placeholder="Поиск по имени или пути…" data-i18n-ph="search_app">
       <div class="proclist" id="procList"></div>
     </div>
   </div>
@@ -593,8 +677,109 @@ const api = (path, body) => fetch(path, {
   body: body ? JSON.stringify(body) : undefined
 }).then(r => r.json());
 
+/* ---------- язык интерфейса ---------- */
+/* Переключает подписи, кнопки и заголовки. Журнал соединений и сообщения,
+   которые присылает сама программа (события, ошибки), собираются на бэкенде
+   и пока остаются на русском — переводить их значило бы дублировать логику
+   на два языка сразу в Go, это отдельная задача на будущее. */
+let LANG = 'ru';
+const I18N = {
+  ru: {
+    log:'Журнал', settings:'Настройки', back:'Назад', back_to_settings:'Назад в настройки',
+    connect:'Подключить', disconnect:'Отключить', cancel:'Отмена',
+    state_stopped:'Отключено', state_connecting:'Подключаюсь…', state_connected:'Защищено',
+    state_reconnecting:'Связь потеряна', state_error:'Ошибка',
+    check_ip_hint:'нажми, чтобы проверить настоящий внешний адрес',
+    down:'Приём', up:'Отдача', connections:'Соединений', channels:'Каналов SSH',
+    speedtest:'Тест скорости',
+    language_label:'Язык интерфейса',
+    add_server:'Добавить сервер',
+    server_settings:'Настройки сервера', general_settings:'Общие настройки приложения',
+    location_label:'Расположение', custom_name_ph:'Название сервера',
+    select_server:'Выбрать этот сервер', current_server:'Текущий сервер',
+    remove_server:'Удалить сервер', confirm_remove_server:'Удалить этот сервер из списка?',
+    discard_unsaved:'Есть несохранённые правки — переключиться и потерять их?',
+    host_label:'Адрес сервера', host_ph:'адрес или домен сервера',
+    user_label:'Пользователь SSH', key_label:'Приватный ключ',
+    filter_title:'Какие программы вести через туннель',
+    local_via_tunnel:'Локальную сеть тоже вести через сервер',
+    direct_label:'Всегда напрямую', scan_net:'Проверить сеть',
+    verbose:'Подробный журнал', connect_on_launch:'Подключаться сразу при запуске',
+    show_picker:'Показывать выбор сервера на главном экране',
+    boot_start:'Запускать при старте системы',
+    boot_note:'Программа сама поставит службу systemd и разрешит ей работать без входа в систему — служба будет подниматься при загрузке машины.',
+    autoconnect_note:'Туннель поднимется сам, как только программа стартует (сейчас или после перезагрузки) — жать «Подключить» в панели не придётся. Выключи, если хочешь запускать вручную.',
+    save:'Сохранить', saved:'сохранено',
+    apps_and_tunnel:'Программы и туннель',
+    mode_all:'Все', mode_all_sub:'Весь трафик, который попадает в прокси, идёт через сервер.',
+    mode_only:'Только выбранные', mode_only_sub:'Через туннель идут только программы из списка. Остальные выходят напрямую.',
+    mode_except:'Все, кроме выбранных', mode_except_sub:'Программы из списка идут напрямую, в обход туннеля. Остальные — через сервер.',
+    selected_apps:'Выбранные программы', add_app:'+  Добавить программу',
+    apps_note:'Программы, которые вообще не обращаются к прокси (часть игр, приложения со своим сетевым стеком), туннель не видит — они идут мимо в любом случае.',
+    who_is_online:'Кто ходит в интернет', clear:'Очистить',
+    pick_app:'Выбери программу', close:'Закрыть', search_app:'Поиск по имени или пути…',
+    custom_flag_name:'Свой (без флага)',
+  },
+  en: {
+    log:'Log', settings:'Settings', back:'Back', back_to_settings:'Back to settings',
+    connect:'Connect', disconnect:'Disconnect', cancel:'Cancel',
+    state_stopped:'Disconnected', state_connecting:'Connecting…', state_connected:'Protected',
+    state_reconnecting:'Connection lost', state_error:'Error',
+    check_ip_hint:'click to check the real external address',
+    down:'Down', up:'Up', connections:'Connections', channels:'SSH channels',
+    speedtest:'Speed test',
+    language_label:'Interface language',
+    add_server:'Add server',
+    server_settings:'Server settings', general_settings:'General app settings',
+    location_label:'Location', custom_name_ph:'Server name',
+    select_server:'Select this server', current_server:'Current server',
+    remove_server:'Remove server', confirm_remove_server:'Remove this server from the list?',
+    discard_unsaved:'There are unsaved changes — switch and lose them?',
+    host_label:'Server address', host_ph:'server address or domain',
+    user_label:'SSH user', key_label:'Private key',
+    filter_title:'Which apps go through the tunnel',
+    local_via_tunnel:'Route the local network through the server too',
+    direct_label:'Always direct', scan_net:'Scan network',
+    verbose:'Verbose log', connect_on_launch:'Connect immediately on launch',
+    show_picker:'Show server picker on the home screen',
+    boot_start:'Start at system boot',
+    boot_note:'The program will install a systemd service itself and allow it to run without logging in — the service will come up at boot.',
+    autoconnect_note:'The tunnel comes up on its own as soon as the program starts (now or after a reboot) — no need to press "Connect" in the panel. Turn it off if you\'d rather start it by hand.',
+    save:'Save', saved:'saved',
+    apps_and_tunnel:'Apps and tunnel',
+    mode_all:'All', mode_all_sub:'All traffic that reaches the proxy goes through the server.',
+    mode_only:'Only selected', mode_only_sub:'Only apps from the list go through the tunnel. The rest go direct.',
+    mode_except:'All except selected', mode_except_sub:'Apps from the list go direct, bypassing the tunnel. The rest go through the server.',
+    selected_apps:'Selected apps', add_app:'+  Add app',
+    apps_note:'Apps that never talk to the proxy at all (some games, apps with their own network stack) are invisible to the tunnel — they always go around it.',
+    who_is_online:'Who is online', clear:'Clear',
+    pick_app:'Pick an app', close:'Close', search_app:'Search by name or path…',
+    custom_flag_name:'Custom (no flag)',
+  },
+};
+function tr(key){ return (I18N[LANG] && I18N[LANG][key]) || (I18N.ru[key] || key); }
+
+function applyI18n(){
+  document.documentElement.lang = LANG;
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = tr(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = tr(el.dataset.i18nTitle); });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = tr(el.dataset.i18nPh); });
+  renderModes();
+  renderApps();
+  if(typeof renderCitySelect === 'function') renderCitySelect();
+  renderTabs();
+  renderHomePicker();
+  if(typeof setState === 'function') setState(lastState);
+}
+$('language').addEventListener('change', () => {
+  LANG = $('language').value === 'en' ? 'en' : 'ru';
+  applyI18n();
+  formDirty = true;
+});
+
 const FIELDS = ['host','user','keyPath','sshPort','socksPort','httpPort','poolSize'];
-const CHECKS = ['verbose','autoStart','localViaTunnel'];
+const PROFILE_CHECKS = ['localViaTunnel'];
+const CHECKS = ['verbose'];
 
 /* Правила фильтра живут отдельно от полей формы: они правятся на своём
    экране и сохраняются своей кнопкой. */
@@ -614,14 +799,13 @@ function normApp(name){
   return name.endsWith('.exe') ? name : name + '.exe';
 }
 
-const MODE_NAMES = { all:'Все', only:'Только выбранные', except:'Все, кроме выбранных' };
-
 function renderModes(){
   document.querySelectorAll('#modes .mode').forEach(el =>
     el.classList.toggle('on', el.dataset.mode === filterMode));
   $('appsBox').hidden = filterMode === 'all';
-  $('filterSummary').textContent = MODE_NAMES[filterMode] +
-    (filterMode === 'all' ? '' : ' — ' + filterApps.length + ' шт.');
+  const names = { all: tr('mode_all'), only: tr('mode_only'), except: tr('mode_except') };
+  $('filterSummary').textContent = names[filterMode] +
+    (filterMode === 'all' ? '' : ' — ' + filterApps.length);
 }
 
 document.querySelectorAll('#modes .mode').forEach(el => {
@@ -685,7 +869,8 @@ function toggleApp(name, path){
 let menuEl = null;
 function closeMenu(){ if(menuEl){ menuEl.remove(); menuEl = null; } }
 document.addEventListener('click', ev => {
-  if(menuEl && !menuEl.contains(ev.target) && ev.target !== $('addApp')) closeMenu();
+  if(menuEl && !menuEl.contains(ev.target) && !$('addApp').contains(ev.target) &&
+     !$('homePicker').contains(ev.target)) closeMenu();
 });
 
 $('addApp').onclick = ev => {
@@ -762,22 +947,37 @@ function renderProcs(){
 
 /* ---------- сохранение правил ---------- */
 $('saveFilter').onclick = async () => {
-  const cfg = Object.assign({}, lastConfig, {
+  const doc = docWithProfile(Object.assign({}, currentProfile(), {
     filterMode: filterMode,
     filterApps: filterApps,
-  });
-  const r = await api('/api/config', cfg);
+  }));
+  const r = await api('/api/config', doc);
   if(r.error){ $('filterNote').textContent = r.error; return; }
-  lastConfig = r.config;
+  applyDoc(r.config);
   filterDirty = false;
-  $('filterNote').textContent = 'сохранено, работает сразу';
+  $('filterNote').textContent = tr('saved') + ', работает сразу';
   setTimeout(() => $('filterNote').textContent = '', 3000);
 };
 
 let running = false, formDirty = false, speedRunning = false;
-// Последние известные настройки: экран фильтра сохраняет их целиком, меняя
-// только свои поля, иначе он затёр бы адрес сервера и порты.
-let lastConfig = {};
+// cfg — весь документ настроек целиком: список серверов и общие галочки.
+// Экран фильтра и вкладки сервера меняют в нём только свою часть и всегда
+// отправляют документ целиком — так соседние поля не затираются.
+let cfg = { profiles: [], activeProfile: '' };
+// editingProfileId — какой сервер сейчас показан в форме настроек. Не
+// обязательно тот же самый, что подключён (activeProfile): вкладки можно
+// листать и править, не переключая, к какому серверу идёт туннель.
+let editingProfileId = null;
+
+function currentProfile(){
+  return (cfg.profiles || []).find(p => p.id === editingProfileId) || (cfg.profiles || [])[0] || {};
+}
+// docWithProfile — весь документ с одним обновлённым профилем внутри массива.
+function docWithProfile(p){
+  const doc = Object.assign({}, cfg);
+  doc.profiles = (cfg.profiles || []).map(x => x.id === p.id ? p : x);
+  return doc;
+}
 
 /* ---------- переключение экранов ---------- */
 const VIEWS = ['viewMain','viewSettings','viewFilter','viewLog'];
@@ -816,14 +1016,17 @@ function fmtMbps(v){
 
 /* ---------- состояние ---------- */
 const STATES = {
-  stopped:      ['Отключено',            'Подключить',  ''    ],
-  connecting:   ['Подключаюсь…',         'Отмена',      'busy'],
-  connected:    ['Защищено',             'Отключить',   'on'  ],
-  reconnecting: ['Связь потеряна',       'Отключить',   'busy'],
-  error:        ['Ошибка',               'Подключить',  'bad' ],
+  stopped:      ['state_stopped',      'connect',    ''    ],
+  connecting:   ['state_connecting',   'cancel',     'busy'],
+  connected:    ['state_connected',    'disconnect', 'on'  ],
+  reconnecting: ['state_reconnecting', 'disconnect', 'busy'],
+  error:        ['state_error',        'connect',    'bad' ],
 };
+let lastState = 'stopped';
 function setState(s, detail){
-  const [text, cap, cls] = STATES[s] || [s, 'Подключить', ''];
+  lastState = s;
+  const [textKey, capKey, cls] = STATES[s] || ['state_stopped', 'connect', ''];
+  const text = tr(textKey), cap = tr(capKey);
   $('stateText').textContent = text;
   if(detail !== undefined) $('stateDetail').textContent = detail || '';
   $('powerCap').textContent = cap;
@@ -1138,8 +1341,6 @@ function renderBootState(st){
   if(!st || !st.supported){ $('bootBlock').hidden = true; return; }
   $('bootBlock').hidden = false;
   $('bootStart').checked = !!st.enabled;
-  $('bootDockerRow').hidden = !st.dockerFound;
-  $('bootDocker').checked = !!st.dockerEnabled;
 
   if(!st.enabled){
     $('bootStatus').textContent = '';
@@ -1155,7 +1356,6 @@ async function applyBoot(password){
   $('bootStatus').textContent = 'настраиваю…';
   const r = await api('/api/bootstart', {
     enabled: $('bootStart').checked,
-    docker: $('bootDocker').checked,
     password: password || ''
   });
   if(r.state) renderBootState(r.state);
@@ -1179,7 +1379,6 @@ async function applyBoot(password){
 }
 
 $('bootStart').onchange = () => applyBoot('');
-$('bootDocker').onchange = () => applyBoot('');
 $('sudoApply').onclick = () => {
   const pass = $('sudoPass').value;
   $('sudoPass').value = '';
@@ -1316,59 +1515,327 @@ function splitEntries(v){
   return (v || '').split(/[\s,;]+/).map(x => x.trim()).filter(Boolean);
 }
 
-[...FIELDS, ...CHECKS, 'directHosts', 'autoConnect'].forEach(f => {
+[...FIELDS, ...PROFILE_CHECKS, ...CHECKS, 'directHosts', 'autoConnect',
+ 'citySelect', 'customCityName', 'showServerPicker'].forEach(f => {
   const el = $(f);
   if(el) el.addEventListener('input', () => { formDirty = true; });
 });
 
+/* ---------- список популярных мест для вкладки сервера ---------- */
+/* Это только подпись и флаг у вкладки — своя личная метка для сервера,
+   а не выбор точки выхода: сервер всё равно только твой собственный, по
+   адресу, который указан ниже. Города — просто узнаваемые ориентиры. */
+const CITIES = [
+  {name:'Амстердам', en:'Amsterdam', flag:'🇳🇱'},
+  {name:'Франкфурт', en:'Frankfurt', flag:'🇩🇪'},
+  {name:'Берлин', en:'Berlin', flag:'🇩🇪'},
+  {name:'Лондон', en:'London', flag:'🇬🇧'},
+  {name:'Париж', en:'Paris', flag:'🇫🇷'},
+  {name:'Мадрид', en:'Madrid', flag:'🇪🇸'},
+  {name:'Милан', en:'Milan', flag:'🇮🇹'},
+  {name:'Цюрих', en:'Zurich', flag:'🇨🇭'},
+  {name:'Вена', en:'Vienna', flag:'🇦🇹'},
+  {name:'Стокгольм', en:'Stockholm', flag:'🇸🇪'},
+  {name:'Осло', en:'Oslo', flag:'🇳🇴'},
+  {name:'Хельсинки', en:'Helsinki', flag:'🇫🇮'},
+  {name:'Варшава', en:'Warsaw', flag:'🇵🇱'},
+  {name:'Прага', en:'Prague', flag:'🇨🇿'},
+  {name:'Рига', en:'Riga', flag:'🇱🇻'},
+  {name:'Вильнюс', en:'Vilnius', flag:'🇱🇹'},
+  {name:'Таллин', en:'Tallinn', flag:'🇪🇪'},
+  {name:'Бухарест', en:'Bucharest', flag:'🇷🇴'},
+  {name:'София', en:'Sofia', flag:'🇧🇬'},
+  {name:'Стамбул', en:'Istanbul', flag:'🇹🇷'},
+  {name:'Дубай', en:'Dubai', flag:'🇦🇪'},
+  {name:'Тель-Авив', en:'Tel Aviv', flag:'🇮🇱'},
+  {name:'Нью-Йорк', en:'New York', flag:'🇺🇸'},
+  {name:'Лос-Анджелес', en:'Los Angeles', flag:'🇺🇸'},
+  {name:'Торонто', en:'Toronto', flag:'🇨🇦'},
+  {name:'Сан-Паулу', en:'São Paulo', flag:'🇧🇷'},
+  {name:'Сингапур', en:'Singapore', flag:'🇸🇬'},
+  {name:'Токио', en:'Tokyo', flag:'🇯🇵'},
+  {name:'Гонконг', en:'Hong Kong', flag:'🇭🇰'},
+  {name:'Сидней', en:'Sydney', flag:'🇦🇺'},
+];
+
+function renderCitySelect(){
+  const sel = $('citySelect');
+  const keep = sel.value;
+  sel.innerHTML = '';
+  CITIES.forEach((c, i) => {
+    const o = document.createElement('option');
+    o.value = String(i);
+    o.textContent = c.flag + ' ' + (LANG === 'en' ? c.en : c.name);
+    sel.appendChild(o);
+  });
+  const custom = document.createElement('option');
+  custom.value = '__custom__';
+  custom.textContent = tr('custom_flag_name');
+  sel.appendChild(custom);
+  if([...sel.options].some(o => o.value === keep)) sel.value = keep;
+}
+
+// cityFor — city{name,en,flag} у профиля, если его флаг+имя совпадают с
+// одним из списка. Сравниваем и по русскому, и по английскому названию:
+// человек мог выбрать город при одном языке интерфейса, а открыть настройки
+// при другом.
+function cityFor(p){
+  return CITIES.find(c => c.flag === p.flag && (c.name === p.name || c.en === p.name));
+}
+
+function renderCityPicker(p){
+  const c = cityFor(p);
+  if(c){
+    $('citySelect').value = String(CITIES.indexOf(c));
+    $('customCityName').hidden = true;
+  } else {
+    $('citySelect').value = '__custom__';
+    $('customCityName').hidden = false;
+    $('customCityName').value = p.name || '';
+  }
+}
+$('citySelect').addEventListener('change', () => {
+  const custom = $('citySelect').value === '__custom__';
+  $('customCityName').hidden = !custom;
+  if(custom) $('customCityName').focus();
+  liveRetitleEditingTab();
+});
+$('customCityName').addEventListener('input', liveRetitleEditingTab);
+
+// pickedNameFlag — {name, flag}, которые сейчас выбраны в форме, ещё до
+// сохранения. Нужны и для живой подписи вкладки, и для сборки профиля перед
+// отправкой на сервер.
+function pickedNameFlag(){
+  const sel = $('citySelect').value;
+  if(sel === '__custom__'){
+    return { name: ($('customCityName').value || '').trim() || currentProfile().name || 'Server', flag: '' };
+  }
+  const c = CITIES[parseInt(sel, 10)];
+  return c ? { name: (LANG === 'en' ? c.en : c.name), flag: c.flag } : { name: currentProfile().name, flag: currentProfile().flag };
+}
+function liveRetitleEditingTab(){
+  const tab = document.querySelector('.tab[data-id="' + CSS.escape(editingProfileId || '') + '"]');
+  if(!tab) return;
+  const { name, flag } = pickedNameFlag();
+  const nm = tab.querySelector('.nm');
+  if(nm) nm.textContent = name;
+  // Флаг и логотип-заглушка — разные элементы (см. tabFlagHTML), поэтому при
+  // переключении между «есть флаг» и «своё имя» иконку пересоздаём, а не
+  // просто прячем: одно из двух в разметке вообще отсутствует.
+  const icon = tab.querySelector('.flag, .vg');
+  if(icon){
+    const next = document.createElement('span');
+    next.className = flag ? 'flag' : 'vg';
+    next.textContent = flag || 'VG';
+    icon.replaceWith(next);
+  }
+}
+
+/* ---------- вкладки серверов ---------- */
+function tabFlagHTML(p){
+  return p.flag ? '<span class="flag">' + p.flag + '</span>'
+                : '<span class="vg">VG</span>';
+}
+
+function renderTabs(){
+  const box = $('profileTabs');
+  box.innerHTML = '';
+  (cfg.profiles || []).forEach(p => {
+    const b = document.createElement('button');
+    b.className = 'tab' + (p.id === editingProfileId ? ' editing' : '');
+    b.dataset.id = p.id;
+    b.innerHTML = tabFlagHTML(p) + '<span class="nm"></span>' +
+      (p.id === cfg.activeProfile ? '<span class="dot" title="' + tr('current_server') + '"></span>' : '');
+    b.querySelector('.nm').textContent = p.name;
+    b.onclick = () => selectEditingTab(p.id);
+    box.appendChild(b);
+  });
+  const plus = document.createElement('button');
+  plus.className = 'tab tabAdd';
+  plus.textContent = '+';
+  plus.title = tr('add_server');
+  plus.onclick = addProfile;
+  box.appendChild(plus);
+
+  renderGeneralVisibility();
+}
+
+// renderGeneralVisibility — «выбор сервера на главном» и «удалить сервер»
+// имеют смысл только когда серверов больше одного.
+function renderGeneralVisibility(){
+  const many = (cfg.profiles || []).length > 1;
+  // .chk-row задаёт свой display:flex — как и с #curBadge/#homePicker, обычный
+  // hidden тут не подействует.
+  $('showPickerRow').style.display = many ? 'flex' : 'none';
+  $('removeServerBtn').hidden = !many;
+}
+
+function renderSelectServerBtn(){
+  const isActive = editingProfileId === cfg.activeProfile;
+  $('selectServerBtn').hidden = isActive;
+  // .curBadge задаёт свой display:flex в CSS, а он бьёт [hidden] по
+  // приоритету источника стилей — обычным hidden тут не спрятать,
+  // переключаем display в JS напрямую (как и с рядом других таких блоков).
+  $('curBadge').style.display = isActive ? 'flex' : 'none';
+}
+
+function selectEditingTab(id){
+  if(id === editingProfileId) return;
+  if(formDirty && !confirm(tr('discard_unsaved'))) return;
+  editingProfileId = id;
+  formDirty = false;
+  fillProfileForm(currentProfile());
+  renderTabs();
+  renderSelectServerBtn();
+}
+
+async function addProfile(){
+  const r = await api('/api/profile/add', { name: '', flag: '' });
+  if(r.error){ showError(r.error, 'setError'); return; }
+  cfg = r.config;
+  editingProfileId = r.profile.id;
+  formDirty = false;
+  fillProfileForm(currentProfile());
+  renderTabs();
+  renderSelectServerBtn();
+  renderHomePicker();
+  $('citySelect').focus();
+}
+
+$('selectServerBtn').onclick = async () => {
+  const r = await api('/api/profile/select', { id: editingProfileId });
+  if(r.error){ showError(r.error, 'setError'); return; }
+  applyDoc(r.config);
+  if(r.note){ $('savedNote').textContent = r.note; setTimeout(() => $('savedNote').textContent = '', 6000); }
+};
+
+$('removeServerBtn').onclick = async () => {
+  if((cfg.profiles || []).length <= 1) return;
+  if(!confirm(tr('confirm_remove_server'))) return;
+  const r = await api('/api/profile/remove', { id: editingProfileId });
+  if(r.error){ showError(r.error, 'setError'); return; }
+  applyDoc(r.config, /*keepEditing*/false);
+  if(r.note){ $('savedNote').textContent = r.note; setTimeout(() => $('savedNote').textContent = '', 6000); }
+};
+
+/* ---------- виджет выбора сервера на главном экране ---------- */
+function renderHomePicker(){
+  const show = !!cfg.showServerPicker && (cfg.profiles || []).length > 1;
+  // Как и #curBadge, у #homePicker свой display:flex в CSS — ID-селектор
+  // всегда весомее атрибута [hidden], поэтому прячем через style напрямую.
+  $('homePicker').style.display = show ? 'flex' : 'none';
+  if(!show) return;
+  const active = (cfg.profiles || []).find(p => p.id === cfg.activeProfile) || {};
+  $('homePickerFlag').innerHTML = active.flag || '<span class="vg">VG</span>';
+  $('homePickerName').textContent = active.name || '';
+}
+$('homePicker').onclick = ev => {
+  ev.stopPropagation();
+  if(menuEl){ closeMenu(); return; }
+  const r = $('homePicker').getBoundingClientRect();
+  menuEl = document.createElement('div');
+  menuEl.className = 'menu';
+  menuEl.style.left = r.left + 'px';
+  menuEl.style.top = (r.bottom + 4) + 'px';
+  (cfg.profiles || []).forEach(p => {
+    const b = document.createElement('button');
+    b.textContent = (p.flag || 'VG') + '  ' + p.name;
+    b.onclick = async () => {
+      closeMenu();
+      const rr = await api('/api/profile/select', { id: p.id });
+      if(!rr.error) applyDoc(rr.config, false);
+    };
+    menuEl.appendChild(b);
+  });
+  document.body.appendChild(menuEl);
+};
+
 $('save').onclick = async () => {
-  const cfg = {};
+  const p = Object.assign({}, currentProfile());
   FIELDS.forEach(f => {
     const el = $(f);
-    cfg[f] = el.type === 'number' ? parseInt(el.value, 10) || 0 : el.value.trim();
+    p[f] = el.type === 'number' ? parseInt(el.value, 10) || 0 : el.value.trim();
   });
-  CHECKS.forEach(f => cfg[f] = $(f).checked);
+  PROFILE_CHECKS.forEach(f => p[f] = $(f).checked);
+  p.directHosts = splitEntries($('directHosts').value);
+  p.filterMode = filterMode;
+  p.filterApps = filterApps;
+  Object.assign(p, pickedNameFlag());
+
+  const doc = docWithProfile(p);
+  CHECKS.forEach(f => doc[f] = $(f).checked);
   // autoConnect — не в CHECKS: пока его явно не сохранили, у поля нет
   // значения (см. AutoConnect в конфиге), и после сохранения оно становится
   // явным true/false — как с любой другой галочкой.
-  cfg.autoConnect = $('autoConnect').checked;
-  cfg.directHosts = splitEntries($('directHosts').value);
-  cfg.filterMode = filterMode;
-  cfg.filterApps = filterApps;
-  const r = await api('/api/config', cfg);
+  doc.autoConnect = $('autoConnect').checked;
+  doc.autoStart = $('autoStart').checked;
+  doc.language = LANG;
+  doc.showServerPicker = $('showServerPicker').checked;
+
+  const r = await api('/api/config', doc);
   if(r.error){ showError(r.error, 'setError'); return; }
   showError('', 'setError');
-  fillConfig(r.config);
-  $('savedNote').textContent = r.note ? 'сохранено — ' + r.note : 'сохранено';
+  applyDoc(r.config);
+  $('savedNote').textContent = r.note ? tr('saved') + ' — ' + r.note : tr('saved');
   setTimeout(() => $('savedNote').textContent = '', 4000);
 };
 
-function fillConfig(cfg){
-  lastConfig = cfg;
-  FIELDS.forEach(f => { if($(f)) $(f).value = cfg[f] ?? ''; });
-  CHECKS.forEach(f => { if($(f)) $(f).checked = !!cfg[f]; });
-  // Пока настройку не сохраняли явно (cfg.autoConnect === undefined), в силе
-  // старое поведение — программа подключается сама, поэтому и галочка стоит.
-  $('autoConnect').checked = cfg.autoConnect === undefined || cfg.autoConnect === null
-    ? true : !!cfg.autoConnect;
-  $('directHosts').value = (cfg.directHosts || []).join(', ');
+function fillProfileForm(p){
+  FIELDS.forEach(f => { if($(f)) $(f).value = p[f] ?? ''; });
+  PROFILE_CHECKS.forEach(f => { if($(f)) $(f).checked = !!p[f]; });
+  $('directHosts').value = (p.directHosts || []).join(', ');
   if(!filterDirty){
-    filterMode = cfg.filterMode || 'all';
-    filterApps = (cfg.filterApps || []).map(normApp);
+    filterMode = p.filterMode || 'all';
+    filterApps = (p.filterApps || []).map(normApp);
   }
   renderModes();
   renderApps();
+  renderCityPicker(p);
+}
+
+function fillGeneralForm(c){
+  CHECKS.forEach(f => { if($(f)) $(f).checked = !!c[f]; });
+  $('autoStart').checked = !!c.autoStart;
+  // Пока настройку не сохраняли явно (autoConnect === undefined), в силе
+  // старое поведение — программа подключается сама, поэтому и галочка стоит.
+  $('autoConnect').checked = c.autoConnect === undefined || c.autoConnect === null
+    ? true : !!c.autoConnect;
+  $('showServerPicker').checked = !!c.showServerPicker;
+  if(c.language && c.language !== LANG){
+    LANG = c.language === 'en' ? 'en' : 'ru';
+  }
+  $('language').value = LANG;
+}
+
+// applyDoc — центральная точка «пришли свежие настройки, разложи их по
+// экрану». keepEditing=false используется после удаления сервера: править
+// удалённый профиль больше нельзя, форма переключается на активный.
+function applyDoc(newCfg, keepEditing){
+  cfg = newCfg;
+  if(keepEditing === false || !(cfg.profiles || []).some(p => p.id === editingProfileId)){
+    editingProfileId = cfg.activeProfile;
+  }
+  fillProfileForm(currentProfile());
+  fillGeneralForm(cfg);
+  renderTabs();
+  renderSelectServerBtn();
+  renderHomePicker();
+  applyI18n();
   formDirty = false;
 }
 
 
 async function refresh(){
   const st = await api('/api/status');
-  setState(st.state, st.state === 'connected' ? st.config.host : '');
+  const active = (st.config.profiles || []).find(p => p.id === st.config.activeProfile) || {};
+  setState(st.state, st.state === 'connected' ? active.host : '');
   // Пока пользователь правит форму, обновление с сервера её не трогает —
   // иначе набранный, но ещё не сохранённый адрес затирался бы.
   seenApps = (st.seenApps || []);
-  if(!formDirty) fillConfig(st.config);
+  if(!formDirty){
+    if(editingProfileId === null) editingProfileId = st.config.activeProfile;
+    applyDoc(st.config);
+  }
   if(st.os && st.os !== OS){
     OS = st.os;
     // Галочка «Подключаться сразу при запуске» в верхней части настроек
@@ -1380,6 +1847,7 @@ async function refresh(){
   }
 }
 
+renderCitySelect();
 connectEvents();
 refresh();
 setInterval(() => { if(!running) refresh(); }, 5000);

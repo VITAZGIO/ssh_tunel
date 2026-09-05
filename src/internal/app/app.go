@@ -48,12 +48,13 @@ type App struct {
 }
 
 func New(cfg config.Config) *App {
+	active := cfg.Active()
 	a := &App{
 		Bus:      events.NewBus(),
 		cfg:      cfg,
 		sys:      sysproxy.NewManager(config.Dir()),
-		policy:   routing.New(routing.Mode(cfg.FilterMode), cfg.FilterApps),
-		direct:   routing.NewDirectList(cfg.DirectHosts),
+		policy:   routing.New(routing.Mode(active.FilterMode), active.FilterApps),
+		direct:   routing.NewDirectList(active.DirectHosts),
 		seenApps: map[string]struct{}{},
 	}
 	go a.collectSeenApps()
@@ -105,12 +106,13 @@ func (a *App) SetConfig(cfg config.Config) (string, error) {
 	tun := a.tun
 	a.mu.Unlock()
 
-	a.policy.Set(routing.Mode(cfg.FilterMode), cfg.FilterApps)
-	a.direct.Set(cfg.DirectHosts)
+	active := cfg.Active()
+	a.policy.Set(routing.Mode(active.FilterMode), active.FilterApps)
+	a.direct.Set(active.DirectHosts)
 	if tun != nil {
 		tun.SetPolicy(a.policy)
 		tun.SetDirect(a.direct)
-		tun.SetLocalViaTunnel(cfg.LocalViaTunnel)
+		tun.SetLocalViaTunnel(active.LocalViaTunnel)
 	}
 
 	if err := cfg.Save(); err != nil {
@@ -123,13 +125,77 @@ func (a *App) SetConfig(cfg config.Config) (string, error) {
 	return "", nil
 }
 
-// connectionSettingsChanged — поменялось ли то, ради чего надо переподключаться.
+// SwitchProfile переключает активный сервер. Работающий туннель принадлежит
+// прежнему серверу, поэтому его надо остановить — переподключаться к новому
+// адресу молча, без нажатия «Подключить», было бы неожиданно.
+func (a *App) SwitchProfile(id string) (string, error) {
+	a.mu.Lock()
+	if _, ok := a.cfg.ProfileByID(id); !ok {
+		a.mu.Unlock()
+		return "", fmt.Errorf("сервер с id %q не найден", id)
+	}
+	a.cfg.ActiveProfile = id
+	cfg := a.cfg
+	wasRunning := a.running
+	a.mu.Unlock()
+
+	if err := cfg.Save(); err != nil {
+		return "", err
+	}
+	if wasRunning {
+		a.Stop()
+		return "туннель прежнего сервера остановлен — нажми «Подключить», чтобы поднять новый", nil
+	}
+	return "", nil
+}
+
+// AddProfile заводит новый сервер и сразу сохраняет его в списке — activным
+// он не становится сам: выбор сервера остаётся отдельным явным действием.
+func (a *App) AddProfile(name, flag string) (config.Profile, error) {
+	a.mu.Lock()
+	p := a.cfg.AddProfile(name, flag)
+	cfg := a.cfg
+	a.mu.Unlock()
+	if err := cfg.Save(); err != nil {
+		return config.Profile{}, err
+	}
+	return p, nil
+}
+
+// RemoveProfile удаляет сервер из списка. Если это был активный (и, значит,
+// возможно, подключённый прямо сейчас) — туннель останавливается: он остался
+// бы работать по адресу, которого в настройках больше нет.
+func (a *App) RemoveProfile(id string) (string, error) {
+	a.mu.Lock()
+	wasActive := a.cfg.ActiveProfile == id
+	ok := a.cfg.RemoveProfile(id)
+	cfg := a.cfg
+	wasRunning := a.running
+	a.mu.Unlock()
+	if !ok {
+		return "", errors.New("этот сервер удалить нельзя — он либо не найден, либо последний из оставшихся")
+	}
+	if err := cfg.Save(); err != nil {
+		return "", err
+	}
+	if wasActive && wasRunning {
+		a.Stop()
+		return "удалённый сервер был подключён — туннель остановлен", nil
+	}
+	return "", nil
+}
+
+// connectionSettingsChanged — поменялось ли у активного сервера то, ради чего
+// надо переподключаться. Правки в неактивном профиле (другая вкладка) сюда не
+// попадают: он всё равно ни к чему сейчас не подключён.
 func connectionSettingsChanged(a, b config.Config) bool {
-	return a.Host != b.Host || a.SSHPort != b.SSHPort || a.User != b.User ||
-		a.KeyPath != b.KeyPath || a.SocksPort != b.SocksPort ||
-		a.HTTPPort != b.HTTPPort || a.PoolSize != b.PoolSize ||
-		a.SysProxy != b.SysProxy || a.SetEnvVars != b.SetEnvVars ||
-		a.LocalViaTunnel != b.LocalViaTunnel
+	newActive := b.Active()
+	oldActive, _ := a.ProfileByID(newActive.ID)
+	return oldActive.Host != newActive.Host || oldActive.SSHPort != newActive.SSHPort ||
+		oldActive.User != newActive.User || oldActive.KeyPath != newActive.KeyPath ||
+		oldActive.SocksPort != newActive.SocksPort || oldActive.HTTPPort != newActive.HTTPPort ||
+		oldActive.PoolSize != newActive.PoolSize || oldActive.LocalViaTunnel != newActive.LocalViaTunnel ||
+		a.SysProxy != b.SysProxy || a.SetEnvVars != b.SetEnvVars
 }
 
 func (a *App) Running() bool {
@@ -154,27 +220,28 @@ func (a *App) Start() error {
 	}
 	cfg := a.cfg
 	a.mu.Unlock()
+	active := cfg.Active()
 
-	if cfg.Host == "" {
+	if active.Host == "" {
 		return errors.New("не указан адрес сервера")
 	}
 
-	socksAddr := net.JoinHostPort("127.0.0.1", strconv.Itoa(cfg.SocksPort))
-	httpAddr := net.JoinHostPort("127.0.0.1", strconv.Itoa(cfg.HTTPPort))
+	socksAddr := net.JoinHostPort("127.0.0.1", strconv.Itoa(active.SocksPort))
+	httpAddr := net.JoinHostPort("127.0.0.1", strconv.Itoa(active.HTTPPort))
 
 	tun := tunnel.New(tunnel.Config{
-		Host:           cfg.Host,
-		SSHPort:        cfg.SSHPort,
-		User:           cfg.User,
-		KeyPath:        cfg.KeyPath,
+		Host:           active.Host,
+		SSHPort:        active.SSHPort,
+		User:           active.User,
+		KeyPath:        active.KeyPath,
 		SocksAddr:      socksAddr,
 		HTTPAddr:       httpAddr,
-		PoolSize:       cfg.PoolSize,
+		PoolSize:       active.PoolSize,
 		KnownHostsPath: config.KnownHostsPath(),
 		Verbose:        cfg.Verbose,
 		Policy:         a.policy,
 		Direct:         a.direct,
-		LocalViaTunnel: cfg.LocalViaTunnel,
+		LocalViaTunnel: active.LocalViaTunnel,
 	}, a.Bus)
 
 	if err := tun.Start(); err != nil {
@@ -188,7 +255,7 @@ func (a *App) Start() error {
 	a.mu.Unlock()
 
 	if cfg.SysProxy {
-		if err := a.sys.Enable(httpAddr, socksAddr, cfg.SetEnvVars, !cfg.LocalViaTunnel, cfg.DirectHosts); err != nil {
+		if err := a.sys.Enable(httpAddr, socksAddr, cfg.SetEnvVars, !active.LocalViaTunnel, active.DirectHosts); err != nil {
 			a.Bus.Warnf("Не удалось включить системный прокси: %v. Туннель работает, но приложения надо настроить вручную.", err)
 		} else {
 			a.mu.Lock()
@@ -298,7 +365,7 @@ func (a *App) SpeedTest() (speedtest.Result, error) {
 		Dial: tun.Dial,
 		// Потоков столько же, сколько соединений в пуле: меряем ровно то,
 		// чем пользуются приложения.
-		Streams: cfg.PoolSize,
+		Streams: cfg.Active().PoolSize,
 		OnProgress: func(phase string, mbps float64) {
 			a.Bus.Speed(phase, mbps, false)
 		},
@@ -322,5 +389,5 @@ func (a *App) ProxyURL() string {
 
 func (a *App) EnvHint() []string {
 	cfg := a.Config()
-	return sysproxy.EnvHint(net.JoinHostPort("127.0.0.1", strconv.Itoa(cfg.HTTPPort)))
+	return sysproxy.EnvHint(net.JoinHostPort("127.0.0.1", strconv.Itoa(cfg.Active().HTTPPort)))
 }

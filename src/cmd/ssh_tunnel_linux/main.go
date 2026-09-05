@@ -44,23 +44,26 @@ const (
 
 func main() {
 	cfg := config.Load()
+	// Флаги правят активный сервер: у консольной версии одна вкладка, и это
+	// она. Несколько серверов заводятся и переключаются уже в веб-панели.
+	p := cfg.Active()
 
-	flag.StringVar(&cfg.Host, "host", cfg.Host, "адрес сервера")
-	flag.IntVar(&cfg.SSHPort, "sshport", cfg.SSHPort, "SSH-порт сервера")
-	flag.StringVar(&cfg.User, "user", cfg.User, "пользователь SSH")
-	flag.StringVar(&cfg.KeyPath, "key", cfg.KeyPath, "путь к приватному ключу")
-	flag.IntVar(&cfg.SocksPort, "port", cfg.SocksPort, "локальный порт SOCKS4/SOCKS5")
-	flag.IntVar(&cfg.HTTPPort, "httpport", cfg.HTTPPort, "локальный порт HTTP-прокси")
-	flag.IntVar(&cfg.PoolSize, "pool", cfg.PoolSize, "сколько SSH-соединений держать (больше — быстрее)")
+	flag.StringVar(&p.Host, "host", p.Host, "адрес сервера")
+	flag.IntVar(&p.SSHPort, "sshport", p.SSHPort, "SSH-порт сервера")
+	flag.StringVar(&p.User, "user", p.User, "пользователь SSH")
+	flag.StringVar(&p.KeyPath, "key", p.KeyPath, "путь к приватному ключу")
+	flag.IntVar(&p.SocksPort, "port", p.SocksPort, "локальный порт SOCKS4/SOCKS5")
+	flag.IntVar(&p.HTTPPort, "httpport", p.HTTPPort, "локальный порт HTTP-прокси")
+	flag.IntVar(&p.PoolSize, "pool", p.PoolSize, "сколько SSH-соединений держать (больше — быстрее)")
 	flag.BoolVar(&cfg.SysProxy, "sysproxy", cfg.SysProxy, "настраивать прокси рабочего стола (GNOME), если он есть")
 	flag.BoolVar(&cfg.SetEnvVars, "setenv", cfg.SetEnvVars, "писать файл proxy.env с переменными окружения")
-	flag.StringVar(&cfg.FilterMode, "filter", cfg.FilterMode,
+	flag.StringVar(&p.FilterMode, "filter", p.FilterMode,
 		"какие программы вести через туннель: all, only, except")
-	apps := flag.String("apps", strings.Join(cfg.FilterApps, ","),
+	apps := flag.String("apps", strings.Join(p.FilterApps, ","),
 		"список программ для -filter через запятую")
-	flag.BoolVar(&cfg.LocalViaTunnel, "local-via-tunnel", cfg.LocalViaTunnel,
+	flag.BoolVar(&p.LocalViaTunnel, "local-via-tunnel", p.LocalViaTunnel,
 		"вести через сервер и локальную сеть (по умолчанию она идёт напрямую)")
-	direct := flag.String("direct", strings.Join(cfg.DirectHosts, ","),
+	direct := flag.String("direct", strings.Join(p.DirectHosts, ","),
 		"адреса и сети, которые всегда идут напрямую (через запятую)")
 	flag.BoolVar(&cfg.Verbose, "v", cfg.Verbose, "подробный журнал")
 
@@ -73,11 +76,12 @@ func main() {
 	printEnv := flag.Bool("env", false, "напечатать строки для подключения прокси в оболочке и выйти")
 	flag.Parse()
 
-	cfg.FilterApps = splitApps(*apps)
-	cfg.DirectHosts = routing.SplitEntries(*direct)
+	p.FilterApps = splitApps(*apps)
+	p.DirectHosts = routing.SplitEntries(*direct)
+	cfg.SetProfile(p)
 
 	if *printEnv {
-		for _, line := range envLines(cfg) {
+		for _, line := range envLines(p) {
 			fmt.Println(line)
 		}
 		return
@@ -89,7 +93,7 @@ func main() {
 		fmt.Println("Настройки сохранены в", config.Path())
 		return
 	}
-	if cfg.Host == "" {
+	if p.Host == "" {
 		usage()
 		os.Exit(1)
 	}
@@ -135,7 +139,7 @@ func main() {
 	// Без веб-интерфейса подключаться самому нечем, поэтому там AutoConnect не
 	// спрашиваем — консоль всегда поднимает туннель сразу, как и раньше.
 	if !*web || cfg.AutoConnectEnabled() {
-		fmt.Printf("\nПодключаюсь к %s:%d...\n", cfg.Host, cfg.SSHPort)
+		fmt.Printf("\nПодключаюсь к %s:%d...\n", p.Host, p.SSHPort)
 		if err := a.Start(); err != nil {
 			// С веб-интерфейсом выходить нельзя: настройки правятся как раз
 			// через него, и человек остался бы без единственного способа
@@ -159,7 +163,7 @@ func main() {
 
 Готово. Ctrl+C — выйти.
 
-`, cfg.SocksPort, cfg.HTTPPort, envFilePath())
+`, p.SocksPort, p.HTTPPort, envFilePath())
 
 	<-shutdown.OnExit(func() {
 		fmt.Println("\nЗавершаю...")
@@ -172,8 +176,8 @@ func envFilePath() string {
 	return config.Dir() + "/proxy.env"
 }
 
-func envLines(cfg config.Config) []string {
-	url := fmt.Sprintf("http://127.0.0.1:%d", cfg.HTTPPort)
+func envLines(p config.Profile) []string {
+	url := fmt.Sprintf("http://127.0.0.1:%d", p.HTTPPort)
 	return []string{
 		"export http_proxy=" + url,
 		"export https_proxy=" + url,

@@ -19,32 +19,36 @@ import (
 
 func main() {
 	cfg := config.Load()
+	// Флаги правят активный сервер: у консольной версии одна вкладка, и это
+	// она. Несколько серверов заводятся и переключаются уже в веб-панели.
+	p := cfg.Active()
 
-	flag.StringVar(&cfg.Host, "host", cfg.Host, "адрес сервера")
-	flag.IntVar(&cfg.SSHPort, "sshport", cfg.SSHPort, "SSH-порт сервера")
-	flag.StringVar(&cfg.User, "user", cfg.User, "пользователь SSH")
-	flag.StringVar(&cfg.KeyPath, "key", cfg.KeyPath, "путь к приватному ключу")
-	flag.IntVar(&cfg.SocksPort, "port", cfg.SocksPort, "локальный порт SOCKS4/SOCKS5")
-	flag.IntVar(&cfg.HTTPPort, "httpport", cfg.HTTPPort, "локальный порт HTTP-прокси")
-	flag.IntVar(&cfg.PoolSize, "pool", cfg.PoolSize, "сколько SSH-соединений держать (больше — быстрее)")
+	flag.StringVar(&p.Host, "host", p.Host, "адрес сервера")
+	flag.IntVar(&p.SSHPort, "sshport", p.SSHPort, "SSH-порт сервера")
+	flag.StringVar(&p.User, "user", p.User, "пользователь SSH")
+	flag.StringVar(&p.KeyPath, "key", p.KeyPath, "путь к приватному ключу")
+	flag.IntVar(&p.SocksPort, "port", p.SocksPort, "локальный порт SOCKS4/SOCKS5")
+	flag.IntVar(&p.HTTPPort, "httpport", p.HTTPPort, "локальный порт HTTP-прокси")
+	flag.IntVar(&p.PoolSize, "pool", p.PoolSize, "сколько SSH-соединений держать (больше — быстрее)")
 	flag.BoolVar(&cfg.SysProxy, "sysproxy", cfg.SysProxy, "прописывать системный прокси Windows")
 	flag.BoolVar(&cfg.SetEnvVars, "setenv", cfg.SetEnvVars, "прописывать HTTPS_PROXY в переменные среды (нужно для Claude Code, npm, pip)")
-	flag.StringVar(&cfg.FilterMode, "filter", cfg.FilterMode,
+	flag.StringVar(&p.FilterMode, "filter", p.FilterMode,
 		"какие программы вести через туннель: all (все), only (только указанные), except (все, кроме указанных)")
-	apps := flag.String("apps", strings.Join(cfg.FilterApps, ","),
+	apps := flag.String("apps", strings.Join(p.FilterApps, ","),
 		"список программ для -filter через запятую, например steam.exe,discord.exe")
-	flag.BoolVar(&cfg.LocalViaTunnel, "local-via-tunnel", cfg.LocalViaTunnel,
+	flag.BoolVar(&p.LocalViaTunnel, "local-via-tunnel", p.LocalViaTunnel,
 		"вести через сервер и локальную сеть (по умолчанию она идёт напрямую)")
-	direct := flag.String("direct", strings.Join(cfg.DirectHosts, ","),
+	direct := flag.String("direct", strings.Join(p.DirectHosts, ","),
 		"адреса и сети, которые всегда идут напрямую (через запятую)")
 	flag.BoolVar(&cfg.Verbose, "v", cfg.Verbose, "подробный лог")
 	save := flag.Bool("save", false, "сохранить указанные настройки как значения по умолчанию и выйти")
 	flag.Parse()
 
-	cfg.FilterApps = splitApps(*apps)
-	cfg.DirectHosts = routing.SplitEntries(*direct)
+	p.FilterApps = splitApps(*apps)
+	p.DirectHosts = routing.SplitEntries(*direct)
+	cfg.SetProfile(p)
 
-	if cfg.Host == "" {
+	if p.Host == "" {
 		usage()
 		os.Exit(1)
 	}
@@ -62,7 +66,7 @@ func main() {
 
 	go printEvents(a.Bus, cfg.Verbose)
 
-	fmt.Printf("Подключаюсь к %s:%d...\n", cfg.Host, cfg.SSHPort)
+	fmt.Printf("Подключаюсь к %s:%d...\n", p.Host, p.SSHPort)
 	if err := a.Start(); err != nil {
 		fmt.Println("\nОшибка:", err)
 		waitEnter()
@@ -75,7 +79,7 @@ func main() {
 
 Готово. Держи окно открытым, пока нужен туннель. Ctrl+C — выйти.
 
-`, cfg.SocksPort, cfg.HTTPPort)
+`, p.SocksPort, p.HTTPPort)
 
 	<-shutdown.OnExit(func() {
 		fmt.Println("\nЗавершаю...")
