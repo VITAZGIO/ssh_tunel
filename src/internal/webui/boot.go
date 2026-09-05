@@ -4,11 +4,11 @@
 //
 // Служба ставится пользовательская (systemctl --user), а не системная:
 // программе не нужны права администратора, а настройки и ключи лежат в
-// домашней папке. Root требуется ровно в двух местах — разрешить службе
-// работать без входа пользователя в систему (loginctl enable-linger) и, если
-// попросили, включить автозапуск самого Docker. Сначала пробуем без пароля:
-// на многих системах это разрешено политикой. Не вышло — страница показывает
-// поле для пароля, он используется один раз и нигде не сохраняется.
+// домашней папке. Root требуется ровно в одном месте — разрешить службе
+// работать без входа пользователя в систему (loginctl enable-linger). Сначала
+// пробуем без пароля: на многих системах это разрешено политикой. Не вышло —
+// страница показывает поле для пароля, он используется один раз и нигде не
+// сохраняется.
 package webui
 
 import (
@@ -36,10 +36,8 @@ type bootState struct {
 	// Linger — служба стартует при загрузке машины, не дожидаясь входа
 	// пользователя. Без него автозапуск сработает только после логина, что на
 	// сервере обычно не то, чего от него ждут.
-	Linger        bool   `json:"linger"`
-	UnitPath      string `json:"unitPath"`
-	DockerFound   bool   `json:"dockerFound"`
-	DockerEnabled bool   `json:"dockerEnabled"`
+	Linger   bool   `json:"linger"`
+	UnitPath string `json:"unitPath"`
 }
 
 func currentBootState() bootState {
@@ -52,17 +50,13 @@ func currentBootState() bootState {
 	}
 	st.Enabled = strings.TrimSpace(output("systemctl", "--user", "is-enabled", unitName)) == "enabled"
 	st.Linger = lingerOn()
-	st.DockerFound = dockerFound()
-	if st.DockerFound {
-		st.DockerEnabled = strings.TrimSpace(output("systemctl", "is-enabled", "docker.service")) == "enabled"
-	}
 	return st
 }
 
 // applyBoot включает или выключает автозапуск. password используется только
 // здесь и только для sudo — он не сохраняется, не пишется в журнал и не
 // возвращается обратно.
-func applyBoot(enable, withDocker bool, password string, flags []string) error {
+func applyBoot(enable bool, password string, flags []string) error {
 	if runtime.GOOS != "linux" || !haveSystemd() {
 		return errors.New("автозапуск через systemd есть только на Linux")
 	}
@@ -89,11 +83,6 @@ func applyBoot(enable, withDocker bool, password string, flags []string) error {
 	// честно скажем, чего именно не хватает.
 	if !lingerOn() {
 		if err := runRoot(password, "loginctl", "enable-linger", username()); err != nil {
-			return err
-		}
-	}
-	if withDocker && dockerFound() {
-		if err := runRoot(password, "systemctl", "enable", "docker.service"); err != nil {
 			return err
 		}
 	}
@@ -176,13 +165,6 @@ func username() string {
 func lingerOn() bool {
 	out := output("loginctl", "show-user", username(), "--property=Linger")
 	return strings.TrimSpace(out) == "Linger=yes"
-}
-
-func dockerFound() bool {
-	if _, err := exec.LookPath("docker"); err == nil {
-		return true
-	}
-	return output("systemctl", "list-unit-files", "docker.service") != ""
 }
 
 func haveSystemd() bool {
