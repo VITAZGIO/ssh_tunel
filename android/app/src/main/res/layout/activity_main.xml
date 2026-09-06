@@ -379,7 +379,7 @@
                         style="@style/SecondaryButton"
                         android:layout_width="0dp"
                         android:layout_weight="1"
-                        android:layout_height="match_parent"
+                        android:layout_height="wrap_content"
                         android:textSize="12.5sp"
                         android:paddingTop="9dp"
                         android:paddingBottom="9dp"
@@ -392,7 +392,7 @@
                         style="@style/SecondaryButton"
                         android:layout_width="0dp"
                         android:layout_weight="1"
-                        android:layout_height="match_parent"
+                        android:layout_height="wrap_content"
                         android:textSize="12.5sp"
                         android:paddingTop="9dp"
                         android:paddingBottom="9dp"
@@ -451,37 +451,21 @@
                     android:inputType="text" android:hint="@string/custom_flag_name"
                     android:textColorHint="@color/dim" android:autofillHints="" />
 
-                <Button
-                    android:id="@+id/removeProfileBtn"
-                    style="@style/SecondaryButton"
-                    android:layout_marginBottom="10dp"
-                    android:text="@string/remove_server" />
-
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:layout_marginBottom="14dp"
-                    android:gravity="center_vertical">
-                    <TextView
+                    android:layout_marginBottom="14dp">
+                    <Button
+                        android:id="@+id/removeProfileBtn"
+                        style="@style/SecondaryButton"
                         android:layout_width="0dp"
                         android:layout_weight="1"
                         android:layout_height="wrap_content"
-                        android:textSize="12sp"
-                        android:textColor="@color/dim"
-                        android:text="@string/always_on_label" />
-                    <TextView
-                        android:id="@+id/alwaysOnInfo"
-                        android:layout_width="16dp"
-                        android:layout_height="16dp"
-                        android:background="@drawable/bg_infoq"
-                        android:gravity="center"
-                        android:textSize="9sp"
-                        android:textStyle="bold"
-                        android:textColor="@color/dim"
-                        android:text="?"
-                        android:clickable="true"
-                        android:focusable="true" />
+                        android:text="@string/remove_server" />
+                    <Space
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="1dp" />
                 </LinearLayout>
 
                 <Button
@@ -741,6 +725,34 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
+
+                    <!-- Настройка самой системы Android, не конкретного сервера —
+                         поэтому здесь, в общих настройках, а не среди полей сервера. -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="14dp"
+                        android:gravity="center_vertical">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:textSize="12sp"
+                            android:textColor="@color/dim"
+                            android:text="@string/always_on_label" />
+                        <TextView
+                            android:id="@+id/alwaysOnInfo"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:background="@drawable/bg_infoq"
+                            android:gravity="center"
+                            android:textSize="9sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/dim"
+                            android:text="?"
+                            android:clickable="true"
+                            android:focusable="true" />
+                    </LinearLayout>
 
                     <LinearLayout
                         android:id="@+id/adBlockRow"
