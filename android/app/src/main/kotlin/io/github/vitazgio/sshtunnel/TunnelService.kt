@@ -4,13 +4,17 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.Network
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import mobile.Callbacks
 import mobile.Mobile
+import org.json.JSONObject
 import java.net.InetAddress
 
 /**
@@ -40,6 +44,34 @@ class TunnelService : VpnService(), Callbacks {
         fun speedTest(): String =
             current?.tunnel?.speedTest() ?: """{"error":"туннель выключен"}"""
 
+        /**
+         * Самопроверка не требует поднятого туннеля — соединение для неё
+         * отдельное — но всё равно идёт через уже настроенный tunnel, чтобы
+         * не заводить второй экземпляр ядра и второй набор настроек.
+         * Настройки, если служба не запущена, применяются здесь же, прямо
+         * перед вызовом: Configure сам по себе ничего не поднимает.
+         */
+        fun selfCheck(context: Context): String {
+            val svc = current
+            if (svc != null) return svc.tunnel.selfCheck()
+
+            val settings = Settings(context)
+            if (!settings.ready()) return """{"error":"не заполнены настройки"}"""
+            val tmp = Mobile.newTunnel()
+            return try {
+                tmp.configure(
+                    settings.host, settings.sshPort.toLong(), settings.user,
+                    settings.keyFile.absolutePath, settings.knownHostsFile.absolutePath,
+                    settings.poolSize.toLong(), settings.directHosts, settings.localViaTunnel,
+                    settings.adBlockEnabled, settings.adBlockListFile.absolutePath, settings.adBlockAllowlist,
+                    settings.udpRelayEnabled,
+                )
+                tmp.selfCheck()
+            } catch (e: Exception) {
+                """{"error":"${e.message}"}"""
+            }
+        }
+
         private const val TAG = "ssh_tunnel"
         private const val CHANNEL = "tunnel"
         private const val NOTIFICATION_ID = 1
@@ -49,10 +81,83 @@ class TunnelService : VpnService(), Callbacks {
     private var fd: ParcelFileDescriptor? = null
     private val tunnel = Mobile.newTunnel()
 
+    // ---------- счётчик заблокированной рекламы «всего» ----------
+    //
+    // Ядро считает только за текущий сеанс (обнуляется при каждом новом
+    // подключении) — здесь копим разницу в постоянные настройки, чтобы число
+    // не терялось между подключениями и не зависело от того, открыт ли экран
+    // приложения: poll работает, пока жива служба, а не только пока видна
+    // активность.
+    private var activeSettings: Settings? = null
+    private var blockedSoFarInSession = 0
+
     /** Гашение уже идёт: второй раз ядро останавливать не надо. */
     @Volatile private var stopping = false
 
     private val ticker = android.os.Handler(android.os.Looper.getMainLooper())
+
+    // ---------- смена сети (Wi-Fi ↔ мобильная) ----------
+    //
+    // Раньше обрыв связи при переключении сети замечался только по внутреннему
+    // таймеру проверки живости — заметная пауза перед тем, как туннель сам
+    // сообразит переподключиться. ConnectivityManager сообщает о новой сети
+    // сразу, и пул пересобирается, не дожидаясь таймера.
+    private var connectivityManager: ConnectivityManager? = null
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var lastNetwork: Network? = null
+
+    private fun accumulateBlockedTotal() {
+        val s = activeSettings ?: return
+        val blocked = try {
+            JSONObject(statsJson).optInt("adsBlocked")
+        } catch (e: Exception) {
+            return
+        }
+        if (blocked > blockedSoFarInSession) {
+            s.adBlockTotal += (blocked - blockedSoFarInSession).toLong()
+            blockedSoFarInSession = blocked
+        }
+    }
+
+    private fun registerNetworkCallback() {
+        if (networkCallback != null) return
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
+        val cb = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                val prev = lastNetwork
+                lastNetwork = network
+                // Первый вызов — это просто исходная сеть, не смена. Кикать
+                // пул, пока он ещё не поднят, тоже незачем — tunnel.kick()
+                // сам по себе безвреден, но и толку от него в этот момент нет.
+                if (prev != null && prev != network) {
+                    onLog("сеть сменилась — пересобираю соединения")
+                    try {
+                        tunnel.networkChanged()
+                    } catch (e: Exception) {
+                        Log.w(TAG, "networkChanged: ${e.message}")
+                    }
+                }
+            }
+        }
+        networkCallback = cb
+        connectivityManager = cm
+        // registerDefaultNetworkCallback, а не registerNetworkCallback с общим
+        // запросом: нужна именно смена сети, которую система считает основной
+        // для исходящих соединений, а не появление любой сети в принципе
+        // (второй Wi-Fi без интернета и подобное подняли бы лишний Kick).
+        cm.registerDefaultNetworkCallback(cb)
+    }
+
+    private fun unregisterNetworkCallback() {
+        val cb = networkCallback ?: return
+        networkCallback = null
+        lastNetwork = null
+        try {
+            connectivityManager?.unregisterNetworkCallback(cb)
+        } catch (e: Exception) {
+            // Уже отписаны или служба системы недоступна — не критично.
+        }
+    }
 
     /**
      * Опрос состояния у ядра.
@@ -72,6 +177,7 @@ class TunnelService : VpnService(), Callbacks {
                 report(now, detail)
             }
             statsJson = try { tunnel.statsJSON() } catch (e: Exception) { "{}" }
+            accumulateBlockedTotal()
             onUpdate?.invoke()
             ticker.postDelayed(this, 1500)
         }
@@ -87,6 +193,14 @@ class TunnelService : VpnService(), Callbacks {
             stopTunnel()
             return START_NOT_STICKY
         }
+        // Всегда включённый VPN и система в целом могут попросить запуститься
+        // ещё раз, пока туннель уже поднят или поднимается, — например, после
+        // восстановления связи система заново подтверждает выбор этого
+        // приложения как always-on VPN. Такой повторный запуск не должен рвать
+        // уже работающее (или ещё поднимающееся) подключение.
+        if (state == "connected" || state == "connecting") {
+            return START_STICKY
+        }
         startTunnel()
         return START_STICKY
     }
@@ -100,8 +214,11 @@ class TunnelService : VpnService(), Callbacks {
         }
 
         stopping = false
+        activeSettings = settings
+        blockedSoFarInSession = 0
         startForeground(NOTIFICATION_ID, notification("подключение…"))
         report("connecting", "")
+        registerNetworkCallback()
 
         // В отдельном потоке: подключение к серверу и проверка его возможностей
         // занимают секунды, а держать всё это время главный поток нельзя.
@@ -117,6 +234,10 @@ class TunnelService : VpnService(), Callbacks {
                     settings.poolSize.toLong(),
                     settings.directHosts,
                     settings.localViaTunnel,
+                    settings.adBlockEnabled,
+                    settings.adBlockListFile.absolutePath,
+                    settings.adBlockAllowlist,
+                    settings.udpRelayEnabled,
                 )
                 tunnel.startCore()
 
@@ -287,6 +408,7 @@ class TunnelService : VpnService(), Callbacks {
      */
     private fun stopTunnel(finalState: String = "stopped", finalDetail: String = "") {
         ticker.removeCallbacks(poll)
+        unregisterNetworkCallback()
         statsJson = "{}"
         report(finalState, finalDetail)
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -335,7 +457,8 @@ class TunnelService : VpnService(), Callbacks {
      */
     override fun protect(fd: Long): Boolean = protect(fd.toInt())
 
-    override fun onState(state: String, detail: String) = report(state, detail)
+    override fun onState(state: String, detail: String, errorKind: String) =
+        report(state, connErrorText(errorKind, detail))
 
     override fun onLog(line: String) {
         synchronized(log) {
@@ -364,6 +487,21 @@ class TunnelService : VpnService(), Callbacks {
         if (newState != "stopped") {
             notificationManager().notify(NOTIFICATION_ID, notification(describe(newState, newDetail)))
         }
+    }
+
+    /**
+     * Перевод типовой ошибки подключения (ТЗ-13). errorKind разобран один
+     * раз в общем коде на Go (internal/tunnel.ConnErrorKind) — здесь только
+     * выбор текста под язык интерфейса из строковых ресурсов. Пустой код
+     * (не ошибка, либо смена ключа сервера — своя отдельная защита) и
+     * незнакомый код оставляют detail как есть.
+     */
+    private fun connErrorText(errorKind: String, detail: String): String = when (errorKind) {
+        "auth" -> getString(R.string.conn_err_auth)
+        "no_response" -> getString(R.string.conn_err_no_response)
+        "refused" -> getString(R.string.conn_err_refused)
+        "other" -> getString(R.string.conn_err_other_prefix, detail)
+        else -> detail
     }
 
     private fun describe(state: String, detail: String): String {

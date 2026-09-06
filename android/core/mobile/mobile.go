@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 	"sync"
 	"syscall"
@@ -19,6 +20,7 @@ import (
 	"sshtunnel/android/core"
 	"sshtunnel/internal/events"
 	"sshtunnel/internal/routing"
+	"sshtunnel/internal/share"
 	"sshtunnel/internal/speedtest"
 	"sshtunnel/internal/tunnel"
 )
@@ -33,7 +35,17 @@ type Callbacks interface {
 	Protect(fd int) bool
 
 	// OnState сообщает о смене состояния, чтобы экран показал её человеку.
-	OnState(state string, detail string)
+	//
+	// errorKind — стабильный код причины отказа подключения (ТЗ-13,
+	// tunnel.ConnErrorKind: "auth", "no_response", "refused", "other"),
+	// заполнен только при state=="error"/"reconnecting" и только если
+	// причина распознана. Экран переводит по нему текст через свой словарь
+	// строк вместо показа сырого detail — разбор самой ошибки один раз
+	// сделан в общем коде (internal/tunnel), сюда приходит уже готовый код.
+	// Пустая строка — либо не ошибка, либо смена ключа сервера
+	// (hostkey.ErrChanged): тот текст в detail не трогаем, показываем как
+	// есть.
+	OnState(state string, detail string, errorKind string)
 
 	// OnLog отдаёт строку для журнала соединений.
 	OnLog(line string)
@@ -53,6 +65,7 @@ type Tunnel struct {
 	cb     Callbacks
 	cfg    tunnel.Config
 	direct *routing.DirectList
+	block  *core.BlockList
 
 	core   *tunnel.Tunnel
 	engine *core.Engine
@@ -88,10 +101,18 @@ func (t *Tunnel) SetCallbacks(cb Callbacks) {
 // keyPath — путь к файлу закрытого ключа: приложение сохраняет его в свою
 // папку само, потому что права на файл ключа задаёт тоже оно.
 // directHosts — список «всегда напрямую», через запятую или с новой строки.
+//
+// adBlockEnabled включает блокировку рекламы и слежки. adBlockListPath —
+// путь к файлу со списком имён, по одному в строке (см. UpdateBlockLists —
+// именно она готовит этот файл на телефоне); если файла ещё нет, блокировка
+// включается, но пока ничего не блокирует. adBlockAllowlist — свои
+// исключения, через запятую или с новой строки, как и directHosts.
 func (t *Tunnel) Configure(
 	host string, sshPort int, user string, keyPath string,
 	knownHostsPath string, poolSize int,
 	directHosts string, localViaTunnel bool,
+	adBlockEnabled bool, adBlockListPath string, adBlockAllowlist string,
+	udpRelayEnabled bool,
 ) error {
 	if strings.TrimSpace(host) == "" {
 		return fmt.Errorf("не задан адрес сервера")
@@ -106,20 +127,31 @@ func (t *Tunnel) Configure(
 		poolSize = 4
 	}
 
+	var block *core.BlockList
+	if adBlockEnabled {
+		var blocked []string
+		if data, err := os.ReadFile(adBlockListPath); err == nil {
+			blocked = strings.Split(strings.TrimSpace(string(data)), "\n")
+		}
+		block = core.NewBlockList(blocked, routing.SplitEntries(adBlockAllowlist))
+	}
+
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
 	t.direct = routing.NewDirectList(routing.SplitEntries(directHosts))
+	t.block = block
 	t.cfg = tunnel.Config{
-		Host:           host,
-		SSHPort:        sshPort,
-		User:           user,
-		KeyPath:        keyPath,
-		KnownHostsPath: knownHostsPath,
-		PoolSize:       poolSize,
-		Direct:         t.direct,
-		LocalViaTunnel: localViaTunnel,
-		ProtectSocket:  t.protect,
+		Host:            host,
+		SSHPort:         sshPort,
+		User:            user,
+		KeyPath:         keyPath,
+		KnownHostsPath:  knownHostsPath,
+		PoolSize:        poolSize,
+		Direct:          t.direct,
+		LocalViaTunnel:  localViaTunnel,
+		ProtectSocket:   t.protect,
+		UDPRelayEnabled: udpRelayEnabled,
 
 		// Локальных прокси на телефоне нет: соединения приходят из пакетов,
 		// а не с портов 1080 и 1081.
@@ -197,7 +229,7 @@ func (t *Tunnel) StartCore() error {
 	t.mu.Unlock()
 
 	if cb != nil {
-		cb.OnState(tun.State(), fmt.Sprintf("%s:%d", cfg.Host, cfg.SSHPort))
+		cb.OnState(tun.State(), fmt.Sprintf("%s:%d", cfg.Host, cfg.SSHPort), "")
 	}
 	return nil
 }
@@ -232,7 +264,7 @@ func (t *Tunnel) ServerHasIPv6() bool {
 // закрывает его сам. Если отдать getFd(), дескриптор закроют дважды.
 func (t *Tunnel) StartStack(tunFD int, mtu int) error {
 	t.mu.Lock()
-	tun, cfg, direct, cb := t.core, t.cfg, t.direct, t.cb
+	tun, cfg, direct, block, cb := t.core, t.cfg, t.direct, t.block, t.cb
 	t.mu.Unlock()
 
 	if tun == nil {
@@ -246,6 +278,8 @@ func (t *Tunnel) StartStack(tunFD int, mtu int) error {
 	if err != nil {
 		return err
 	}
+
+	stackStats := &core.Stats{}
 
 	dns := &core.DNS{
 		Pool: pool,
@@ -263,9 +297,11 @@ func (t *Tunnel) StartStack(tunFD int, mtu int) error {
 			}
 			return parseIPs(cb.ResolveLocal(name))
 		},
+		// Block проверяется раньше Direct и раньше Pool.Get — см. dns.go.
+		Block: block,
+		Stats: stackStats,
 	}
 
-	stackStats := &core.Stats{}
 	eng, err := core.Start(tunFD, uint32(mtu), &core.Handler{
 		Core:    tun,
 		Resolve: pool.Resolver(),
@@ -276,6 +312,11 @@ func (t *Tunnel) StartStack(tunFD int, mtu int) error {
 				cb.OnLog(line)
 			}
 		},
+		// UDPRelay — тот же клиент, что и на компьютере (см.
+		// tunnel.Tunnel.UDPRelay): звонит по требованию, кеширует и сам
+		// переподключается. Значение проверяется на каждый новый поток, не
+		// один раз, — поэтому здесь достаточно функции-обёртки без вызова.
+		UDPRelay: tun.UDPRelay,
 	})
 	if err != nil {
 		return err
@@ -304,7 +345,7 @@ func (t *Tunnel) forwardEvents(ch <-chan events.Event, unsub func(), stop <-chan
 			}
 			switch ev.Kind {
 			case events.KindState:
-				cb.OnState(ev.State, ev.Detail)
+				cb.OnState(ev.State, ev.Detail, ev.ErrorKind)
 			case events.KindLog:
 				cb.OnLog(ev.Text)
 			case events.KindConn:
@@ -348,6 +389,50 @@ func (t *Tunnel) Stop() {
 	if tun != nil {
 		tun.Stop()
 	}
+}
+
+// NetworkChanged сообщает, что телефон сменил сеть (Wi-Fi ↔ мобильная).
+//
+// Вызывается из ConnectivityManager.NetworkCallback на стороне Kotlin. Без
+// этого сигнала обрыв замечался бы только по таймеру проверки живости — до
+// двадцати секунд паузы при каждом переключении сети. Пул пересобирается
+// сразу: старые сокеты, помеченные VpnService.protect() под прежнюю сеть,
+// после смены почти наверняка уже нерабочие, ждать их естественной смерти
+// незачем.
+func (t *Tunnel) NetworkChanged() {
+	t.mu.Lock()
+	tun := t.core
+	t.mu.Unlock()
+	if tun != nil {
+		tun.Kick()
+	}
+}
+
+// SelfCheck прогоняет ту же цепочку самопроверки, что и на компьютере (см.
+// sshtunnel/internal/tunnel.RunSelfCheck), и отдаёт результат строкой JSON:
+// {"steps":[{"name":"dns","ok":true,"code":"resolved","detail":"..."}, ...]}.
+// Соединение для проверки отдельное от уже поднятого пула — работает и
+// объясняет причину, даже когда туннель выключен. Configure нужно вызвать
+// заранее: отсюда берутся адрес, пользователь и путь к ключу.
+func (t *Tunnel) SelfCheck() string {
+	t.mu.Lock()
+	cfg := t.cfg
+	t.mu.Unlock()
+	if cfg.Host == "" {
+		return `{"error":"сначала нужно задать настройки"}`
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	steps := tunnel.RunSelfCheck(ctx, tunnel.SelfCheckOptions{Config: cfg})
+
+	b, err := json.Marshal(struct {
+		Steps []tunnel.CheckStep `json:"steps"`
+	}{Steps: steps})
+	if err != nil {
+		return `{"error":"не удалось разобрать результат"}`
+	}
+	return string(b)
 }
 
 // SpeedTest мерит скорость через туннель — тот же тест, что в окне на
@@ -412,10 +497,11 @@ func (t *Tunnel) StatsJSON() string {
 		UDPDropped int `json:"udpDropped"`
 		DNSAsked   int `json:"dnsAsked"`
 		V6Blocked  int `json:"v6Blocked"`
+		AdsBlocked int `json:"adsBlocked"`
 	}{Stats: tun.Stats()}
 
 	if st != nil {
-		_, out.UDPDropped, out.DNSAsked, out.V6Blocked = st.Counts()
+		_, out.UDPDropped, out.DNSAsked, out.V6Blocked, out.AdsBlocked = st.Counts()
 	}
 
 	b, err := json.Marshal(out)
@@ -441,6 +527,104 @@ const (
 	// работает половина интернета.
 	dnsAddr = "198.18.0.53"
 )
+
+// ParsedConfig — конфиг сервера, разобранный из текста (файл экспорта или
+// содержимое QR-кода) в форму, понятную Kotlin: gomobile умеет отдавать
+// только простые типы, поэтому списки полей (FilterApps, DirectHosts)
+// приходят строками, по одному значению на строку.
+type ParsedConfig struct {
+	Name           string
+	Flag           string
+	Host           string
+	SshPort        int
+	User           string
+	PoolSize       int
+	FilterMode     string
+	FilterApps     string
+	DirectHosts    string
+	LocalViaTunnel bool
+	KeyIncluded    bool
+	KeyContents    string
+	// Panel/DeviceName — заполнены, только если конфиг выдан веб-панелью на
+	// VPS (internal/share, поля версии 2). У сервера, настроенного руками,
+	// Panel пустой — по нему экран настроек решает, показывать ли строку
+	// «Этот сервер выдан панелью».
+	Panel      string
+	DeviceName string
+}
+
+// ParseConfig разбирает текст, вставленный из буфера обмена или считанный из
+// QR-кода, в ParsedConfig. Тот же формат, что использует экспорт/импорт
+// сервера в панели на компьютере (internal/share), версии 1 и 2 — оба
+// читаются одинаково. Ошибка возвращается такой, какую можно показать
+// человеку на экране как есть — она уже на русском.
+func ParseConfig(text string) (*ParsedConfig, error) {
+	doc, err := share.Parse([]byte(text))
+	if err != nil {
+		return nil, err
+	}
+	return &ParsedConfig{
+		Name: doc.Name, Flag: doc.Flag, Host: doc.Host, SshPort: doc.SSHPort, User: doc.User,
+		PoolSize:       doc.PoolSize,
+		FilterMode:     doc.FilterMode,
+		FilterApps:     strings.Join(doc.FilterApps, "\n"),
+		DirectHosts:    strings.Join(doc.DirectHosts, "\n"),
+		LocalViaTunnel: doc.LocalViaTunnel,
+		KeyIncluded:    doc.KeyIncluded,
+		KeyContents:    doc.KeyContents,
+		Panel:          doc.Panel,
+		DeviceName:     doc.DeviceName,
+	}, nil
+}
+
+// UpdateBlockLists загружает списки блокировки рекламы и слежки по адресам
+// или путям из sourcesText (через запятую или с новой строки, вперемешку
+// http(s)-ссылки и локальные файлы), сохраняет объединённый и очищенный от
+// повторов список имён на телефон по пути cachePath — чтобы дальше
+// блокировка работала и без сети — и отдаёт результат строкой JSON:
+// {"count":N} при успехе, {"error":"..."} при неудаче.
+//
+// Вызывается только по явному нажатию кнопки в настройках, никогда сама по
+// себе: список не должен меняться без ведома человека, а обновление по
+// расписанию — это ещё и сетевой запрос, который на телефоне не бесплатен.
+func UpdateBlockLists(sourcesText string, cachePath string) string {
+	sources := routing.SplitEntries(sourcesText)
+	if len(sources) == 0 {
+		return `{"error":"не указан ни один список"}`
+	}
+
+	seen := make(map[string]struct{})
+	var names []string
+	var lastErr error
+	fetchedAny := false
+	for _, src := range sources {
+		list, err := core.FetchBlockListSource(src)
+		if err != nil {
+			lastErr = fmt.Errorf("%s: %w", src, err)
+			continue
+		}
+		fetchedAny = true
+		for _, n := range list {
+			n = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(n), "."))
+			if n == "" {
+				continue
+			}
+			if _, dup := seen[n]; dup {
+				continue
+			}
+			seen[n] = struct{}{}
+			names = append(names, n)
+		}
+	}
+	if !fetchedAny {
+		return fmt.Sprintf(`{"error":%q}`, lastErr.Error())
+	}
+
+	if err := os.WriteFile(cachePath, []byte(strings.Join(names, "\n")), 0o600); err != nil {
+		return fmt.Sprintf(`{"error":%q}`, "не удалось сохранить список: "+err.Error())
+	}
+	return fmt.Sprintf(`{"count":%d}`, len(names))
+}
 
 // FakeNet отдаёт подсеть подставных адресов.
 func FakeNet() string { return fakeNet }

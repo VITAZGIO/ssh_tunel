@@ -77,4 +77,7 @@ dependencies {
 	implementation(fileTree("libs") { include("*.aar") })
 	implementation("androidx.appcompat:appcompat:1.7.0")
 	implementation("com.google.android.material:material:1.12.0")
+	// Сканер QR-кода настроек: работает без сервисов Google, ничего не
+	// отправляет наружу — весь разбор идёт на устройстве.
+	implementation("com.journeyapps:zxing-android-embedded:4.3.0")
 }

@@ -113,6 +113,8 @@
        color:var(--text);font:inherit}
   input:focus{outline:none;border-color:var(--accent)}
   .two{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .wztab{background:var(--card2);border:1px solid var(--line);color:var(--dim)}
+  .wztab.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
   .hint{font-size:11.5px;color:var(--dim);margin-top:3px;line-height:1.35}
 
   select{width:100%;background:var(--card);border:1px solid var(--line);
@@ -156,6 +158,13 @@
                 font-size:16px;line-height:1;padding:2px 4px}
   .appitem .del:hover{color:var(--err)}
   .empty{color:var(--dim);font-size:12.5px;padding:10px 2px}
+  /* Значок программы — картинка, если её удалось достать (только на
+     Windows), иначе буква первая буква имени на подложке того же размера. */
+  .appicon{position:relative;width:26px;height:26px;border-radius:7px;flex:none;
+           background:var(--card2);border:1px solid var(--line);
+           display:flex;align-items:center;justify-content:center;
+           font-size:11px;font-weight:700;color:var(--dim);overflow:hidden}
+  .appicon img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
 
   /* Подсказка «как получить ключ». */
   .lbl-row{display:flex;align-items:center;gap:6px;margin-bottom:3px}
@@ -204,11 +213,12 @@
   .proclist{overflow-y:auto;margin-top:9px;display:flex;flex-direction:column;gap:5px}
   .proclist::-webkit-scrollbar{width:8px}
   .proclist::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
-  .proc{display:flex;flex-direction:column;gap:1px;background:var(--card2);
+  .proc{display:flex;align-items:center;gap:9px;background:var(--card2);
         border:1px solid transparent;border-radius:8px;padding:7px 10px;
         cursor:pointer;text-align:left;font:inherit;color:var(--text)}
   .proc:hover{border-color:var(--accent)}
   .proc.picked{border-color:var(--ok)}
+  .proc .info{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
   .proc .n{font-family:var(--mono);font-size:12.5px}
   .proc .p{font-size:10.5px;color:var(--dim);overflow:hidden;
            text-overflow:ellipsis;white-space:nowrap}
@@ -219,6 +229,19 @@
   .chk .lbl{font-size:13px}
   .chk-row{display:flex;align-items:center;gap:8px;border-top:1px solid var(--line)}
   .chk-row .chk{border-top:none;flex:1}
+
+  /* Значок «?» вместо всегда открытого пояснения под галочкой — наводишь
+     или нажимаешь, и всплывает текст; остальное время он не занимает места. */
+  .infoq{position:relative;display:inline-flex;align-items:center;justify-content:center;
+         width:15px;height:15px;border-radius:50%;background:var(--card2);
+         border:1px solid var(--line);color:var(--dim);font-size:10px;font-weight:700;
+         cursor:help;flex:none;margin-top:2px}
+  .infoq .tip{display:none;position:absolute;left:0;top:20px;z-index:30;width:240px;
+              max-width:60vw;background:var(--card);border:1px solid var(--line);
+              border-radius:9px;padding:9px 11px;font-size:11.5px;font-weight:400;
+              color:var(--text);line-height:1.4;box-shadow:0 8px 22px rgba(0,0,0,.4);
+              cursor:auto}
+  .infoq:hover .tip, .infoq.show .tip{display:block}
   .help .step{margin:11px 0 5px;font-weight:600;color:var(--text)}
   .help .note{margin:5px 0 0;color:var(--dim)}
   .netline{display:flex;gap:7px;align-items:flex-start;padding:3px 0}
@@ -226,6 +249,10 @@
   .netline.bad .mark{color:#ff8a5c}
   .netline.ok .mark{color:#4bd07a}
   .netline .cidr{font-family:ui-monospace,Consolas,monospace}
+  .tab .lat{font-size:10.5px;color:var(--dim);margin-left:5px}
+  .netline.pending .mark{color:var(--dim)}
+  .netline.skip{opacity:.5}
+  .netline .why{color:var(--dim);margin-left:4px}
   textarea{width:100%;box-sizing:border-box;resize:vertical;
        background:var(--card);border:1px solid var(--line);border-radius:8px;
        padding:7px 10px;color:var(--text);font:inherit;line-height:1.4}
@@ -283,8 +310,13 @@
 
   .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;
          padding:13px 13px 3px;margin-bottom:16px}
-  .panel .ptitle{font-size:11.5px;font-weight:700;text-transform:uppercase;
-                 letter-spacing:.5px;color:var(--dim);margin:0 0 11px}
+  .panel .ptitle{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none;
+                 font-size:11.5px;font-weight:700;text-transform:uppercase;
+                 letter-spacing:.5px;color:var(--dim);margin:0 0 11px;padding:2px 0}
+  .panel .ptitle .chev{transition:transform .15s;font-size:10px;flex:none}
+  .panel.collapsed .ptitle{margin-bottom:2px}
+  .panel.collapsed .ptitle .chev{transform:rotate(-90deg)}
+  .panel.collapsed .pbody{display:none}
 
   .rowbtns{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:2px 0 12px}
   .curBadge{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ok);
@@ -376,7 +408,10 @@
       <div class="tile"><div class="k" data-i18n="channels">Каналов SSH</div><div class="v" id="links">—</div></div>
     </div>
 
-    <button class="btn speed" id="speedtest" data-i18n="speedtest">Тест скорости</button>
+    <div style="display:flex;gap:9px;margin-top:0">
+      <button class="btn speed" id="speedtest" style="flex:1" data-i18n="speedtest">Тест скорости</button>
+      <button class="btn" id="toSelfCheck" style="flex:1" data-i18n="selfcheck_open">Самопроверка</button>
+    </div>
   </div>
 
   <!-- НАСТРОЙКИ -->
@@ -403,12 +438,16 @@
       <button class="btn" id="importBtn" title="Импортировать сервер из файла"
         data-i18n-title="import_title" style="font-size:12.5px;padding:8px 12px;flex:none">
         <span data-i18n="import_short">Импорт</span></button>
+      <button class="btn" id="pasteBtn" title="Вставить настройки сервера из буфера обмена"
+        data-i18n-title="paste_title" style="font-size:12.5px;padding:8px 10px;flex:none">📋</button>
       <input type="file" id="importFile" accept=".json,application/json" hidden>
     </div>
     <div style="margin-bottom:12px"></div>
 
-    <div class="panel">
-      <p class="ptitle" data-i18n="server_settings">Настройки сервера</p>
+    <div class="panel" id="serverPanel">
+      <p class="ptitle" id="serverPanelTitle"><span class="chev">▾</span>
+        <span data-i18n="server_settings">Настройки сервера</span></p>
+      <div class="pbody">
 
       <div class="field">
         <label id="cityLabel" data-i18n="location_label">Расположение</label>
@@ -428,15 +467,12 @@
           data-i18n="remove_server">Удалить сервер</button>
       </div>
 
-      <div class="rowbtns" style="margin-top:0">
+      <div class="rowbtns" style="margin-top:0;margin-bottom:14px">
         <button class="btn" id="exportBtn" data-i18n="export_server">Экспортировать сервер</button>
       </div>
-      <label class="chk" style="padding:4px 0 6px;border-top:none">
-        <input type="checkbox" id="exportIncludeKey" checked>
-        <span class="lbl" data-i18n="export_include_key">Включить приватный ключ в файл</span></label>
-      <p class="note" style="margin:-4px 0 12px" data-i18n="export_key_warn">С ключом внутри файл равносилен
-        паролю от сервера — передавай только тем, кому доверяешь, и удали после того, как человек импортирует
-        его. Без ключа файл несёт только адрес и настройки: доступ на сервере нужно будет выдать отдельно.</p>
+
+      <div id="issuedByPanel" hidden style="margin:-4px 0 14px;font-size:12.5px;
+           color:var(--accent);cursor:pointer"></div>
 
     <div class="field"><label for="host" data-i18n="host_label">Адрес сервера</label>
       <input type="text" id="host" placeholder="адрес или домен сервера" spellcheck="false"
@@ -507,6 +543,12 @@
       <p class="note" id="cmd3note"></p>
     </div>
 
+    <button class="row-link" id="toVpsSetup" style="margin:2px 0 14px">
+      <span class="t"><span data-i18n="vps_setup_row">Настроить сервер по SSH</span>
+        <div class="v" data-i18n="vps_setup_row_sub">Ключ, firewall и отдельный пользователь — одной кнопкой</div>
+      </span>
+    </button>
+
     <div class="two">
       <div class="field"><label for="sshPort">SSH-порт</label>
         <input type="number" id="sshPort" min="1" max="65535"></div>
@@ -535,6 +577,17 @@
         <span class="lbl" data-i18n="local_via_tunnel">Локальную сеть тоже вести через сервер</span></label>
       <button class="qmark" id="localHelpBtn" title="Подробнее">?</button>
     </div>
+    <div class="chk-row">
+      <label class="chk"><input type="checkbox" id="udpRelayEnabled">
+        <span class="lbl" data-i18n="udp_relay_enabled">Пробрасывать UDP (звонки, игры) через сервер</span></label>
+      <button class="qmark" id="udpRelayHelpBtn" title="Подробнее">?</button>
+    </div>
+    <div class="help" id="udpRelayHelp" hidden>
+      <p data-i18n="udp_relay_help">SSH умеет пробрасывать только TCP, поэтому по умолчанию видеозвонки, игры и
+        QUIC (быстрый HTTP/3) не проходят через туннель. Эта галочка включает проброс через отдельный
+        ретранслятор на сервере — ставится один раз, в мастере настройки VPS (кнопка «Настроить сервер по SSH»
+        в этом же меню). Пока он не установлен, галочка ничего не меняет: UDP по-прежнему не проходит.</p>
+    </div>
     <div class="help" id="localHelp" hidden>
       <p>Обычно не нужно. Домашние и офисные адреса (роутер, NAS,
         Home&nbsp;Assistant, рабочие сервисы) и так идут напрямую и остаются
@@ -550,7 +603,7 @@
         <button class="qmark" id="directHelpBtn" title="Подробнее">?</button>
       </div>
       <textarea id="directHosts" rows="2" spellcheck="false"
-        placeholder="10.8.0.0/16, 172.30.*, .corp.local"></textarea>
+        data-i18n-ph="direct_ph" placeholder="10.8.0.0/16, 172.30.*, .corp.local, vitazgio.ru"></textarea>
       <div style="display:flex;gap:8px;align-items:center;margin-top:7px">
         <button class="btn" id="scanNet" style="font-size:12.5px;padding:6px 12px"
           data-i18n="scan_net">Проверить сеть</button>
@@ -558,20 +611,23 @@
       </div>
       <div class="help" id="scanResult" hidden></div>
     </div>
-    <div class="help" id="directHelp" hidden>
-      <p>Сети, которые не надо вести через сервер. Домашние и офисные адреса,
-        а также сети mesh-VPN уже учтены — сюда вписывают только то, что в них
-        не попало: например, корпоративный VPN со своим диапазоном адресов.</p>
-      <p>Через запятую, в любом виде: сеть (<code>10.8.0.0/16</code> или
-        <code>10.8.*</code>), отдельный адрес или окончание имени
-        (<code>.corp.local</code>).</p>
-      <p>Не знаешь, что вписать — нажми «Проверить сеть»: программа посмотрит
-        адаптеры этого компьютера и скажет, сломается что-нибудь или нет.</p>
-    </div>
+    <!-- Текст подсказки берётся из словаря (direct_help_html): он переводится
+         и упоминает домены, а не только сети. -->
+    <div class="help" id="directHelp" hidden></div>
+      </div><!-- /.pbody -->
     </div><!-- /.panel настроек сервера -->
 
-    <div class="panel">
-      <p class="ptitle" data-i18n="general_settings">Общие настройки приложения</p>
+    <button class="row-link" id="toWizard" style="margin-bottom:16px">
+      <span class="t"><span data-i18n="wizard_title">Мастер настройки</span>
+        <div class="v" data-i18n="wizard_sub">Подключить телефон или новый сервер</div>
+      </span>
+      <span class="arr">›</span>
+    </button>
+
+    <div class="panel" id="generalPanel">
+      <p class="ptitle" id="generalPanelTitle"><span class="chev">▾</span>
+        <span data-i18n="general_settings">Общие настройки приложения</span></p>
+      <div class="pbody">
 
       <label class="chk"><input type="checkbox" id="verbose">
         <span class="lbl" data-i18n="verbose">Подробный журнал</span></label>
@@ -584,18 +640,25 @@
           <span class="lbl" data-i18n="show_picker">Показывать выбор сервера на главном экране</span></label>
       </div>
 
+      <div class="chk-row" id="autoPickRow" style="display:none">
+        <label class="chk"><input type="checkbox" id="autoPickFastest">
+          <span class="lbl" data-i18n="auto_pick_fastest">Подключаться к самому быстрому серверу</span></label>
+      </div>
+      <p class="note" id="autoPickNote" style="display:none;margin:-4px 0 10px" data-i18n="auto_pick_fastest_note">
+        При подключении программа измерит отклик всех серверов и выберет самый быстрый. Если он не поднимется
+        или упадёт — перейдёт на следующий по отклику, об этом будет видно в журнале. Возврат на выбранный
+        вручную сервер — кнопкой «Выбрать этот сервер» или при следующем подключении.</p>
+
       <div id="bootBlock" hidden>
         <label class="chk"><input type="checkbox" id="bootStart">
-          <span class="lbl" data-i18n="boot_start">Запускать при старте системы</span></label>
-        <p class="note" id="bootNote" style="margin-top:-2px" data-i18n="boot_note">Программа сама поставит
-          службу systemd и разрешит ей работать без входа в систему — служба будет
-          подниматься при загрузке машины.</p>
+          <span class="lbl" data-i18n="boot_start">Запускать при старте системы</span>
+          <span class="infoq" onclick="event.preventDefault();event.stopPropagation();this.classList.toggle('show')">?<span class="tip" id="bootNote"></span></span></label>
 
-        <label class="chk"><input type="checkbox" id="autoConnect">
-          <span class="lbl" data-i18n="connect_on_launch">Подключаться сразу при запуске</span></label>
-        <p class="note" style="margin-top:-2px" data-i18n="autoconnect_note">Туннель поднимется сам, как только
-          программа стартует (сейчас или после перезагрузки) — жать «Подключить»
-          в панели не придётся. Выключи, если хочешь запускать вручную.</p>
+        <label class="chk" id="autoConnectRow"><input type="checkbox" id="autoConnect">
+          <span class="lbl" data-i18n="connect_on_launch">Подключаться сразу при запуске</span>
+          <span class="infoq" onclick="event.preventDefault();event.stopPropagation();this.classList.toggle('show')">?<span class="tip" data-i18n="autoconnect_note">Туннель поднимется сам, как только
+            программа стартует (сейчас или после перезагрузки) — жать «Подключить»
+            в панели не придётся. Выключи, если хочешь запускать вручную.</span></span></label>
 
         <div id="sudoRow" hidden>
           <p class="note" style="margin-bottom:4px">Этот шаг требует прав администратора.
@@ -609,6 +672,7 @@
         </div>
         <span class="hint" id="bootStatus" style="display:block;margin:4px 0 0"></span>
       </div>
+      </div><!-- /.pbody -->
     </div><!-- /.panel общих настроек -->
 
     <div style="display:flex;gap:9px;align-items:center;margin-top:14px">
@@ -655,6 +719,15 @@
       </div>
       <div class="applist" id="appList"></div>
       <button class="btn" id="addApp" style="width:100%" data-i18n="add_app">+  Добавить программу</button>
+
+      <div class="two" style="margin-top:8px">
+        <button class="btn" id="exportAppsBtn" data-i18n="export_apps">Экспортировать список</button>
+        <button class="btn" id="importAppsBtn" data-i18n="import_apps">Импортировать список</button>
+      </div>
+      <button class="btn" id="pasteAppsBtn" style="width:100%;margin-top:8px;font-size:12.5px"
+        data-i18n="paste_apps">Вставить список из буфера</button>
+      <input type="file" id="importAppsFile" accept=".json,application/json" hidden>
+
       <div class="hint" style="margin-top:10px" data-i18n="apps_note">Программы, которые вообще не
         обращаются к прокси (часть игр, приложения со своим сетевым стеком),
         туннель не видит — они идут мимо в любом случае.</div>
@@ -664,6 +737,175 @@
       <button class="btn primary" id="saveFilter" data-i18n="save">Сохранить</button>
       <span class="hint" id="filterNote"></span>
     </div>
+  </div>
+
+  <!-- МАСТЕР НАСТРОЙКИ -->
+  <div class="view" id="viewWizard">
+    <div class="head">
+      <button class="ico" id="backFromWizard" title="Назад в настройки" data-i18n-title="back_to_settings">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <span class="t" data-i18n="wizard_title">Мастер настройки</span>
+    </div>
+
+    <div class="two" style="margin-bottom:14px">
+      <button class="btn wztab on" id="wzTabAndroid" data-i18n="wizard_android">Android</button>
+      <button class="btn wztab" id="wzTabVPS" data-i18n="wizard_vps">VPS</button>
+    </div>
+
+    <!-- Android: свой ключ для телефона + QR с настройками -->
+    <div id="wzAndroid">
+      <p class="note" style="margin-top:0" data-i18n="wizard_android_intro">Выбери, какой ключ отдать
+        телефону, и получишь QR с готовыми настройками для текущего выбранного сервера.</p>
+
+      <label class="chk"><input type="radio" name="wzKeyMode" id="wzKeyModeLocal" checked>
+        <span class="lbl" data-i18n="wizard_key_mode_local">Взять ключ этого компьютера</span></label>
+
+      <label class="chk"><input type="radio" name="wzKeyMode" id="wzKeyModeOwn">
+        <span class="lbl" data-i18n="wizard_key_mode_own">Сделать отдельный ключ для телефона</span>
+        <span class="infoq" onclick="event.preventDefault();event.stopPropagation();this.classList.toggle('show')">?<span class="tip" data-i18n="wizard_key_mode_own_note">Отдельный ключ можно потом отозвать на
+          сервере, не трогая ключ компьютера.</span></span></label>
+
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0">
+        <button class="btn" id="wzGenBtn" data-i18n="wizard_generate">Сгенерировать</button>
+        <span class="hint" id="wzGenNote"></span>
+      </div>
+
+      <div id="wzAndroidResult" hidden>
+        <p class="step" id="wzAlreadyAllowed" data-i18n="wizard_key_mode_local_ready">Ключ уже разрешён
+          на сервере — просто отсканируй код.</p>
+        <div id="wzAuthBlock" hidden>
+          <p class="step" id="wzAuthStep">Добавить этот ключ на сервере</p>
+          <div class="cmdbox">
+            <button class="cp" data-cmd="wzAuthCmd" data-note="wzGenNote" title="Скопировать">
+              <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/>
+                <path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+            </button>
+            <span id="wzAuthCmd"></span>
+          </div>
+        </div>
+
+        <p class="step" style="margin-top:16px" data-i18n="wizard_qr_step">Отсканируй на телефоне
+          или нажми на код, чтобы скопировать настройки текстом</p>
+        <div style="display:flex;justify-content:center;margin:8px 0">
+          <img id="wzQr" style="width:220px;height:220px;border-radius:10px;cursor:pointer;
+               background:#fff;padding:8px" title="Нажми, чтобы скопировать">
+        </div>
+        <span class="hint" id="wzQrNote" style="display:block;text-align:center;margin-bottom:10px"></span>
+
+        <div class="help">
+          <p><b data-i18n="host_label">Адрес сервера</b>: <span id="wzInfoHost"></span></p>
+          <p><b data-i18n="user_label">Пользователь SSH</b>: <span id="wzInfoUser"></span></p>
+          <p><b data-i18n="wizard_key">Приватный ключ</b></p>
+          <pre id="wzInfoKey" style="white-space:pre-wrap;word-break:break-all;font-family:var(--mono);
+               font-size:11px;margin:0"></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- VPS: параметризованный скрипт настройки сервера из docs/SERVER_SETUP.md -->
+    <div id="wzVPS" hidden>
+      <p class="note" style="margin-top:0" data-i18n="wizard_vps_intro">Готовые команды для новго
+        сервера — вставить целиком на нём под root. Что настраивают: ключи вместо паролей,
+        firewall, бан за перебор, автообновления и отдельный пользователь для туннеля.</p>
+
+      <div class="two">
+        <div class="field"><label for="wzNewUser" data-i18n="wizard_admin_user">Обычный пользователь</label>
+          <input type="text" id="wzNewUser" spellcheck="false" value="admin"></div>
+        <div class="field"><label for="wzSshPort" data-i18n="wizard_ssh_port">SSH-порт</label>
+          <input type="number" id="wzSshPort" min="1" max="65535" value="22"></div>
+      </div>
+      <div class="two">
+        <div class="field"><label for="wzTunnelUser" data-i18n="wizard_tunnel_user">Пользователь туннеля</label>
+          <input type="text" id="wzTunnelUser" spellcheck="false" value="tunnel"></div>
+        <div class="field"><label for="wzTimezone" data-i18n="wizard_timezone">Часовой пояс</label>
+          <input type="text" id="wzTimezone" spellcheck="false" value="Europe/Moscow"></div>
+      </div>
+      <div class="field">
+        <label for="wzTunnelKey" data-i18n="wizard_tunnel_key">Открытый ключ туннеля (необязательно)</label>
+        <input type="text" id="wzTunnelKey" spellcheck="false" data-i18n-ph="wizard_tunnel_key_ph">
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 10px">
+        <button class="btn" id="wzVpsBtn" data-i18n="wizard_build">Собрать команды</button>
+        <span class="hint" id="wzVpsNote"></span>
+      </div>
+
+      <div id="wzVpsResult" hidden>
+        <div class="cmdbox" style="max-height:320px;overflow-y:auto">
+          <button class="cp" data-cmd="wzVpsScript" data-note="wzVpsNote" title="Скопировать">
+            <svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/>
+              <path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+          </button>
+          <span id="wzVpsScript" style="white-space:pre-wrap;word-break:break-all"></span>
+        </div>
+      </div>
+    </div>
+  <!-- НАСТРОЙКА VPS -->
+  <div class="view" id="viewVpsSetup">
+    <div class="head">
+      <button class="ico" id="backFromVpsSetup" title="Назад в настройки" data-i18n-title="back_to_settings">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <span class="t" data-i18n="vps_setup_title">Настройка сервера по SSH</span>
+    </div>
+
+    <p class="note" style="margin-top:0" data-i18n="vps_setup_intro">Программа сама подключится по паролю
+      root, положит на сервер свой ключ, проверит, что вход по нему работает, и только после этого
+      выполнит те же шаги, что описаны в docs/SERVER_SETUP.md: базовую защиту (firewall, бан за перебор,
+      отключение входа по паролю) и отдельного пользователя, которому можно только пробрасывать
+      соединения. Пароль root нигде не сохраняется и не показывается повторно.</p>
+
+    <div class="field"><label for="vpsHost" data-i18n="host_label">Адрес сервера</label>
+      <input type="text" id="vpsHost" spellcheck="false" data-i18n-ph="host_ph"></div>
+    <div class="two">
+      <div class="field"><label for="vpsPort" data-i18n="vps_port_label">SSH-порт</label>
+        <input type="number" id="vpsPort" min="1" max="65535" value="22"></div>
+      <div class="field"><label for="vpsUser" data-i18n="vps_user_label">Пользователь</label>
+        <input type="text" id="vpsUser" spellcheck="false" value="root"></div>
+    </div>
+    <div class="field"><label for="vpsPassword" data-i18n="vps_password_label">Пароль root</label>
+      <input type="password" id="vpsPassword" autocomplete="off" spellcheck="false"></div>
+
+    <label class="chk" style="margin:4px 0 14px">
+      <input type="checkbox" id="vpsInstallPanel">
+      <span class="lbl" data-i18n="vps_install_panel">Заодно поставить веб-панель для клиентов</span></label>
+    <p class="note" style="margin-top:-8px" data-i18n="vps_install_panel_note">Отдельная веб-страница для
+      администрирования сервера (систeмные службы, сеть, диски) — новый открытый порт наружу. Показывает
+      адрес и одноразовый пароль после установки.</p>
+
+    <label class="chk" style="margin:4px 0 14px">
+      <input type="checkbox" id="vpsInstallUdpRelay">
+      <span class="lbl" data-i18n="vps_install_udprelay">Заодно поставить ретранслятор UDP (звонки, игры)</span></label>
+    <p class="note" style="margin-top:-8px" data-i18n="vps_install_udprelay_note">Слушает только 127.0.0.1 —
+      отдельный порт наружу не открывается, достучаться до него можно только через уже настроенный туннель.
+      После установки включи «Пробрасывать UDP через сервер» в настройках сервера.</p>
+
+    <div style="display:flex;gap:9px;align-items:center;margin-top:6px">
+      <button class="btn primary" id="vpsSetupStart" data-i18n="vps_setup_start">Настроить сервер</button>
+      <span class="hint" id="vpsSetupNote"></span>
+    </div>
+
+    <div class="help" id="vpsSetupLog" hidden style="margin-top:14px;max-height:320px;overflow:auto;
+      white-space:pre-wrap;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace"></div>
+  </div>
+
+  <!-- САМОПРОВЕРКА -->
+  <div class="view" id="viewSelfCheck">
+    <div class="head">
+      <button class="ico" id="backFromSelfCheck" title="Назад" data-i18n-title="back">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <span class="t" data-i18n="selfcheck_title">Самопроверка</span>
+    </div>
+    <p class="note" style="margin-top:0" data-i18n="selfcheck_intro">Семь шагов подряд, от имени сервера до
+      внешнего адреса. Первая же неудача останавливает цепочку — дальше проверять бессмысленно, зато сразу
+      видно, где сломалось. Работает и без включённого туннеля: соединение для проверки своё, отдельное.</p>
+
+    <div id="selfCheckSteps"></div>
+
+    <button class="btn primary" id="selfCheckStart" style="margin-top:10px"
+      data-i18n="selfcheck_start">Проверить</button>
   </div>
 
   <!-- ЖУРНАЛ -->
@@ -721,24 +963,104 @@ const I18N = {
     state_stopped:'Отключено', state_connecting:'Подключаюсь…', state_connected:'Защищено',
     state_reconnecting:'Связь потеряна', state_error:'Ошибка',
     check_ip_hint:'нажми, чтобы проверить настоящий внешний адрес',
+    conn_err_auth:'Сервер не принял ключ. Устройство могли заморозить или удалить в панели, либо ключ не тот.',
+    conn_err_no_response:'Сервер не отвечает: проверь адрес и порт.',
+    conn_err_refused:'Порт закрыт или SSH на сервере не запущен.',
+    conn_err_other_prefix:'Ответ сервера: ',
     down:'Приём', up:'Отдача', connections:'Соединений', channels:'Каналов SSH',
     speedtest:'Тест скорости',
+    selfcheck_open:'Самопроверка',
+    selfcheck_title:'Самопроверка',
+    selfcheck_intro:'Семь шагов подряд, от имени сервера до внешнего адреса. Первая же неудача '+
+      'останавливает цепочку — дальше проверять бессмысленно, зато сразу видно, где сломалось. '+
+      'Работает и без включённого туннеля: соединение для проверки своё, отдельное.',
+    selfcheck_start:'Проверить', selfcheck_running:'Проверяю…',
+    selfcheck_step_dns:'Адрес сервера разрешается в IP',
+    selfcheck_step_port:'Порт SSH отвечает',
+    selfcheck_step_key:'Ключ принят сервером',
+    selfcheck_step_forward:'Проброс через туннель работает',
+    selfcheck_step_dns_tunnel:'DNS через туннель отвечает',
+    selfcheck_step_sites:'Известные сайты открываются',
+    selfcheck_step_external_ip:'Внешний адрес совпадает с сервером',
+    sc_dns_resolved:'{detail}', sc_dns_resolve_failed:'не разрешилось: {detail}',
+    sc_port_responded:'{detail}',
+    sc_port_timeout:'сервер не ответил вовремя', sc_port_refused:'сервер отказал в соединении',
+    sc_port_unreachable:'сервер недоступен по сети', sc_port_error:'{detail}',
+    sc_key_accepted:'принят',
+    sc_key_auth_failed:'ключ не подошёл — проверь путь к файлу и что он добавлен на сервере',
+    sc_key_host_key_changed:'ключ сервера изменился — возможна подмена, подробности: {detail}',
+    sc_key_timeout:'сервер не ответил вовремя', sc_key_refused:'сервер отказал в соединении',
+    sc_key_unreachable:'сервер недоступен по сети', sc_key_error:'{detail}',
+    sc_forward_ok:'{detail}', sc_forward_forward_failed:'не удалось открыть тестовое соединение: {detail}',
+    sc_dns_tunnel_ok:'отвечает', sc_dns_tunnel_no_answer:'нет ответа от DNS через туннель: {detail}',
+    sc_sites_ok:'{detail}', sc_sites_all_failed:'ни один сайт не открылся',
+    sc_external_ip_matches:'{detail} — совпадает с адресом сервера',
+    sc_external_ip_mismatch:'{detail} — не совпадает с адресом сервера, это ожидаемо для некоторых '+
+      'хостингов (CDN, несколько адресов на сервер)',
+    sc_external_ip_check_failed:'не удалось узнать внешний адрес: {detail}',
     language_label:'Язык интерфейса',
     add_server:'Добавить сервер',
     server_settings:'Настройки сервера', general_settings:'Общие настройки приложения',
+    issued_by_panel:'Этот сервер выдан панелью · {name}',
     location_label:'Расположение', custom_name_ph:'Название сервера',
     select_server:'Выбрать этот сервер', current_server:'Текущий сервер',
     remove_server:'Удалить сервер', confirm_remove_server:'Удалить этот сервер из списка?',
     discard_unsaved:'Есть несохранённые правки — переключиться и потерять их?',
     host_label:'Адрес сервера', host_ph:'адрес или домен сервера',
     user_label:'Пользователь SSH', key_label:'Приватный ключ',
+    vps_setup_row:'Настроить сервер по SSH',
+    vps_setup_row_sub:'Ключ, firewall и отдельный пользователь — одной кнопкой',
+    vps_setup_title:'Настройка сервера по SSH',
+    vps_setup_intro:'Программа сама подключится по паролю root, положит на сервер свой ключ, '+
+      'проверит, что вход по нему работает, и только после этого выполнит те же шаги, что описаны в '+
+      'docs/SERVER_SETUP.md: базовую защиту (firewall, бан за перебор, отключение входа по паролю) и '+
+      'отдельного пользователя, которому можно только пробрасывать соединения. Пароль root нигде не '+
+      'сохраняется и не показывается повторно.',
+    vps_port_label:'SSH-порт', vps_user_label:'Пользователь', vps_password_label:'Пароль root',
+    vps_install_panel:'Заодно поставить веб-панель для клиентов',
+    vps_install_panel_note:'Отдельная веб-страница для администрирования сервера (системные службы, '+
+      'сеть, диски) — новый открытый порт наружу. Показывает адрес и одноразовый пароль после установки.',
+    vps_install_udprelay:'Заодно поставить ретранслятор UDP (звонки, игры)',
+    vps_install_udprelay_note:'Слушает только 127.0.0.1 — отдельный порт наружу не открывается, '+
+      'достучаться до него можно только через уже настроенный туннель. После установки включи '+
+      '«Пробрасывать UDP через сервер» в настройках сервера.',
+    vps_setup_start:'Настроить сервер',
+    vps_setup_need_fields:'заполни адрес сервера и пароль root',
+    vps_setup_done_ok:'готово',
+    vps_setup_done_fail:'не получилось:',
     filter_title:'Какие программы вести через туннель',
     local_via_tunnel:'Локальную сеть тоже вести через сервер',
+    udp_relay_enabled:'Пробрасывать UDP (звонки, игры) через сервер',
+    udp_relay_help:'SSH умеет пробрасывать только TCP, поэтому по умолчанию видеозвонки, игры и QUIC '+
+      '(быстрый HTTP/3) не проходят через туннель. Эта галочка включает проброс через отдельный '+
+      'ретранслятор на сервере — ставится один раз, в мастере настройки VPS (кнопка «Настроить сервер по '+
+      'SSH» в этом же меню). Пока он не установлен, галочка ничего не меняет: UDP по-прежнему не проходит.',
     direct_label:'Всегда напрямую', scan_net:'Проверить сеть',
+    direct_ph:'10.8.0.0/16, 172.30.*, .corp.local, vitazgio.ru',
+    direct_help_html:'<p>Сети и домены, которые не надо вести через сервер. Домашние и офисные '+
+      'адреса, а также сети mesh-VPN уже учтены — сюда вписывают только то, что в них не попало: '+
+      'например, корпоративный VPN со своим диапазоном адресов или отдельный сайт.</p>'+
+      '<p>Через запятую, в любом виде: сеть (<code>10.8.0.0/16</code> или <code>10.8.*</code>), '+
+      'отдельный адрес, домен целиком (<code>vitazgio.ru</code>) или его поддомены '+
+      '(<code>.vitazgio.ru</code> и <code>*.vitazgio.ru</code> — это одно и то же: сам домен сюда не '+
+      'входит, только поддомены; чтобы обойти и сам домен, и поддомены, впиши оба варианта).</p>'+
+      '<p>Не знаешь, что вписать — нажми «Проверить сеть»: программа посмотрит адаптеры этого '+
+      'компьютера и скажет, сломается что-нибудь или нет.</p>',
     verbose:'Подробный журнал', connect_on_launch:'Подключаться сразу при запуске',
     show_picker:'Показывать выбор сервера на главном экране',
+    auto_pick_fastest:'Подключаться к самому быстрому серверу',
+    auto_pick_fastest_note:'При подключении программа измерит отклик всех серверов и выберет самый '+
+      'быстрый. Если он не поднимется или упадёт — перейдёт на следующий по отклику, об этом будет видно '+
+      'в журнале. Возврат на выбранный вручную сервер — кнопкой «Выбрать этот сервер» или при следующем '+
+      'подключении.',
+    latency_measuring:'…', latency_unreachable:'нет ответа',
+    backup_server_note:'запасной',
     boot_start:'Запускать при старте системы',
-    boot_note:'Программа сама поставит службу systemd и разрешит ей работать без входа в систему — служба будет подниматься при загрузке машины.',
+    boot_note_linux:'Программа сама поставит службу systemd и разрешит ей работать без входа в систему — служба будет подниматься при загрузке машины.',
+    boot_note_windows:'Программа пропишет себя в автозагрузке Windows (для текущего пользователя, без прав администратора) — запустится сама при следующем входе в систему.',
+    boot_ready:'Включено: туннель поднимется сам при загрузке машины.',
+    boot_need_root:'Включено, но только после входа в систему — чтобы поднимался при загрузке, нужен пароль sudo.',
+    boot_configuring:'настраиваю…',
     autoconnect_note:'Туннель поднимется сам, как только программа стартует (сейчас или после перезагрузки) — жать «Подключить» в панели не придётся. Выключи, если хочешь запускать вручную.',
     save:'Сохранить', saved:'сохранено',
     apps_and_tunnel:'Программы и туннель',
@@ -751,14 +1073,36 @@ const I18N = {
     pick_app:'Выбери программу', close:'Закрыть', search_app:'Поиск по имени или пути…',
     custom_flag_name:'Свой (без флага)',
     import_title:'Импортировать сервер из файла', import_short:'Импорт',
-    export_server:'Экспортировать сервер', export_include_key:'Включить приватный ключ в файл',
-    export_key_warn:'С ключом внутри файл равносилен паролю от сервера — передавай только тем, '+
-      'кому доверяешь, и удали после того, как человек импортирует его. Без ключа файл несёт только '+
-      'адрес и настройки: доступ на сервере нужно будет выдать отдельно.',
+    export_server:'Экспортировать сервер',
     import_ok_with_key:'сервер импортирован вместе с ключом — можно нажимать «Подключить»',
     import_ok_no_key:'сервер импортирован без ключа — укажи свой приватный ключ перед подключением',
     import_bad_file:'этот файл не похож на экспорт ssh_tunnel',
     exported:'файл сохранён',
+    export_apps:'Экспортировать список', import_apps:'Импортировать список',
+    apps_imported:'список программ импортирован',
+    wizard_title:'Мастер настройки', wizard_sub:'Подключить телефон или новый сервер',
+    wizard_android:'Android', wizard_vps:'VPS',
+    wizard_android_intro:'Выбери, какой ключ отдать телефону, и получишь QR с готовыми настройками для текущего выбранного сервера.',
+    wizard_key_mode_local:'Взять ключ этого компьютера',
+    wizard_key_mode_own:'Сделать отдельный ключ для телефона',
+    wizard_key_mode_own_note:'Отдельный ключ можно потом отозвать на сервере, не трогая ключ компьютера.',
+    wizard_key_mode_local_ready:'Ключ уже разрешён на сервере — просто отсканируй код.',
+    wizard_generate:'Сгенерировать', wizard_generating:'создаю…',
+    wizard_need_host:'сначала укажи адрес сервера в настройках',
+    wizard_qr_step:'Отсканируй на телефоне или нажми на код, чтобы скопировать настройки текстом',
+    wizard_key:'Приватный ключ',
+    wizard_vps_intro:'Готовые команды для нового сервера — вставить целиком на нём под root. Что настраивают: ключи вместо паролей, firewall, бан за перебор, автообновления и отдельный пользователь для туннеля.',
+    wizard_admin_user:'Обычный пользователь', wizard_ssh_port:'SSH-порт',
+    wizard_tunnel_user:'Пользователь туннеля', wizard_timezone:'Часовой пояс',
+    wizard_tunnel_key:'Открытый ключ туннеля (необязательно)',
+    wizard_tunnel_key_ph:'пусто = взять ключи root',
+    wizard_build:'Собрать команды', wizard_vps_copied:'скопировано — вставь на сервере под root',
+    copied:'скопировано', copy_manually:'скопируй вручную',
+    exported_and_copied:'файл сохранён и скопирован в буфер',
+    paste_title:'Вставить настройки сервера из буфера обмена',
+    paste_apps:'Вставить список из буфера',
+    paste_failed:'не удалось прочитать буфер обмена',
+    paste_not_config:'в буфере не похоже на настройки ssh_tunnel',
   },
   en: {
     log:'Log', settings:'Settings', back:'Back', back_to_settings:'Back to settings',
@@ -766,24 +1110,103 @@ const I18N = {
     state_stopped:'Disconnected', state_connecting:'Connecting…', state_connected:'Protected',
     state_reconnecting:'Connection lost', state_error:'Error',
     check_ip_hint:'click to check the real external address',
+    conn_err_auth:'The server did not accept the key. The device may have been frozen or removed in the panel, or the key is wrong.',
+    conn_err_no_response:'The server is not responding: check the address and port.',
+    conn_err_refused:'The port is closed, or SSH is not running on the server.',
+    conn_err_other_prefix:'Server response: ',
     down:'Down', up:'Up', connections:'Connections', channels:'SSH channels',
     speedtest:'Speed test',
+    selfcheck_open:'Self-check',
+    selfcheck_title:'Self-check',
+    selfcheck_intro:'Seven steps in a row, from the server address to the external IP. The first '+
+      'failure stops the chain — no point checking further, and it shows exactly where it broke. '+
+      'Works even with the tunnel off: the check uses its own separate connection.',
+    selfcheck_start:'Check', selfcheck_running:'Checking…',
+    selfcheck_step_dns:'Server address resolves to an IP',
+    selfcheck_step_port:'SSH port responds',
+    selfcheck_step_key:'Key accepted by the server',
+    selfcheck_step_forward:'Port-forward through the tunnel works',
+    selfcheck_step_dns_tunnel:'DNS through the tunnel responds',
+    selfcheck_step_sites:'Known sites open',
+    selfcheck_step_external_ip:'External address matches the server',
+    sc_dns_resolved:'{detail}', sc_dns_resolve_failed:"didn't resolve: {detail}",
+    sc_port_responded:'{detail}',
+    sc_port_timeout:"the server didn't answer in time", sc_port_refused:'the server refused the connection',
+    sc_port_unreachable:'the server is unreachable', sc_port_error:'{detail}',
+    sc_key_accepted:'accepted',
+    sc_key_auth_failed:"the key didn't work — check the file path and that it's on the server",
+    sc_key_host_key_changed:'the server key changed — possible spoofing, details: {detail}',
+    sc_key_timeout:"the server didn't answer in time", sc_key_refused:'the server refused the connection',
+    sc_key_unreachable:'the server is unreachable', sc_key_error:'{detail}',
+    sc_forward_ok:'{detail}', sc_forward_forward_failed:"couldn't open a test connection: {detail}",
+    sc_dns_tunnel_ok:'responds', sc_dns_tunnel_no_answer:'no answer from DNS through the tunnel: {detail}',
+    sc_sites_ok:'{detail}', sc_sites_all_failed:'no site opened',
+    sc_external_ip_matches:'{detail} — matches the server address',
+    sc_external_ip_mismatch:'{detail} — does not match the server address, which is expected for some '+
+      'hosting setups (CDN, multiple addresses per server)',
+    sc_external_ip_check_failed:"couldn't check the external address: {detail}",
     language_label:'Interface language',
     add_server:'Add server',
     server_settings:'Server settings', general_settings:'General app settings',
+    issued_by_panel:'This server was issued by a panel · {name}',
     location_label:'Location', custom_name_ph:'Server name',
     select_server:'Select this server', current_server:'Current server',
     remove_server:'Remove server', confirm_remove_server:'Remove this server from the list?',
     discard_unsaved:'There are unsaved changes — switch and lose them?',
     host_label:'Server address', host_ph:'server address or domain',
     user_label:'SSH user', key_label:'Private key',
+    vps_setup_row:'Set up the server over SSH',
+    vps_setup_row_sub:'Key, firewall and a dedicated user — one button',
+    vps_setup_title:'Server setup over SSH',
+    vps_setup_intro:'The program connects with the root password itself, installs its own key on the '+
+      'server, checks that logging in with it actually works, and only then runs the same steps described '+
+      'in docs/SERVER_SETUP.md: basic hardening (firewall, brute-force ban, disabling password login) and '+
+      'a dedicated user that can only forward connections. The root password is never saved and never '+
+      'shown again.',
+    vps_port_label:'SSH port', vps_user_label:'User', vps_password_label:'Root password',
+    vps_install_panel:'Also install the client web panel',
+    vps_install_panel_note:'A separate web page for administering the server (system services, network, '+
+      'disks) — one more open port. Shows the address and a one-time password once installed.',
+    vps_install_udprelay:'Also install the UDP relay (calls, games)',
+    vps_install_udprelay_note:"Listens only on 127.0.0.1 — no separate port opens up; it's reachable only "+
+      'through the tunnel that\'s already set up. Once installed, turn on "Route UDP through the server" '+
+      'in the server settings.',
+    vps_setup_start:'Set up server',
+    vps_setup_need_fields:'fill in the server address and the root password',
+    vps_setup_done_ok:'done',
+    vps_setup_done_fail:'failed:',
     filter_title:'Which apps go through the tunnel',
     local_via_tunnel:'Route the local network through the server too',
+    udp_relay_enabled:'Route UDP (calls, games) through the server',
+    udp_relay_help:'SSH can only forward TCP, so by default video calls, games, and QUIC (fast HTTP/3) '+
+      "don't get through the tunnel. This checkbox turns on forwarding through a separate relay on the "+
+      'server — set up once, in the VPS setup wizard ("Set up the server over SSH" button in this same '+
+      "menu). Until it's installed, this checkbox changes nothing: UDP still doesn't get through.",
     direct_label:'Always direct', scan_net:'Scan network',
+    direct_ph:'10.8.0.0/16, 172.30.*, .corp.local, vitazgio.ru',
+    direct_help_html:'<p>Networks and domains that shouldn\'t go through the server. Home and office '+
+      'addresses, as well as mesh-VPN networks, are already covered — list here only what they miss: '+
+      'a corporate VPN with its own address range, or a single site.</p>'+
+      '<p>Comma-separated, in any form: a network (<code>10.8.0.0/16</code> or <code>10.8.*</code>), '+
+      'a single address, a whole domain (<code>vitazgio.ru</code>), or its subdomains '+
+      '(<code>.vitazgio.ru</code> and <code>*.vitazgio.ru</code> mean the same thing: subdomains only, '+
+      'not the domain itself — to bypass both the domain and its subdomains, add both entries).</p>'+
+      '<p>Not sure what to enter — click "Scan network": the program will look at this computer\'s '+
+      'adapters and tell you if anything would break.</p>',
     verbose:'Verbose log', connect_on_launch:'Connect immediately on launch',
     show_picker:'Show server picker on the home screen',
+    auto_pick_fastest:'Connect to the fastest server',
+    auto_pick_fastest_note:"When connecting, the program measures every server's response time and picks "+
+      "the fastest one. If it doesn't come up or drops, it moves on to the next-best one — visible in the "+
+      'log. Returning to the manually chosen server: the "Select this server" button, or the next connect.',
+    latency_measuring:'…', latency_unreachable:"no answer",
+    backup_server_note:'backup',
     boot_start:'Start at system boot',
-    boot_note:'The program will install a systemd service itself and allow it to run without logging in — the service will come up at boot.',
+    boot_note_linux:'The program will install a systemd service itself and allow it to run without logging in — the service will come up at boot.',
+    boot_note_windows:'The program will add itself to Windows startup (for the current user, no administrator rights needed) — it will launch on the next login.',
+    boot_ready:'Enabled: the tunnel will come up on its own at boot.',
+    boot_need_root:'Enabled, but only after logging in — a sudo password is needed for it to come up at boot.',
+    boot_configuring:'configuring…',
     autoconnect_note:'The tunnel comes up on its own as soon as the program starts (now or after a reboot) — no need to press "Connect" in the panel. Turn it off if you\'d rather start it by hand.',
     save:'Save', saved:'saved',
     apps_and_tunnel:'Apps and tunnel',
@@ -796,14 +1219,36 @@ const I18N = {
     pick_app:'Pick an app', close:'Close', search_app:'Search by name or path…',
     custom_flag_name:'Custom (no flag)',
     import_title:'Import a server from a file', import_short:'Import',
-    export_server:'Export server', export_include_key:'Include the private key in the file',
-    export_key_warn:'With the key inside, the file is as good as a password to the server — only share it '+
-      'with people you trust, and delete it once they\'ve imported it. Without the key, the file only '+
-      'carries the address and settings: access on the server side has to be granted separately.',
+    export_server:'Export server',
     import_ok_with_key:'server imported along with its key — you can hit "Connect"',
     import_ok_no_key:'server imported without a key — point it at your own private key before connecting',
     import_bad_file:'this file doesn\'t look like an ssh_tunnel export',
     exported:'file saved',
+    export_apps:'Export list', import_apps:'Import list',
+    apps_imported:'app list imported',
+    wizard_title:'Setup wizard', wizard_sub:'Connect a phone or a new server',
+    wizard_android:'Android', wizard_vps:'VPS',
+    wizard_android_intro:'Pick which key to hand the phone, and get a QR with ready-made settings for the currently selected server.',
+    wizard_key_mode_local:'Use this computer\'s key',
+    wizard_key_mode_own:'Make a separate key for the phone',
+    wizard_key_mode_own_note:'A separate key can later be revoked on the server without touching the computer\'s key.',
+    wizard_key_mode_local_ready:'The key is already allowed on the server — just scan the code.',
+    wizard_generate:'Generate', wizard_generating:'generating…',
+    wizard_need_host:'set the server address in settings first',
+    wizard_qr_step:'Scan it on the phone, or click the code to copy the settings as text',
+    wizard_key:'Private key',
+    wizard_vps_intro:'Ready-made commands for a new server — paste the whole thing on it as root. What they set up: keys instead of passwords, a firewall, a ban after failed logins, automatic updates, and a separate user just for the tunnel.',
+    wizard_admin_user:'Regular user', wizard_ssh_port:'SSH port',
+    wizard_tunnel_user:'Tunnel user', wizard_timezone:'Timezone',
+    wizard_tunnel_key:'Tunnel public key (optional)',
+    wizard_tunnel_key_ph:'empty = reuse root\'s keys',
+    wizard_build:'Build the commands', wizard_vps_copied:'copied — paste it on the server as root',
+    copied:'copied', copy_manually:'copy it by hand',
+    exported_and_copied:'file saved and copied to clipboard',
+    paste_title:'Paste server settings from clipboard',
+    paste_apps:'Paste list from clipboard',
+    paste_failed:'couldn\'t read the clipboard',
+    paste_not_config:'this doesn\'t look like ssh_tunnel settings',
   },
 };
 function tr(key){ return (I18N[LANG] && I18N[LANG][key]) || (I18N.ru[key] || key); }
@@ -813,12 +1258,16 @@ function applyI18n(){
   document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = tr(el.dataset.i18n); });
   document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = tr(el.dataset.i18nTitle); });
   document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = tr(el.dataset.i18nPh); });
+  const dh = $('directHelp');
+  if(dh) dh.innerHTML = tr('direct_help_html');
+  if(typeof renderSelfCheckSteps === 'function') renderSelfCheckSteps(lastSelfCheckSteps);
   renderModes();
   renderApps();
   if(typeof renderCityBtn === 'function') renderCityBtn();
   renderTabs();
   renderHomePicker();
   if(typeof setState === 'function') setState(lastState);
+  if(typeof renderBootState === 'function' && lastBootState) renderBootState(lastBootState);
 }
 $('language').addEventListener('change', () => {
   LANG = $('language').value === 'en' ? 'en' : 'ru';
@@ -827,7 +1276,7 @@ $('language').addEventListener('change', () => {
 });
 
 const FIELDS = ['host','user','keyPath','sshPort','socksPort','httpPort','poolSize'];
-const PROFILE_CHECKS = ['localViaTunnel'];
+const PROFILE_CHECKS = ['localViaTunnel', 'udpRelayEnabled'];
 const CHECKS = ['verbose'];
 
 /* Правила фильтра живут отдельно от полей формы: они правятся на своём
@@ -874,14 +1323,29 @@ function renderApps(){
   filterApps.forEach(name => {
     const row = document.createElement('div');
     row.className = 'appitem';
+
+    const icon = document.createElement('div');
+    icon.className = 'appicon';
+    icon.textContent = (name[0] || '?').toUpperCase();
+    const path = appPaths[name];
+    if(path){
+      // Значок достаётся только на Windows (там же, где вообще есть путь к
+      // файлу) — если запроса не будет или он не удастся, буква на подложке
+      // просто останется на месте, ничего не сломается.
+      const img = document.createElement('img');
+      img.src = '/api/appicon?path=' + encodeURIComponent(path) + '&t=' + encodeURIComponent(T);
+      img.onload = () => { icon.textContent = ''; icon.appendChild(img); };
+      img.onerror = () => {};
+    }
+
     const info = document.createElement('span');
     info.style.cssText = 'flex:1;min-width:0';
     const nm = document.createElement('div');
     nm.className = 'nm'; nm.textContent = name;
     info.appendChild(nm);
-    if(appPaths[name]){
+    if(path){
       const pt = document.createElement('div');
-      pt.className = 'pt'; pt.textContent = appPaths[name];
+      pt.className = 'pt'; pt.textContent = path;
       info.appendChild(pt);
     }
     const del = document.createElement('button');
@@ -891,10 +1355,101 @@ function renderApps(){
       filterDirty = true;
       renderApps(); renderModes();
     };
-    row.appendChild(info); row.appendChild(del);
+    row.appendChild(icon); row.appendChild(info); row.appendChild(del);
     box.appendChild(row);
   });
 }
+
+/* ---------- экспорт и импорт списка программ ---------- */
+/* Тот же список, что редактируется на этом экране — независимо от того, к
+   какому серверу он привязан (правила фильтра свои у каждого профиля).
+   Пригодится и на Android, когда до него дойдут руки: формат простой и
+   ничего специфичного для Windows/Linux в нём нет. */
+function appsExportDoc(){
+  return {
+    sshTunnelAppList: 1,
+    filterMode: filterMode,
+    apps: filterApps.map(n => ({ name: n, path: appPaths[n] || '' })),
+  };
+}
+
+// appsListFrom — достаёт список программ из документа, если он вообще похож
+// на экспорт списка: принимаем и наш формат {apps:[...]}, и просто голый
+// массив, но не абы что — иначе долго объяснять, почему список вдруг пуст.
+function appsListFrom(doc){
+  if(doc && Array.isArray(doc.apps)) return doc.apps;
+  if(Array.isArray(doc)) return doc;
+  return null;
+}
+
+function applyAppsDoc(list){
+  list.forEach(item => {
+    if(typeof item === 'string') addApp(item, '');
+    else if(item && item.name) addApp(item.name, item.path || '');
+  });
+  $('filterNote').textContent = tr('apps_imported');
+  setTimeout(() => $('filterNote').textContent = '', 4000);
+}
+
+$('exportAppsBtn').onclick = async () => {
+  const text = JSON.stringify(appsExportDoc(), null, 2);
+  const blob = new Blob([text], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'ssh_tunnel-apps.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  const copied = await copyToClipboard(text);
+  $('filterNote').textContent = copied ? tr('exported_and_copied') : tr('exported');
+  setTimeout(() => $('filterNote').textContent = '', 4000);
+};
+
+$('importAppsBtn').onclick = () => $('importAppsFile').click();
+$('importAppsFile').addEventListener('change', async () => {
+  const file = $('importAppsFile').files[0];
+  $('importAppsFile').value = '';
+  if(!file) return;
+
+  let doc;
+  try {
+    doc = JSON.parse(await file.text());
+  } catch(e) {
+    $('filterNote').textContent = tr('import_bad_file');
+    return;
+  }
+  const list = appsListFrom(doc);
+  if(!list){
+    $('filterNote').textContent = tr('import_bad_file');
+    return;
+  }
+  applyAppsDoc(list);
+});
+
+$('pasteAppsBtn').onclick = async () => {
+  let text;
+  try {
+    text = await navigator.clipboard.readText();
+  } catch(e) {
+    $('filterNote').textContent = tr('paste_failed');
+    return;
+  }
+  let doc;
+  try {
+    doc = JSON.parse(text);
+  } catch(e) {
+    $('filterNote').textContent = tr('paste_not_config');
+    return;
+  }
+  const list = appsListFrom(doc);
+  if(!list){
+    $('filterNote').textContent = tr('paste_not_config');
+    return;
+  }
+  applyAppsDoc(list);
+};
 
 function addApp(name, path){
   const n = normApp(name);
@@ -920,6 +1475,13 @@ function closeMenu(){ if(menuEl){ menuEl.remove(); menuEl = null; } }
 document.addEventListener('click', ev => {
   if(menuEl && !menuEl.contains(ev.target) && !$('addApp').contains(ev.target) &&
      !$('homePicker').contains(ev.target) && !$('cityBtn').contains(ev.target)) closeMenu();
+});
+
+/* Значки «?» открытые по клику (не по наведению) закрываются щелчком мимо. */
+document.addEventListener('click', ev => {
+  document.querySelectorAll('.infoq.show').forEach(el => {
+    if(!el.contains(ev.target)) el.classList.remove('show');
+  });
 });
 
 $('addApp').onclick = ev => {
@@ -981,12 +1543,27 @@ function renderProcs(){
   list.forEach(p => {
     const b = document.createElement('button');
     b.className = 'proc' + (filterApps.includes(normApp(p.name)) ? ' picked' : '');
+
+    const icon = document.createElement('div');
+    icon.className = 'appicon';
+    icon.textContent = (p.name[0] || '?').toUpperCase();
+    if(p.path){
+      const img = document.createElement('img');
+      img.src = '/api/appicon?path=' + encodeURIComponent(p.path) + '&t=' + encodeURIComponent(T);
+      img.onload = () => { icon.textContent = ''; icon.appendChild(img); };
+      img.onerror = () => {};
+    }
+    b.appendChild(icon);
+
+    const info = document.createElement('div'); info.className = 'info';
     const n = document.createElement('div'); n.className = 'n'; n.textContent = p.name;
-    b.appendChild(n);
+    info.appendChild(n);
     if(p.path){
       const pa = document.createElement('div'); pa.className = 'p'; pa.textContent = p.path;
-      b.appendChild(pa);
+      info.appendChild(pa);
     }
+    b.appendChild(info);
+
     // Повторный щелчок снимает выбор — иначе лишнюю программу пришлось бы
     // убирать, закрыв окно, а это неочевидно.
     b.onclick = () => { toggleApp(p.name, p.path); renderProcs(); };
@@ -1029,7 +1606,8 @@ function docWithProfile(p){
 }
 
 /* ---------- переключение экранов ---------- */
-const VIEWS = ['viewMain','viewSettings','viewFilter','viewLog'];
+const VIEWS = ['viewMain','viewSettings','viewFilter','viewWizard',
+               'viewVpsSetup','viewSelfCheck','viewLog'];
 let current = 'viewMain';
 
 function show(name){
@@ -1056,6 +1634,15 @@ $('backFromSettings').onclick = () => show('viewMain');
 $('backFromLog').onclick = () => show('viewMain');
 $('backFromFilter').onclick = () => show('viewSettings');
 $('toFilter').onclick = () => show('viewFilter');
+$('backFromSelfCheck').onclick = () => show('viewMain');
+$('toSelfCheck').onclick = () => { show('viewSelfCheck'); runSelfCheck(); };
+$('backFromVpsSetup').onclick = () => show('viewSettings');
+$('toVpsSetup').onclick = () => {
+  if(!$('vpsHost').value) $('vpsHost').value = $('host').value;
+  if($('user').value) $('vpsUser').value = $('user').value;
+  if($('sshPort').value) $('vpsPort').value = $('sshPort').value;
+  show('viewVpsSetup');
+};
 
 /* ---------- форматирование ---------- */
 function fmtMbps(v){
@@ -1141,16 +1728,29 @@ function push(el){
 $('clear').onclick = () => { logEl.innerHTML = ''; lastKey = null; };
 
 /* ---------- поток событий ---------- */
+// connErrorText — перевод типовой ошибки подключения (ТЗ-13). errorKind
+// разобран один раз в общем коде (internal/tunnel.ConnErrorKind), сюда
+// приходит уже готовый код причины — здесь только выбор текста под язык
+// интерфейса. Пустой или незнакомый код (и "hostkey_changed" — своя,
+// отдельная защита, её текст не трогаем) — показываем detail как есть.
+function connErrorText(kind, detail){
+  if(!kind || kind === 'hostkey_changed') return detail;
+  const known = ['auth', 'no_response', 'refused'];
+  if(known.includes(kind)) return tr('conn_err_' + kind);
+  return tr('conn_err_other_prefix') + detail;
+}
+
 function connectEvents(){
   const es = new EventSource('/events?t=' + encodeURIComponent(T));
   es.onmessage = ev => {
     const e = JSON.parse(ev.data);
-    if(e.kind === 'conn')  return addConn(e);
-    if(e.kind === 'speed') return onSpeed(e);
-    if(e.kind === 'log')   return addMsg(e);
+    if(e.kind === 'conn')     return addConn(e);
+    if(e.kind === 'speed')    return onSpeed(e);
+    if(e.kind === 'log')      return addMsg(e);
+    if(e.kind === 'vpssetup') return onVpsSetupEvent(e);
     if(e.kind === 'state'){
       setState(e.state, e.state === 'connected' ? e.detail : '');
-      showError(e.state === 'error' ? e.detail : '');
+      showError(e.state === 'error' ? connErrorText(e.errorKind, e.detail) : '');
       return;
     }
     if(e.kind === 'stats'){
@@ -1177,7 +1777,7 @@ $('power').onclick = async () => {
   showError('');
   try{
     const r = running ? await api('/api/stop', {}) : await api('/api/start', {});
-    if(r.error){ showError(r.error); show('viewMain'); }
+    if(r.error){ showError(connErrorText(r.errorKind, r.error)); show('viewMain'); }
   } finally {
     $('power').disabled = false;
     refresh();
@@ -1253,6 +1853,108 @@ $('speedtest').onclick = async () => {
   if(r.note) showError(r.note);
 };
 
+/* ---------- самопроверка ---------- */
+const SELFCHECK_STEPS = ['dns','port','key','forward','dns_tunnel','sites','external_ip'];
+
+function selfCheckCodeText(name, code, detail){
+  const key = 'sc_' + name + '_' + code;
+  const tpl = tr(key);
+  if (tpl === key) return detail || code || '';
+  return tpl.replace('{detail}', detail || '');
+}
+
+let lastSelfCheckSteps = [];
+function renderSelfCheckSteps(steps){
+  lastSelfCheckSteps = steps || [];
+  const box = $('selfCheckSteps');
+  const byName = {};
+  (steps || []).forEach(s => { byName[s.name] = s; });
+  box.innerHTML = SELFCHECK_STEPS.map(name => {
+    const s = byName[name] || null;
+    let cls = 'pending', mark = '…';
+    if (s){
+      if (s.skipped){ cls = 'skip'; mark = '–'; }
+      else if (s.ok){ cls = 'ok'; mark = '✓'; }
+      else { cls = 'bad'; mark = '✗'; }
+    }
+    const label = tr('selfcheck_step_' + name);
+    const why = (s && !s.skipped) ? selfCheckCodeText(name, s.code, s.detail) : '';
+    return '<div class="netline ' + cls + '">' +
+      '<span class="mark">' + mark + '</span>' +
+      '<span>' + label + (why ? '<span class="why">— ' + why + '</span>' : '') + '</span>' +
+      '</div>';
+  }).join('');
+}
+
+async function runSelfCheck(){
+  renderSelfCheckSteps([]); // все «в ожидании»
+  $('selfCheckStart').disabled = true;
+  $('selfCheckStart').textContent = tr('selfcheck_running');
+  try{
+    const r = await api('/api/selfcheck');
+    renderSelfCheckSteps(r.steps);
+  } catch(e){
+    renderSelfCheckSteps([]);
+  }
+  $('selfCheckStart').disabled = false;
+  $('selfCheckStart').textContent = tr('selfcheck_start');
+}
+$('selfCheckStart').onclick = runSelfCheck;
+
+/* ---------- мастер настройки VPS ---------- */
+let vpsSetupRunning = false;
+
+function vpsLogLine(text){
+  const box = $('vpsSetupLog');
+  box.hidden = false;
+  const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 4;
+  box.textContent += (box.textContent ? '\n' : '') + text;
+  if(atBottom) box.scrollTop = box.scrollHeight;
+}
+
+function onVpsSetupEvent(e){
+  if(e.done){
+    vpsSetupRunning = false;
+    $('vpsSetupStart').disabled = false;
+    $('vpsPassword').value = '';
+    $('vpsSetupNote').textContent = e.failed ? '' : tr('vps_setup_done_ok');
+    if(e.failed) vpsLogLine(tr('vps_setup_done_fail') + ' ' + (e.error || ''));
+    return;
+  }
+  vpsLogLine(e.text || '');
+}
+
+$('vpsSetupStart').onclick = async () => {
+  if(vpsSetupRunning) return;
+  const host = $('vpsHost').value.trim();
+  const port = parseInt($('vpsPort').value, 10) || 22;
+  const user = $('vpsUser').value.trim() || 'root';
+  const password = $('vpsPassword').value;
+  if(!host || !password){
+    $('vpsSetupNote').textContent = tr('vps_setup_need_fields');
+    return;
+  }
+  vpsSetupRunning = true;
+  $('vpsSetupStart').disabled = true;
+  $('vpsSetupNote').textContent = '';
+  $('vpsSetupLog').hidden = true;
+  $('vpsSetupLog').textContent = '';
+
+  const r = await api('/api/vpssetup/start', {
+    host, port, user, password,
+    keyPath: $('keyPath').value || undefined,
+    installPanel: $('vpsInstallPanel').checked,
+    installUdpRelay: $('vpsInstallUdpRelay').checked,
+  });
+  if(r.error){
+    vpsSetupRunning = false;
+    $('vpsSetupStart').disabled = false;
+    $('vpsSetupNote').textContent = r.error;
+  }
+  // Дальше ход работы приходит построчно через /events (onVpsSetupEvent) —
+  // здесь мы только попросили начать.
+};
+
 // Плитки со скоростью убираются сами через десять секунд: результат нужен
 // сразу после теста, а дальше он только занимает место. Таймер сбрасывается
 // при новом тесте, иначе он погасил бы свежий результат раньше времени.
@@ -1308,9 +2010,10 @@ function cmdShowKey(){
 // null, и команда для сервера собирается с плейсхолдером, как раньше.
 let genKeyPub = null;
 
-function cmdServer(){
-  const user = ($('user').value || '').trim() || 'tunnel';
-  const key = genKeyPub || 'ВСТАВЬ_СЮДА_КЛЮЧ_ИЗ_ШАГА_2';
+// buildAuthCmd — команда «добавить этот ключ на сервере», в общем виде: тем
+// же кодом пользуются и настройка ключа для этого компьютера (cmdServer), и
+// генерация ключа для телефона в мастере настройки.
+function buildAuthCmd(user, key){
   if(user === 'root'){
     return 'mkdir -p ~/.ssh; chmod 700 ~/.ssh; ' +
       'echo \'' + key + '\' >> ~/.ssh/authorized_keys; ' +
@@ -1322,6 +2025,12 @@ function cmdServer(){
     'echo \'restrict,port-forwarding ' + key + '\' >> /home/' + u + '/.ssh/authorized_keys; ' +
     'chown ' + u + ':' + u + ' /home/' + u + '/.ssh/authorized_keys; ' +
     'chmod 600 /home/' + u + '/.ssh/authorized_keys';
+}
+
+function cmdServer(){
+  const user = ($('user').value || '').trim() || 'tunnel';
+  const key = genKeyPub || 'ВСТАВЬ_СЮДА_КЛЮЧ_ИЗ_ШАГА_2';
+  return buildAuthCmd(user, key);
 }
 
 function renderSetupCmd(){
@@ -1386,23 +2095,27 @@ $('keyPath').addEventListener('input', () => {
 // Показываем состояние словами: «включено» само по себе ещё не значит, что
 // туннель поднимется до входа в систему — за это отвечает отдельная штука
 // (linger), и если её нет, честнее так и сказать.
+let lastBootState = null;
 function renderBootState(st){
+  if(st) lastBootState = st;
   if(!st || !st.supported){ $('bootBlock').hidden = true; return; }
   $('bootBlock').hidden = false;
   $('bootStart').checked = !!st.enabled;
+  $('bootNote').textContent = tr(isWindows() ? 'boot_note_windows' : 'boot_note_linux');
 
   if(!st.enabled){
     $('bootStatus').textContent = '';
-  } else if(st.linger){
-    $('bootStatus').textContent = 'Включено: туннель поднимется сам при загрузке машины.';
+  } else if(isWindows() || st.linger){
+    // На Windows отдельного понятия "linger" нет — запись в реестре и так
+    // срабатывает сама при следующем входе, без прав администратора.
+    $('bootStatus').textContent = tr('boot_ready');
   } else {
-    $('bootStatus').textContent = 'Включено, но только после входа в систему — '
-      + 'чтобы поднимался при загрузке, нужен пароль sudo.';
+    $('bootStatus').textContent = tr('boot_need_root');
   }
 }
 
 async function applyBoot(password){
-  $('bootStatus').textContent = 'настраиваю…';
+  $('bootStatus').textContent = tr('boot_configuring');
   const r = await api('/api/bootstart', {
     enabled: $('bootStart').checked,
     password: password || ''
@@ -1448,8 +2161,9 @@ $('manualToggle').onclick = () => {
 document.querySelectorAll('.cp[data-cmd]').forEach(b => {
   b.onclick = async () => {
     const ok = await copyToClipboard($(b.dataset.cmd).textContent);
-    $('keyHelpNote').textContent = ok ? 'скопировано' : 'скопируй вручную';
-    setTimeout(() => $('keyHelpNote').textContent = '', 2500);
+    const note = $(b.dataset.note || 'keyHelpNote');
+    note.textContent = ok ? 'скопировано' : 'скопируй вручную';
+    setTimeout(() => note.textContent = '', 2500);
   };
 });
 
@@ -1465,6 +2179,7 @@ function toggleHelp(btnId, boxId, onShow){
 }
 toggleHelp('keyHelpBtn', 'keyHelp', renderSetupCmd);
 toggleHelp('localHelpBtn', 'localHelp');
+toggleHelp('udpRelayHelpBtn', 'udpRelayHelp');
 toggleHelp('directHelpBtn', 'directHelp');
 
 function hideKeyHelp(){
@@ -1801,6 +2516,24 @@ function liveRetitleEditingTab(){
   if(icon) icon.innerHTML = tabFlagHTML(flag);
 }
 
+// refreshLatencyBadges — отклик у каждой вкладки. Не влияет на то, к какому
+// серверу подключается программа, — только показывает цифры рядом с именем.
+let latencyRunning = false;
+async function refreshLatencyBadges(){
+  if(latencyRunning) return;
+  latencyRunning = true;
+  document.querySelectorAll('.tab .lat').forEach(el => el.textContent = tr('latency_measuring'));
+  try{
+    const r = await api('/api/profile/latency', {});
+    (r.results || []).forEach(res => {
+      const el = document.querySelector('.tab .lat[data-lat-id="' + CSS.escape(res.id) + '"]');
+      if(!el) return;
+      el.textContent = res.error ? tr('latency_unreachable') : res.ms + ' мс';
+    });
+  } catch(e){ /* тихо: это необязательное украшение вкладок */ }
+  latencyRunning = false;
+}
+
 /* ---------- вкладки серверов ---------- */
 // tabFlagHTML принимает код страны (или пусто — тогда логотип-заглушка).
 function tabFlagHTML(code){
@@ -1816,11 +2549,13 @@ function renderTabs(){
     b.dataset.id = p.id;
     b.innerHTML = '<span class="flagicon">' + tabFlagHTML(resolveFlagCode(p.flag)) + '</span>' +
       '<span class="nm"></span>' +
+      '<span class="lat" data-lat-id="' + p.id + '"></span>' +
       (p.id === cfg.activeProfile ? '<span class="dot" title="' + tr('current_server') + '"></span>' : '');
     b.querySelector('.nm').textContent = p.name;
     b.onclick = () => selectEditingTab(p.id);
     box.appendChild(b);
   });
+  if((cfg.profiles || []).length > 1) refreshLatencyBadges();
   const plus = document.createElement('button');
   plus.className = 'tab tabAdd';
   plus.textContent = '+';
@@ -1838,6 +2573,8 @@ function renderGeneralVisibility(){
   // .chk-row задаёт свой display:flex — как и с #curBadge/#homePicker, обычный
   // hidden тут не подействует.
   $('showPickerRow').style.display = many ? 'flex' : 'none';
+  $('autoPickRow').style.display = many ? 'flex' : 'none';
+  $('autoPickNote').style.display = many ? 'block' : 'none';
   $('removeServerBtn').hidden = !many;
 }
 
@@ -1890,14 +2627,14 @@ $('removeServerBtn').onclick = async () => {
 };
 
 /* ---------- экспорт и импорт сервера файлом ---------- */
-/* Экспортируется тот сервер, что сейчас показан в форме (editingProfileId).
-   Несохранённые правки в файл не попадают — только то, что уже лежит на
-   диске, поэтому перед экспортом стоит сперва нажать «Сохранить». */
+/* Экспортируется тот сервер, что сейчас показан в форме (editingProfileId),
+   вместе с приватным ключом — файл готовится для передачи тому, кому уже
+   доверяешь (другу, знакомому), поэтому лишний вопрос «включать ли ключ»
+   только мешал бы. Несохранённые правки в файл не попадают — только то,
+   что уже лежит на диске, поэтому перед экспортом стоит сперва нажать
+   «Сохранить». */
 $('exportBtn').onclick = async () => {
-  const r = await api('/api/profile/export', {
-    id: editingProfileId,
-    includeKey: $('exportIncludeKey').checked,
-  });
+  const r = await api('/api/profile/export', { id: editingProfileId, includeKey: true });
   if(r.error){ showError(r.error, 'setError'); return; }
   const blob = new Blob([r.data], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -1908,9 +2645,27 @@ $('exportBtn').onclick = async () => {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
-  $('savedNote').textContent = tr('exported');
+  const copied = await copyToClipboard(r.data);
+  $('savedNote').textContent = copied ? tr('exported_and_copied') : tr('exported');
   setTimeout(() => $('savedNote').textContent = '', 4000);
 };
+
+// isServerExportDoc — тот же критерий, что и на сервере (config.Host==""):
+// без адреса это не экспорт ssh_tunnel, а что-то другое, случайно
+// оказавшееся в буфере обмена.
+function isServerExportDoc(doc){
+  return !!doc && typeof doc.host === 'string' && doc.host !== '';
+}
+
+async function importProfileDoc(doc){
+  const r = await api('/api/profile/import', doc);
+  if(r.error){ showError(r.error, 'setError'); return; }
+  showError('', 'setError');
+  editingProfileId = r.profile.id;
+  applyDoc(r.config);
+  $('savedNote').textContent = r.keyImported ? tr('import_ok_with_key') : tr('import_ok_no_key');
+  setTimeout(() => $('savedNote').textContent = '', 8000);
+}
 
 $('importBtn').onclick = () => $('importFile').click();
 $('importFile').addEventListener('change', async () => {
@@ -1925,14 +2680,30 @@ $('importFile').addEventListener('change', async () => {
     showError(tr('import_bad_file'), 'setError');
     return;
   }
-  const r = await api('/api/profile/import', doc);
-  if(r.error){ showError(r.error, 'setError'); return; }
-  showError('', 'setError');
-  editingProfileId = r.profile.id;
-  applyDoc(r.config);
-  $('savedNote').textContent = r.keyImported ? tr('import_ok_with_key') : tr('import_ok_no_key');
-  setTimeout(() => $('savedNote').textContent = '', 8000);
+  await importProfileDoc(doc);
 });
+
+$('pasteBtn').onclick = async () => {
+  let text;
+  try {
+    text = await navigator.clipboard.readText();
+  } catch(e) {
+    showError(tr('paste_failed'), 'setError');
+    return;
+  }
+  let doc;
+  try {
+    doc = JSON.parse(text);
+  } catch(e) {
+    showError(tr('paste_not_config'), 'setError');
+    return;
+  }
+  if(!isServerExportDoc(doc)){
+    showError(tr('paste_not_config'), 'setError');
+    return;
+  }
+  await importProfileDoc(doc);
+};
 
 /* ---------- виджет выбора сервера на главном экране ---------- */
 function renderHomePicker(){
@@ -1989,6 +2760,7 @@ $('save').onclick = async () => {
   doc.autoStart = $('autoStart').checked;
   doc.language = LANG;
   doc.showServerPicker = $('showServerPicker').checked;
+  doc.autoPickFastest = $('autoPickFastest').checked;
 
   const r = await api('/api/config', doc);
   if(r.error){ showError(r.error, 'setError'); return; }
@@ -2009,6 +2781,23 @@ function fillProfileForm(p){
   renderModes();
   renderApps();
   renderCityPicker(p);
+  renderIssuedByPanel(p);
+}
+
+// renderIssuedByPanel — сервер настроен вручную почти всегда, поле panel в
+// нём пусто, и строка вообще не появляется. Заполняется только у сервера,
+// заведённого через веб-панель на VPS (ТЗ-07…10, internal/share версии 2).
+function renderIssuedByPanel(p){
+  const el = $('issuedByPanel');
+  if(!el) return;
+  if(!p.panel){
+    el.hidden = true;
+    el.onclick = null;
+    return;
+  }
+  el.hidden = false;
+  el.textContent = tr('issued_by_panel').replace('{name}', p.deviceName || p.name || '');
+  el.onclick = () => window.open(p.panel, '_blank', 'noopener');
 }
 
 function fillGeneralForm(c){
@@ -2019,6 +2808,7 @@ function fillGeneralForm(c){
   $('autoConnect').checked = c.autoConnect === undefined || c.autoConnect === null
     ? true : !!c.autoConnect;
   $('showServerPicker').checked = !!c.showServerPicker;
+  $('autoPickFastest').checked = !!c.autoPickFastest;
   if(c.language && c.language !== LANG){
     LANG = c.language === 'en' ? 'en' : 'ru';
   }
@@ -2045,8 +2835,15 @@ function applyDoc(newCfg, keepEditing){
 
 async function refresh(){
   const st = await api('/api/status');
-  const active = (st.config.profiles || []).find(p => p.id === st.config.activeProfile) || {};
-  setState(st.state, st.state === 'connected' ? active.host : '');
+  // На главном экране показываем сервер, к которому подключены на самом
+  // деле, — после автовыбора самого быстрого или перехода на запасной он
+  // может отличаться от выбранного вручную (st.config.activeProfile).
+  const usingBackup = st.effectiveProfile && st.effectiveProfile !== st.config.activeProfile;
+  const shownId = st.state === 'connected' && st.effectiveProfile ? st.effectiveProfile : st.config.activeProfile;
+  const active = (st.config.profiles || []).find(p => p.id === shownId) || {};
+  let detail = st.state === 'connected' ? active.host : '';
+  if(detail && usingBackup) detail += ' (' + tr('backup_server_note') + ')';
+  setState(st.state, detail);
   // Пока пользователь правит форму, обновление с сервера её не трогает —
   // иначе набранный, но ещё не сохранённый адрес затирался бы.
   seenApps = (st.seenApps || []);
@@ -2056,14 +2853,107 @@ async function refresh(){
   }
   if(st.os && st.os !== OS){
     OS = st.os;
-    // Галочка «Подключаться сразу при запуске» в верхней части настроек
-    // относится только к окну на Windows — на Linux она ни на что не влияет,
-    // там за то же самое отвечает пара «Запускать при старте системы» +
-    // «Подключаться сразу при запуске» внизу, у автозапуска.
+    // Галочка «Подключаться сразу при запуске» в верхней части настроек —
+    // для Windows: и обычный запуск двойным щелчком, и запуск из автозагрузки
+    // при входе в систему используют один и тот же exe, так что достаточно
+    // одной галочки. На Linux эта верхняя ни на что не влияет — там то же
+    // самое отвечает нижняя пара «Запускать при старте системы» +
+    // «Подключаться сразу при запуске», у автозапуска.
     $('autoStartRow').style.display = isWindows() ? '' : 'none';
+    $('autoConnectRow').style.display = isWindows() ? 'none' : '';
     if(!$('keyHelp').hidden) renderSetupCmd();
   }
 }
+
+/* ---------- сворачиваемые блоки настроек ---------- */
+/* При первом запуске оба блока открыты — надо всё увидеть и заполнить.
+   Дальше, раз всё уже настроено, они по умолчанию свёрнуты, чтобы не
+   листать то, что и так работает. Ручной выбор запоминается насовсем —
+   это чисто локальное удобство браузера, не часть конфига на диске. */
+function initCollapsible(panelId, titleId){
+  const panel = $(panelId), title = $(titleId);
+  const key = 'ssh_tunnel_collapsed_' + panelId;
+  let collapsed = false;
+  try {
+    if(localStorage.getItem('ssh_tunnel_settings_seen')){
+      const v = localStorage.getItem(key);
+      collapsed = v === null ? true : v === '1';
+    }
+  } catch(e) {}
+  panel.classList.toggle('collapsed', collapsed);
+  title.onclick = () => {
+    const now = panel.classList.toggle('collapsed');
+    try { localStorage.setItem(key, now ? '1' : '0'); } catch(e) {}
+  };
+}
+initCollapsible('serverPanel', 'serverPanelTitle');
+initCollapsible('generalPanel', 'generalPanelTitle');
+try { localStorage.setItem('ssh_tunnel_settings_seen', '1'); } catch(e) {}
+
+/* ---------- мастер настройки: Android + VPS ---------- */
+$('toWizard').onclick = () => {
+  // Открытый ключ туннеля для этого сервера уже мог быть создан на экране
+  // настроек — если да, подставляем его в поле VPS-скрипта, чтобы не
+  // копировать вручную из другого места.
+  if(genKeyPub && !$('wzTunnelKey').value) $('wzTunnelKey').value = genKeyPub;
+  show('viewWizard');
+};
+$('backFromWizard').onclick = () => show('viewSettings');
+
+$('wzTabAndroid').onclick = () => {
+  $('wzTabAndroid').classList.add('on'); $('wzTabVPS').classList.remove('on');
+  $('wzAndroid').hidden = false; $('wzVPS').hidden = true;
+};
+$('wzTabVPS').onclick = () => {
+  $('wzTabVPS').classList.add('on'); $('wzTabAndroid').classList.remove('on');
+  $('wzVPS').hidden = false; $('wzAndroid').hidden = true;
+};
+
+let wzQrPayload = '';
+$('wzGenBtn').onclick = async () => {
+  const p = currentProfile();
+  if(!p.id || !p.host){
+    $('wzGenNote').textContent = tr('wizard_need_host');
+    return;
+  }
+  const own = $('wzKeyModeOwn').checked;
+  $('wzGenNote').textContent = tr('wizard_generating');
+  const r = await api('/api/androidkey', { id: p.id, mode: own ? 'own' : 'local' });
+  if(r.error){ $('wzGenNote').textContent = r.error; return; }
+  $('wzGenNote').textContent = '';
+  $('wzAuthBlock').hidden = !own;
+  $('wzAlreadyAllowed').hidden = own;
+  if(own) $('wzAuthCmd').textContent = buildAuthCmd(r.user, r.pubKey);
+  $('wzInfoHost').textContent = r.host + ':' + r.sshPort;
+  $('wzInfoUser').textContent = r.user;
+  let doc = {};
+  try { doc = JSON.parse(r.payload); } catch(e) {}
+  $('wzInfoKey').textContent = doc.keyContents || '';
+  $('wzQr').src = 'data:image/png;base64,' + r.qrPng;
+  wzQrPayload = r.payload;
+  $('wzAndroidResult').hidden = false;
+};
+$('wzQr').onclick = async () => {
+  if(!wzQrPayload) return;
+  const ok = await copyToClipboard(wzQrPayload);
+  $('wzQrNote').textContent = ok ? tr('copied') : tr('copy_manually');
+  setTimeout(() => $('wzQrNote').textContent = '', 2500);
+};
+
+$('wzVpsBtn').onclick = async () => {
+  $('wzVpsNote').textContent = tr('wizard_generating');
+  $('wzVpsResult').hidden = true;
+  const r = await api('/api/vpsscript', {
+    newUser: $('wzNewUser').value, sshPort: $('wzSshPort').value,
+    timezone: $('wzTimezone').value, tunnelUser: $('wzTunnelUser').value,
+    tunnelKey: $('wzTunnelKey').value,
+  });
+  if(r.error){ $('wzVpsNote').textContent = r.error; return; }
+  $('wzVpsScript').textContent = r.script;
+  $('wzVpsResult').hidden = false;
+  const copied = await copyToClipboard(r.script);
+  $('wzVpsNote').textContent = copied ? tr('wizard_vps_copied') : tr('copy_manually');
+};
 
 renderCityBtn();
 connectEvents();

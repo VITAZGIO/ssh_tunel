@@ -24,12 +24,14 @@
 | **Windows** | [**ssh_tunnel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe) | окно с кнопкой, значок у часов |
 | **Android** | [**ssh_tunnel.apk**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.apk) | VPN-подключение, кнопка в шторке |
 | **Linux** | [**Установка на Linux**](docs/LINUX_SETUP.md) | консоль + веб-интерфейс, служба systemd, команды под все основные дистрибутивы |
-| **VPS-сервер** | [**Первая настройка**](docs/SERVER_SETUP.md) | что сделать на новом сервере: пользователь `tunnel`, ключи, firewall |
+| **VPS-сервер** | [**Установка панели**](docs/PANEL_SETUP.md) | веб-панель на самом сервере: заводит клиентов по кнопке, без консоли |
 
 Windows и Android — прямые ссылки на файл. Linux и VPS-сервер открывают
 страницу с инструкцией: у Linux слишком много разных систем, чтобы обойтись
 одной командой, а VPS — это вообще не файл, а порядок действий на новом
-сервере.
+сервере. Ручная настройка сервера без панели (один пользователь для
+туннеля, заводится через SSH) — в
+[первой настройке сервера](docs/SERVER_SETUP.md).
 
 Сборка под ARM и контрольные суммы — на
 [странице релиза](https://github.com/VITAZGIO/ssh_tunel/releases/latest).

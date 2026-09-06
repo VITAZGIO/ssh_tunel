@@ -108,6 +108,95 @@ func TestExportImportRoundTrip(t *testing.T) {
 	}
 }
 
+// Конфиг, выданный панелью на VPS (ТЗ-10), несёт поля версии 2 — они должны
+// дойти до профиля при импорте и вернуться назад при повторном экспорте
+// (ТЗ-12: по ним экран решает, показывать ли «Этот сервер выдан панелью»).
+func TestImportCarriesPanelFields(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmp)
+	t.Setenv("APPDATA", tmp)
+	cfg := withHost("")
+	s, err := NewOn(app.New(cfg), "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	doc := `{"sshTunnelExport":2,"name":"Ноутбук","host":"203.0.113.10","sshPort":22,
+		"user":"tun_0123456789abcdef","socksPort":1080,"httpPort":1081,"poolSize":4,
+		"filterMode":"all","keyIncluded":false,
+		"panel":"https://panel.example.com/","clientId":"tun_0123456789abcdef",
+		"deviceName":"Ноутбук"}`
+
+	rec := httptest.NewRecorder()
+	s.handleProfileImport(rec, httptest.NewRequest(http.MethodPost, "/api/profile/import", strings.NewReader(doc)))
+	var impResp struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &impResp); err != nil || impResp.Error != "" {
+		t.Fatalf("импорт не удался: %v (%s)", err, rec.Body.String())
+	}
+
+	active := s.app.Config().Active()
+	if active.Panel != "https://panel.example.com/" {
+		t.Errorf("Panel не сохранился при импорте: %q", active.Panel)
+	}
+	if active.ClientID != "tun_0123456789abcdef" {
+		t.Errorf("ClientID не сохранился при импорте: %q", active.ClientID)
+	}
+	if active.DeviceName != "Ноутбук" {
+		t.Errorf("DeviceName не сохранился при импорте: %q", active.DeviceName)
+	}
+
+	// Повторный экспорт того же профиля не должен потерять эти поля.
+	rec = httptest.NewRecorder()
+	body := `{"id":"` + active.ID + `","includeKey":false}`
+	s.handleProfileExport(rec, httptest.NewRequest(http.MethodPost, "/api/profile/export", strings.NewReader(body)))
+	var expResp struct {
+		Data  string `json:"data"`
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &expResp); err != nil || expResp.Error != "" {
+		t.Fatalf("экспорт не удался: %v (%s)", err, rec.Body.String())
+	}
+	if !strings.Contains(expResp.Data, `"panel": "https://panel.example.com/"`) {
+		t.Errorf("повторный экспорт должен сохранить поле panel: %s", expResp.Data)
+	}
+}
+
+// Сервер, настроенный руками (или конфиг версии 1), не несёт полей панели —
+// импорт не должен на этом падать, а профиль остаётся с пустыми полями:
+// строка «выдано панелью» на экране в этом случае просто не появляется.
+func TestImportWithoutPanelFieldsLeavesThemEmpty(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmp)
+	t.Setenv("APPDATA", tmp)
+	cfg := withHost("")
+	s, err := NewOn(app.New(cfg), "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	doc := `{"sshTunnelExport":1,"name":"Свой сервер","host":"203.0.113.10","sshPort":22,
+		"user":"tunnel","socksPort":1080,"httpPort":1081,"poolSize":4,"filterMode":"all",
+		"keyIncluded":false}`
+
+	rec := httptest.NewRecorder()
+	s.handleProfileImport(rec, httptest.NewRequest(http.MethodPost, "/api/profile/import", strings.NewReader(doc)))
+	var impResp struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &impResp); err != nil || impResp.Error != "" {
+		t.Fatalf("импорт не удался: %v (%s)", err, rec.Body.String())
+	}
+
+	active := s.app.Config().Active()
+	if active.Panel != "" || active.ClientID != "" || active.DeviceName != "" {
+		t.Errorf("конфиг без полей панели не должен их придумывать: %+v", active)
+	}
+}
+
 // Файл без ключа — тоже валидный сценарий: например, у друга уже есть свой
 // ключ на сервере, и делиться нужно только адресом и настройками фильтра.
 func TestImportWithoutKey(t *testing.T) {

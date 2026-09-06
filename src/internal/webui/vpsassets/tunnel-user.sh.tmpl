@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+# Пользователь, которому можно только пробрасывать соединения.
+set -euo pipefail
+
+# ─── что настроить ────────────────────────────────────────────────────────
+TUNNEL_USER="{{.TunnelUser}}"
+TUNNEL_KEY="{{.TunnelKey}}"        # публичный ключ для туннеля ("ssh-ed25519 AAAA... ").
+                     # Пусто = взять те же ключи, что у root. Отдельный ключ
+                     # лучше: тогда компрометация одного не тянет за собой
+                     # второй.
+BLOCK_INTERNALS={{.BlockInternals}}    # 1 = запретить этому пользователю обращаться к самому
+                     # серверу и к приватным сетям хостера
+# ──────────────────────────────────────────────────────────────────────────
+
+say() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
+die() { printf '\n\033[1;31mОШИБКА: %s\033[0m\n' "$*" >&2; exit 1; }
+[ "$(id -u)" -eq 0 ] || die "запускать от root"
+
+say "Создаю пользователя $TUNNEL_USER"
+id -u "$TUNNEL_USER" >/dev/null 2>&1 || \
+  useradd -m -d "/home/$TUNNEL_USER" -s /usr/sbin/nologin "$TUNNEL_USER"
+usermod -s /usr/sbin/nologin "$TUNNEL_USER"
+usermod -G "" "$TUNNEL_USER"          # ни одной дополнительной группы
+# Звёздочка, а не восклицательный знак: '!' означает "учётка заблокирована", и
+# с ним PAM может отказать даже во входе по ключу. '*' — пароль не подойдёт
+# никогда, ключ работает.
+usermod -p '*' "$TUNNEL_USER"
+
+say "Ставлю ключ с ограничениями"
+install -d -m 700 -o "$TUNNEL_USER" -g "$TUNNEL_USER" "/home/$TUNNEL_USER/.ssh"
+AK="/home/$TUNNEL_USER/.ssh/authorized_keys"
+if [ -z "$TUNNEL_KEY" ] && [ ! -s /root/.ssh/authorized_keys ]; then
+  die "ключей нет ни в TUNNEL_KEY, ни у root — вписать публичный ключ в TUNNEL_KEY"
+fi
+{
+  if [ -n "$TUNNEL_KEY" ]; then printf '%s\n' "$TUNNEL_KEY"; else cat /root/.ssh/authorized_keys; fi
+} | grep -E '^(ssh-|ecdsa-|sk-)' \
+  | sed 's/^/restrict,port-forwarding /' > "$AK"
+[ -s "$AK" ] || die "не нашёл ни одного ключа — заполни TUNNEL_KEY"
+chown "$TUNNEL_USER:$TUNNEL_USER" "$AK"; chmod 600 "$AK"
+echo "ключей записано: $(wc -l < "$AK")"
+
+# restrict выключает всё сразу (сессии, агент, X11, туннели, ~/.ssh/rc), после
+# чего port-forwarding возвращает ровно одну нужную возможность.
+
+say "Ограничиваю его в настройках SSH"
+if grep -q '^Include /etc/ssh/sshd_config.d/\*.conf' /etc/ssh/sshd_config; then
+  MATCH_CONF=/etc/ssh/sshd_config.d/01-tunnel-user.conf
+  : > "$MATCH_CONF"
+else
+  # На старых системах без Include блок дописывается в конец основного файла:
+  # Match действует до конца файла, поэтому он обязан быть последним.
+  MATCH_CONF=/etc/ssh/sshd_config
+  sed -i "/^# --- ssh_tunnel: $TUNNEL_USER ---\$/,\$d" "$MATCH_CONF"
+  echo "# --- ssh_tunnel: $TUNNEL_USER ---" >> "$MATCH_CONF"
+fi
+cat >> "$MATCH_CONF" <<EOF
+Match User $TUNNEL_USER
+    PermitTTY no
+    AllowAgentForwarding no
+    PermitTunnel no
+    X11Forwarding no
+    AllowTcpForwarding yes
+    ForceCommand /usr/sbin/nologin
+EOF
+sshd -t || die "конфиг SSH не прошёл проверку"
+systemctl restart ssh 2>/dev/null || systemctl restart sshd
+
+if [ "$BLOCK_INTERNALS" = 1 ]; then
+  say "Закрываю ему доступ к самому серверу"
+  cat > /usr/local/sbin/tunnel-fw.sh <<EOF
+#!/bin/sh
+# Пробрасывать соединения можно куда угодно, кроме самого сервера и приватных
+# сетей: иначе через туннель достаётся то, что слушает на 127.0.0.1 (базы,
+# админки), и метаданные облака на 169.254.169.254.
+#
+# Правила только для TCP: DNS по UDP должен продолжать работать, иначе туннель
+# перестанет разрешать имена. Для DNS по TCP есть отдельное исключение.
+set -e
+U="$TUNNEL_USER"
+for T in iptables ip6tables; do
+  \$T -N SSHTUNNEL 2>/dev/null || \$T -F SSHTUNNEL
+  \$T -A SSHTUNNEL -p tcp --dport 53 -j RETURN
+done
+# Сайты в контейнерах — исключение.
+#
+# Когда сервер обращается к собственному публичному адресу, Docker подменяет
+# назначение на внутренний адрес контейнера, и до фильтра пакет доходит уже с
+# ним. Без этой строки собственный сайт через туннель не открывается, хотя имя
+# разрешается в публичный адрес и со стороны всё выглядит правильно.
+#
+# Открыты только веб-порты: админки и базы в контейнерах остаются закрытыми.
+iptables -A SSHTUNNEL -p tcp -d 172.16.0.0/12 -m multiport --dports 80,443 -j RETURN
+
+for N in 127.0.0.0/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 169.254.0.0/16; do
+  iptables -A SSHTUNNEL -p tcp -d \$N -j REJECT
+done
+for N in ::1/128 fc00::/7 fe80::/10; do
+  ip6tables -A SSHTUNNEL -p tcp -d \$N -j REJECT
+done
+for T in iptables ip6tables; do
+  \$T -C OUTPUT -m owner --uid-owner "\$U" -j SSHTUNNEL 2>/dev/null || \
+    \$T -I OUTPUT 1 -m owner --uid-owner "\$U" -j SSHTUNNEL
+done
+EOF
+  chmod +x /usr/local/sbin/tunnel-fw.sh
+  cat > /etc/systemd/system/tunnel-fw.service <<'EOF'
+[Unit]
+Description=Ограничения сети для пользователя туннеля
+After=network-online.target ufw.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/tunnel-fw.sh
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  systemctl daemon-reload
+  systemctl enable --now tunnel-fw.service
+  iptables -L SSHTUNNEL -n | head -3 || true
+fi
+
+say "Готово"
+echo "В настройках ssh_tunnel поменяй пользователя: root -> $TUNNEL_USER"
+echo "Ключ остаётся тот же, если TUNNEL_KEY был пустым."
+echo
+echo "Проверить со своего компьютера — проброс должен работать:"
+echo "  ssh -N -D 1080 $TUNNEL_USER@$(hostname -I | awk '{print $1}')"
+echo "а команда — нет:"
+echo "  ssh $TUNNEL_USER@$(hostname -I | awk '{print $1}') id     # This account is currently not available."

@@ -52,6 +52,23 @@ GOOS=linux GOARCH=arm64 go build \
   -ldflags="-s -w" \
   -o "$OUT/linux/ssh_tunnel_linux_arm64" ./cmd/ssh_tunnel_linux
 
+# Веб-панель и ретранслятор UDP работают только на самом сервере, поэтому
+# собираются лишь под Linux. Готовые файлы нужны в релизе не для красоты:
+# мастер настройки VPS скачивает их прямо на сервер по постоянной ссылке —
+# без этого он либо ставил бы туда компилятор Go, либо не работал бы вовсе.
+for arch in amd64 arm64; do
+  suffix=""
+  [ "$arch" = arm64 ] && suffix="_arm64"
+  echo "Linux: панель ($arch)..."
+  GOOS=linux GOARCH="$arch" go build \
+    -ldflags="-s -w" \
+    -o "$OUT/linux/ssh_tunnel_panel$suffix" ./cmd/ssh_tunnel_panel
+  echo "Linux: ретранслятор UDP ($arch)..."
+  GOOS=linux GOARCH="$arch" go build \
+    -ldflags="-s -w" \
+    -o "$OUT/linux/udprelay$suffix" ./cmd/udprelay
+done
+
 # Архив для Windows. Браузеры почти не придираются к .zip, тогда как
 # неподписанный .exe многие помечают как опасный уже при скачивании. Внутри тот
 # же файл — это способ отдать его человеку без спора с браузером.

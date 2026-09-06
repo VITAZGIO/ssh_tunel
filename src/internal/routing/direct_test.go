@@ -42,6 +42,40 @@ func TestDirectListMatches(t *testing.T) {
 	}
 }
 
+// Домены: точное имя, поддомены через ".имя" и через "*.имя" — это одна и та
+// же запись, и она не должна перехватывать сам домен без отдельной строки.
+func TestDirectListDomainPatterns(t *testing.T) {
+	d := NewDirectList([]string{
+		"vitazgio.ru",     // точное имя
+		".sub.example.ru", // поддомены через точку
+		"*.wild.example",  // та же запись через звёздочку
+	})
+
+	in := []string{
+		"vitazgio.ru:443", "VITAZGIO.RU",
+		"a.sub.example.ru", "a.b.sub.example.ru:22",
+		"a.wild.example", "a.b.wild.example:443",
+	}
+	for _, target := range in {
+		if !d.Match(target) {
+			t.Errorf("Match(%q) = false, ожидалось true", target)
+		}
+	}
+
+	out := []string{
+		"notvitazgio.ru", "vitazgio.ru.evil.net",
+		"sub.example.ru",     // сам поддоменный узел без записи как точного имени
+		"evilsub.example.ru", // похожее имя без точки-разделителя не должно совпасть
+		"wild.example",       // сам домен без отдельной записи
+		"evilwild.example",
+	}
+	for _, target := range out {
+		if d.Match(target) {
+			t.Errorf("Match(%q) = true, ожидалось false", target)
+		}
+	}
+}
+
 // Пустой список не должен ничего перехватывать — иначе опечатка в настройках
 // молча выпускала бы трафик мимо туннеля.
 func TestDirectListEmpty(t *testing.T) {

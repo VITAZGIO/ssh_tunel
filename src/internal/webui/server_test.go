@@ -3,13 +3,17 @@ package webui
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
 	"sshtunnel/internal/app"
 	"sshtunnel/internal/config"
+	"sshtunnel/internal/tunnel"
 )
 
 // withHost — тестовый помощник: конфиг по умолчанию с адресом сервера у
@@ -210,5 +214,104 @@ func TestProfileEndpoints(t *testing.T) {
 	json.Unmarshal(rec.Body.Bytes(), &rmResp)
 	if rmResp.Error == "" {
 		t.Error("последний сервер не должен удаляться")
+	}
+}
+
+// Отказ подключения по SSH должен приходить со стабильным кодом причины
+// (ТЗ-13, internal/tunnel.ConnErrorKind), а не только сырым текстом — по
+// нему страница выбирает переведённое сообщение вместо "ssh: handshake
+// failed: ssh: unable to authenticate" на экране.
+func TestHandleStartReportsConnErrorKind(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("XDG_CONFIG_HOME", tmp)
+	t.Setenv("APPDATA", tmp)
+
+	keyPath := filepath.Join(tmp, "id_test")
+	if _, _, err := ensureKey(keyPath); err != nil {
+		t.Fatal(err)
+	}
+
+	// Порт, на котором заведомо никто не слушает — TCP сразу отвечает RST.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, portStr, _ := net.SplitHostPort(ln.Addr().String())
+	ln.Close()
+
+	cfg := withHost("127.0.0.1")
+	p := cfg.Active()
+	p.KeyPath = keyPath
+	port, _ := strconv.Atoi(portStr)
+	p.SSHPort = port
+	cfg.SetProfile(p)
+
+	s, err := NewOn(app.New(cfg), "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	rec := httptest.NewRecorder()
+	s.handleStart(rec, httptest.NewRequest(http.MethodPost, "/api/start", nil))
+	var resp struct {
+		Error     string `json:"error"`
+		ErrorKind string `json:"errorKind"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("ответ не разобрался: %v (%s)", err, rec.Body.String())
+	}
+	if resp.Error == "" {
+		t.Fatal("подключение к закрытому порту должно провалиться")
+	}
+	if resp.ErrorKind != string(tunnel.ConnErrorRefused) {
+		t.Fatalf("ожидал errorKind=%q, получил %q (error=%q)",
+			tunnel.ConnErrorRefused, resp.ErrorKind, resp.Error)
+	}
+}
+
+// Самопроверка работает и без поднятого туннеля: адрес недоступен (порт
+// закрыт), поэтому первый же сетевой шаг проваливается быстро, а не висит —
+// сама глубина цепочки уже проверена отдельно в internal/tunnel.
+func TestSelfCheckEndpoint(t *testing.T) {
+	cfg := withHost("127.0.0.1")
+	p := cfg.Active()
+	p.SSHPort = 1 // закрытый порт — «отказано в соединении» почти сразу
+	cfg.SetProfile(p)
+
+	s, err := NewOn(app.New(cfg), "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	rec := httptest.NewRecorder()
+	s.handleSelfCheck(rec, httptest.NewRequest(http.MethodGet, "/api/selfcheck", nil))
+
+	var resp struct {
+		Steps []struct {
+			Name    string `json:"name"`
+			OK      bool   `json:"ok"`
+			Skipped bool   `json:"skipped"`
+			Code    string `json:"code"`
+		} `json:"steps"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("не разобрал ответ: %v, тело: %s", err, rec.Body.String())
+	}
+	if len(resp.Steps) == 0 {
+		t.Fatal("шагов не пришло")
+	}
+	if resp.Steps[0].Name != "dns" || !resp.Steps[0].OK {
+		t.Errorf("шаг DNS для 127.0.0.1 обязан пройти сразу: %+v", resp.Steps[0])
+	}
+	var sawFailure bool
+	for _, s := range resp.Steps {
+		if !s.OK && !s.Skipped {
+			sawFailure = true
+		}
+	}
+	if !sawFailure {
+		t.Error("закрытый порт должен был провалить один из шагов")
 	}
 }

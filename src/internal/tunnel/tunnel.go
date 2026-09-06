@@ -31,7 +31,12 @@ import (
 	"sshtunnel/internal/hostkey"
 	"sshtunnel/internal/procinfo"
 	"sshtunnel/internal/routing"
+	"sshtunnel/internal/udprelay"
 )
+
+// defaultUDPRelayAddr — куда стучаться, если Config.UDPRelayAddr не задан:
+// тот же адрес, на котором cmd/udprelay слушает без флагов.
+const defaultUDPRelayAddr = "127.0.0.1:47830"
 
 type Config struct {
 	Host    string
@@ -76,6 +81,18 @@ type Config struct {
 	// Включать это стоит ровно в одном случае — когда нужна внутренняя сеть
 	// САМОГО сервера, а не своя.
 	LocalViaTunnel bool
+
+	// UDPRelayEnabled — пробрасывать ли UDP (звонки, игры, QUIC) через
+	// ретранслятор на сервере (см. sshtunnel/internal/udprelay,
+	// sshtunnel/cmd/udprelay) вместо молчаливого отказа. По умолчанию
+	// выключено: пока ретранслятор на сервере не установлен, включать нечего
+	// — соединение до него просто не поднимется, и UDP продолжит
+	// отбрасываться, как и раньше.
+	UDPRelayEnabled bool
+	// UDPRelayAddr — где на сервере слушает ретранслятор (его собственный
+	// localhost). Пусто — значение по умолчанию, то же, что и у
+	// cmd/udprelay без флагов.
+	UDPRelayAddr string
 }
 
 var ErrNotConnected = errors.New("нет живого SSH-соединения с сервером")
@@ -123,6 +140,16 @@ type Tunnel struct {
 	// localViaTunnel меняется на ходу из настроек, поэтому atomic, а не поле
 	// в cfg: перезапускать туннель ради галочки не надо.
 	localViaTunnel atomic.Bool
+
+	// kickMu и kick — сигнал «пересобрать пул немедленно», см. Kick.
+	kickMu sync.Mutex
+	kick   chan struct{}
+
+	// udpRelayMu и udpRelayClient — соединение до ретранслятора UDP на
+	// сервере, поднимается по требованию и переживает до тех пор, пока не
+	// оборвётся само (см. UDPRelay).
+	udpRelayMu     sync.Mutex
+	udpRelayClient *udprelay.Client
 }
 
 type stats struct {
@@ -153,6 +180,38 @@ func (t *Tunnel) SetDirect(d *routing.DirectList) {
 	t.mu.Unlock()
 }
 
+// currentKick отдаёт текущий канал сигнала «пересобрать пул» — создаёт его
+// при первом обращении.
+func (t *Tunnel) currentKick() <-chan struct{} {
+	t.kickMu.Lock()
+	defer t.kickMu.Unlock()
+	if t.kick == nil {
+		t.kick = make(chan struct{})
+	}
+	return t.kick
+}
+
+// Kick форсирует немедленное переподключение всего пула — например, когда
+// телефон сменил сеть (Wi-Fi ↔ мобильная) и ждать таймера проверки живости
+// незачем: старые сокеты после смены сети почти наверняка уже мертвы.
+//
+// Все слоты помечаются оборванными тем же способом, что использует
+// keepLinkAlive при настоящем обрыве связи, — отдельного пути переподключения
+// заводить не пришлось. Безопасно вызывать в любой момент, включая случай,
+// когда туннель ещё не запущен.
+func (t *Tunnel) Kick() {
+	t.kickMu.Lock()
+	old := t.kick
+	t.kick = make(chan struct{})
+	t.kickMu.Unlock()
+	if old != nil {
+		close(old)
+	}
+	for _, l := range t.snapLinks() {
+		l.set(nil)
+	}
+}
+
 func (t *Tunnel) State() string {
 	s, _ := t.state.Load().(string)
 	return s
@@ -161,6 +220,20 @@ func (t *Tunnel) State() string {
 func (t *Tunnel) setState(s, detail string) {
 	t.state.Store(s)
 	t.bus.State(s, detail)
+}
+
+// reportDialErr переводит ошибку dial() в состояние туннеля. Для
+// *ConnError — по разобранному коду причины (ErrorKind), который экран с
+// I18N переводит сам; для смены ключа сервера (hostkey.ErrChanged) и любого
+// другого случая — как раньше, текстом ошибки без изменений.
+func (t *Tunnel) reportDialErr(s string, err error) {
+	var ce *ConnError
+	if errors.As(err, &ce) {
+		t.state.Store(s)
+		t.bus.StateErr(s, ce.Message, string(ce.Kind))
+		return
+	}
+	t.setState(s, err.Error())
 }
 
 // Start поднимает пул и локальные слушатели. Возвращает ошибку только если
@@ -189,7 +262,7 @@ func (t *Tunnel) Start() error {
 	// не подходит, пользователь должен узнать об этом сразу, а не из лога.
 	first, err := t.dial()
 	if err != nil {
-		t.setState(events.StateError, "не удалось подключиться")
+		t.reportDialErr(events.StateError, err)
 		t.cancel()
 		return err
 	}
@@ -375,7 +448,51 @@ func (t *Tunnel) Stop() {
 	t.mu.Lock()
 	t.links = nil
 	t.mu.Unlock()
+
+	t.udpRelayMu.Lock()
+	relay := t.udpRelayClient
+	t.udpRelayClient = nil
+	t.udpRelayMu.Unlock()
+	if relay != nil {
+		relay.Shutdown()
+	}
+
 	t.setState(events.StateStopped, "")
+}
+
+// UDPRelay отдаёт клиента ретранслятора UDP, поднимая соединение до него по
+// требованию — и заново, если прежнее оборвалось. nil, если функция
+// выключена в настройках или соединение сейчас поднять не удалось (сеть,
+// ретранслятор не установлен на сервере) — вызывающий код в этом случае
+// просто продолжает вести себя так, будто UDP не поддерживается вовсе.
+func (t *Tunnel) UDPRelay() *udprelay.Client {
+	if !t.cfg.UDPRelayEnabled {
+		return nil
+	}
+
+	t.udpRelayMu.Lock()
+	defer t.udpRelayMu.Unlock()
+
+	if t.udpRelayClient != nil {
+		select {
+		case <-t.udpRelayClient.Done():
+			t.udpRelayClient = nil // прежнее соединение оборвалось — поднимем новое ниже
+		default:
+			return t.udpRelayClient
+		}
+	}
+
+	addr := t.cfg.UDPRelayAddr
+	if addr == "" {
+		addr = defaultUDPRelayAddr
+	}
+	conn, err := t.Dial("tcp", addr)
+	if err != nil {
+		t.bus.Warnf("UDP через туннель недоступен: %v", err)
+		return nil
+	}
+	t.udpRelayClient = udprelay.NewClient(conn)
+	return t.udpRelayClient
 }
 
 // snapLinks отдаёт срез пула под замком.
@@ -427,9 +544,10 @@ func (t *Tunnel) dial() (*ssh.Client, error) {
 	if err != nil {
 		var changed *hostkey.ErrChanged
 		if errors.As(err, &changed) {
-			return nil, changed // отдельный понятный текст, см. hostkey
+			return nil, changed // отдельный понятный текст, см. hostkey — не трогаем
 		}
-		return nil, fmt.Errorf("не удалось подключиться к %s: %w", addr, err)
+		wrapped := fmt.Errorf("не удалось подключиться к %s: %w", addr, err)
+		return nil, classifyConnError(wrapped)
 	}
 	return client, nil
 }
@@ -489,6 +607,7 @@ func (t *Tunnel) keepLinkAlive(l *link, idx int) {
 		if t.ctx.Err() != nil {
 			return
 		}
+		kickCh := t.currentKick()
 
 		client := l.get()
 		if client == nil {
@@ -498,12 +617,16 @@ func (t *Tunnel) keepLinkAlive(l *link, idx int) {
 					return
 				}
 				if idx == 0 {
-					t.setState(events.StateReconnecting, err.Error())
+					t.reportDialErr(events.StateReconnecting, err)
 				}
 				select {
 				case <-t.ctx.Done():
 					return
 				case <-time.After(backoff):
+				case <-kickCh:
+					// Сеть точно сменилась — прежняя пауза уже не про
+					// текущие условия, начинаем заново с минимальной.
+					backoff = time.Second
 				}
 				if backoff < 30*time.Second {
 					backoff *= 2
@@ -519,11 +642,14 @@ func (t *Tunnel) keepLinkAlive(l *link, idx int) {
 			continue
 		}
 
-		// Ждём либо остановки, либо момента следующей проверки.
+		// Ждём либо остановки, либо момента следующей проверки, либо сигнала
+		// пересобрать пул немедленно (Kick уже пометил этот слот оборванным —
+		// следующий круг цикла сразу уйдёт на переподключение).
 		select {
 		case <-t.ctx.Done():
 			return
 		case <-time.After(20 * time.Second):
+		case <-kickCh:
 		}
 
 		if t.ctx.Err() != nil {

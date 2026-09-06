@@ -20,6 +20,8 @@ import (
 	"time"
 
 	"golang.org/x/net/dns/dnsmessage"
+
+	"sshtunnel/internal/routing"
 )
 
 // recordingCore запоминает, что именно пришло наверх, и соединяется напрямую.
@@ -202,6 +204,53 @@ func TestИмяМимоТуннеляБезРезолвераОтклоняет�
 	}
 }
 
+// То же самое, но с настоящим DirectList и записью-шаблоном "*.corp.local":
+// это ровно то правило, что пользователь вписывает в поле «Всегда напрямую»,
+// и оно обязано сработать уже на этапе ответа DNS — до того, как для имени
+// вообще заведётся подставной адрес.
+func TestDirectListШаблонБлокируетПодставнойАдресНаЭтапеDNS(t *testing.T) {
+	pool, err := NewFakePool("198.18.0.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+	direct := routing.NewDirectList([]string{"*.corp.local", "vitazgio.ru"})
+	d := &DNS{
+		Pool:   pool,
+		Direct: direct.Match,
+		Local: func(name string) ([]net.IP, error) {
+			return []net.IP{net.IPv4(203, 0, 113, 9)}, nil
+		},
+	}
+
+	for _, name := range []string{"a.corp.local", "vitazgio.ru"} {
+		reply, err := d.Answer(buildQuery(t, name, dnsmessage.TypeA))
+		if err != nil {
+			t.Fatalf("%s: ответ не построился: %v", name, err)
+		}
+		var p dnsmessage.Parser
+		h, err := p.Start(reply)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if h.RCode != dnsmessage.RCodeSuccess {
+			t.Fatalf("%s: код ответа %v, ожидался успех через локальный резолвер", name, h.RCode)
+		}
+		if _, ok := pool.Name("203.0.113.9"); ok {
+			t.Fatalf("%s: реальному адресу назначено имя из пула подставных", name)
+		}
+	}
+
+	// Имя, не подпадающее ни под одно правило, как и раньше получает
+	// подставной адрес из пула.
+	if _, err := d.Answer(buildQuery(t, "example.test", dnsmessage.TypeA)); err != nil {
+		t.Fatalf("ответ не построился: %v", err)
+	}
+	fakeName, ok := pool.Name(pool.Get("example.test").String())
+	if !ok || fakeName != "example.test" {
+		t.Fatal("имени вне правил не выдан подставной адрес из пула")
+	}
+}
+
 func TestПулПомнитВыданное(t *testing.T) {
 	pool, err := NewFakePool("198.18.0.0/24")
 	if err != nil {
@@ -219,6 +268,92 @@ func TestПулПомнитВыданное(t *testing.T) {
 	other := pool.Get("second.test")
 	if other.Equal(first) {
 		t.Fatal("двум именам достался один адрес")
+	}
+}
+
+// Заблокированное имя получает NXDOMAIN и не должно даже занять слот в пуле
+// подставных адресов — иначе блокировка была бы наполовину декоративной:
+// формально отказ приходит, а имя всё равно "разрешилось" бы через пул при
+// повторном запросе типа AAAA или при отдельном A-запросе позже.
+func TestСписокБлокировкиВозвращаетNXDOMAIN(t *testing.T) {
+	pool, err := NewFakePool("198.18.0.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stats := &Stats{}
+	d := &DNS{
+		Pool:  pool,
+		Block: NewBlockList([]string{"ads.example.com"}, nil),
+		Stats: stats,
+	}
+
+	reply, err := d.Answer(buildQuery(t, "ads.example.com", dnsmessage.TypeA))
+	if err != nil {
+		t.Fatalf("ответ не построился: %v", err)
+	}
+	var p dnsmessage.Parser
+	h, err := p.Start(reply)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h.RCode != dnsmessage.RCodeNameError {
+		t.Fatalf("код ответа %v, ожидался NXDOMAIN", h.RCode)
+	}
+
+	if _, ok := pool.byName["ads.example.com"]; ok {
+		t.Fatal("заблокированному имени всё равно выдан подставной адрес")
+	}
+	if _, _, _, _, blocked := stats.Counts(); blocked != 1 {
+		t.Fatalf("счётчик заблокированного = %d, ожидался 1", blocked)
+	}
+}
+
+// Незаблокированное имя продолжает получать подставной адрес как обычно —
+// список пуст или ничего не сработало, поведение не меняется.
+func TestСписокБлокировкиНеТрогаетОстальныеИмена(t *testing.T) {
+	pool, err := NewFakePool("198.18.0.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := &DNS{Pool: pool, Block: NewBlockList([]string{"ads.example.com"}, nil)}
+
+	reply, err := d.Answer(buildQuery(t, "example.test", dnsmessage.TypeA))
+	if err != nil {
+		t.Fatalf("ответ не построился: %v", err)
+	}
+	var p dnsmessage.Parser
+	h, err := p.Start(reply)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h.RCode != dnsmessage.RCodeSuccess {
+		t.Fatalf("код ответа %v, ожидался успех", h.RCode)
+	}
+	if _, ok := pool.byName["example.test"]; !ok {
+		t.Fatal("незаблокированному имени не выдан подставной адрес")
+	}
+}
+
+// Список исключений снимает блокировку — то, что человек явно разрешил,
+// не должно ломаться списком, загруженным из интернета.
+func TestСписокБлокировкиИсключениеПропускаетИмя(t *testing.T) {
+	pool, err := NewFakePool("198.18.0.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := &DNS{Pool: pool, Block: NewBlockList([]string{"ads.example.com"}, []string{"ads.example.com"})}
+
+	reply, err := d.Answer(buildQuery(t, "ads.example.com", dnsmessage.TypeA))
+	if err != nil {
+		t.Fatalf("ответ не построился: %v", err)
+	}
+	var p dnsmessage.Parser
+	h, err := p.Start(reply)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h.RCode != dnsmessage.RCodeSuccess {
+		t.Fatalf("код ответа %v, ожидался успех — имя в списке исключений", h.RCode)
 	}
 }
 

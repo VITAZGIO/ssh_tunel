@@ -191,11 +191,74 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <Button
-                android:id="@+id/speedtest"
-                style="@style/SecondaryButton"
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:layout_marginTop="14dp"
-                android:text="@string/speedtest" />
+                android:orientation="horizontal">
+
+                <LinearLayout style="@style/Tile">
+                    <TextView style="@style/TileKey" android:text="@string/tile_blocked" />
+                    <TextView android:id="@+id/tileBlocked" style="@style/TileValue" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:orientation="horizontal">
+                <Button
+                    android:id="@+id/speedtest"
+                    style="@style/SecondaryButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:text="@string/speedtest" />
+                <Space android:layout_width="10dp" android:layout_height="1dp" />
+                <Button
+                    android:id="@+id/toSelfCheck"
+                    style="@style/SecondaryButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:text="@string/selfcheck_open" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- ================= самопроверка ================= -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="16dp">
+
+            <TextView style="@style/Head" android:text="@string/selfcheck_title" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="10dp"
+                android:textSize="11.5sp"
+                android:textColor="@color/dim"
+                android:text="@string/selfcheck_intro" />
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+                <LinearLayout
+                    android:id="@+id/selfCheckSteps"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </ScrollView>
+
+            <Button
+                android:id="@+id/selfCheckStart"
+                style="@style/PrimaryButton"
+                android:layout_marginTop="10dp"
+                android:text="@string/selfcheck_start" />
         </LinearLayout>
 
         <!-- ================= журнал ================= -->
@@ -249,130 +312,459 @@
 
                 <TextView style="@style/Head" android:text="@string/tab_settings" />
 
-                <TextView style="@style/FieldLabel" android:text="@string/host_hint" />
-                <EditText android:id="@+id/host" style="@style/Field"
-                    android:inputType="textUri" android:autofillHints="" />
-
-                <TextView style="@style/FieldLabel" android:text="@string/user_hint" />
-                <EditText android:id="@+id/user" style="@style/Field"
-                    android:inputType="text" android:autofillHints="" />
-
-                <TextView style="@style/FieldLabel" android:text="@string/key" />
-                <TextView
-                    android:id="@+id/keyState"
+                <TextView style="@style/FieldLabel" android:text="@string/language_label" />
+                <Spinner
+                    android:id="@+id/languageSpinner"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:paddingBottom="4dp"
-                    android:textSize="12sp"
-                    android:textColor="@color/dim"
-                    android:text="@string/key_missing" />
-                <EditText android:id="@+id/key" style="@style/Field"
-                    android:inputType="textMultiLine" android:minLines="3"
-                    android:gravity="top" android:hint="@string/key_hint"
-                    android:textColorHint="@color/dim" android:autofillHints="" />
+                    android:layout_marginBottom="14dp"
+                    android:background="@drawable/bg_field"
+                    android:popupBackground="@drawable/bg_card"
+                    android:spinnerMode="dropdown" />
 
+                <!-- Вкладки серверов, как в браузере — плюс кнопка «+» справа. -->
                 <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal">
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-                        <TextView style="@style/FieldLabel" android:text="@string/port_hint" />
-                        <EditText android:id="@+id/port" style="@style/Field"
-                            android:inputType="number" android:autofillHints="" />
-                    </LinearLayout>
-
-                    <Space android:layout_width="12dp" android:layout_height="1dp" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-                        <TextView style="@style/FieldLabel" android:text="@string/pool_hint" />
-                        <EditText android:id="@+id/pool" style="@style/Field"
-                            android:inputType="number" android:autofillHints="" />
-                    </LinearLayout>
-                </LinearLayout>
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
-                    android:textSize="11.5sp"
-                    android:textColor="@color/dim"
-                    android:text="@string/pool_note" />
-
-                <LinearLayout
-                    android:id="@+id/apps"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:background="@drawable/bg_card"
-                    android:padding="12dp"
-                    android:clickable="true"
-                    android:focusable="true">
+                    android:gravity="center_vertical">
 
-                    <LinearLayout
+                    <HorizontalScrollView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
+                        android:scrollbars="none">
+                        <LinearLayout
+                            android:id="@+id/profileTabs"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:textSize="14sp"
-                            android:textColor="@color/text"
-                            android:text="@string/apps_row" />
+                            android:orientation="horizontal" />
+                    </HorizontalScrollView>
 
-                        <TextView
-                            android:id="@+id/appsSummary"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:textSize="12sp"
-                            android:textColor="@color/dim"
-                            android:text="@string/mode_all" />
-                    </LinearLayout>
+                    <TextView
+                        android:id="@+id/addProfileBtn"
+                        android:layout_width="38dp"
+                        android:layout_height="38dp"
+                        android:layout_marginStart="6dp"
+                        android:background="@drawable/bg_button"
+                        android:gravity="center"
+                        android:textSize="18sp"
+                        android:textColor="@color/text"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:text="+"
+                        android:contentDescription="@string/add_server" />
+                </LinearLayout>
+
+                <!-- Два способа настроить телефон за раз: из буфера обмена или
+                     сканированием QR-кода, показанного панелью на компьютере. -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/pasteConfigBtn"
+                        style="@style/SecondaryButton"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:textSize="12.5sp"
+                        android:paddingTop="9dp"
+                        android:paddingBottom="9dp"
+                        android:text="@string/paste_config" />
+
+                    <Space android:layout_width="8dp" android:layout_height="1dp" />
+
+                    <Button
+                        android:id="@+id/scanConfigBtn"
+                        style="@style/SecondaryButton"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:textSize="12.5sp"
+                        android:paddingTop="9dp"
+                        android:paddingBottom="9dp"
+                        android:text="@string/scan_config" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/importNote"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="6dp"
+                    android:textSize="12sp"
+                    android:textColor="@color/dim" />
+
+                <!-- Выбор города и флага для подписи вкладки — не точка выхода,
+                     сервер всё равно только свой, по адресу ниже. -->
+                <LinearLayout
+                    android:id="@+id/cityBtn"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:background="@drawable/bg_field"
+                    android:padding="10dp"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <io.github.vitazgio.sshtunnel.FlagView
+                        android:id="@+id/cityFlagView"
+                        android:layout_width="26dp"
+                        android:layout_height="18dp" />
+
+                    <TextView
+                        android:id="@+id/cityLabelView"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="10dp"
+                        android:textSize="14sp"
+                        android:textColor="@color/text" />
 
                     <ImageView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:src="@drawable/ic_chevron"
-                        android:contentDescription="@string/apps_row" />
+                        android:rotation="90"
+                        android:contentDescription="@string/pick_city" />
                 </LinearLayout>
 
+                <EditText android:id="@+id/customCityName" style="@style/Field"
+                    android:layout_marginTop="8dp"
+                    android:inputType="text" android:hint="@string/custom_flag_name"
+                    android:textColorHint="@color/dim" android:autofillHints="" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:paddingBottom="14dp"
+                    android:textSize="11.5sp"
+                    android:textColor="@color/dim"
+                    android:text="@string/always_on_hint" />
+
                 <CheckBox
-                    android:id="@+id/localViaTunnel"
+                    android:id="@+id/adBlockEnabled"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
                     android:textColor="@color/text"
-                    android:text="@string/local_via_tunnel" />
+                    android:text="@string/ad_block_enabled" />
 
                 <TextView style="@style/FieldLabel"
-                    android:layout_marginTop="8dp" android:text="@string/direct" />
-                <EditText android:id="@+id/direct" style="@style/Field"
+                    android:layout_marginTop="8dp" android:text="@string/ad_block_sources" />
+                <EditText android:id="@+id/adBlockSources" style="@style/Field"
                     android:inputType="textMultiLine" android:minLines="2"
-                    android:gravity="top" android:hint="@string/direct_hint"
+                    android:gravity="top" android:hint="@string/ad_block_sources_hint"
                     android:textColorHint="@color/dim" android:autofillHints="" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingBottom="10dp"
+                    android:textSize="11.5sp"
+                    android:textColor="@color/dim"
+                    android:text="@string/ad_block_sources_note" />
+
+                <TextView style="@style/FieldLabel"
+                    android:text="@string/ad_block_allowlist" />
+                <EditText android:id="@+id/adBlockAllowlist" style="@style/Field"
+                    android:inputType="textMultiLine" android:minLines="1"
+                    android:gravity="top" android:hint="@string/ad_block_allowlist_hint"
+                    android:textColorHint="@color/dim" android:autofillHints="" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+                    <Button
+                        android:id="@+id/adBlockUpdate"
+                        style="@style/SecondaryButton"
+                        android:layout_width="wrap_content"
+                        android:text="@string/ad_block_update" />
+                    <TextView
+                        android:id="@+id/adBlockStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:textSize="12.5sp"
+                        android:textColor="@color/dim" />
+                </LinearLayout>
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:paddingBottom="14dp"
+                    android:textSize="11.5sp"
+                    android:textColor="@color/dim"
+                    android:text="@string/ad_block_note" />
+
+                <CheckBox
+                    android:id="@+id/udpRelayEnabled"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="@color/text"
+                    android:text="@string/udp_relay_enabled" />
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:paddingBottom="14dp"
                     android:textSize="11.5sp"
                     android:textColor="@color/dim"
-                    android:text="@string/direct_note" />
+                    android:text="@string/udp_relay_note" />
 
                 <Button
-                    android:id="@+id/save"
-                    style="@style/PrimaryButton"
-                    android:text="@string/save" />
+                    android:id="@+id/selectServerBtn"
+                    style="@style/SecondaryButton"
+                    android:layout_marginTop="4dp"
+                    android:layout_marginBottom="14dp"
+                    android:text="@string/select_this_server" />
+
+                <!-- Настройки сервера (сворачиваемый блок) -->
+                <LinearLayout
+                    android:id="@+id/serverPanelHeader"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingTop="6dp"
+                    android:paddingBottom="6dp"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <ImageView
+                        android:id="@+id/serverPanelChevron"
+                        android:layout_width="10dp"
+                        android:layout_height="10dp"
+                        android:src="@drawable/ic_chevron"
+                        android:rotation="90"
+                        android:contentDescription="@null" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/text"
+                        android:text="@string/server_settings" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/serverPanelBody"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/issuedByPanel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="10dp"
+                        android:textSize="12.5sp"
+                        android:textColor="@color/accent"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:visibility="gone"
+                        android:text="@string/issued_by_panel" />
+
+                    <TextView style="@style/FieldLabel" android:text="@string/host_hint" />
+                    <EditText android:id="@+id/host" style="@style/Field"
+                        android:inputType="textUri" android:autofillHints="" />
+
+                    <TextView style="@style/FieldLabel" android:text="@string/user_hint" />
+                    <EditText android:id="@+id/user" style="@style/Field"
+                        android:inputType="text" android:autofillHints="" />
+
+                    <TextView style="@style/FieldLabel" android:text="@string/key" />
+                    <TextView
+                        android:id="@+id/keyState"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingBottom="4dp"
+                        android:textSize="12sp"
+                        android:textColor="@color/dim"
+                        android:text="@string/key_missing" />
+                    <EditText android:id="@+id/key" style="@style/Field"
+                        android:inputType="textMultiLine" android:minLines="3"
+                        android:gravity="top" android:hint="@string/key_hint"
+                        android:textColorHint="@color/dim" android:autofillHints="" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+                            <TextView style="@style/FieldLabel" android:text="@string/port_hint" />
+                            <EditText android:id="@+id/port" style="@style/Field"
+                                android:inputType="number" android:autofillHints="" />
+                        </LinearLayout>
+
+                        <Space android:layout_width="12dp" android:layout_height="1dp" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+                            <TextView style="@style/FieldLabel" android:text="@string/pool_hint" />
+                            <EditText android:id="@+id/pool" style="@style/Field"
+                                android:inputType="number" android:autofillHints="" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="12dp"
+                        android:textSize="11.5sp"
+                        android:textColor="@color/dim"
+                        android:text="@string/pool_note" />
+
+                    <LinearLayout
+                        android:id="@+id/apps"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:background="@drawable/bg_card"
+                        android:padding="12dp"
+                        android:clickable="true"
+                        android:focusable="true">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textSize="14sp"
+                                android:textColor="@color/text"
+                                android:text="@string/apps_row" />
+
+                            <TextView
+                                android:id="@+id/appsSummary"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textSize="12sp"
+                                android:textColor="@color/dim"
+                                android:text="@string/mode_all" />
+                        </LinearLayout>
+
+                        <ImageView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:src="@drawable/ic_chevron"
+                            android:contentDescription="@string/apps_row" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:gravity="center_vertical">
+
+                        <CheckBox
+                            android:id="@+id/localViaTunnel"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:textColor="@color/text"
+                            android:text="@string/local_via_tunnel" />
+
+                        <TextView
+                            android:id="@+id/localViaTunnelInfo"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:background="@drawable/bg_infoq"
+                            android:gravity="center"
+                            android:textSize="9sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/dim"
+                            android:text="?"
+                            android:clickable="true"
+                            android:focusable="true" />
+                    </LinearLayout>
+
+                    <TextView style="@style/FieldLabel"
+                        android:layout_marginTop="8dp" android:text="@string/direct" />
+                    <EditText android:id="@+id/direct" style="@style/Field"
+                        android:inputType="textMultiLine" android:minLines="2"
+                        android:gravity="top" android:hint="@string/direct_hint"
+                        android:textColorHint="@color/dim" android:autofillHints="" />
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingBottom="14dp"
+                        android:textSize="11.5sp"
+                        android:textColor="@color/dim"
+                        android:text="@string/direct_note" />
+
+                    <Button
+                        android:id="@+id/save"
+                        style="@style/PrimaryButton"
+                        android:text="@string/save" />
+                </LinearLayout>
+
+                <!-- Общие настройки приложения (сворачиваемый блок) -->
+                <LinearLayout
+                    android:id="@+id/generalPanelHeader"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="14dp"
+                    android:paddingTop="6dp"
+                    android:paddingBottom="6dp"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <ImageView
+                        android:id="@+id/generalPanelChevron"
+                        android:layout_width="10dp"
+                        android:layout_height="10dp"
+                        android:src="@drawable/ic_chevron"
+                        android:rotation="90"
+                        android:contentDescription="@null" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/text"
+                        android:text="@string/general_settings" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/generalPanelBody"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textSize="12sp"
+                        android:textColor="@color/dim"
+                        android:text="@string/app_name" />
+                </LinearLayout>
             </LinearLayout>
         </ScrollView>
     </ViewFlipper>

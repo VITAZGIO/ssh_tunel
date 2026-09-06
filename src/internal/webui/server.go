@@ -23,6 +23,7 @@
 package webui
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"embed"
@@ -45,6 +46,7 @@ import (
 	"sshtunnel/internal/filedialog"
 	"sshtunnel/internal/procinfo"
 	"sshtunnel/internal/sysproxy"
+	"sshtunnel/internal/tunnel"
 )
 
 //go:embed assets/*
@@ -61,6 +63,15 @@ type Server struct {
 	// системы», чтобы после перезагрузки панель работала в том же режиме, а
 	// не в угаданном.
 	bootFlags []string
+
+	// vpsSetup — идёт ли сейчас настройка VPS. Мастер занимает минуту-две и
+	// трогает sshd на сервере; запускать второй одновременно с первым — верный
+	// способ всё перепутать, поэтому второй запрос отклоняется, пока первый
+	// не закончился.
+	vpsSetup struct {
+		mu      sync.Mutex
+		running bool
+	}
 }
 
 // App — то, что интерфейс умеет делать с программой.
@@ -165,14 +176,20 @@ func (s *Server) Serve() error {
 	mux.HandleFunc("/api/profile/select", s.guard(s.handleProfileSelect))
 	mux.HandleFunc("/api/profile/export", s.guard(s.handleProfileExport))
 	mux.HandleFunc("/api/profile/import", s.guard(s.handleProfileImport))
+	mux.HandleFunc("/api/androidkey", s.guard(s.handleAndroidKey))
+	mux.HandleFunc("/api/vpsscript", s.guard(s.handleVPSScript))
 	mux.HandleFunc("/api/checkip", s.guard(s.handleCheckIP))
 	mux.HandleFunc("/api/speedtest", s.guard(s.handleSpeedTest))
 	mux.HandleFunc("/api/processes", s.guard(s.handleProcesses))
+	mux.HandleFunc("/api/appicon", s.guard(s.handleAppIcon))
 	mux.HandleFunc("/api/pickfile", s.guard(s.handlePickFile))
 	mux.HandleFunc("/api/openterminal", s.guard(s.handleOpenTerminal))
 	mux.HandleFunc("/api/genkey", s.guard(s.handleGenKey))
 	mux.HandleFunc("/api/bootstart", s.guard(s.handleBootStart))
 	mux.HandleFunc("/api/scannet", s.guard(s.handleScanNet))
+	mux.HandleFunc("/api/vpssetup/start", s.guard(s.handleVpsSetupStart))
+	mux.HandleFunc("/api/selfcheck", s.guard(s.handleSelfCheck))
+	mux.HandleFunc("/api/profile/latency", s.guard(s.handleProfileLatency))
 
 	srv := &http.Server{
 		Handler:           mux,
@@ -279,25 +296,39 @@ type statusResp struct {
 	// SeenApps — программы, замеченные за этот запуск: из них удобно
 	// собирать список фильтра, не вспоминая имена вручную.
 	SeenApps []string `json:"seenApps"`
+	// EffectiveProfile — какой сервер реально подключён сейчас. Пусто, если
+	// туннель не работает. Отличается от Config.ActiveProfile после
+	// автовыбора самого быстрого сервера или перехода на запасной.
+	EffectiveProfile string `json:"effectiveProfile,omitempty"`
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, statusResp{
-		State:    s.app.State(),
-		Running:  s.app.Running(),
-		Config:   s.app.Config(),
-		Stats:    s.app.Stats(),
-		SysProxy: sysproxy.Current(),
-		EnvHint:  s.app.EnvHint(),
-		ProxyURL: s.app.ProxyURL(),
-		SeenApps: s.app.SeenApps(),
-		OS:       runtime.GOOS,
+		State:            s.app.State(),
+		Running:          s.app.Running(),
+		Config:           s.app.Config(),
+		Stats:            s.app.Stats(),
+		SysProxy:         sysproxy.Current(),
+		EnvHint:          s.app.EnvHint(),
+		ProxyURL:         s.app.ProxyURL(),
+		SeenApps:         s.app.SeenApps(),
+		OS:               runtime.GOOS,
+		EffectiveProfile: s.app.EffectiveProfileID(),
 	})
 }
 
 func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 	if err := s.app.Start(); err != nil {
-		writeJSON(w, map[string]string{"error": err.Error()})
+		resp := map[string]string{"error": err.Error()}
+		// errorKind — стабильный код причины (см. tunnel.ConnErrorKind),
+		// разобранный один раз в общем коде: страница переводит по нему текст
+		// через свой словарь I18N, а не разбирает "error" сама (см. addMsg/
+		// showError и ERROR_KIND_TEXT в assets/index.html).
+		var ce *tunnel.ConnError
+		if errors.As(err, &ce) {
+			resp["errorKind"] = string(ce.Kind)
+		}
+		writeJSON(w, resp)
 		return
 	}
 	writeJSON(w, map[string]bool{"ok": true})
@@ -399,6 +430,24 @@ func (s *Server) handleScanNet(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleSelfCheck прогоняет цепочку самопроверки для текущего активного
+// сервера. Не требует поднятого туннеля — соединение для проверки отдельное,
+// поэтому экран работает и объясняет причину, даже когда всё выключено.
+func (s *Server) handleSelfCheck(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
+	defer cancel()
+	steps := s.app.SelfCheck(ctx)
+	writeJSON(w, map[string]any{"steps": steps})
+}
+
+// handleProfileLatency меряет отклик всех серверов рядом с вкладками — не
+// влияет на выбор при подключении, только на то, что видно человеку.
+func (s *Server) handleProfileLatency(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	writeJSON(w, map[string]any{"results": s.app.LatencyReport(ctx)})
+}
+
 func (s *Server) handleCheckIP(w http.ResponseWriter, r *http.Request) {
 	ip, err := s.app.CheckIP()
 	if err != nil {
@@ -423,6 +472,22 @@ func (s *Server) handleSpeedTest(w http.ResponseWriter, r *http.Request) {
 // приложения для фильтра, как в диспетчере задач.
 func (s *Server) handleProcesses(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"processes": procinfo.List()})
+}
+
+// handleAppIcon отдаёт значок программы по пути к её файлу — только на
+// Windows, там же, где вообще есть список запущенных программ. Не нашли или
+// не вышло — обычный 404: страница на это место просто рисует заглушку,
+// без иконки, как было раньше.
+func (s *Server) handleAppIcon(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	data, err := procinfo.IconPNG(path)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "private, max-age=3600")
+	w.Write(data)
 }
 
 // handlePickFile показывает системный диалог выбора программы. Отмена — не
@@ -513,6 +578,62 @@ func (s *Server) handleBootStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]any{"ok": true, "state": currentBootState()})
+}
+
+// handleVpsSetupStart запускает мастер настройки VPS в фоне и сразу отвечает
+// — ход работы (построчный вывод скриптов, ошибки, готовность) смотрят через
+// уже существующий поток /events, событиями events.KindVpsSetup. Пароль root
+// уходит прямо в runVpsSetup и не возвращается в ответе ни в каком виде.
+func (s *Server) handleVpsSetupStart(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Host            string `json:"host"`
+		Port            int    `json:"port"`
+		User            string `json:"user"`
+		Password        string `json:"password"`
+		KeyPath         string `json:"keyPath"`
+		InstallPanel    bool   `json:"installPanel"`
+		InstallUDPRelay bool   `json:"installUdpRelay"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, map[string]string{"error": "не разобрал запрос: " + err.Error()})
+		return
+	}
+
+	s.vpsSetup.mu.Lock()
+	if s.vpsSetup.running {
+		s.vpsSetup.mu.Unlock()
+		writeJSON(w, map[string]string{"error": "настройка сервера уже идёт"})
+		return
+	}
+	s.vpsSetup.running = true
+	s.vpsSetup.mu.Unlock()
+
+	keyPath := strings.TrimSpace(req.KeyPath)
+	if keyPath == "" {
+		keyPath = config.DetectKeyPath()
+	}
+	port := req.Port
+	if port <= 0 {
+		port = 22
+	}
+	params := vpsSetupParams{
+		Host:            strings.TrimSpace(req.Host),
+		Port:            port,
+		User:            strings.TrimSpace(req.User),
+		Password:        req.Password,
+		KeyPath:         keyPath,
+		InstallPanel:    req.InstallPanel,
+		InstallUDPRelay: req.InstallUDPRelay,
+	}
+	go func() {
+		defer func() {
+			s.vpsSetup.mu.Lock()
+			s.vpsSetup.running = false
+			s.vpsSetup.mu.Unlock()
+		}()
+		runVpsSetup(s.app.Bus, params)
+	}()
+	writeJSON(w, map[string]bool{"ok": true})
 }
 
 // handleEvents — поток событий в окно (Server-Sent Events). Проще вебсокетов
