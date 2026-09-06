@@ -8,6 +8,13 @@
     <string name="state_reconnecting">Переподключение…</string>
     <string name="state_error">Ошибка</string>
 
+    <!-- Типовые ошибки подключения (ТЗ-13) — код причины разбирается один раз
+         в общем коде на Go (internal/tunnel.ConnErrorKind), здесь только текст. -->
+    <string name="conn_err_auth">Сервер не принял ключ. Устройство могли заморозить или удалить в панели, либо ключ не тот.</string>
+    <string name="conn_err_no_response">Сервер не отвечает: проверь адрес и порт.</string>
+    <string name="conn_err_refused">Порт закрыт или SSH на сервере не запущен.</string>
+    <string name="conn_err_other_prefix">Ответ сервера: %1$s</string>
+
     <string name="start">Включить</string>
     <string name="stop">Выключить</string>
     <string name="save">Сохранить</string>

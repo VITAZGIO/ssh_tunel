@@ -163,6 +163,20 @@ func (t *Tunnel) setState(s, detail string) {
 	t.bus.State(s, detail)
 }
 
+// reportDialErr переводит ошибку dial() в состояние туннеля. Для
+// *ConnError — по разобранному коду причины (ErrorKind), который экран с
+// I18N переводит сам; для смены ключа сервера (hostkey.ErrChanged) и любого
+// другого случая — как раньше, текстом ошибки без изменений.
+func (t *Tunnel) reportDialErr(s string, err error) {
+	var ce *ConnError
+	if errors.As(err, &ce) {
+		t.state.Store(s)
+		t.bus.StateErr(s, ce.Message, string(ce.Kind))
+		return
+	}
+	t.setState(s, err.Error())
+}
+
 // Start поднимает пул и локальные слушатели. Возвращает ошибку только если
 // стартовать вообще не получилось (нет ключа, занят порт, сервер не отвечает);
 // после успешного старта обрывы связи лечатся сами, без ошибки наружу.
@@ -189,7 +203,7 @@ func (t *Tunnel) Start() error {
 	// не подходит, пользователь должен узнать об этом сразу, а не из лога.
 	first, err := t.dial()
 	if err != nil {
-		t.setState(events.StateError, "не удалось подключиться")
+		t.reportDialErr(events.StateError, err)
 		t.cancel()
 		return err
 	}
@@ -427,9 +441,10 @@ func (t *Tunnel) dial() (*ssh.Client, error) {
 	if err != nil {
 		var changed *hostkey.ErrChanged
 		if errors.As(err, &changed) {
-			return nil, changed // отдельный понятный текст, см. hostkey
+			return nil, changed // отдельный понятный текст, см. hostkey — не трогаем
 		}
-		return nil, fmt.Errorf("не удалось подключиться к %s: %w", addr, err)
+		wrapped := fmt.Errorf("не удалось подключиться к %s: %w", addr, err)
+		return nil, classifyConnError(wrapped)
 	}
 	return client, nil
 }
@@ -498,7 +513,7 @@ func (t *Tunnel) keepLinkAlive(l *link, idx int) {
 					return
 				}
 				if idx == 0 {
-					t.setState(events.StateReconnecting, err.Error())
+					t.reportDialErr(events.StateReconnecting, err)
 				}
 				select {
 				case <-t.ctx.Done():

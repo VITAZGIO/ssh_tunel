@@ -45,6 +45,7 @@ import (
 	"sshtunnel/internal/filedialog"
 	"sshtunnel/internal/procinfo"
 	"sshtunnel/internal/sysproxy"
+	"sshtunnel/internal/tunnel"
 )
 
 //go:embed assets/*
@@ -300,7 +301,16 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 	if err := s.app.Start(); err != nil {
-		writeJSON(w, map[string]string{"error": err.Error()})
+		resp := map[string]string{"error": err.Error()}
+		// errorKind — стабильный код причины (см. tunnel.ConnErrorKind),
+		// разобранный один раз в общем коде: страница переводит по нему текст
+		// через свой словарь I18N, а не разбирает "error" сама (см. addMsg/
+		// showError и ERROR_KIND_TEXT в assets/index.html).
+		var ce *tunnel.ConnError
+		if errors.As(err, &ce) {
+			resp["errorKind"] = string(ce.Kind)
+		}
+		writeJSON(w, resp)
 		return
 	}
 	writeJSON(w, map[string]bool{"ok": true})

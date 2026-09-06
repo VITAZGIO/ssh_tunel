@@ -51,6 +51,14 @@ type Event struct {
 	// KindState
 	State  string `json:"state,omitempty"`
 	Detail string `json:"detail,omitempty"`
+	// ErrorKind — стабильный код причины для state=="error"/"reconnecting"
+	// (internal/tunnel.ConnErrorKind: "auth", "no_response", "refused",
+	// "hostkey_changed", "other"). Пустая строка — переход состояния не
+	// связан с ошибкой подключения (обычное "connecting"/"connected").
+	// Detail при этом остаётся русским текстом того же события — для
+	// потребителей без своего словаря (консоль); экран с I18N (веб-панель,
+	// Android) выбирает текст по ErrorKind, а не по Detail.
+	ErrorKind string `json:"errorKind,omitempty"`
 
 	// KindConn
 	Process string `json:"process,omitempty"`
@@ -150,6 +158,12 @@ func (b *Bus) Publish(e Event) {
 
 func (b *Bus) State(state, detail string) {
 	b.Publish(Event{Kind: KindState, State: state, Detail: detail})
+}
+
+// StateErr — то же самое, но с кодом причины ошибки подключения (см.
+// ErrorKind), для переходов в StateError/StateReconnecting.
+func (b *Bus) StateErr(state, detail, errorKind string) {
+	b.Publish(Event{Kind: KindState, State: state, Detail: detail, ErrorKind: errorKind})
 }
 
 func (b *Bus) Infof(format string, args ...any)  { b.logf("info", format, args...) }

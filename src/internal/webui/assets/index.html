@@ -872,6 +872,10 @@ const I18N = {
     state_stopped:'Отключено', state_connecting:'Подключаюсь…', state_connected:'Защищено',
     state_reconnecting:'Связь потеряна', state_error:'Ошибка',
     check_ip_hint:'нажми, чтобы проверить настоящий внешний адрес',
+    conn_err_auth:'Сервер не принял ключ. Устройство могли заморозить или удалить в панели, либо ключ не тот.',
+    conn_err_no_response:'Сервер не отвечает: проверь адрес и порт.',
+    conn_err_refused:'Порт закрыт или SSH на сервере не запущен.',
+    conn_err_other_prefix:'Ответ сервера: ',
     down:'Приём', up:'Отдача', connections:'Соединений', channels:'Каналов SSH',
     speedtest:'Тест скорости',
     language_label:'Язык интерфейса',
@@ -944,6 +948,10 @@ const I18N = {
     state_stopped:'Disconnected', state_connecting:'Connecting…', state_connected:'Protected',
     state_reconnecting:'Connection lost', state_error:'Error',
     check_ip_hint:'click to check the real external address',
+    conn_err_auth:'The server did not accept the key. The device may have been frozen or removed in the panel, or the key is wrong.',
+    conn_err_no_response:'The server is not responding: check the address and port.',
+    conn_err_refused:'The port is closed, or SSH is not running on the server.',
+    conn_err_other_prefix:'Server response: ',
     down:'Down', up:'Up', connections:'Connections', channels:'SSH channels',
     speedtest:'Speed test',
     language_label:'Interface language',
@@ -1475,6 +1483,18 @@ function push(el){
 $('clear').onclick = () => { logEl.innerHTML = ''; lastKey = null; };
 
 /* ---------- поток событий ---------- */
+// connErrorText — перевод типовой ошибки подключения (ТЗ-13). errorKind
+// разобран один раз в общем коде (internal/tunnel.ConnErrorKind), сюда
+// приходит уже готовый код причины — здесь только выбор текста под язык
+// интерфейса. Пустой или незнакомый код (и "hostkey_changed" — своя,
+// отдельная защита, её текст не трогаем) — показываем detail как есть.
+function connErrorText(kind, detail){
+  if(!kind || kind === 'hostkey_changed') return detail;
+  const known = ['auth', 'no_response', 'refused'];
+  if(known.includes(kind)) return tr('conn_err_' + kind);
+  return tr('conn_err_other_prefix') + detail;
+}
+
 function connectEvents(){
   const es = new EventSource('/events?t=' + encodeURIComponent(T));
   es.onmessage = ev => {
@@ -1484,7 +1504,7 @@ function connectEvents(){
     if(e.kind === 'log')   return addMsg(e);
     if(e.kind === 'state'){
       setState(e.state, e.state === 'connected' ? e.detail : '');
-      showError(e.state === 'error' ? e.detail : '');
+      showError(e.state === 'error' ? connErrorText(e.errorKind, e.detail) : '');
       return;
     }
     if(e.kind === 'stats'){
@@ -1511,7 +1531,7 @@ $('power').onclick = async () => {
   showError('');
   try{
     const r = running ? await api('/api/stop', {}) : await api('/api/start', {});
-    if(r.error){ showError(r.error); show('viewMain'); }
+    if(r.error){ showError(connErrorText(r.errorKind, r.error)); show('viewMain'); }
   } finally {
     $('power').disabled = false;
     refresh();

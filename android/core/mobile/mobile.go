@@ -34,7 +34,17 @@ type Callbacks interface {
 	Protect(fd int) bool
 
 	// OnState сообщает о смене состояния, чтобы экран показал её человеку.
-	OnState(state string, detail string)
+	//
+	// errorKind — стабильный код причины отказа подключения (ТЗ-13,
+	// tunnel.ConnErrorKind: "auth", "no_response", "refused", "other"),
+	// заполнен только при state=="error"/"reconnecting" и только если
+	// причина распознана. Экран переводит по нему текст через свой словарь
+	// строк вместо показа сырого detail — разбор самой ошибки один раз
+	// сделан в общем коде (internal/tunnel), сюда приходит уже готовый код.
+	// Пустая строка — либо не ошибка, либо смена ключа сервера
+	// (hostkey.ErrChanged): тот текст в detail не трогаем, показываем как
+	// есть.
+	OnState(state string, detail string, errorKind string)
 
 	// OnLog отдаёт строку для журнала соединений.
 	OnLog(line string)
@@ -198,7 +208,7 @@ func (t *Tunnel) StartCore() error {
 	t.mu.Unlock()
 
 	if cb != nil {
-		cb.OnState(tun.State(), fmt.Sprintf("%s:%d", cfg.Host, cfg.SSHPort))
+		cb.OnState(tun.State(), fmt.Sprintf("%s:%d", cfg.Host, cfg.SSHPort), "")
 	}
 	return nil
 }
@@ -305,7 +315,7 @@ func (t *Tunnel) forwardEvents(ch <-chan events.Event, unsub func(), stop <-chan
 			}
 			switch ev.Kind {
 			case events.KindState:
-				cb.OnState(ev.State, ev.Detail)
+				cb.OnState(ev.State, ev.Detail, ev.ErrorKind)
 			case events.KindLog:
 				cb.OnLog(ev.Text)
 			case events.KindConn:

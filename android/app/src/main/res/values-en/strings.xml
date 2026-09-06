@@ -8,6 +8,13 @@
     <string name="state_reconnecting">Reconnecting…</string>
     <string name="state_error">Error</string>
 
+    <!-- Common connection errors (ТЗ-13) — the reason code is classified once
+         in the shared Go code (internal/tunnel.ConnErrorKind), text only here. -->
+    <string name="conn_err_auth">The server did not accept the key. The device may have been frozen or removed in the panel, or the key is wrong.</string>
+    <string name="conn_err_no_response">The server is not responding: check the address and port.</string>
+    <string name="conn_err_refused">The port is closed, or SSH is not running on the server.</string>
+    <string name="conn_err_other_prefix">Server response: %1$s</string>
+
     <string name="start">Connect</string>
     <string name="stop">Disconnect</string>
     <string name="save">Save</string>

@@ -335,7 +335,8 @@ class TunnelService : VpnService(), Callbacks {
      */
     override fun protect(fd: Long): Boolean = protect(fd.toInt())
 
-    override fun onState(state: String, detail: String) = report(state, detail)
+    override fun onState(state: String, detail: String, errorKind: String) =
+        report(state, connErrorText(errorKind, detail))
 
     override fun onLog(line: String) {
         synchronized(log) {
@@ -364,6 +365,21 @@ class TunnelService : VpnService(), Callbacks {
         if (newState != "stopped") {
             notificationManager().notify(NOTIFICATION_ID, notification(describe(newState, newDetail)))
         }
+    }
+
+    /**
+     * Перевод типовой ошибки подключения (ТЗ-13). errorKind разобран один
+     * раз в общем коде на Go (internal/tunnel.ConnErrorKind) — здесь только
+     * выбор текста под язык интерфейса из строковых ресурсов. Пустой код
+     * (не ошибка, либо смена ключа сервера — своя отдельная защита) и
+     * незнакомый код оставляют detail как есть.
+     */
+    private fun connErrorText(errorKind: String, detail: String): String = when (errorKind) {
+        "auth" -> getString(R.string.conn_err_auth)
+        "no_response" -> getString(R.string.conn_err_no_response)
+        "refused" -> getString(R.string.conn_err_refused)
+        "other" -> getString(R.string.conn_err_other_prefix, detail)
+        else -> detail
     }
 
     private fun describe(state: String, detail: String): String {
