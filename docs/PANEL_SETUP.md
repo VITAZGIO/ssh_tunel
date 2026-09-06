@@ -44,35 +44,50 @@ systemd сужает ей всё остальное (`PrivateTmp`, `ProtectSyste
 
 ## Установка одной командой
 
-Собери или скачай бинарь `ssh_tunnel_panel`, положи рядом с ним файлы из
-`packaging/panel/` и на самом сервере:
+Один блок — вставить целиком на свежем сервере под root. Ничего скачивать
+заранее не нужно: сам заберёт бинарь под архитектуру сервера с GitHub,
+поставит службу и покажет адрес панели и пароль.
+
+**Вариант 1 — без своего домена.** Панель слушает только `127.0.0.1:47823`,
+снаружи её открывать не нужно — заходить через SSH-туннель или добавить
+домен и nginx/Caddy позже (см. «Домен и TLS» ниже):
 
 ```bash
-sudo bash install.sh ./ssh_tunnel_panel
+curl -fsSL https://raw.githubusercontent.com/VITAZGIO/ssh_tunel/main/packaging/panel/install.sh \
+  | sudo bash -s -- --lan --ssh-host=АДРЕС_ЭТОГО_СЕРВЕРА
 ```
 
-Три варианта, в зависимости от того, что стоит перед панелью:
+**Вариант 2 — со своим доменом.** Домен должен уже указывать A-записью на
+этот сервер — тогда панель сама получит сертификат Let's Encrypt и будет
+доступна по HTTPS сразу:
 
 ```bash
-# По умолчанию: панель слушает только 127.0.0.1:47823 — домен и TLS
-# берёт на себя nginx/Caddy перед ней (см. "Домен и сертификат" ниже).
-sudo bash install.sh ./ssh_tunnel_panel
-
-# Без реверс-прокси, только для теста или доверенной сети: панель слушает
-# все интерфейсы на порту 47823 (открывается в ufw), без TLS.
-sudo bash install.sh ./ssh_tunnel_panel --lan
-
-# Свой HTTPS со встроенным автосертификатом Let's Encrypt — домен должен
-# уже указывать A-записью на этот сервер.
-sudo bash install.sh ./ssh_tunnel_panel --domain=panel.example.com
+curl -fsSL https://raw.githubusercontent.com/VITAZGIO/ssh_tunel/main/packaging/panel/install.sh \
+  | sudo bash -s -- --domain=panel.example.com
 ```
 
-Установщик копирует бинарь в `/usr/local/bin`, ставит systemd-юнит,
-открывает нужный порт в ufw (если он включён) и печатает адрес панели вместе
-с логином и одноразовым паролем — их же в любой момент можно посмотреть так:
+В обоих случаях в конце команда сама печатает, по какому адресу открывать
+панель, и одноразовый пароль для входа — их же в любой момент можно
+посмотреть так:
 
 ```bash
 journalctl -u ssh_tunnel_panel -n 50
+```
+
+Если уже есть свой reverse proxy (nginx/Caddy) и хочется завести панель
+за ним без открытого наружу порта — третий вариант, без `--lan` и без
+`--domain` (это режим по умолчанию, подробнее — «Домен и TLS» ниже):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/VITAZGIO/ssh_tunel/main/packaging/panel/install.sh \
+  | sudo bash -s -- --ssh-host=АДРЕС_ЭТОГО_СЕРВЕРА
+```
+
+Уже скачал бинарь сам (например, собрал из исходников) — путь к нему первым
+аргументом после `--`:
+
+```bash
+sudo bash install.sh ./ssh_tunnel_panel --lan --ssh-host=АДРЕС_СЕРВЕРА
 ```
 
 ## Первый вход

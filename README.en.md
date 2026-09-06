@@ -24,7 +24,7 @@ standard SSH mechanism.
 | **Windows** | [**ssh_tunnel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe) | window with a button, tray icon |
 | **Android** | [**ssh_tunnel.apk**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.apk) | VPN connection, quick-settings tile |
 | **Linux** | [**Installing on Linux**](docs/LINUX_SETUP.en.md) | console + web interface, systemd service, commands for every major distro |
-| **VPS server** | [**Installing the panel**](docs/PANEL_SETUP.md) (in Russian) | a web panel on the server itself: adds clients with a button, no console needed |
+| **VPS server** | [**Installing the panel**](docs/PANEL_SETUP.en.md) | a web panel on the server itself: adds clients with a button, no console needed |
 
 Windows and Android are direct file links. Linux and VPS server open an
 instructions page instead: Linux has too many different systems for one
