@@ -441,95 +441,32 @@
                     android:inputType="text" android:hint="@string/custom_flag_name"
                     android:textColorHint="@color/dim" android:autofillHints="" />
 
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:paddingBottom="14dp"
-                    android:textSize="11.5sp"
-                    android:textColor="@color/dim"
-                    android:text="@string/always_on_hint" />
-
-                <CheckBox
-                    android:id="@+id/adBlockEnabled"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:textColor="@color/text"
-                    android:text="@string/ad_block_enabled" />
-
-                <TextView
-                    android:id="@+id/tileBlocked"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:paddingBottom="8dp"
-                    android:textSize="12.5sp"
-                    android:textColor="@color/dim" />
-
-                <TextView style="@style/FieldLabel"
-                    android:layout_marginTop="8dp" android:text="@string/ad_block_sources" />
-                <EditText android:id="@+id/adBlockSources" style="@style/Field"
-                    android:inputType="textMultiLine" android:minLines="2"
-                    android:gravity="top" android:hint="@string/ad_block_sources_hint"
-                    android:textColorHint="@color/dim" android:autofillHints="" />
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingBottom="10dp"
-                    android:textSize="11.5sp"
-                    android:textColor="@color/dim"
-                    android:text="@string/ad_block_sources_note" />
-
-                <TextView style="@style/FieldLabel"
-                    android:text="@string/ad_block_allowlist" />
-                <EditText android:id="@+id/adBlockAllowlist" style="@style/Field"
-                    android:inputType="textMultiLine" android:minLines="1"
-                    android:gravity="top" android:hint="@string/ad_block_allowlist_hint"
-                    android:textColorHint="@color/dim" android:autofillHints="" />
-
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-                    <Button
-                        android:id="@+id/adBlockUpdate"
-                        style="@style/SecondaryButton"
-                        android:layout_width="wrap_content"
-                        android:text="@string/ad_block_update" />
+                    android:layout_marginBottom="14dp"
+                    android:gravity="center_vertical">
                     <TextView
-                        android:id="@+id/adBlockStatus"
-                        android:layout_width="wrap_content"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="10dp"
-                        android:textSize="12.5sp"
-                        android:textColor="@color/dim" />
+                        android:textSize="12sp"
+                        android:textColor="@color/dim"
+                        android:text="@string/always_on_label" />
+                    <TextView
+                        android:id="@+id/alwaysOnInfo"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:background="@drawable/bg_infoq"
+                        android:gravity="center"
+                        android:textSize="9sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/dim"
+                        android:text="?"
+                        android:clickable="true"
+                        android:focusable="true" />
                 </LinearLayout>
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:paddingBottom="14dp"
-                    android:textSize="11.5sp"
-                    android:textColor="@color/dim"
-                    android:text="@string/ad_block_note" />
-
-                <CheckBox
-                    android:id="@+id/udpRelayEnabled"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:textColor="@color/text"
-                    android:text="@string/udp_relay_enabled" />
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingBottom="14dp"
-                    android:textSize="11.5sp"
-                    android:textColor="@color/dim"
-                    android:text="@string/udp_relay_note" />
 
                 <Button
                     android:id="@+id/selectServerBtn"
@@ -630,24 +567,36 @@
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
                             android:orientation="vertical">
-                            <TextView style="@style/FieldLabel" android:text="@string/pool_hint" />
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:gravity="center_vertical">
+                                <TextView style="@style/FieldLabel"
+                                    android:layout_width="0dp" android:layout_weight="1"
+                                    android:text="@string/pool_hint" />
+                                <TextView
+                                    android:id="@+id/poolInfo"
+                                    android:layout_width="16dp"
+                                    android:layout_height="16dp"
+                                    android:background="@drawable/bg_infoq"
+                                    android:gravity="center"
+                                    android:textSize="9sp"
+                                    android:textStyle="bold"
+                                    android:textColor="@color/dim"
+                                    android:text="?"
+                                    android:clickable="true"
+                                    android:focusable="true" />
+                            </LinearLayout>
                             <EditText android:id="@+id/pool" style="@style/Field"
                                 android:inputType="number" android:autofillHints="" />
                         </LinearLayout>
                     </LinearLayout>
 
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="12dp"
-                        android:textSize="11.5sp"
-                        android:textColor="@color/dim"
-                        android:text="@string/pool_note" />
-
                     <LinearLayout
                         android:id="@+id/apps"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
                         android:background="@drawable/bg_card"
@@ -712,19 +661,33 @@
                             android:focusable="true" />
                     </LinearLayout>
 
-                    <TextView style="@style/FieldLabel"
-                        android:layout_marginTop="8dp" android:text="@string/direct" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:gravity="center_vertical">
+                        <TextView style="@style/FieldLabel"
+                            android:layout_width="0dp" android:layout_weight="1"
+                            android:layout_marginTop="0dp"
+                            android:text="@string/direct" />
+                        <TextView
+                            android:id="@+id/directInfo"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:background="@drawable/bg_infoq"
+                            android:gravity="center"
+                            android:textSize="9sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/dim"
+                            android:text="?"
+                            android:clickable="true"
+                            android:focusable="true" />
+                    </LinearLayout>
                     <EditText android:id="@+id/direct" style="@style/Field"
                         android:inputType="textMultiLine" android:minLines="2"
                         android:gravity="top" android:hint="@string/direct_hint"
-                        android:textColorHint="@color/dim" android:autofillHints="" />
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:paddingBottom="14dp"
-                        android:textSize="11.5sp"
-                        android:textColor="@color/dim"
-                        android:text="@string/direct_note" />
+                        android:textColorHint="@color/dim" android:autofillHints=""
+                        android:layout_marginBottom="14dp" />
 
                     <Button
                         android:id="@+id/save"
@@ -769,12 +732,114 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
 
-                    <TextView
+                    <CheckBox
+                        android:id="@+id/adBlockEnabled"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:textSize="12sp"
-                        android:textColor="@color/dim"
-                        android:text="@string/app_name" />
+                        android:textColor="@color/text"
+                        android:text="@string/ad_block_enabled" />
+
+                    <TextView
+                        android:id="@+id/tileBlocked"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:paddingBottom="8dp"
+                        android:textSize="12.5sp"
+                        android:textColor="@color/dim" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:gravity="center_vertical">
+                        <TextView style="@style/FieldLabel"
+                            android:layout_width="0dp" android:layout_weight="1"
+                            android:layout_marginTop="0dp"
+                            android:text="@string/ad_block_sources" />
+                        <TextView
+                            android:id="@+id/adBlockSourcesInfo"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:background="@drawable/bg_infoq"
+                            android:gravity="center"
+                            android:textSize="9sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/dim"
+                            android:text="?"
+                            android:clickable="true"
+                            android:focusable="true" />
+                    </LinearLayout>
+                    <EditText android:id="@+id/adBlockSources" style="@style/Field"
+                        android:inputType="textMultiLine" android:minLines="2"
+                        android:gravity="top" android:hint="@string/ad_block_sources_hint"
+                        android:textColorHint="@color/dim" android:autofillHints="" />
+
+                    <TextView style="@style/FieldLabel"
+                        android:text="@string/ad_block_allowlist" />
+                    <EditText android:id="@+id/adBlockAllowlist" style="@style/Field"
+                        android:inputType="textMultiLine" android:minLines="1"
+                        android:gravity="top" android:hint="@string/ad_block_allowlist_hint"
+                        android:textColorHint="@color/dim" android:autofillHints="" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:layout_marginBottom="14dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+                        <Button
+                            android:id="@+id/adBlockUpdate"
+                            style="@style/SecondaryButton"
+                            android:layout_width="wrap_content"
+                            android:text="@string/ad_block_update" />
+                        <TextView
+                            android:id="@+id/adBlockStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:textSize="12.5sp"
+                            android:textColor="@color/dim" />
+                        <TextView
+                            android:id="@+id/adBlockUpdateInfo"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:layout_marginStart="8dp"
+                            android:background="@drawable/bg_infoq"
+                            android:gravity="center"
+                            android:textSize="9sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/dim"
+                            android:text="?"
+                            android:clickable="true"
+                            android:focusable="true" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical">
+                        <CheckBox
+                            android:id="@+id/udpRelayEnabled"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/text"
+                            android:text="@string/udp_relay_enabled" />
+                        <TextView
+                            android:id="@+id/udpRelayInfo"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:background="@drawable/bg_infoq"
+                            android:gravity="center"
+                            android:textSize="9sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/dim"
+                            android:text="?"
+                            android:clickable="true"
+                            android:focusable="true" />
+                    </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
         </ScrollView>

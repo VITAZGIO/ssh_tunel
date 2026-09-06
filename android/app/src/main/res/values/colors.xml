@@ -11,6 +11,13 @@
     <color name="text">#e8ebf2</color>
     <color name="dim">#828b9e</color>
     <color name="accent">#4c8dff</color>
+    <!-- Приглушённый синий для крупных заливок (главные кнопки, галочки,
+         переключатели) — тот же оттенок, что и accent, но темнее и менее
+         насыщенный, чтобы не бросался в глаза на тёмной теме (как на иконке
+         приложения, где яркий синий притушен зерном). Сам accent остаётся
+         как есть — для мелких акцентов текста и ссылок. -->
+    <color name="accent_muted">#3d5f8a</color>
+    <color name="accent_muted_dark">#2c4665</color>
     <color name="ok">#2fbf71</color>
     <color name="warn">#e8b339</color>
     <color name="err">#e5484d</color>

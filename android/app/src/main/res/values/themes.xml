@@ -4,8 +4,9 @@
         <item name="android:colorBackground">@color/bg</item>
         <item name="android:windowBackground">@color/bg</item>
         <item name="android:textColor">@color/text</item>
-        <item name="colorPrimary">@color/accent</item>
-        <item name="colorAccent">@color/accent</item>
+        <item name="colorPrimary">@color/accent_muted</item>
+        <item name="colorAccent">@color/accent_muted</item>
+        <item name="colorControlActivated">@color/accent_muted</item>
         <item name="android:statusBarColor">@color/bg</item>
         <item name="android:navigationBarColor">@color/card</item>
     </style>

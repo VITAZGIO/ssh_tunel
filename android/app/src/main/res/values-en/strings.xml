@@ -118,6 +118,7 @@
     <string name="tile_blocked">BLOCKED</string>
 
     <string name="always_on_hint">Want the tunnel to come up on its own when the phone starts and never drop — in the system settings: Settings → Network and internet → VPN → the gear next to this app → \"Always-on VPN\". The same screen has \"Block connections without VPN\": with it on, all traffic stops if the tunnel breaks instead of going around it — the system does this itself, the app stays out of it.</string>
+    <string name="always_on_label">Auto-start and always-on VPN — in system settings</string>
 
     <string name="udp_relay_enabled">Route UDP (calls, games) through the server</string>
     <string name="udp_relay_note">Needs the relay installed on the server (the VPS setup wizard on the computer, web panel tab). Until it is there, turning this on changes nothing — UDP still doesn\'t go through.</string>

@@ -239,6 +239,12 @@ class MainActivity : AppCompatActivity() {
         pasteConfigBtn.setOnClickListener { onPasteConfig() }
         scanConfigBtn.setOnClickListener { onScanConfig() }
         localCheckInfo.setOnClickListener { showTip(it, getString(R.string.local_via_tunnel_note)) }
+        bindInfo(R.id.alwaysOnInfo, R.string.always_on_hint)
+        bindInfo(R.id.adBlockSourcesInfo, R.string.ad_block_sources_note)
+        bindInfo(R.id.adBlockUpdateInfo, R.string.ad_block_note)
+        bindInfo(R.id.udpRelayInfo, R.string.udp_relay_note)
+        bindInfo(R.id.poolInfo, R.string.pool_note)
+        bindInfo(R.id.directInfo, R.string.direct_note)
 
         // Шапка одна на все экраны: логотип всегда возвращает на главную,
         // значки открывают своё, а повторное нажатие на уже открытый экран
@@ -707,6 +713,10 @@ class MainActivity : AppCompatActivity() {
     // ---------------------------------------------------------------------
     // Всплывающая подсказка по значку «?» — как .infoq в панели на компьютере.
     // ---------------------------------------------------------------------
+
+    private fun bindInfo(id: Int, textRes: Int) {
+        findViewById<View>(id).setOnClickListener { showTip(it, getString(textRes)) }
+    }
 
     private fun showTip(anchor: View, text: String) {
         val tv = TextView(this)
