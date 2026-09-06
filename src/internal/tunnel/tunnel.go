@@ -123,6 +123,10 @@ type Tunnel struct {
 	// localViaTunnel меняется на ходу из настроек, поэтому atomic, а не поле
 	// в cfg: перезапускать туннель ради галочки не надо.
 	localViaTunnel atomic.Bool
+
+	// kickMu и kick — сигнал «пересобрать пул немедленно», см. Kick.
+	kickMu sync.Mutex
+	kick   chan struct{}
 }
 
 type stats struct {
@@ -151,6 +155,38 @@ func (t *Tunnel) SetDirect(d *routing.DirectList) {
 	t.mu.Lock()
 	t.cfg.Direct = d
 	t.mu.Unlock()
+}
+
+// currentKick отдаёт текущий канал сигнала «пересобрать пул» — создаёт его
+// при первом обращении.
+func (t *Tunnel) currentKick() <-chan struct{} {
+	t.kickMu.Lock()
+	defer t.kickMu.Unlock()
+	if t.kick == nil {
+		t.kick = make(chan struct{})
+	}
+	return t.kick
+}
+
+// Kick форсирует немедленное переподключение всего пула — например, когда
+// телефон сменил сеть (Wi-Fi ↔ мобильная) и ждать таймера проверки живости
+// незачем: старые сокеты после смены сети почти наверняка уже мертвы.
+//
+// Все слоты помечаются оборванными тем же способом, что использует
+// keepLinkAlive при настоящем обрыве связи, — отдельного пути переподключения
+// заводить не пришлось. Безопасно вызывать в любой момент, включая случай,
+// когда туннель ещё не запущен.
+func (t *Tunnel) Kick() {
+	t.kickMu.Lock()
+	old := t.kick
+	t.kick = make(chan struct{})
+	t.kickMu.Unlock()
+	if old != nil {
+		close(old)
+	}
+	for _, l := range t.snapLinks() {
+		l.set(nil)
+	}
 }
 
 func (t *Tunnel) State() string {
@@ -489,6 +525,7 @@ func (t *Tunnel) keepLinkAlive(l *link, idx int) {
 		if t.ctx.Err() != nil {
 			return
 		}
+		kickCh := t.currentKick()
 
 		client := l.get()
 		if client == nil {
@@ -504,6 +541,10 @@ func (t *Tunnel) keepLinkAlive(l *link, idx int) {
 				case <-t.ctx.Done():
 					return
 				case <-time.After(backoff):
+				case <-kickCh:
+					// Сеть точно сменилась — прежняя пауза уже не про
+					// текущие условия, начинаем заново с минимальной.
+					backoff = time.Second
 				}
 				if backoff < 30*time.Second {
 					backoff *= 2
@@ -519,11 +560,14 @@ func (t *Tunnel) keepLinkAlive(l *link, idx int) {
 			continue
 		}
 
-		// Ждём либо остановки, либо момента следующей проверки.
+		// Ждём либо остановки, либо момента следующей проверки, либо сигнала
+		// пересобрать пул немедленно (Kick уже пометил этот слот оборванным —
+		// следующий круг цикла сразу уйдёт на переподключение).
 		select {
 		case <-t.ctx.Done():
 			return
 		case <-time.After(20 * time.Second):
+		case <-kickCh:
 		}
 
 		if t.ctx.Err() != nil {

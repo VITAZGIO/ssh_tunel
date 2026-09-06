@@ -544,6 +544,41 @@ func TestPoolSurvivesDeadLink(t *testing.T) {
 	}
 }
 
+// Kick пересобирает пул немедленно, а не через до двадцати секунд, которые
+// нужны обычной проверке живости, — ровно это нужно после смены сети на
+// телефоне (Wi-Fi ↔ мобильная), когда старый сокет почти наверняка уже мёртв.
+func TestKickReconnectsWithoutWaitingCheckInterval(t *testing.T) {
+	tun, socksAddr, _, srv := startTunnel(t, 1)
+	target := echoServer(t)
+
+	if !tun.WaitReady(1, 5*time.Second) {
+		t.Fatal("пул не поднялся")
+	}
+	before := srv.accepted.Load()
+
+	tun.Kick()
+
+	// Слот обнуляется сразу же, синхронно с вызовом Kick — это видно ещё до
+	// того, как переподключение вообще успело случиться.
+	if tun.links[0].get() != nil {
+		t.Fatal("Kick не пометил соединение оборванным")
+	}
+
+	// Без сигнала Kick горутина спала бы в ожидании своей проверки живости до
+	// двадцати секунд — три секунды здесь именно проверяют, что этого не
+	// произошло.
+	if !tun.WaitReady(1, 3*time.Second) {
+		t.Fatal("пул не переподключился за разумное время после Kick")
+	}
+	if got := srv.accepted.Load(); got <= before {
+		t.Error("после Kick сервер не принял новое соединение — переподключения не было")
+	}
+
+	c := socks5Connect(t, socksAddr, target.IP.String(), target.Port, false)
+	assertHTTPBody(t, c, target.String(), "/hello", "привет от ")
+	c.Close()
+}
+
 func TestStatsCounted(t *testing.T) {
 	tun, socksAddr, _, _ := startTunnel(t, 1)
 	target := echoServer(t)
