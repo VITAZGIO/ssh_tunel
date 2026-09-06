@@ -8,6 +8,12 @@
   :root{
     --bg:#0d1017; --card:#161a23; --card2:#1d222d; --line:#272d3a;
     --text:#e8ebf2; --dim:#828b9e; --accent:#4c8dff;
+    /* Приглушённый синий для крупных заливок (кнопки-кнопки, а не мелкие
+       акценты текста/рамок) — тот же оттенок, что и accent, но темнее и
+       менее насыщенный, как на телефоне: там весь яркий синий пришлось
+       притушить, чтобы не резал глаз на тёмной теме. Сам --accent остаётся
+       ярким — для рамок при наведении, текста и мелких точек-переключателей. */
+    --accent-muted:#3d5f8a; --accent-muted-dark:#2c4665;
     --ok:#2fbf71; --warn:#e8b339; --err:#e5484d;
     --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
   }
@@ -29,7 +35,7 @@
   /* Логотип в левом верхнем углу, без подписи: название и так стоит в
      заголовке окна. */
   .brand{display:flex;align-items:center}
-  .brand svg{display:block;fill:#2de2ff;width:32px;height:auto}
+  .brand svg{display:block;fill:var(--accent-muted);width:32px;height:auto}
   .ico{width:32px;height:32px;border-radius:8px;border:1px solid transparent;
        display:grid;place-items:center;cursor:pointer;color:var(--dim);
        background:transparent;-webkit-app-region:no-drag}
@@ -93,7 +99,7 @@
      совсем, сетка схлопнулась бы с двух рядов в один и утянула бы за собой
      кнопку. Появление результата не должно двигать интерфейс. */
   .tile[hidden]{visibility:hidden}
-  button.btn.speed{width:100%;margin-top:9px;flex:none;padding:9px}
+  button.btn.speed{padding:9px}
   button.btn.speed .ph{color:var(--dim);font-size:12px;margin-left:6px}
   .tile{background:var(--card);border:1px solid var(--line);border-radius:11px;
         padding:9px 12px}
@@ -114,7 +120,7 @@
   input:focus{outline:none;border-color:var(--accent)}
   .two{display:grid;grid-template-columns:1fr 1fr;gap:9px}
   .wztab{background:var(--card2);border:1px solid var(--line);color:var(--dim)}
-  .wztab.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+  .wztab.on{background:var(--accent-muted);border-color:var(--accent-muted);color:#fff;font-weight:600}
   .hint{font-size:11.5px;color:var(--dim);margin-top:3px;line-height:1.35}
 
   select{width:100%;background:var(--card);border:1px solid var(--line);
@@ -268,8 +274,8 @@
   button.btn{font:inherit;color:var(--text);background:var(--card2);
        border:1px solid var(--line);border-radius:8px;padding:8px 15px;cursor:pointer}
   button.btn:hover{border-color:var(--accent)}
-  button.btn.primary{background:var(--accent);border-color:var(--accent);
-       color:#fff;font-weight:600}
+  button.btn.primary{background:linear-gradient(180deg,var(--accent-muted),var(--accent-muted-dark));
+       border-color:var(--accent-muted);color:#fff;font-weight:600}
 
   #log{font-family:var(--mono);font-size:11.5px;background:var(--card);
        border:1px solid var(--line);border-radius:11px;
@@ -474,8 +480,12 @@
           data-i18n="remove_server">Удалить сервер</button>
       </div>
 
-      <div class="rowbtns" style="margin-top:0;margin-bottom:14px">
-        <button class="btn" id="exportBtn" data-i18n="export_server">Экспортировать сервер</button>
+      <div class="field" style="margin-bottom:14px">
+        <label data-i18n="export_server">Экспортировать сервер</label>
+        <div class="rowbtns" style="margin-top:0">
+          <button class="btn" id="exportFileBtn" style="flex:1" data-i18n="export_to_file">В файл</button>
+          <button class="btn" id="exportClipBtn" style="flex:1" data-i18n="export_to_clipboard">В буфер</button>
+        </div>
       </div>
 
       <div id="issuedByPanel" hidden style="margin:-4px 0 14px;font-size:12.5px;
@@ -549,12 +559,6 @@
       </div>
       <p class="note" id="cmd3note"></p>
     </div>
-
-    <button class="row-link" id="toVpsSetup" style="margin:2px 0 14px">
-      <span class="t"><span data-i18n="vps_setup_row">Настроить сервер по SSH</span>
-        <div class="v" data-i18n="vps_setup_row_sub">Ключ, firewall и отдельный пользователь — одной кнопкой</div>
-      </span>
-    </button>
 
     <div class="two">
       <div class="field"><label for="sshPort">SSH-порт</label>
@@ -682,9 +686,9 @@
       </div><!-- /.pbody -->
     </div><!-- /.panel общих настроек -->
 
-    <div style="display:flex;gap:9px;align-items:center;margin-top:14px">
-      <button class="btn primary" id="save" data-i18n="save">Сохранить</button>
-      <span class="hint" id="savedNote"></span>
+    <div style="margin-top:14px">
+      <button class="btn primary" id="save" style="width:100%" data-i18n="save">Сохранить</button>
+      <span class="hint" id="savedNote" style="display:block;margin-top:6px;text-align:center"></span>
     </div>
 
   </div>
@@ -810,12 +814,19 @@
       </div>
     </div>
 
-    <!-- VPS: параметризованный скрипт настройки сервера из docs/SERVER_SETUP.md -->
+    <!-- VPS: два способа — набор команд для ручной вставки (docs/SERVER_SETUP.md)
+         или тот же результат одной кнопкой (программа сама заходит по паролю root). -->
     <div id="wzVPS" hidden>
       <p class="note" style="margin-top:0" data-i18n="wizard_vps_intro">Готовые команды для новго
         сервера — вставить целиком на нём под root. Что настраивают: ключи вместо паролей,
         firewall, бан за перебор, автообновления и отдельный пользователь для туннеля.</p>
 
+      <div class="two" style="margin-bottom:14px">
+        <button class="btn wztab on" id="wzVpsModeManual" data-i18n="vps_mode_manual">Вручную</button>
+        <button class="btn wztab" id="wzVpsModeAuto" data-i18n="vps_mode_auto">Автоматически</button>
+      </div>
+
+      <div id="wzVpsManual">
       <div class="two">
         <div class="field"><label for="wzNewUser" data-i18n="wizard_admin_user">Обычный пользователь (необязательно)</label>
           <input type="text" id="wzNewUser" spellcheck="false" data-i18n-ph="wizard_admin_user_ph"></div>
@@ -847,6 +858,7 @@
           <span id="wzVpsScript" style="white-space:pre-wrap;word-break:break-all"></span>
         </div>
       </div>
+      </div><!-- /#wzVpsManual -->
     </div>
   </div><!-- /view viewWizard -->
   <!-- НАСТРОЙКА VPS -->
@@ -1006,7 +1018,7 @@ const I18N = {
     sc_external_ip_mismatch:'{detail} — не совпадает с адресом сервера, это ожидаемо для некоторых '+
       'хостингов (CDN, несколько адресов на сервер)',
     sc_external_ip_check_failed:'не удалось узнать внешний адрес: {detail}',
-    language_label:'Язык интерфейса',
+    language_label:'Язык интерфейса / Language',
     add_server:'Добавить сервер',
     server_settings:'Настройки сервера', general_settings:'Общие настройки приложения',
     issued_by_panel:'Этот сервер выдан панелью · {name}',
@@ -1016,8 +1028,7 @@ const I18N = {
     discard_unsaved:'Есть несохранённые правки — переключиться и потерять их?',
     host_label:'Адрес сервера', host_ph:'адрес или домен сервера',
     user_label:'Пользователь SSH', key_label:'Приватный ключ',
-    vps_setup_row:'Настроить сервер по SSH',
-    vps_setup_row_sub:'Ключ, firewall и отдельный пользователь — одной кнопкой',
+    vps_mode_manual:'Вручную', vps_mode_auto:'Автоматически',
     vps_setup_title:'Настройка сервера по SSH',
     vps_setup_intro:'Программа сама подключится по паролю root, положит на сервер свой ключ, '+
       'проверит, что вход по нему работает, и только после этого выполнит те же шаги, что описаны в '+
@@ -1081,7 +1092,7 @@ const I18N = {
     pick_app:'Выбери программу', close:'Закрыть', search_app:'Поиск по имени или пути…',
     custom_flag_name:'Свой (без флага)',
     import_title:'Импортировать сервер из файла', import_short:'Импорт',
-    export_server:'Экспортировать сервер',
+    export_server:'Экспортировать сервер', export_to_file:'В файл', export_to_clipboard:'В буфер',
     import_ok_with_key:'сервер импортирован вместе с ключом — можно нажимать «Подключить»',
     import_ok_no_key:'сервер импортирован без ключа — укажи свой приватный ключ перед подключением',
     import_bad_file:'этот файл не похож на экспорт ssh_tunnel',
@@ -1164,8 +1175,7 @@ const I18N = {
     discard_unsaved:'There are unsaved changes — switch and lose them?',
     host_label:'Server address', host_ph:'server address or domain',
     user_label:'SSH user', key_label:'Private key',
-    vps_setup_row:'Set up the server over SSH',
-    vps_setup_row_sub:'Key, firewall and a dedicated user — one button',
+    vps_mode_manual:'Manual', vps_mode_auto:'Automatic',
     vps_setup_title:'Server setup over SSH',
     vps_setup_intro:'The program connects with the root password itself, installs its own key on the '+
       'server, checks that logging in with it actually works, and only then runs the same steps described '+
@@ -1228,7 +1238,7 @@ const I18N = {
     pick_app:'Pick an app', close:'Close', search_app:'Search by name or path…',
     custom_flag_name:'Custom (no flag)',
     import_title:'Import a server from a file', import_short:'Import',
-    export_server:'Export server',
+    export_server:'Export server', export_to_file:'To file', export_to_clipboard:'To clipboard',
     import_ok_with_key:'server imported along with its key — you can hit "Connect"',
     import_ok_no_key:'server imported without a key — point it at your own private key before connecting',
     import_bad_file:'this file doesn\'t look like an ssh_tunnel export',
@@ -1673,12 +1683,18 @@ $('backFromFilter').onclick = () => show('viewSettings');
 $('toFilter').onclick = () => show('viewFilter');
 $('backFromSelfCheck').onclick = () => show('viewMain');
 $('toSelfCheck').onclick = () => { show('viewSelfCheck'); runSelfCheck(); };
-$('backFromVpsSetup').onclick = () => show('viewSettings');
-$('toVpsSetup').onclick = () => {
+// «Настроить сервер по SSH» — вариант «автоматически» внутри вкладки VPS
+// мастера настройки, поэтому назад возвращает туда же, а не в настройки.
+$('backFromVpsSetup').onclick = () => show('viewWizard');
+$('wzVpsModeAuto').onclick = () => {
+  $('wzVpsModeAuto').classList.add('on'); $('wzVpsModeManual').classList.remove('on');
   if(!$('vpsHost').value) $('vpsHost').value = $('host').value;
   if($('user').value) $('vpsUser').value = $('user').value;
   if($('sshPort').value) $('vpsPort').value = $('sshPort').value;
   show('viewVpsSetup');
+};
+$('wzVpsModeManual').onclick = () => {
+  $('wzVpsModeManual').classList.add('on'); $('wzVpsModeAuto').classList.remove('on');
 };
 
 /* ---------- форматирование ---------- */
@@ -2678,7 +2694,7 @@ $('removeServerBtn').onclick = async () => {
    только мешал бы. Несохранённые правки в файл не попадают — только то,
    что уже лежит на диске, поэтому перед экспортом стоит сперва нажать
    «Сохранить». */
-$('exportBtn').onclick = async () => {
+$('exportFileBtn').onclick = async () => {
   const r = await api('/api/profile/export', { id: editingProfileId, includeKey: true });
   if(r.error){ showError(r.error, 'setError'); return; }
   const blob = new Blob([r.data], { type: 'application/json' });
@@ -2690,8 +2706,15 @@ $('exportBtn').onclick = async () => {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
+  $('savedNote').textContent = tr('exported');
+  setTimeout(() => $('savedNote').textContent = '', 4000);
+};
+
+$('exportClipBtn').onclick = async () => {
+  const r = await api('/api/profile/export', { id: editingProfileId, includeKey: true });
+  if(r.error){ showError(r.error, 'setError'); return; }
   const copied = await copyToClipboard(r.data);
-  $('savedNote').textContent = copied ? tr('exported_and_copied') : tr('exported');
+  $('savedNote').textContent = copied ? tr('copied') : tr('copy_manually');
   setTimeout(() => $('savedNote').textContent = '', 4000);
 };
 
