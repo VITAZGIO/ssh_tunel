@@ -17,8 +17,6 @@ package webui
 
 import (
 	"bytes"
-	"crypto/rand"
-	"encoding/base32"
 	"errors"
 	"fmt"
 	"io"
@@ -126,14 +124,16 @@ func runVpsSetup(bus *events.Bus, p vpsSetupParams) (err error) {
 	bus.VpsSetupLine("tunnel-user", "tunnel-user.sh готово")
 
 	if p.InstallPanel {
-		bus.VpsSetupLine("panel", "Ставлю веб-панель Cockpit")
-		panelAddr, panelPass, perr := installPanel(keyClient, p.Host, func(line string) { bus.VpsSetupLine("panel", line) })
+		bus.VpsSetupLine("panel", "Ставлю веб-панель ssh_tunnel_panel")
+		panelAddr, panelPass, perr := installPanel(keyClient, p.Host, p.Port,
+			func(line string) { bus.VpsSetupLine("panel", line) })
 		if perr != nil {
 			bus.VpsSetupLine("panel", "Веб-панель не установлена: "+perr.Error())
 		} else {
-			bus.VpsSetupLine("panel", fmt.Sprintf(
-				"Панель: %s   пользователь: vpsadmin   пароль (одноразовый, спросит сменить при входе): %s",
-				panelAddr, panelPass))
+			bus.VpsSetupLine("panel", "Панель: "+panelAddr)
+			bus.VpsSetupLine("panel", panelPass)
+			bus.VpsSetupLine("panel", "Панель потребует сменить одноразовый пароль при первом входе. "+
+				"Наружу её выставлять только через nginx или Caddy с сертификатом — см. docs/PANEL_SETUP.md")
 		}
 	}
 
@@ -281,13 +281,6 @@ func (w *lineWriter) Flush() {
 	}
 }
 
-// installPanel — необязательный шаг (см. ТЗ на веб-панель): ставит Cockpit,
-// штатную веб-панель администрирования для Debian/Ubuntu (systemd, journalctl,
-// сеть, диски, обновления — из браузера), заводит для входа в неё отдельного
-// пользователя vpsadmin с одноразовым паролем. В документе harden.sh
-// советует не ставить веб-панели ради самой безопасности сервера — поэтому
-// это отдельная явная галочка, выключенная по умолчанию, а не часть
-// обязательных шагов.
 // installUDPRelay ставит ретранслятор UDP (см. sshtunnel/cmd/udprelay,
 // sshtunnel/internal/udprelay): SSH умеет пробрасывать только TCP, поэтому
 // звонки, игры и QUIC без него не проходят через туннель. Ретранслятор
@@ -305,14 +298,37 @@ func installUDPRelay(client *ssh.Client, onLine func(string)) error {
 	const marker = "EOF_UDPRELAY_SOURCE_39fa2c"
 	script := fmt.Sprintf(`set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
-command -v go >/dev/null || { echo "ставлю Go"; apt-get -y -qq install golang-go >/dev/null; }
-mkdir -p /root/udprelay
-cat > /root/udprelay/main.go <<'%s'
+
+# Сначала пробуем готовый файл со страницы релиза: он собран под ту же пару
+# систем, что и остальные файлы проекта, и не тянет на сервер ничего лишнего.
+# Компиляция на месте осталась запасным путём — на случай архитектуры, для
+# которой сборки нет, или сервера без доступа к GitHub.
+BIN=""
+case "$(uname -m)" in
+  x86_64)        BIN=udprelay ;;
+  aarch64|arm64) BIN=udprelay_arm64 ;;
+esac
+GOT=0
+if [ -n "$BIN" ] && command -v curl >/dev/null; then
+  if curl -fsSL -o /usr/local/bin/udprelay \
+      "https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$BIN"; then
+    chmod +x /usr/local/bin/udprelay
+    GOT=1
+    echo "ретранслятор скачан"
+  fi
+fi
+
+if [ "$GOT" != 1 ]; then
+  echo "готового файла нет — собираю на сервере"
+  command -v go >/dev/null || { echo "ставлю Go"; apt-get -y -qq install golang-go >/dev/null; }
+  mkdir -p /root/udprelay
+  cat > /root/udprelay/main.go <<'%s'
 %s
 %s
-cd /root/udprelay
-go build -o /usr/local/bin/udprelay main.go
-echo "ретранслятор собран"
+  cd /root/udprelay
+  go build -o /usr/local/bin/udprelay main.go
+  echo "ретранслятор собран"
+fi
 
 cat > /etc/systemd/system/udprelay.service <<'EOF_UNIT'
 [Unit]
@@ -339,47 +355,108 @@ echo "udprelay запущен"
 	return runRemoteScript(client, script, onLine)
 }
 
-func installPanel(client *ssh.Client, host string, onLine func(string)) (addr, password string, err error) {
-	const script = `set -euo pipefail
-export DEBIAN_FRONTEND=noninteractive
-command -v apt-get >/dev/null || { echo "панель ставится только на Debian/Ubuntu" >&2; exit 1; }
-apt-get -y -qq install cockpit >/dev/null
-id -u vpsadmin >/dev/null 2>&1 || useradd -m -s /bin/bash vpsadmin
-usermod -aG sudo vpsadmin
-echo "vpsadmin ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/90-vpsadmin
-chmod 440 /etc/sudoers.d/90-vpsadmin
-systemctl enable --now cockpit.socket >/dev/null
-if command -v ufw >/dev/null; then ufw allow 9090/tcp comment cockpit-panel >/dev/null || true; fi
-echo "cockpit установлен"
-`
+// installPanel ставит НАШУ веб-панель (sshtunnel/cmd/ssh_tunnel_panel):
+// заводит клиентов, показывает трафик, умеет замораживать и удалять
+// устройства. Готовый бинарь скачивается со страницы релиза — собирать его
+// на сервере (и тащить туда компилятор) незачем, сборка под linux/amd64 и
+// linux/arm64 уже лежит в релизе (см. src/build.sh).
+//
+// Панель слушает только 127.0.0.1: наружу её выставляет тот, кто поставит
+// перед ней nginx или Caddy со своим сертификатом (docs/PANEL_SETUP.md).
+// Порт в файрволе мастер намеренно не открывает — иначе получилась бы
+// работающая от root панель, доступная из интернета по голому HTTP, ровно
+// после того как harden.sh закрыл вход по паролю.
+func installPanel(client *ssh.Client, host string, sshPort int, onLine func(string)) (addr, password string, err error) {
+	script := fmt.Sprintf(`set -euo pipefail
+command -v curl >/dev/null || { echo "нужен curl" >&2; exit 1; }
+case "$(uname -m)" in
+  x86_64)          BIN=ssh_tunnel_panel ;;
+  aarch64|arm64)   BIN=ssh_tunnel_panel_arm64 ;;
+  *) echo "нет сборки панели для $(uname -m)" >&2; exit 1 ;;
+esac
+echo "скачиваю панель ($BIN)"
+curl -fsSL -o /usr/local/bin/ssh_tunnel_panel \
+  "https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$BIN"
+chmod +x /usr/local/bin/ssh_tunnel_panel
+install -d -m 700 /etc/ssh_tunnel_panel
+
+cat > /etc/systemd/system/ssh_tunnel_panel.service <<'EOF_UNIT'
+%s
+EOF_UNIT
+systemctl daemon-reload
+systemctl enable --now ssh_tunnel_panel
+echo "панель запущена"
+`, panelUnit(host, sshPort))
+
 	if err := runRemoteScript(client, script, onLine); err != nil {
-		return "", "", fmt.Errorf("установка cockpit: %w", err)
+		return "", "", fmt.Errorf("установка панели: %w", err)
 	}
 
-	pass, err := randomPassword()
+	// Одноразовый пароль панель придумывает сама при первом запуске и пишет
+	// в журнал — мастер его только достаёт и показывает. Придумывать пароль
+	// здесь и передавать внутрь было бы лишним звеном: панель всё равно
+	// потребует сменить его при первом входе.
+	pass, err := firstRunPassword(client)
 	if err != nil {
 		return "", "", err
 	}
-	session, err := client.NewSession()
-	if err != nil {
-		return "", "", err
-	}
-	defer session.Close()
-	session.Stdin = strings.NewReader(fmt.Sprintf("vpsadmin:%s\n", pass))
-	out, err := session.CombinedOutput("chpasswd && chage -d 0 vpsadmin")
-	if err != nil {
-		return "", "", fmt.Errorf("не удалось задать пароль панели: %s: %w", strings.TrimSpace(string(out)), err)
-	}
-
-	return fmt.Sprintf("https://%s:9090", host), pass, nil
+	return "http://127.0.0.1:47823/ (на самом сервере; наружу — через nginx или Caddy)", pass, nil
 }
 
-func randomPassword() (string, error) {
-	b := make([]byte, 15)
-	if _, err := rand.Read(b); err != nil {
+// panelUnit — тот же юнит, что в packaging/panel/ssh_tunnel_panel.service, с
+// подставленным адресом сервера: без -ssh-host панель не сможет собрать
+// конфиг ни одному клиенту, потому что не знает, куда им подключаться.
+func panelUnit(host string, sshPort int) string {
+	return `[Unit]
+Description=ssh_tunnel_panel — веб-панель управления сервером и клиентами
+Documentation=https://github.com/VITAZGIO/ssh_tunel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/ssh_tunnel_panel -ssh-host ` + shQuote(host) +
+		` -ssh-port ` + strconv.Itoa(sshPort) + `
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=15
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=true
+ProtectHome=false
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target
+`
+}
+
+// firstRunPassword достаёт из журнала строку, которую панель печатает при
+// первом запуске. Служба только что стартовала, поэтому пару секунд ждём:
+// иначе журнал успевает оказаться пустым.
+func firstRunPassword(client *ssh.Client) (string, error) {
+	session, err := client.NewSession()
+	if err != nil {
 		return "", err
 	}
-	return base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(b), nil
+	defer session.Close()
+	out, err := session.CombinedOutput(
+		"sleep 2; journalctl -u ssh_tunnel_panel --no-pager -n 50 | grep -i 'парол' | tail -3")
+	if err != nil {
+		return "", fmt.Errorf("панель поставлена, но пароль из журнала не достать "+
+			"(посмотри сам: journalctl -u ssh_tunnel_panel): %w", err)
+	}
+	pass := strings.TrimSpace(string(out))
+	if pass == "" {
+		return "", errors.New("панель поставлена, но строки с паролем в журнале нет — " +
+			"посмотри: journalctl -u ssh_tunnel_panel")
+	}
+	return pass, nil
 }
 
 func shQuote(s string) string {

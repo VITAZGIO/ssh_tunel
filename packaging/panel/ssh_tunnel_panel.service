@@ -32,11 +32,20 @@ TimeoutStopSec=15
 # Панели нужен root ровно для одного — управлять системными учётными
 # записями и правами клиентов; со всем остальным она может быть настолько
 # ограничена, насколько это позволяет systemd для процесса с UID 0.
+#
+# Границы выбраны по тому, что панель обязана делать, а не по принципу «чем
+# строже, тем лучше»: useradd пишет в /etc/passwd и /etc/shadow, ключи
+# клиентов ложатся в /home/tun_*/.ssh, поэтому ProtectSystem=strict и
+# ProtectHome=true здесь стояли бы только для вида — с ними панель не может
+# завести ни одного клиента и падает на первой же кнопке. Read-only остаются
+# /usr и /boot: туда ей писать незачем.
 NoNewPrivileges=true
-ProtectHome=true
 PrivateTmp=true
-ProtectSystem=strict
-ReadWritePaths=/etc/ssh_tunnel_panel
+ProtectSystem=true
+ProtectHome=false
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
 
 [Install]
 WantedBy=multi-user.target

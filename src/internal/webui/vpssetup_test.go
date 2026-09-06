@@ -204,6 +204,9 @@ func (s *fakeAdminServer) runExec(ch ssh.Channel, cmd string) {
 			s.mu.Unlock()
 		}
 		sendExit(ch, 0)
+	case strings.Contains(cmd, "journalctl -u ssh_tunnel_panel"):
+		fmt.Fprintln(ch, `Первый запуск: создан пользователь "admin" с одноразовым паролем: TESTPASS`)
+		sendExit(ch, 0)
 	case strings.HasPrefix(cmd, "chpasswd"):
 		// В отличие от остальных команд здесь клиент действительно пишет в
 		// stdin (пароль) и сам закрывает запись, когда дописал. Раньше эта
@@ -236,8 +239,8 @@ func (s *fakeAdminServer) handleScript(ch ssh.Channel, script string) {
 	case strings.Contains(script, "TUNNEL_USER="):
 		fmt.Fprintln(ch, "tunnel-user: строка первая")
 		sendExit(ch, tunnelExit)
-	case strings.Contains(script, "cockpit"):
-		fmt.Fprintln(ch, "cockpit установлен")
+	case strings.Contains(script, "ssh_tunnel_panel"):
+		fmt.Fprintln(ch, "панель запущена")
 		sendExit(ch, 0)
 	case strings.Contains(script, "udprelay"):
 		fmt.Fprintln(ch, "udprelay собран")
@@ -325,8 +328,14 @@ func TestRunVpsSetupFullFlow(t *testing.T) {
 	if !srv.hasScriptContaining(`TUNNEL_USER="tunnel"`) {
 		t.Error("tunnel-user.sh не запустился")
 	}
-	if !srv.hasScriptContaining("cockpit") {
+	if !srv.hasScriptContaining("ssh_tunnel_panel") {
 		t.Error("установка панели не запросилась, хотя InstallPanel=true")
+	}
+	// Ставим свою панель, а не постороннюю системную консоль: та открывала бы
+	// наружу вход по паролю к учётке с полным sudo — ровно то, что harden.sh
+	// только что закрыл.
+	if srv.hasScriptContaining("cockpit") || srv.hasScriptContaining("vpsadmin") {
+		t.Error("мастер ставит постороннюю панель вместо ssh_tunnel_panel")
 	}
 	if !srv.hasScriptContaining("udprelay") {
 		t.Error("установка ретранслятора UDP не запросилась, хотя InstallUDPRelay=true")
@@ -341,7 +350,7 @@ func TestRunVpsSetupFullFlow(t *testing.T) {
 		if strings.Contains(e.Text, params.Password) || strings.Contains(e.Error, params.Password) {
 			t.Fatalf("пароль root попал в событие: %+v", e)
 		}
-		if e.Stage == "panel" && strings.Contains(e.Text, "https://") {
+		if e.Stage == "panel" && strings.Contains(e.Text, "TESTPASS") {
 			panelLineFound = true
 		}
 		if e.Done {
@@ -355,7 +364,7 @@ func TestRunVpsSetupFullFlow(t *testing.T) {
 		t.Fatal("не пришло итоговое событие VpsSetupDone")
 	}
 	if !panelLineFound {
-		t.Error("адрес и пароль панели не пришли в поток событий")
+		t.Error("одноразовый пароль панели не пришёл в поток событий")
 	}
 }
 

@@ -99,4 +99,52 @@
     <string name="apps_imported">app list imported</string>
     <string name="apps_exported">list saved and copied to clipboard</string>
     <string name="import_bad_apps">this doesn\'t look like an ssh_tunnel app list</string>
+    <!-- Блокировка рекламы, самопроверка и UDP: строки пришли из ветки, где
+         английского файла ещё не было. -->
+    <string name="ad_block_enabled">Block ads and tracking</string>
+    <string name="ad_block_sources">Block lists</string>
+    <string name="ad_block_sources_hint">an https://… link or a file path, one per line</string>
+    <string name="ad_block_sources_note">Both the hosts format and \"one name per line\" are understood as-is, and they can be mixed. There are no built-in lists: only what you add here is used.</string>
+    <string name="ad_block_allowlist">Never block</string>
+    <string name="ad_block_allowlist_hint">your own exceptions, comma-separated or one per line</string>
+    <string name="ad_block_note">Lists are downloaded and stored on the phone only by this button — they never update on their own. An updated list takes effect on the next connection.</string>
+    <string name="ad_block_update">Update list</string>
+    <string name="ad_block_updating">Updating…</string>
+    <string name="ad_block_updated">names loaded: %1$d</string>
+    <string name="ad_block_update_failed">failed: %1$s</string>
+    <string name="tile_blocked">BLOCKED</string>
+
+    <string name="always_on_hint">Want the tunnel to come up on its own when the phone starts and never drop — in the system settings: Settings → Network and internet → VPN → the gear next to this app → \"Always-on VPN\". The same screen has \"Block connections without VPN\": with it on, all traffic stops if the tunnel breaks instead of going around it — the system does this itself, the app stays out of it.</string>
+
+    <string name="udp_relay_enabled">Route UDP (calls, games) through the server</string>
+    <string name="udp_relay_note">Needs the relay installed on the server (the VPS setup wizard on the computer, web panel tab). Until it is there, turning this on changes nothing — UDP still doesn\'t go through.</string>
+
+    <string name="selfcheck_title">Self-check</string>
+    <string name="selfcheck_open">Self-check</string>
+    <string name="selfcheck_start">Check</string>
+    <string name="selfcheck_running">Checking…</string>
+    <string name="selfcheck_intro">Seven steps in a row, from the server name to the external address. The first failure stops the chain — checking further is pointless, and it shows at once where it broke. Works with the tunnel off too: the check opens its own separate connection.</string>
+    <string name="selfcheck_step_dns">Server address resolves to an IP</string>
+    <string name="selfcheck_step_port">SSH port answers</string>
+    <string name="selfcheck_step_key">Server accepted the key</string>
+    <string name="selfcheck_step_forward">Forwarding through the tunnel works</string>
+    <string name="selfcheck_step_dns_tunnel">DNS answers through the tunnel</string>
+    <string name="selfcheck_step_sites">Known sites open</string>
+    <string name="selfcheck_step_external_ip">External address matches the server</string>
+    <string name="sc_dns_resolve_failed">didn\'t resolve: %1$s</string>
+    <string name="sc_port_refused">the server refused the connection</string>
+    <string name="sc_port_timeout">the server didn\'t answer in time</string>
+    <string name="sc_port_unreachable">the server is unreachable</string>
+    <string name="sc_key_auth_failed">the key was not accepted — check the file path and that it is added on the server</string>
+    <string name="sc_key_host_key_changed">the server key changed — this can be an impersonation, details: %1$s</string>
+    <string name="sc_key_refused">the server refused the connection</string>
+    <string name="sc_key_timeout">the server didn\'t answer in time</string>
+    <string name="sc_key_unreachable">the server is unreachable</string>
+    <string name="sc_forward_forward_failed">couldn\'t open a test connection: %1$s</string>
+    <string name="sc_dns_tunnel_ok">answers</string>
+    <string name="sc_dns_tunnel_no_answer">no answer from DNS through the tunnel: %1$s</string>
+    <string name="sc_sites_all_failed">not a single site opened</string>
+    <string name="sc_external_ip_matches">%1$s — matches the server address</string>
+    <string name="sc_external_ip_mismatch">%1$s — doesn\'t match the server address; that is expected with some hosting providers (CDN, several addresses per server)</string>
+    <string name="sc_external_ip_check_failed">couldn\'t determine the external address: %1$s</string>
 </resources>

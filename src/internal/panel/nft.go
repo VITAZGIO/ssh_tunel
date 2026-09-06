@@ -175,11 +175,17 @@ func AccumulateCounter(prevRaw, prevTotal, newRaw uint64) (raw, total uint64) {
 // setupScript — таблица и обе цепочки. "add table"/"add chain" в nftables
 // сами по себе идемпотентны (повторный вызов на уже существующие не
 // ошибка), поэтому отдельная проверка "уже есть или нет" не нужна.
+//
+// Точки с запятой внутри фигурных скобок пишутся как есть. Экранировать их
+// (`filter\;`) нужно, только когда правило набирают в командной строке и от
+// шелла — здесь же текст уходит прямо в stdin "nft -f -", никакого шелла на
+// пути нет, и обратная косая превращается в синтаксическую ошибку: цепочки
+// не создаются, а весь учёт трафика молча остаётся пустым.
 func setupScript() string {
 	return fmt.Sprintf(
 		"add table %s %s\n"+
-			"add chain %s %s %s { type filter hook input priority filter\\; policy accept\\; }\n"+
-			"add chain %s %s %s { type filter hook output priority filter\\; policy accept\\; }\n",
+			"add chain %s %s %s { type filter hook input priority filter; policy accept; }\n"+
+			"add chain %s %s %s { type filter hook output priority filter; policy accept; }\n",
 		nftFamily, nftTable,
 		nftFamily, nftTable, chainIn,
 		nftFamily, nftTable, chainOut,
