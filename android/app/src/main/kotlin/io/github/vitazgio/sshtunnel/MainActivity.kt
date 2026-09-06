@@ -17,6 +17,7 @@ import android.widget.Toast
 import android.widget.ViewFlipper
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import mobile.Mobile
 import org.json.JSONObject
 
 /**
@@ -55,6 +56,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tileUp: TextView
     private lateinit var tileConns: TextView
     private lateinit var tileLinks: TextView
+    private lateinit var tileBlocked: TextView
 
     private lateinit var hostEdit: EditText
     private lateinit var portEdit: EditText
@@ -63,6 +65,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var keyEdit: EditText
     private lateinit var directEdit: EditText
     private lateinit var localCheck: CheckBox
+
+    private lateinit var adBlockEnabledCheck: CheckBox
+    private lateinit var adBlockSourcesEdit: EditText
+    private lateinit var adBlockAllowlistEdit: EditText
+    private lateinit var adBlockUpdateButton: Button
+    private lateinit var adBlockStatusView: TextView
 
     private val vpnPermission = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
@@ -98,6 +106,7 @@ class MainActivity : AppCompatActivity() {
         tileUp = findViewById(R.id.tileUp)
         tileConns = findViewById(R.id.tileConns)
         tileLinks = findViewById(R.id.tileLinks)
+        tileBlocked = findViewById(R.id.tileBlocked)
 
         hostEdit = findViewById(R.id.host)
         portEdit = findViewById(R.id.port)
@@ -107,11 +116,18 @@ class MainActivity : AppCompatActivity() {
         directEdit = findViewById(R.id.direct)
         localCheck = findViewById(R.id.localViaTunnel)
 
+        adBlockEnabledCheck = findViewById(R.id.adBlockEnabled)
+        adBlockSourcesEdit = findViewById(R.id.adBlockSources)
+        adBlockAllowlistEdit = findViewById(R.id.adBlockAllowlist)
+        adBlockUpdateButton = findViewById(R.id.adBlockUpdate)
+        adBlockStatusView = findViewById(R.id.adBlockStatus)
+
         loadSettings()
 
         power.setOnClickListener { onToggle() }
         speedButton.setOnClickListener { runSpeedTest() }
         findViewById<Button>(R.id.save).setOnClickListener { saveSettings() }
+        adBlockUpdateButton.setOnClickListener { updateBlockLists() }
         findViewById<View>(R.id.apps).setOnClickListener {
             startActivity(Intent(this, AppsActivity::class.java))
         }
@@ -179,6 +195,10 @@ class MainActivity : AppCompatActivity() {
         userEdit.setText(settings.user)
         directEdit.setText(settings.directHosts)
         localCheck.isChecked = settings.localViaTunnel
+
+        adBlockEnabledCheck.isChecked = settings.adBlockEnabled
+        adBlockSourcesEdit.setText(settings.adBlockSources)
+        adBlockAllowlistEdit.setText(settings.adBlockAllowlist)
     }
 
     private fun saveSettings() {
@@ -188,6 +208,10 @@ class MainActivity : AppCompatActivity() {
         settings.user = userEdit.text.toString()
         settings.directHosts = directEdit.text.toString()
         settings.localViaTunnel = localCheck.isChecked
+
+        settings.adBlockEnabled = adBlockEnabledCheck.isChecked
+        settings.adBlockSources = adBlockSourcesEdit.text.toString()
+        settings.adBlockAllowlist = adBlockAllowlistEdit.text.toString()
 
         // Ключ вводится один раз: после сохранения поле очищается, чтобы он не
         // лежал на экране у всех на виду.
@@ -268,6 +292,41 @@ class MainActivity : AppCompatActivity() {
     // INVISIBLE, а не GONE: место под плитками остаётся занятым, и экран не
     // дёргается при каждом появлении результата.
     private val hideSpeed = Runnable { rowSpeed.visibility = View.INVISIBLE }
+
+    /**
+     * Загружает списки блокировки по нажатию кнопки — не сама по себе, не по
+     * расписанию. Сеть небыстрая, поэтому в отдельном потоке; результат
+     * (сколько имён загружено, или ошибка) сохраняется на телефон самим ядром
+     * и тут же показывается человеку.
+     */
+    private fun updateBlockLists() {
+        val sources = adBlockSourcesEdit.text.toString()
+        if (sources.isBlank()) {
+            adBlockStatusView.text = ""
+            Toast.makeText(this, R.string.ad_block_sources_hint, Toast.LENGTH_SHORT).show()
+            return
+        }
+        settings.adBlockSources = sources
+        adBlockUpdateButton.isEnabled = false
+        adBlockStatusView.setText(R.string.ad_block_updating)
+        Thread {
+            val result = try {
+                Mobile.updateBlockLists(sources, settings.adBlockListFile.absolutePath)
+            } catch (e: Exception) {
+                """{"error":"${e.message}"}"""
+            }
+            runOnUiThread {
+                adBlockUpdateButton.isEnabled = true
+                val o = try { JSONObject(result) } catch (e: Exception) { JSONObject() }
+                val err = o.optString("error")
+                adBlockStatusView.text = if (err.isNotBlank()) {
+                    getString(R.string.ad_block_update_failed, err)
+                } else {
+                    getString(R.string.ad_block_updated, o.optInt("count"))
+                }
+            }
+        }.start()
+    }
 
     /** Задержка до сервера. Цвет важнее числа: зелёный, жёлтый, красный. */
     private fun showPing(ms: Long) {
@@ -359,6 +418,14 @@ class MainActivity : AppCompatActivity() {
         val running = state != "stopped"
         tileConns.text = if (running) o.optLong("total").toString() else "—"
         tileLinks.text = if (running) "${o.optInt("healthy")} / ${o.optInt("links")}" else "—"
+        // Сессия — с текущего подключения (её считает ядро и обнуляет при
+        // каждом новом старте), «всего» — копится на телефоне между сеансами,
+        // см. Settings.adBlockTotal и TunnelService.poll.
+        tileBlocked.text = if (running && settings.adBlockEnabled) {
+            "${o.optInt("adsBlocked")} (всего ${settings.adBlockTotal})"
+        } else {
+            "—"
+        }
 
         showPing(if (state == "connected") o.optLong("pingMs") else 0L)
         if (!running) {

@@ -57,6 +57,41 @@ class Settings(context: Context) {
         get() = prefs.getStringSet("filterApps", emptySet()) ?: emptySet()
         set(v) = prefs.edit().putStringSet("filterApps", v).apply()
 
+    /**
+     * Блокировка рекламы и слежки. Выключена по умолчанию — список пуст, пока
+     * человек сам не добавит источник и не нажмёт «Обновить».
+     */
+    var adBlockEnabled: Boolean
+        get() = prefs.getBoolean("adBlockEnabled", false)
+        set(v) = prefs.edit().putBoolean("adBlockEnabled", v).apply()
+
+    /** Источники списков: ссылки http(s):// и/или пути к файлам на телефоне. */
+    var adBlockSources: String
+        get() = prefs.getString("adBlockSources", "") ?: ""
+        set(v) = prefs.edit().putString("adBlockSources", v).apply()
+
+    /** Свои исключения — имена, которые никогда не блокируются. */
+    var adBlockAllowlist: String
+        get() = prefs.getString("adBlockAllowlist", "") ?: ""
+        set(v) = prefs.edit().putString("adBlockAllowlist", v).apply()
+
+    /**
+     * Сколько раз блокировка сработала за всё время — в отличие от счётчика
+     * за сеанс (тот считает ядро и обнуляется при каждом подключении), это
+     * значение копится и переживает переподключения и перезапуск приложения.
+     */
+    var adBlockTotal: Long
+        get() = prefs.getLong("adBlockTotal", 0)
+        set(v) = prefs.edit().putLong("adBlockTotal", v).apply()
+
+    /**
+     * Файл со списком заблокированных имён, один на строку. Готовит его
+     * UpdateBlockLists (ядро на Go) по нажатию кнопки «Обновить» — и он же
+     * читается при каждом подключении, поэтому блокировка работает и без
+     * сети, если список уже был загружен хоть раз.
+     */
+    val adBlockListFile: File get() = File(filesDir, "adblock.list")
+
     val keyFile: File get() = File(filesDir, "id_ed25519")
     val knownHostsFile: File get() = File(filesDir, "known_hosts")
 

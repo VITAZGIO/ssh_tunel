@@ -41,6 +41,21 @@
     <string name="tile_links">КАНАЛОВ SSH</string>
     <string name="pool_hint">каналов SSH</string>
     <string name="direct_note">Адреса, сети и домены, которым туннель не нужен. Локальная сеть и так идёт напрямую. Домен целиком — vitazgio.ru; поддомены — .vitazgio.ru или *.vitazgio.ru (это одно и то же и не включает сам домен — впишите оба варианта, если нужно и то, и другое).</string>
+    <string name="always_on_hint">Хочешь, чтобы туннель поднимался сам при включении телефона и не выключался ни при каких обстоятельствах — в системных настройках: Настройки → Сеть и интернет → VPN → шестерёнка рядом с этим приложением → «Всегда включённый VPN». Там же — «Блокировать соединения без VPN»: если он включён, при обрыве туннеля весь трафик останавливается, а не идёт в обход, — это делает сама система, приложение в это не вмешивается.</string>
+
+    <string name="tile_blocked">ЗАБЛОКИРОВАНО</string>
+
+    <string name="ad_block_enabled">Блокировать рекламу и слежку</string>
+    <string name="ad_block_sources">Списки блокировки</string>
+    <string name="ad_block_sources_hint">ссылка https://… или путь к файлу, по одному в строке</string>
+    <string name="ad_block_sources_note">Форматы hosts и «одно имя в строке» — оба понимаются сразу, можно смешивать. Встроенных списков нет: работает только то, что добавлено здесь.</string>
+    <string name="ad_block_allowlist">Никогда не блокировать</string>
+    <string name="ad_block_allowlist_hint">свои исключения, через запятую или с новой строки</string>
+    <string name="ad_block_update">Обновить список</string>
+    <string name="ad_block_note">Списки загружаются и сохраняются на телефоне только по этой кнопке — сами по себе они не обновляются. После обновления список применится при следующем подключении.</string>
+    <string name="ad_block_updating">Обновляю…</string>
+    <string name="ad_block_updated">загружено имён: %1$d</string>
+    <string name="ad_block_update_failed">не получилось: %1$s</string>
     <string name="need_settings">Заполните адрес сервера, пользователя и ключ</string>
     <string name="saved">Сохранено</string>
     <string name="back">Назад</string>

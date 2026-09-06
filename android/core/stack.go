@@ -52,6 +52,7 @@ type Stats struct {
 	udpDrop   int
 	dnsAsked  int
 	v6Blocked int
+	blocked   int
 	targets   []string
 
 	// seenUDP помнит, о каких адресах уже сообщили: QUIC шлёт пакеты пачками,
@@ -84,6 +85,12 @@ func (s *Stats) dns() {
 	s.dnsAsked++
 }
 
+func (s *Stats) block() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.blocked++
+}
+
 // Snapshot — копия счётчиков без гонок.
 func (s *Stats) Snapshot() (tcpOpen, udpDrop, dnsAsked int, targets []string) {
 	s.mu.Lock()
@@ -92,10 +99,10 @@ func (s *Stats) Snapshot() (tcpOpen, udpDrop, dnsAsked int, targets []string) {
 }
 
 // Counts — счётчики для показа человеку.
-func (s *Stats) Counts() (tcpOpen, udpDrop, dnsAsked, v6Blocked int) {
+func (s *Stats) Counts() (tcpOpen, udpDrop, dnsAsked, v6Blocked, adsBlocked int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.tcpOpen, s.udpDrop, s.dnsAsked, s.v6Blocked
+	return s.tcpOpen, s.udpDrop, s.dnsAsked, s.v6Blocked, s.blocked
 }
 
 // Handler — мост между сетевым стеком и ядром туннеля.
