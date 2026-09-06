@@ -14,7 +14,7 @@ mkdir -p "$OUT/windows" "$OUT/linux"
 export CGO_ENABLED=0
 
 echo "Проверяю тесты..."
-go test ./... >/dev/null
+go test ./...
 
 echo "Собираю иконку..."
 go run tools/mkicon/main.go internal/nativeui/icon-source.png internal/nativeui/icon.ico

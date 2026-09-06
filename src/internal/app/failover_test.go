@@ -268,20 +268,31 @@ func TestWatchFailoverSwitchesOnSustainedReconnecting(t *testing.T) {
 		a.watchFailover(cfg, profiles, 0, 1)
 		close(done)
 	}()
-	time.Sleep(50 * time.Millisecond) // дать горутине подписаться на шину
 
-	// В жизни каждый провал переподключения внутри пула публикует то же
-	// состояние заново (setState ничего не сравнивает с прошлым значением) —
-	// поэтому и здесь событие шлём несколько раз, с паузой больше срока
-	// ожидания, а не один раз.
-	a.Bus.State(events.StateReconnecting, "тестовый обрыв")
-	time.Sleep(failoverGrace + 30*time.Millisecond)
-	a.Bus.State(events.StateReconnecting, "тестовый обрыв")
-
-	select {
-	case <-done:
-	case <-time.After(5 * time.Second):
-		t.Fatal("watchFailover не завершился — переход на запасной не случился")
+	// watchFailover подписывается на шину внутри своей горутины — сколько
+	// именно ждать её планировщику, заранее не угадать, особенно под
+	// нагрузкой всего пакета тестов разом (как в CI). Фиксированная пауза
+	// перед первым событием этого не даёт: событие, отправленное до
+	// подписки, теряется навсегда (обычная семантика pub/sub), и тест
+	// зависает или мигает. Вместо угаданной паузы шлём "тестовый обрыв"
+	// раз в 10мс, пока горутина не завершится сама или не истечёт запас
+	// времени, — reconnectingSince внутри watchFailover выставляется по
+	// ПЕРВОМУ полученному событию, какое бы оно ни было по счёту, поэтому
+	// лишние повторы ничего не портят: как только с момента первого
+	// дошедшего события пройдёт failoverGrace, переход случится сам.
+	deadline := time.After(5 * time.Second)
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+loop:
+	for {
+		select {
+		case <-done:
+			break loop
+		case <-deadline:
+			t.Fatal("watchFailover не завершился — переход на запасной не случился")
+		case <-ticker.C:
+			a.Bus.State(events.StateReconnecting, "тестовый обрыв")
+		}
 	}
 
 	if got := a.EffectiveProfileID(); got != "backup" {

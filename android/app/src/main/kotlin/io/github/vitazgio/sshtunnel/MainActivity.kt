@@ -634,9 +634,11 @@ class MainActivity : AppCompatActivity() {
         val name = parsed.getName()
         val flag = parsed.getFlag()
         val host = parsed.getHost()
-        val sshPort = parsed.getSshPort()
+        // gomobile отдаёт поля Go-типа int как Long — приводим сразу здесь,
+        // чтобы ниже не путаться с типами при сравнении и присваивании в Int.
+        val sshPort = parsed.getSshPort().toInt()
         val user = parsed.getUser()
-        val poolSize = parsed.getPoolSize()
+        val poolSize = parsed.getPoolSize().toInt()
         val filterMode = parsed.getFilterMode()
         val filterApps = parsed.getFilterApps()
         val directHosts = parsed.getDirectHosts()
