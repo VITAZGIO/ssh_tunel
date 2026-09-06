@@ -294,6 +294,62 @@ func TestClientFreezeUnfreezeDisconnect(t *testing.T) {
 	}
 }
 
+func TestClientConfigEndpoint(t *testing.T) {
+	s, pass := newTestServer(t)
+	s.WithClientDefaults("vps.example.com", 2222, "https://panel.example.com/")
+	h := s.Handler()
+	cookies := loggedInCookies(t, h, pass)
+
+	rec, body := doJSON(t, h, http.MethodPost, "/api/clients/create",
+		map[string]string{"name": "Ноутбук", "deviceType": "linux"}, cookies)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("не удалось создать клиента: %d %v", rec.Code, body)
+	}
+	id := body["client"].(map[string]any)["id"].(string)
+
+	rec, body = doJSON(t, h, http.MethodGet, "/api/clients/config?id="+id, nil, cookies)
+	if rec.Code != http.StatusOK || body["ok"] != true {
+		t.Fatalf("ожидал успешный конфиг, получил %d %v", rec.Code, body)
+	}
+	cfg, _ := body["config"].(map[string]any)
+	if cfg == nil {
+		t.Fatalf("ответ должен содержать config: %v", body)
+	}
+	if cfg["host"] != "vps.example.com" || cfg["sshPort"] != float64(2222) {
+		t.Fatalf("неверные host/sshPort в конфиге: %v", cfg)
+	}
+	if cfg["privateKey"] == nil || cfg["privateKey"] == "" {
+		t.Fatal("конфиг должен содержать приватный ключ клиента")
+	}
+	if cfg["qrPngBase64"] == nil || cfg["qrPngBase64"] == "" {
+		t.Fatal("конфиг должен содержать QR-код")
+	}
+}
+
+func TestClientConfigEndpointWithoutSSHHostFails(t *testing.T) {
+	s, pass := newTestServer(t)
+	h := s.Handler()
+	cookies := loggedInCookies(t, h, pass)
+
+	rec, body := doJSON(t, h, http.MethodPost, "/api/clients/create",
+		map[string]string{"name": "Ноутбук", "deviceType": "linux"}, cookies)
+	id := body["client"].(map[string]any)["id"].(string)
+
+	rec, body = doJSON(t, h, http.MethodGet, "/api/clients/config?id="+id, nil, cookies)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("без -ssh-host ожидал 400, получил %d %v", rec.Code, body)
+	}
+}
+
+func TestClientConfigEndpointRequiresAuth(t *testing.T) {
+	s, _ := newTestServer(t)
+	h := s.Handler()
+	rec, _ := doJSON(t, h, http.MethodGet, "/api/clients/config?id=tun_0000000000000000", nil, nil)
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("без сессии ожидал 401, получил %d", rec.Code)
+	}
+}
+
 func TestClientActionsRequireAuth(t *testing.T) {
 	s, _ := newTestServer(t)
 	h := s.Handler()

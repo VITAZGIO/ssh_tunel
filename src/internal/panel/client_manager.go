@@ -292,3 +292,10 @@ func (m *ClientManager) List() []Client {
 	}
 	return list
 }
+
+// Get отдаёт одного клиента целиком, включая приватный ключ — в отличие от
+// List, это ручка для конкретного действия «Показать настройки» (ТЗ-10), не
+// для общего списка, который могут увидеть посторонние глаза на экране.
+func (m *ClientManager) Get(id string) (Client, bool) {
+	return m.store.Get(id)
+}

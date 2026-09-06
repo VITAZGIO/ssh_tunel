@@ -169,19 +169,40 @@
       <button class="btn ghost" id="cancelClientBtn" style="margin-top:8px" data-i18n="cancel">Отмена</button>
     </div>
 
-    <!-- ---------- приватный ключ нового клиента ---------- -->
-    <div class="card" id="newClientKeyCard" hidden>
-      <h1 data-i18n="client_key_title">Ключ клиента готов</h1>
-      <p class="note" data-i18n="client_key_note">Это единственный раз, когда панель
+    <!-- ---------- настройки клиента: QR, буфер обмена, файл ---------- -->
+    <div class="card" id="clientConfigCard" hidden>
+      <h1 id="clientConfigTitle" data-i18n="client_key_title">Ключ клиента готов</h1>
+      <p class="note" id="clientConfigNote" data-i18n="client_key_note">Это единственный раз, когда панель
         показывает приватный ключ сам, без нажатия «Показать настройки» в списке.
         Сохрани его сейчас — он понадобится, чтобы подключить устройство.</p>
+      <div id="clientConfigMsg"></div>
+
+      <div style="text-align:center;margin-bottom:14px">
+        <img id="clientConfigQR" alt="QR" style="width:200px;height:200px;border-radius:8px;
+             background:#fff;padding:8px">
+        <p class="note" style="margin:8px 0 0" data-i18n="qr_hint">Отсканируй в приложении на телефоне</p>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="btn" id="copyClientConfigBtn" data-i18n="copy_config">Скопировать</button>
+        <button class="btn ghost" id="downloadClientConfigBtn" data-i18n="download_config">Скачать файл</button>
+      </div>
+
+      <p class="ptitle" style="font-size:12px;color:var(--dim);text-transform:uppercase;
+         letter-spacing:.6px;margin:0 0 8px" data-i18n="manual_entry_title">Или впиши руками</p>
+      <div class="field"><label data-i18n="host_label">Адрес сервера</label>
+        <input type="text" id="clientConfigHost" readonly></div>
+      <div class="field"><label data-i18n="port_label">Порт</label>
+        <input type="text" id="clientConfigPort" readonly></div>
+      <div class="field"><label data-i18n="user_label">Пользователь</label>
+        <input type="text" id="clientConfigUser" readonly></div>
       <div class="field">
         <label data-i18n="private_key_label">Приватный ключ</label>
-        <textarea id="newClientKeyText" readonly rows="6"
+        <textarea id="clientConfigKey" readonly rows="6"
           style="width:100%;font-family:var(--mono);font-size:11.5px;background:var(--card2);
                  border:1px solid var(--line);border-radius:8px;padding:8px;resize:vertical"></textarea>
       </div>
-      <button class="btn ghost" id="closeClientKeyBtn" data-i18n="close">Закрыть</button>
+      <button class="btn ghost" id="closeClientConfigBtn" data-i18n="close">Закрыть</button>
     </div>
 
     <div class="card">
@@ -243,6 +264,15 @@ const I18N = {
     delete_client:'Удалить', confirm_delete_client:'Удалить этого клиента? '+
       'Его ключ перестанет работать, системная учётная запись будет стёрта.',
     freeze_client:'Заморозить', unfreeze_client:'Разморозить', disconnect_client:'Отключить',
+    show_settings:'Показать настройки',
+    client_settings_title:'Настройки клиента',
+    client_settings_note:'Приватный ключ клиента — храни его так же бережно, как пароль от '+
+      'сервера: с ним можно подключиться от имени этого устройства.',
+    qr_hint:'Отсканируй в приложении на телефоне',
+    copy_config:'Скопировать', download_config:'Скачать файл',
+    manual_entry_title:'Или впиши руками',
+    host_label:'Адрес сервера', port_label:'Порт', user_label:'Пользователь',
+    copied:'Скопировано в буфер обмена', copy_failed:'Не удалось скопировать — используй файл',
     state_active:'активен', state_frozen:'заморожен',
     traffic_down:'принято', traffic_up:'отдано',
     sessions_online:'на связи ({n})', last_seen:'был на связи', never_connected:'ещё не подключался',
@@ -281,6 +311,15 @@ const I18N = {
     delete_client:'Delete', confirm_delete_client:'Delete this client? '+
       'Its key will stop working and the system account will be erased.',
     freeze_client:'Freeze', unfreeze_client:'Unfreeze', disconnect_client:'Disconnect',
+    show_settings:'Show settings',
+    client_settings_title:'Client settings',
+    client_settings_note:'The client\'s private key — keep it as safely as the server '+
+      'password: it lets someone connect as this device.',
+    qr_hint:'Scan it in the app on the phone',
+    copy_config:'Copy', download_config:'Download file',
+    manual_entry_title:'Or enter it by hand',
+    host_label:'Server address', port_label:'Port', user_label:'User',
+    copied:'Copied to clipboard', copy_failed:'Could not copy — use the file instead',
     state_active:'active', state_frozen:'frozen',
     traffic_down:'down', traffic_up:'up',
     sessions_online:'online ({n})', last_seen:'last seen', never_connected:'never connected',
@@ -414,11 +453,16 @@ function renderClients(list){
     disconnectBtn.className = 'btn ghost small';
     disconnectBtn.textContent = t('disconnect_client');
     disconnectBtn.addEventListener('click', () => clientAction('disconnect', c.id));
+    const settingsBtn = document.createElement('button');
+    settingsBtn.className = 'btn ghost small';
+    settingsBtn.textContent = t('show_settings');
+    settingsBtn.addEventListener('click', () => showClientConfig(c.id, false));
     const del = document.createElement('button');
     del.className = 'btn danger small';
     del.textContent = t('delete_client');
     del.addEventListener('click', () => deleteClient(c.id));
-    actions.appendChild(freezeBtn); actions.appendChild(disconnectBtn); actions.appendChild(del);
+    actions.appendChild(freezeBtn); actions.appendChild(disconnectBtn);
+    actions.appendChild(settingsBtn); actions.appendChild(del);
 
     row.appendChild(top); row.appendChild(meta); row.appendChild(actions);
     el.appendChild(row);
@@ -465,14 +509,53 @@ $('createClientBtn').addEventListener('click', async () => {
   $('createClientBtn').disabled = false;
   if (!ok){ showMsg($('addClientMsg'), errText(data.error, data), 'err'); return; }
   $('addClientForm').hidden = true;
-  $('newClientKeyText').value = data.client.privateKey || '';
-  $('newClientKeyCard').hidden = false;
   loadClients();
+  showClientConfig(data.client.id, true);
 });
 
-$('closeClientKeyBtn').addEventListener('click', () => {
-  $('newClientKeyText').value = '';
-  $('newClientKeyCard').hidden = true;
+/* ---------- показать настройки: QR / буфер / файл ---------- */
+let currentConfigFilename = 'ssh_tunnel.json';
+let currentConfigJSON = '';
+
+async function showClientConfig(id, justCreated){
+  showMsg($('clientConfigMsg'), '', '');
+  $('clientConfigTitle').textContent = t(justCreated ? 'client_key_title' : 'client_settings_title');
+  $('clientConfigNote').textContent = t(justCreated ? 'client_key_note' : 'client_settings_note');
+  const {ok, data} = await api('/api/clients/config?id=' + encodeURIComponent(id));
+  if (!ok){ showMsg($('clientConfigMsg'), errText(data.error, data), 'err'); return; }
+  const cfg = data.config;
+  $('clientConfigQR').src = 'data:image/png;base64,' + cfg.qrPngBase64;
+  $('clientConfigHost').value = cfg.host;
+  $('clientConfigPort').value = cfg.sshPort;
+  $('clientConfigUser').value = cfg.user;
+  $('clientConfigKey').value = cfg.privateKey;
+  currentConfigFilename = 'ssh_tunnel-' + cfg.user + '.json';
+  currentConfigJSON = cfg.json;
+  $('clientConfigCard').hidden = false;
+}
+
+$('copyClientConfigBtn').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(currentConfigJSON);
+    showMsg($('clientConfigMsg'), t('copied'), 'ok');
+  } catch (e) {
+    showMsg($('clientConfigMsg'), t('copy_failed'), 'err');
+  }
+});
+
+$('downloadClientConfigBtn').addEventListener('click', () => {
+  const blob = new Blob([currentConfigJSON], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = currentConfigFilename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+$('closeClientConfigBtn').addEventListener('click', () => {
+  $('clientConfigKey').value = '';
+  currentConfigJSON = '';
+  $('clientConfigCard').hidden = true;
 });
 
 $('loginBtn').addEventListener('click', async () => {

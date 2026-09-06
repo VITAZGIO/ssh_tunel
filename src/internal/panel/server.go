@@ -24,6 +24,17 @@ type Server struct {
 	// startedAt — с какого момента считать время работы панели на экране
 	// статуса.
 	startedAt time.Time
+
+	// sshHost/sshPort/panelURL — то, что идёт в конфиг клиента (ТЗ-10):
+	// адрес и порт SSH, на который клиенту подключаться (это адрес самого
+	// сервера, не панели), и адрес самой панели — он попадает в поле Panel
+	// формата share.Doc, чтобы приложение клиента могло показать, чем этот
+	// сервер выдан (ТЗ-12). sshHost пустым быть не должно в проде — если он
+	// не задан, /api/clients/config отвечает понятной ошибкой вместо
+	// конфига без адреса.
+	sshHost  string
+	sshPort  int
+	panelURL string
 }
 
 func NewServer(store *Store, clients *ClientManager) *Server {
@@ -34,6 +45,14 @@ func NewServer(store *Store, clients *ClientManager) *Server {
 		clients:   clients,
 		startedAt: time.Now(),
 	}
+}
+
+// WithClientDefaults задаёт значения для конфигов клиентов (ТЗ-10) —
+// отдельным шагом, а не параметром NewServer, чтобы существующие тесты и
+// вызовы не разрослись сразу тремя новыми обязательными аргументами.
+func (s *Server) WithClientDefaults(sshHost string, sshPort int, panelURL string) *Server {
+	s.sshHost, s.sshPort, s.panelURL = sshHost, sshPort, panelURL
+	return s
 }
 
 // Handler собирает маршруты в http.Handler — вызывающий код сам решает, как
@@ -52,6 +71,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/clients/freeze", s.requireAuth(s.handleClientFreeze))
 	mux.HandleFunc("/api/clients/unfreeze", s.requireAuth(s.handleClientUnfreeze))
 	mux.HandleFunc("/api/clients/disconnect", s.requireAuth(s.handleClientDisconnect))
+	mux.HandleFunc("/api/clients/config", s.requireAuth(s.handleClientConfig))
 	return mux
 }
 
@@ -301,6 +321,26 @@ func (s *Server) handleClientUnfreeze(w http.ResponseWriter, r *http.Request) {
 // ключ — клиент может подключиться заново сам сразу же.
 func (s *Server) handleClientDisconnect(w http.ResponseWriter, r *http.Request) {
 	s.handleClientAction(w, r, s.clients.Disconnect)
+}
+
+// handleClientConfig отдаёт готовый конфиг клиента для «Показать настройки»
+// (ТЗ-10): JSON для копирования/скачивания, QR того же содержимого и те же
+// значения текстом. Приватный ключ в ответе есть — эта ручка и существует
+// ровно затем, чтобы показать его по явному действию, в отличие от
+// /api/clients, где его нет никогда.
+func (s *Server) handleClientConfig(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("id")
+	c, ok := s.clients.Get(id)
+	if !ok {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "client_not_found"})
+		return
+	}
+	payload, err := BuildClientConfigPayload(c, s.sshHost, s.sshPort, s.panelURL)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "config": payload})
 }
 
 // handleClientAction — общий каркас для ручек, которые принимают только id

@@ -53,6 +53,12 @@ func main() {
 		"TLS-терминацию на nginx/Caddy перед собой")
 	dataDir := flag.String("data-dir", defaultDataDir(), "папка с учётными записями панели "+
 		"и, при -domain, кешем сертификатов")
+	sshHost := flag.String("ssh-host", "", "адрес, на который клиентам подключаться по SSH "+
+		"(это адрес сервера, не панели) — по умолчанию совпадает с -domain, если он задан")
+	sshPort := flag.Int("ssh-port", 22, "SSH-порт сервера — тот, что попадает в конфиг клиента")
+	publicURL := flag.String("public-url", "", "адрес самой панели, каким его увидит клиент "+
+		"(например https://panel.example.com/) — по умолчанию собирается из -domain; "+
+		"попадает в конфиг клиента, чтобы его программа могла показать, чем сервер выдан")
 	flag.Parse()
 
 	store, err := panel.OpenStore(filepath.Join(*dataDir, "users.json"))
@@ -83,7 +89,20 @@ func main() {
 		WithWarnf(func(format string, args ...any) { log.Printf(format, args...) })
 	go syncClientsLoop(clients, accountant)
 
-	srv := panel.NewServer(store, clients)
+	effectiveSSHHost := *sshHost
+	if effectiveSSHHost == "" {
+		effectiveSSHHost = *domain
+	}
+	effectivePublicURL := *publicURL
+	if effectivePublicURL == "" && *domain != "" {
+		effectivePublicURL = "https://" + *domain + "/"
+	}
+	if effectiveSSHHost == "" {
+		log.Printf("не задан -ssh-host и -domain — конфиги для новых клиентов (ТЗ-10) " +
+			"придётся донастраивать вручную, пока один из флагов не будет задан")
+	}
+
+	srv := panel.NewServer(store, clients).WithClientDefaults(effectiveSSHHost, *sshPort, effectivePublicURL)
 	handler := srv.Handler()
 
 	if *domain != "" {
