@@ -177,7 +177,7 @@
         Сохрани его сейчас — он понадобится, чтобы подключить устройство.</p>
       <div id="clientConfigMsg"></div>
 
-      <div style="text-align:center;margin-bottom:14px">
+      <div id="clientConfigQRBox" style="text-align:center;margin-bottom:14px">
         <img id="clientConfigQR" alt="QR" style="width:200px;height:200px;border-radius:8px;
              background:#fff;padding:8px">
         <p class="note" style="margin:8px 0 0" data-i18n="qr_hint">Отсканируй в приложении на телефоне</p>
@@ -524,6 +524,9 @@ async function showClientConfig(id, justCreated){
   const {ok, data} = await api('/api/clients/config?id=' + encodeURIComponent(id));
   if (!ok){ showMsg($('clientConfigMsg'), errText(data.error, data), 'err'); return; }
   const cfg = data.config;
+  // QR — только для телефона: сканировать его на самом компьютере, для
+  // которого он показан, нечем и незачем — там нужен файл или буфер обмена.
+  $('clientConfigQRBox').hidden = cfg.deviceType !== 'android';
   $('clientConfigQR').src = 'data:image/png;base64,' + cfg.qrPngBase64;
   $('clientConfigHost').value = cfg.host;
   $('clientConfigPort').value = cfg.sshPort;
@@ -534,11 +537,32 @@ async function showClientConfig(id, justCreated){
   $('clientConfigCard').hidden = false;
 }
 
+// navigator.clipboard требует безопасный контекст (HTTPS или localhost) —
+// панель в режиме --lan без домена отдаётся по голому HTTP на адрес в сети,
+// и там этого API у браузера просто нет. Второй способ — временный textarea
+// и document.execCommand('copy') — устарел, но работает и без HTTPS, поэтому
+// это не запасной вариант «на всякий случай», а основной путь для --lan.
+async function copyText(text){
+  if (navigator.clipboard && window.isSecureContext) {
+    try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* попробуем иначе */ }
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  document.body.removeChild(ta);
+  return ok;
+}
+
 $('copyClientConfigBtn').addEventListener('click', async () => {
-  try {
-    await navigator.clipboard.writeText(currentConfigJSON);
+  if (await copyText(currentConfigJSON)) {
     showMsg($('clientConfigMsg'), t('copied'), 'ok');
-  } catch (e) {
+  } else {
     showMsg($('clientConfigMsg'), t('copy_failed'), 'err');
   }
 });

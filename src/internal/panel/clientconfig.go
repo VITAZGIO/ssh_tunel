@@ -64,12 +64,13 @@ func BuildClientDoc(c Client, sshHost string, sshPort int, panelURL string) (sha
 // сканирования телефоном) и те же значения текстом — на случай, если их
 // проще вписать руками, чем сканировать или импортировать файлом.
 type ClientConfigPayload struct {
-	JSON        string `json:"json"`
-	QRPngBase64 string `json:"qrPngBase64"`
-	Host        string `json:"host"`
-	SSHPort     int    `json:"sshPort"`
-	User        string `json:"user"`
-	PrivateKey  string `json:"privateKey"`
+	JSON        string     `json:"json"`
+	QRPngBase64 string     `json:"qrPngBase64"`
+	Host        string     `json:"host"`
+	SSHPort     int        `json:"sshPort"`
+	User        string     `json:"user"`
+	PrivateKey  string     `json:"privateKey"`
+	DeviceType  DeviceType `json:"deviceType"`
 }
 
 // BuildClientConfigPayload собирает всё, что нужно /api/clients/config
@@ -95,5 +96,6 @@ func BuildClientConfigPayload(c Client, sshHost string, sshPort int, panelURL st
 		SSHPort:     doc.SSHPort,
 		User:        doc.User,
 		PrivateKey:  c.PrivateKey,
+		DeviceType:  c.DeviceType,
 	}, nil
 }
