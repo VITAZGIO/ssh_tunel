@@ -104,7 +104,10 @@ func runVpsSetup(bus *events.Bus, p vpsSetupParams) (err error) {
 	bus.VpsSetupLine("key", "Вход по ключу работает")
 
 	bus.VpsSetupLine("harden", "Запускаю базовую защиту сервера (harden.sh)")
-	hardenScript, err := renderHarden(hardenParams{NewUser: "admin", SSHPort: p.Port, Timezone: ""})
+	// NewUser пустой: отдельный sudo-пользователь тут не нужен, вход и так
+	// уже под root по ключу — заводить его просто ради заведения было бы
+	// лишним шагом. Пользователь для самого туннеля появится следующим шагом.
+	hardenScript, err := renderHarden(hardenParams{NewUser: "", SSHPort: p.Port, Timezone: ""})
 	if err != nil {
 		return err
 	}

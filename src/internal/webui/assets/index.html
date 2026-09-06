@@ -182,6 +182,13 @@
           border-radius:8px;padding:9px 34px 9px 10px;font-family:var(--mono);
           font-size:11px;line-height:1.45;word-break:break-all;
           -webkit-user-select:text;user-select:text;color:var(--text)}
+  /* Глобальный сброс "*{user-select:none}" выше метит КАЖДЫЙ элемент
+     напрямую, а не только через наследование — родительского user-select:text
+     на .cmdbox для текста внутри (span с самой командой) недостаточно:
+     прямое правило всегда перебивает унаследованное значение, даже если у
+     прямого правила специфичность ниже. Без этой строки сам текст команды
+     мышью не выделялся, хотя выглядело так, будто выделение включено. */
+  .cmdbox *{-webkit-user-select:text;user-select:text}
   .cmdbox .cp{position:absolute;top:6px;right:6px;width:22px;height:22px;
               border-radius:6px;border:1px solid var(--line);background:var(--card);
               color:var(--dim);cursor:pointer;display:grid;place-items:center;padding:0}
@@ -237,7 +244,7 @@
          border:1px solid var(--line);color:var(--dim);font-size:10px;font-weight:700;
          cursor:help;flex:none;margin-top:2px}
   .infoq .tip{display:none;position:absolute;left:0;top:20px;z-index:30;width:240px;
-              max-width:60vw;background:var(--card);border:1px solid var(--line);
+              max-width:calc(100vw - 32px);background:var(--card);border:1px solid var(--line);
               border-radius:9px;padding:9px 11px;font-size:11.5px;font-weight:400;
               color:var(--text);line-height:1.4;box-shadow:0 8px 22px rgba(0,0,0,.4);
               cursor:auto}
@@ -652,11 +659,11 @@
       <div id="bootBlock" hidden>
         <label class="chk"><input type="checkbox" id="bootStart">
           <span class="lbl" data-i18n="boot_start">Запускать при старте системы</span>
-          <span class="infoq" onclick="event.preventDefault();event.stopPropagation();this.classList.toggle('show')">?<span class="tip" id="bootNote"></span></span></label>
+          <span class="infoq" onclick="event.preventDefault();event.stopPropagation();toggleInfoq(this)">?<span class="tip" id="bootNote"></span></span></label>
 
         <label class="chk" id="autoConnectRow"><input type="checkbox" id="autoConnect">
           <span class="lbl" data-i18n="connect_on_launch">Подключаться сразу при запуске</span>
-          <span class="infoq" onclick="event.preventDefault();event.stopPropagation();this.classList.toggle('show')">?<span class="tip" data-i18n="autoconnect_note">Туннель поднимется сам, как только
+          <span class="infoq" onclick="event.preventDefault();event.stopPropagation();toggleInfoq(this)">?<span class="tip" data-i18n="autoconnect_note">Туннель поднимется сам, как только
             программа стартует (сейчас или после перезагрузки) — жать «Подключить»
             в панели не придётся. Выключи, если хочешь запускать вручную.</span></span></label>
 
@@ -763,7 +770,7 @@
 
       <label class="chk"><input type="radio" name="wzKeyMode" id="wzKeyModeOwn">
         <span class="lbl" data-i18n="wizard_key_mode_own">Сделать отдельный ключ для телефона</span>
-        <span class="infoq" onclick="event.preventDefault();event.stopPropagation();this.classList.toggle('show')">?<span class="tip" data-i18n="wizard_key_mode_own_note">Отдельный ключ можно потом отозвать на
+        <span class="infoq" onclick="event.preventDefault();event.stopPropagation();toggleInfoq(this)">?<span class="tip" data-i18n="wizard_key_mode_own_note">Отдельный ключ можно потом отозвать на
           сервере, не трогая ключ компьютера.</span></span></label>
 
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0">
@@ -810,8 +817,8 @@
         firewall, бан за перебор, автообновления и отдельный пользователь для туннеля.</p>
 
       <div class="two">
-        <div class="field"><label for="wzNewUser" data-i18n="wizard_admin_user">Обычный пользователь</label>
-          <input type="text" id="wzNewUser" spellcheck="false" value="admin"></div>
+        <div class="field"><label for="wzNewUser" data-i18n="wizard_admin_user">Обычный пользователь (необязательно)</label>
+          <input type="text" id="wzNewUser" spellcheck="false" data-i18n-ph="wizard_admin_user_ph"></div>
         <div class="field"><label for="wzSshPort" data-i18n="wizard_ssh_port">SSH-порт</label>
           <input type="number" id="wzSshPort" min="1" max="65535" value="22"></div>
       </div>
@@ -841,6 +848,7 @@
         </div>
       </div>
     </div>
+  </div><!-- /view viewWizard -->
   <!-- НАСТРОЙКА VPS -->
   <div class="view" id="viewVpsSetup">
     <div class="head">
@@ -1092,7 +1100,8 @@ const I18N = {
     wizard_qr_step:'Отсканируй на телефоне или нажми на код, чтобы скопировать настройки текстом',
     wizard_key:'Приватный ключ',
     wizard_vps_intro:'Готовые команды для нового сервера — вставить целиком на нём под root. Что настраивают: ключи вместо паролей, firewall, бан за перебор, автообновления и отдельный пользователь для туннеля.',
-    wizard_admin_user:'Обычный пользователь', wizard_ssh_port:'SSH-порт',
+    wizard_admin_user:'Обычный пользователь (необязательно)', wizard_admin_user_ph:'пусто = не заводить, останется root',
+    wizard_ssh_port:'SSH-порт',
     wizard_tunnel_user:'Пользователь туннеля', wizard_timezone:'Часовой пояс',
     wizard_tunnel_key:'Открытый ключ туннеля (необязательно)',
     wizard_tunnel_key_ph:'пусто = взять ключи root',
@@ -1238,7 +1247,8 @@ const I18N = {
     wizard_qr_step:'Scan it on the phone, or click the code to copy the settings as text',
     wizard_key:'Private key',
     wizard_vps_intro:'Ready-made commands for a new server — paste the whole thing on it as root. What they set up: keys instead of passwords, a firewall, a ban after failed logins, automatic updates, and a separate user just for the tunnel.',
-    wizard_admin_user:'Regular user', wizard_ssh_port:'SSH port',
+    wizard_admin_user:'Regular user (optional)', wizard_admin_user_ph:'empty = skip, stay on root',
+    wizard_ssh_port:'SSH port',
     wizard_tunnel_user:'Tunnel user', wizard_timezone:'Timezone',
     wizard_tunnel_key:'Tunnel public key (optional)',
     wizard_tunnel_key_ph:'empty = reuse root\'s keys',
@@ -1482,6 +1492,33 @@ document.addEventListener('click', ev => {
   document.querySelectorAll('.infoq.show').forEach(el => {
     if(!el.contains(ev.target)) el.classList.remove('show');
   });
+});
+
+// toggleInfoq — как обычный toggle('show'), но перед показом ещё и
+// подгоняет всплывающий текст под ширину окна: сама подсказка привязана
+// left:0 к значку, а окно программы узкое (около 400px), и если значок
+// стоит правее середины строки, фиксированные 240px ширины вылезают за
+// правый край — с этим же сталкивается и наведение мышью, поэтому позиция
+// пересчитывается и при простом hover, не только по клику.
+function positionInfoqTip(el){
+  const tip = el.querySelector('.tip');
+  if(!tip) return;
+  tip.style.left = '0px';
+  const margin = 10;
+  const rect = el.getBoundingClientRect();
+  const tw = tip.offsetWidth;
+  let left = 0;
+  const overflowRight = rect.left + tw - (window.innerWidth - margin);
+  if(overflowRight > 0) left -= overflowRight;
+  if(rect.left + left < margin) left = margin - rect.left;
+  tip.style.left = left + 'px';
+}
+function toggleInfoq(el){
+  positionInfoqTip(el);
+  el.classList.toggle('show');
+}
+document.querySelectorAll('.infoq').forEach(el => {
+  el.addEventListener('mouseenter', () => positionInfoqTip(el));
 });
 
 $('addApp').onclick = ev => {
@@ -1988,8 +2025,16 @@ function showSpeed(v){
 // выполняются в PowerShell. На сервере (Linux) программа работает на самом
 // сервере — те же шаги, но в обычном bash: другой путь по умолчанию и другие
 // команды создания/показа ключа. Пока первый ответ /api/status не пришёл,
-// считаем Windows — так было исторически, и это безопасный запасной вариант.
-let OS = 'windows';
+// isWindows() считает Windows — это безопасный запасной вариант.
+//
+// OS начинается с null, а не сразу с 'windows': разница important для
+// refresh() ниже, который применяет видимость OS-зависимых строк настроек
+// только when "st.os !== OS" — если бы по умолчанию OS уже была 'windows',
+// то на настоящей Windows-машине st.os тоже 'windows', разница никогда бы
+// не обнаружилась, и блок с $('autoStartRow')/$('autoConnectRow') не
+// выполнился бы ни разу — обе галочки «Подключаться сразу при запуске»
+// остались бы видны одновременно (ровно так и было).
+let OS = null;
 function isWindows(){ return OS !== 'linux' && OS !== 'darwin'; }
 function keyfile(){ return isWindows() ? '$env:USERPROFILE\\.ssh\\id_ed25519' : '~/.ssh/id_ed25519'; }
 

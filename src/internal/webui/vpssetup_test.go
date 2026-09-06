@@ -322,8 +322,10 @@ func TestRunVpsSetupFullFlow(t *testing.T) {
 	if !srv.hasScriptContaining(fmt.Sprintf("SSH_PORT=%d", port)) {
 		t.Error("harden.sh не получил правильный SSH_PORT")
 	}
-	if !srv.hasScriptContaining(`NEW_USER="admin"`) {
-		t.Error("harden.sh не получил NEW_USER")
+	// NEW_USER пустой: отдельного sudo-пользователя автоматический мастер не
+	// заводит, вход и так уже под root по ключу.
+	if !srv.hasScriptContaining(`NEW_USER=""`) {
+		t.Error("harden.sh должен получить пустой NEW_USER")
 	}
 	if !srv.hasScriptContaining(`TUNNEL_USER="tunnel"`) {
 		t.Error("tunnel-user.sh не запустился")

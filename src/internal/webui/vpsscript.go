@@ -122,11 +122,12 @@ func (s *Server) handleVPSScript(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Пустое поле — осознанный выбор «не заводить отдельного sudo-пользователя»
+	// (harden.sh.tmpl сам это умеет, см. комментарий у NEW_USER там), а не
+	// повод молча подставить "admin": лишний пользователь на сервере — не то,
+	// что должно появляться само по себе, если поле просто не тронули.
 	newUser := strings.TrimSpace(req.NewUser)
-	if newUser == "" {
-		newUser = "admin"
-	}
-	if !usernameRe.MatchString(newUser) {
+	if newUser != "" && !usernameRe.MatchString(newUser) {
 		writeJSON(w, map[string]string{"error": "имя пользователя: только латиница, цифры, «-» и «_», с буквы"})
 		return
 	}
