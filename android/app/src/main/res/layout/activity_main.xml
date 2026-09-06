@@ -451,6 +451,12 @@
                     android:inputType="text" android:hint="@string/custom_flag_name"
                     android:textColorHint="@color/dim" android:autofillHints="" />
 
+                <Button
+                    android:id="@+id/removeProfileBtn"
+                    style="@style/SecondaryButton"
+                    android:layout_marginBottom="10dp"
+                    android:text="@string/remove_server" />
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -478,31 +484,12 @@
                         android:focusable="true" />
                 </LinearLayout>
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
+                <Button
+                    android:id="@+id/selectServerBtn"
+                    style="@style/SecondaryButton"
                     android:layout_marginTop="4dp"
                     android:layout_marginBottom="14dp"
-                    android:orientation="horizontal">
-
-                    <Button
-                        android:id="@+id/selectServerBtn"
-                        style="@style/SecondaryButton"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="match_parent"
-                        android:text="@string/select_this_server" />
-
-                    <Space android:layout_width="8dp" android:layout_height="1dp" />
-
-                    <Button
-                        android:id="@+id/removeProfileBtn"
-                        style="@style/SecondaryButton"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="match_parent"
-                        android:text="@string/remove_server" />
-                </LinearLayout>
+                    android:text="@string/select_this_server" />
 
                 <!-- Настройки сервера (сворачиваемый блок) -->
                 <LinearLayout
