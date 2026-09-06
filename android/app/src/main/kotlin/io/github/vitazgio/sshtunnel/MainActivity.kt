@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
@@ -70,6 +71,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tileConns: TextView
     private lateinit var tileLinks: TextView
 
+    private lateinit var issuedByPanel: TextView
     private lateinit var hostEdit: EditText
     private lateinit var portEdit: EditText
     private lateinit var poolEdit: EditText
@@ -152,6 +154,7 @@ class MainActivity : AppCompatActivity() {
         tileConns = findViewById(R.id.tileConns)
         tileLinks = findViewById(R.id.tileLinks)
 
+        issuedByPanel = findViewById(R.id.issuedByPanel)
         hostEdit = findViewById(R.id.host)
         portEdit = findViewById(R.id.port)
         poolEdit = findViewById(R.id.pool)
@@ -465,6 +468,21 @@ class MainActivity : AppCompatActivity() {
     // ---------------------------------------------------------------------
 
     private fun loadProfileIntoForm(p: Settings.Profile) {
+        if (p.panel.isBlank()) {
+            issuedByPanel.visibility = View.GONE
+        } else {
+            issuedByPanel.visibility = View.VISIBLE
+            issuedByPanel.text = getString(R.string.issued_by_panel, p.deviceName.ifBlank { p.name })
+            issuedByPanel.setOnClickListener {
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(p.panel)))
+                } catch (e: Exception) {
+                    // Нет браузера или адрес некорректен — тихо игнорируем,
+                    // строка и так только подсказка, а не единственный способ
+                    // добраться до панели.
+                }
+            }
+        }
         hostEdit.setText(p.host)
         portEdit.setText(p.sshPort.toString())
         poolEdit.setText(p.poolSize.toString())
@@ -575,6 +593,8 @@ class MainActivity : AppCompatActivity() {
         val localViaTunnel = parsed.getLocalViaTunnel()
         val keyIncluded = parsed.getKeyIncluded()
         val keyContents = parsed.getKeyContents()
+        val panel = parsed.getPanel()
+        val deviceName = parsed.getDeviceName()
 
         saveCurrentFormInto(editingProfileId)
         val p = settings.addProfile(name, flag)
@@ -586,6 +606,8 @@ class MainActivity : AppCompatActivity() {
         p.filterApps = filterApps.split("\n").map { it.trim() }.filter { it.isNotBlank() }.toMutableSet()
         p.directHosts = directHosts
         p.localViaTunnel = localViaTunnel
+        p.panel = panel
+        p.deviceName = deviceName
         settings.saveProfile(p)
 
         if (keyIncluded && keyContents.isNotBlank()) {

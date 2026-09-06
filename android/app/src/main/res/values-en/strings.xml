@@ -61,6 +61,10 @@
     <string name="server_settings">Server settings</string>
     <string name="general_settings">General app settings</string>
 
+    <!-- Server was issued by a VPS web panel (ТЗ-07…10) — shown only when the
+         config has a panel field; %1$s is the device name from the panel. -->
+    <string name="issued_by_panel">This server was issued by a panel · %1$s</string>
+
     <!-- Note under "Route the local network through the server too" -->
     <string name="local_via_tunnel_note">Off by default: otherwise home devices (printer, NAS, smart home) would stop being reachable while the tunnel is on. Turn it on only if you need the server\'s own internal network.</string>
 

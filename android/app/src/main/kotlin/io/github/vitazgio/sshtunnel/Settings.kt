@@ -34,6 +34,12 @@ class Settings(context: Context) {
         var localViaTunnel: Boolean,
         var filterMode: String,
         var filterApps: MutableSet<String>,
+        // panel/deviceName — заполняются только при импорте конфига,
+        // выданного веб-панелью на VPS (internal/share, поля версии 2).
+        // Сервер, настроенный руками, их не имеет — panel остаётся пустым,
+        // и экран настроек ничего дополнительного не показывает.
+        var panel: String = "",
+        var deviceName: String = "",
     )
 
     private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
@@ -122,6 +128,7 @@ class Settings(context: Context) {
             val apps = JSONArray()
             p.filterApps.forEach { apps.put(it) }
             o.put("filterApps", apps)
+            o.put("panel", p.panel); o.put("deviceName", p.deviceName)
             arr.put(o)
         }
         return arr.toString()
@@ -150,6 +157,8 @@ class Settings(context: Context) {
                         localViaTunnel = o.optBoolean("localViaTunnel", false),
                         filterMode = o.optString("filterMode", "all"),
                         filterApps = apps,
+                        panel = o.optString("panel", ""),
+                        deviceName = o.optString("deviceName", ""),
                     )
                 )
             }

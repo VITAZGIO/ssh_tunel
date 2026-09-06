@@ -460,6 +460,12 @@ type ParsedConfig struct {
 	LocalViaTunnel bool
 	KeyIncluded    bool
 	KeyContents    string
+	// Panel/DeviceName — заполнены, только если конфиг выдан веб-панелью на
+	// VPS (internal/share, поля версии 2). У сервера, настроенного руками,
+	// Panel пустой — по нему экран настроек решает, показывать ли строку
+	// «Этот сервер выдан панелью».
+	Panel      string
+	DeviceName string
 }
 
 // ParseConfig разбирает текст, вставленный из буфера обмена или считанный из
@@ -481,6 +487,8 @@ func ParseConfig(text string) (*ParsedConfig, error) {
 		LocalViaTunnel: doc.LocalViaTunnel,
 		KeyIncluded:    doc.KeyIncluded,
 		KeyContents:    doc.KeyContents,
+		Panel:          doc.Panel,
+		DeviceName:     doc.DeviceName,
 	}, nil
 }
 

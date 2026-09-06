@@ -47,6 +47,7 @@ func (s *Server) handleProfileExport(w http.ResponseWriter, r *http.Request) {
 		SocksPort: p.SocksPort, HTTPPort: p.HTTPPort, PoolSize: p.PoolSize,
 		FilterMode: p.FilterMode, FilterApps: p.FilterApps, DirectHosts: p.DirectHosts,
 		LocalViaTunnel: p.LocalViaTunnel,
+		Panel:          p.Panel, ClientID: p.ClientID, DeviceName: p.DeviceName,
 	}
 	if req.IncludeKey {
 		data, err := os.ReadFile(p.KeyPath)
@@ -109,6 +110,7 @@ func (s *Server) handleProfileImport(w http.ResponseWriter, r *http.Request) {
 	p.SocksPort, p.HTTPPort, p.PoolSize = doc.SocksPort, doc.HTTPPort, doc.PoolSize
 	p.FilterMode, p.FilterApps = doc.FilterMode, doc.FilterApps
 	p.DirectHosts, p.LocalViaTunnel = doc.DirectHosts, doc.LocalViaTunnel
+	p.Panel, p.ClientID, p.DeviceName = doc.Panel, doc.ClientID, doc.DeviceName
 
 	keyImported := false
 	if doc.KeyIncluded && strings.TrimSpace(doc.KeyContents) != "" {

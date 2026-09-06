@@ -419,6 +419,18 @@
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
 
+                    <TextView
+                        android:id="@+id/issuedByPanel"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="10dp"
+                        android:textSize="12.5sp"
+                        android:textColor="@color/accent"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:visibility="gone"
+                        android:text="@string/issued_by_panel" />
+
                     <TextView style="@style/FieldLabel" android:text="@string/host_hint" />
                     <EditText android:id="@+id/host" style="@style/Field"
                         android:inputType="textUri" android:autofillHints="" />

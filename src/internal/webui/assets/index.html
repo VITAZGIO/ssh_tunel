@@ -464,6 +464,9 @@
         <button class="btn" id="exportBtn" data-i18n="export_server">Экспортировать сервер</button>
       </div>
 
+      <div id="issuedByPanel" hidden style="margin:-4px 0 14px;font-size:12.5px;
+           color:var(--accent);cursor:pointer"></div>
+
     <div class="field"><label for="host" data-i18n="host_label">Адрес сервера</label>
       <input type="text" id="host" placeholder="адрес или домен сервера" spellcheck="false"
              data-i18n-ph="host_ph"></div>
@@ -874,6 +877,7 @@ const I18N = {
     language_label:'Язык интерфейса',
     add_server:'Добавить сервер',
     server_settings:'Настройки сервера', general_settings:'Общие настройки приложения',
+    issued_by_panel:'Этот сервер выдан панелью · {name}',
     location_label:'Расположение', custom_name_ph:'Название сервера',
     select_server:'Выбрать этот сервер', current_server:'Текущий сервер',
     remove_server:'Удалить сервер', confirm_remove_server:'Удалить этот сервер из списка?',
@@ -945,6 +949,7 @@ const I18N = {
     language_label:'Interface language',
     add_server:'Add server',
     server_settings:'Server settings', general_settings:'General app settings',
+    issued_by_panel:'This server was issued by a panel · {name}',
     location_label:'Location', custom_name_ph:'Server name',
     select_server:'Select this server', current_server:'Current server',
     remove_server:'Remove server', confirm_remove_server:'Remove this server from the list?',
@@ -2384,6 +2389,23 @@ function fillProfileForm(p){
   renderModes();
   renderApps();
   renderCityPicker(p);
+  renderIssuedByPanel(p);
+}
+
+// renderIssuedByPanel — сервер настроен вручную почти всегда, поле panel в
+// нём пусто, и строка вообще не появляется. Заполняется только у сервера,
+// заведённого через веб-панель на VPS (ТЗ-07…10, internal/share версии 2).
+function renderIssuedByPanel(p){
+  const el = $('issuedByPanel');
+  if(!el) return;
+  if(!p.panel){
+    el.hidden = true;
+    el.onclick = null;
+    return;
+  }
+  el.hidden = false;
+  el.textContent = tr('issued_by_panel').replace('{name}', p.deviceName || p.name || '');
+  el.onclick = () => window.open(p.panel, '_blank', 'noopener');
 }
 
 function fillGeneralForm(c){

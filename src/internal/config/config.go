@@ -53,6 +53,15 @@ type Profile struct {
 	// через сервер. По умолчанию false: такие адреса идут напрямую, иначе
 	// домашние сервисы становятся недоступны при включённом туннеле.
 	LocalViaTunnel bool `json:"localViaTunnel"`
+
+	// Panel/ClientID/DeviceName заполняются только при импорте конфига,
+	// выданного веб-панелью на VPS (internal/share, поля версии 2 формата
+	// обмена). У сервера, настроенного руками, Panel остаётся пустым — по
+	// нему экран настроек решает, показывать ли строку «Этот сервер выдан
+	// панелью».
+	Panel      string `json:"panel,omitempty"`
+	ClientID   string `json:"clientId,omitempty"`
+	DeviceName string `json:"deviceName,omitempty"`
 }
 
 // Config — вся программа целиком: список серверов и настройки, общие для
