@@ -735,9 +735,15 @@ func TestRemoteTargetStillGoesThroughTunnel(t *testing.T) {
 // программа знать не может.
 func TestDirectListSkipsTunnel(t *testing.T) {
 	tun, _, _, srv := startTunnel(t, 1)
-	tun.SetDirect(routing.NewDirectList([]string{"example.invalid", "203.0.113.0/24"}))
+	tun.SetDirect(routing.NewDirectList([]string{
+		"example.invalid", "203.0.113.0/24", "*.wild.invalid",
+	}))
 
-	for _, target := range []string{"example.invalid:80", "203.0.113.9:443"} {
+	// Решение принимается по имени из запроса, до какого-либо резолва DNS:
+	// dialFor получает ровно ту строку, что SOCKS5/CONNECT разобрали из
+	// запроса клиента, поэтому и поддомен по шаблону "*.wild.invalid" тоже
+	// обязан уйти напрямую, не открывая канал в туннеле.
+	for _, target := range []string{"example.invalid:80", "203.0.113.9:443", "a.wild.invalid:443"} {
 		before := srv.channels.Load()
 		conn, direct, _ := tun.dialFor("chrome.exe", target)
 		if conn != nil {

@@ -23,7 +23,7 @@
     <string name="key_saved">Ключ сохранён</string>
 
     <string name="direct">Всегда напрямую</string>
-    <string name="direct_hint">10.8.0.0/16, 172.30.*, .corp.local</string>
+    <string name="direct_hint">10.8.0.0/16, 172.30.*, .corp.local, vitazgio.ru</string>
     <string name="local_via_tunnel">Локальную сеть тоже вести через сервер</string>
 
     <string name="apps_title">Приложения</string>
@@ -40,7 +40,7 @@
     <string name="tile_conns">СОЕДИНЕНИЙ</string>
     <string name="tile_links">КАНАЛОВ SSH</string>
     <string name="pool_hint">каналов SSH</string>
-    <string name="direct_note">Адреса и сети, которым туннель не нужен. Локальная сеть и так идёт напрямую.</string>
+    <string name="direct_note">Адреса, сети и домены, которым туннель не нужен. Локальная сеть и так идёт напрямую. Домен целиком — vitazgio.ru; поддомены — .vitazgio.ru или *.vitazgio.ru (это одно и то же и не включает сам домен — впишите оба варианта, если нужно и то, и другое).</string>
     <string name="need_settings">Заполните адрес сервера, пользователя и ключ</string>
     <string name="saved">Сохранено</string>
     <string name="back">Назад</string>

@@ -550,7 +550,7 @@
         <button class="qmark" id="directHelpBtn" title="Подробнее">?</button>
       </div>
       <textarea id="directHosts" rows="2" spellcheck="false"
-        placeholder="10.8.0.0/16, 172.30.*, .corp.local"></textarea>
+        data-i18n-ph="direct_ph" placeholder="10.8.0.0/16, 172.30.*, .corp.local, vitazgio.ru"></textarea>
       <div style="display:flex;gap:8px;align-items:center;margin-top:7px">
         <button class="btn" id="scanNet" style="font-size:12.5px;padding:6px 12px"
           data-i18n="scan_net">Проверить сеть</button>
@@ -558,16 +558,7 @@
       </div>
       <div class="help" id="scanResult" hidden></div>
     </div>
-    <div class="help" id="directHelp" hidden>
-      <p>Сети, которые не надо вести через сервер. Домашние и офисные адреса,
-        а также сети mesh-VPN уже учтены — сюда вписывают только то, что в них
-        не попало: например, корпоративный VPN со своим диапазоном адресов.</p>
-      <p>Через запятую, в любом виде: сеть (<code>10.8.0.0/16</code> или
-        <code>10.8.*</code>), отдельный адрес или окончание имени
-        (<code>.corp.local</code>).</p>
-      <p>Не знаешь, что вписать — нажми «Проверить сеть»: программа посмотрит
-        адаптеры этого компьютера и скажет, сломается что-нибудь или нет.</p>
-    </div>
+    <div class="help" id="directHelp" hidden></div>
     </div><!-- /.panel настроек сервера -->
 
     <div class="panel">
@@ -735,6 +726,16 @@ const I18N = {
     filter_title:'Какие программы вести через туннель',
     local_via_tunnel:'Локальную сеть тоже вести через сервер',
     direct_label:'Всегда напрямую', scan_net:'Проверить сеть',
+    direct_ph:'10.8.0.0/16, 172.30.*, .corp.local, vitazgio.ru',
+    direct_help_html:'<p>Сети и домены, которые не надо вести через сервер. Домашние и офисные '+
+      'адреса, а также сети mesh-VPN уже учтены — сюда вписывают только то, что в них не попало: '+
+      'например, корпоративный VPN со своим диапазоном адресов или отдельный сайт.</p>'+
+      '<p>Через запятую, в любом виде: сеть (<code>10.8.0.0/16</code> или <code>10.8.*</code>), '+
+      'отдельный адрес, домен целиком (<code>vitazgio.ru</code>) или его поддомены '+
+      '(<code>.vitazgio.ru</code> и <code>*.vitazgio.ru</code> — это одно и то же: сам домен сюда не '+
+      'входит, только поддомены; чтобы обойти и сам домен, и поддомены, впиши оба варианта).</p>'+
+      '<p>Не знаешь, что вписать — нажми «Проверить сеть»: программа посмотрит адаптеры этого '+
+      'компьютера и скажет, сломается что-нибудь или нет.</p>',
     verbose:'Подробный журнал', connect_on_launch:'Подключаться сразу при запуске',
     show_picker:'Показывать выбор сервера на главном экране',
     boot_start:'Запускать при старте системы',
@@ -780,6 +781,16 @@ const I18N = {
     filter_title:'Which apps go through the tunnel',
     local_via_tunnel:'Route the local network through the server too',
     direct_label:'Always direct', scan_net:'Scan network',
+    direct_ph:'10.8.0.0/16, 172.30.*, .corp.local, vitazgio.ru',
+    direct_help_html:'<p>Networks and domains that shouldn\'t go through the server. Home and office '+
+      'addresses, as well as mesh-VPN networks, are already covered — list here only what they miss: '+
+      'a corporate VPN with its own address range, or a single site.</p>'+
+      '<p>Comma-separated, in any form: a network (<code>10.8.0.0/16</code> or <code>10.8.*</code>), '+
+      'a single address, a whole domain (<code>vitazgio.ru</code>), or its subdomains '+
+      '(<code>.vitazgio.ru</code> and <code>*.vitazgio.ru</code> mean the same thing: subdomains only, '+
+      'not the domain itself — to bypass both the domain and its subdomains, add both entries).</p>'+
+      '<p>Not sure what to enter — click "Scan network": the program will look at this computer\'s '+
+      'adapters and tell you if anything would break.</p>',
     verbose:'Verbose log', connect_on_launch:'Connect immediately on launch',
     show_picker:'Show server picker on the home screen',
     boot_start:'Start at system boot',
@@ -813,6 +824,8 @@ function applyI18n(){
   document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = tr(el.dataset.i18n); });
   document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = tr(el.dataset.i18nTitle); });
   document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = tr(el.dataset.i18nPh); });
+  const dh = $('directHelp');
+  if(dh) dh.innerHTML = tr('direct_help_html');
   renderModes();
   renderApps();
   if(typeof renderCityBtn === 'function') renderCityBtn();

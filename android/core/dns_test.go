@@ -20,6 +20,8 @@ import (
 	"time"
 
 	"golang.org/x/net/dns/dnsmessage"
+
+	"sshtunnel/internal/routing"
 )
 
 // recordingCore запоминает, что именно пришло наверх, и соединяется напрямую.
@@ -199,6 +201,53 @@ func TestИмяМимоТуннеляБезРезолвераОтклоняет�
 	}
 	if h.RCode == dnsmessage.RCodeSuccess {
 		t.Fatal("на локальное имя выдан успешный ответ с подставным адресом")
+	}
+}
+
+// То же самое, но с настоящим DirectList и записью-шаблоном "*.corp.local":
+// это ровно то правило, что пользователь вписывает в поле «Всегда напрямую»,
+// и оно обязано сработать уже на этапе ответа DNS — до того, как для имени
+// вообще заведётся подставной адрес.
+func TestDirectListШаблонБлокируетПодставнойАдресНаЭтапеDNS(t *testing.T) {
+	pool, err := NewFakePool("198.18.0.0/24")
+	if err != nil {
+		t.Fatal(err)
+	}
+	direct := routing.NewDirectList([]string{"*.corp.local", "vitazgio.ru"})
+	d := &DNS{
+		Pool:   pool,
+		Direct: direct.Match,
+		Local: func(name string) ([]net.IP, error) {
+			return []net.IP{net.IPv4(203, 0, 113, 9)}, nil
+		},
+	}
+
+	for _, name := range []string{"a.corp.local", "vitazgio.ru"} {
+		reply, err := d.Answer(buildQuery(t, name, dnsmessage.TypeA))
+		if err != nil {
+			t.Fatalf("%s: ответ не построился: %v", name, err)
+		}
+		var p dnsmessage.Parser
+		h, err := p.Start(reply)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if h.RCode != dnsmessage.RCodeSuccess {
+			t.Fatalf("%s: код ответа %v, ожидался успех через локальный резолвер", name, h.RCode)
+		}
+		if _, ok := pool.Name("203.0.113.9"); ok {
+			t.Fatalf("%s: реальному адресу назначено имя из пула подставных", name)
+		}
+	}
+
+	// Имя, не подпадающее ни под одно правило, как и раньше получает
+	// подставной адрес из пула.
+	if _, err := d.Answer(buildQuery(t, "example.test", dnsmessage.TypeA)); err != nil {
+		t.Fatalf("ответ не построился: %v", err)
+	}
+	fakeName, ok := pool.Name(pool.Get("example.test").String())
+	if !ok || fakeName != "example.test" {
+		t.Fatal("имени вне правил не выдан подставной адрес из пула")
 	}
 }
 
