@@ -116,7 +116,7 @@
     <string name="speed_result">приём %1$s · отдача %2$s</string>
 
     <!-- Язык интерфейса -->
-    <string name="language_label">Язык интерфейса</string>
+    <string name="language_label">Язык интерфейса / Language</string>
     <string name="lang_ru">Русский</string>
     <string name="lang_en">English</string>
 
@@ -144,9 +144,9 @@
 
     <!-- Настройка телефона из буфера обмена или сканированием QR -->
     <string name="paste_config">Вставить из буфера</string>
-    <string name="scan_config">Сканировать код</string>
-    <string name="import_ok">настройки применены — можно подключаться</string>
-    <string name="import_ok_no_key">настройки применены без ключа — импортируй ещё раз файл с ключом</string>
+    <string name="scan_config">Сканировать QR-код</string>
+    <string name="import_ok">добавлен новый сервер «%1$s» — можно подключаться</string>
+    <string name="import_ok_no_key">добавлен новый сервер «%1$s» без ключа — импортируй ещё раз файл с ключом</string>
     <string name="paste_failed">не удалось прочитать буфер обмена</string>
     <string name="camera_permission_needed">нужен доступ к камере, чтобы отсканировать код</string>
     <string name="camera_denied">без доступа к камере код не отсканировать</string>

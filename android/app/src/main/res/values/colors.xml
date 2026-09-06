@@ -21,5 +21,8 @@
     <color name="ok">#2fbf71</color>
     <color name="warn">#e8b339</color>
     <color name="err">#e5484d</color>
-    <color name="logo">#2de2ff</color>
+    <!-- Логотип в шапке — тот же приглушённый синий, что и у кнопок, а не
+         яркий голубой сам по себе: раньше он единственный выделялся на фоне
+         остальной, уже притушенной, палитры. -->
+    <color name="logo">@color/accent_muted</color>
 </resources>

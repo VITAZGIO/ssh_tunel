@@ -99,6 +99,13 @@ class AdBlockActivity : AppCompatActivity() {
         onBlockTab = block
         tabBlockBtn.setBackgroundResource(if (block) R.drawable.bg_button_primary else R.drawable.bg_button)
         tabAllowBtn.setBackgroundResource(if (block) R.drawable.bg_button else R.drawable.bg_button_primary)
+        // Цвет фона один поверх другого мог быть недостаточно заметен —
+        // жирный белый текст на активной вкладке убирает всякую путаницу,
+        // какой список сейчас открыт.
+        tabBlockBtn.setTextColor(ContextCompat.getColor(this, if (block) android.R.color.white else R.color.text))
+        tabBlockBtn.setTypeface(null, if (block) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
+        tabAllowBtn.setTextColor(ContextCompat.getColor(this, if (block) R.color.text else android.R.color.white))
+        tabAllowBtn.setTypeface(null, if (block) android.graphics.Typeface.NORMAL else android.graphics.Typeface.BOLD)
         if (block) {
             tabLabel.setText(R.string.ad_block_sources)
             listEdit.hint = getString(R.string.ad_block_sources_hint)

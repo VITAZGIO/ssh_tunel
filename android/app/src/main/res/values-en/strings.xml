@@ -88,9 +88,9 @@
 
     <!-- Setting up the phone from clipboard or by scanning a QR code -->
     <string name="paste_config">Paste from clipboard</string>
-    <string name="scan_config">Scan code</string>
-    <string name="import_ok">settings applied — ready to connect</string>
-    <string name="import_ok_no_key">settings applied without a key — import the key file again</string>
+    <string name="scan_config">Scan QR code</string>
+    <string name="import_ok">added new server "%1$s" — ready to connect</string>
+    <string name="import_ok_no_key">added new server "%1$s" without a key — import the key file again</string>
     <string name="paste_failed">couldn\'t read the clipboard</string>
     <string name="camera_permission_needed">camera access is needed to scan the code</string>
     <string name="camera_denied">can\'t scan a code without camera access</string>

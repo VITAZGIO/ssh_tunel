@@ -85,7 +85,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var languageSpinner: Spinner
     private lateinit var profileTabs: LinearLayout
-    private lateinit var addProfileBtn: View
+    private lateinit var profileTabsScroll: android.widget.HorizontalScrollView
     private lateinit var removeProfileBtn: View
     private lateinit var pasteConfigBtn: Button
     private lateinit var scanConfigBtn: Button
@@ -181,7 +181,7 @@ class MainActivity : AppCompatActivity() {
 
         languageSpinner = findViewById(R.id.languageSpinner)
         profileTabs = findViewById(R.id.profileTabs)
-        addProfileBtn = findViewById(R.id.addProfileBtn)
+        profileTabsScroll = findViewById(R.id.profileTabsScroll)
         removeProfileBtn = findViewById(R.id.removeProfileBtn)
         pasteConfigBtn = findViewById(R.id.pasteConfigBtn)
         scanConfigBtn = findViewById(R.id.scanConfigBtn)
@@ -233,7 +233,6 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, AppsActivity::class.java))
         }
 
-        addProfileBtn.setOnClickListener { onAddProfile() }
         removeProfileBtn.setOnClickListener { onRemoveProfile() }
         cityBtn.setOnClickListener { showCityMenu() }
         customCityName.addOnTextChanged { liveRetitleEditingTab() }
@@ -409,6 +408,17 @@ class MainActivity : AppCompatActivity() {
             tab.setOnClickListener { onTabClicked(p.id) }
             profileTabs.addView(tab)
         }
+
+        val plus = TextView(this)
+        plus.text = "+"
+        plus.setTextColor(ContextCompat.getColor(this, R.color.dim))
+        plus.textSize = 16f
+        plus.setPadding(dp(14), dp(8), dp(14), dp(8))
+        plus.setBackgroundResource(R.drawable.bg_button)
+        plus.contentDescription = getString(R.string.add_server)
+        plus.setOnClickListener { onAddProfile() }
+        profileTabs.addView(plus)
+
         renderHomePicker()
     }
 
@@ -764,7 +774,10 @@ class MainActivity : AppCompatActivity() {
         editingProfileId = p.id
         renderProfileTabs()
         loadProfileIntoForm(p)
-        importNote.text = getString(if (keyIncluded) R.string.import_ok else R.string.import_ok_no_key)
+        importNote.text = getString(if (keyIncluded) R.string.import_ok else R.string.import_ok_no_key, p.name)
+        // Прокрутить к новой вкладке — она в конце списка, легко потерять
+        // из вида и решить, что «ничего не добавилось».
+        profileTabsScroll.post { profileTabsScroll.fullScroll(View.FOCUS_RIGHT) }
         refresh()
     }
 

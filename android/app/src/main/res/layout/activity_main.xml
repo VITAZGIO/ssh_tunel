@@ -82,12 +82,12 @@
             <Space
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_weight="1" />
+                android:layout_weight="0.8" />
 
             <LinearLayout
                 android:id="@+id/power"
-                android:layout_width="172dp"
-                android:layout_height="172dp"
+                android:layout_width="190dp"
+                android:layout_height="190dp"
                 android:layout_gravity="center_horizontal"
                 android:orientation="vertical"
                 android:gravity="center"
@@ -97,8 +97,8 @@
 
                 <ImageView
                     android:id="@+id/powerIcon"
-                    android:layout_width="86dp"
-                    android:layout_height="86dp"
+                    android:layout_width="95dp"
+                    android:layout_height="95dp"
                     android:src="@drawable/ic_power"
                     android:contentDescription="@string/start" />
 
@@ -187,7 +187,7 @@
             <Space
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_weight="1" />
+                android:layout_weight="1.2" />
 
             <!-- Приём и отдача появляются после замера скорости и через десять
                  секунд исчезают: сразу после теста цифры интересны, а через
@@ -352,53 +352,19 @@
                     android:popupBackground="@drawable/bg_card"
                     android:spinnerMode="dropdown" />
 
-                <!-- Вкладки серверов, как в браузере — плюс кнопка «+» справа. -->
-                <LinearLayout
+                <!-- Вкладки серверов, как в браузере — кнопка «+» дорисовывается
+                     последней в этой же прокручиваемой ленте (renderProfileTabs). -->
+                <HorizontalScrollView
+                    android:id="@+id/profileTabsScroll"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <HorizontalScrollView
-                        android:layout_width="0dp"
+                    android:scrollbars="none">
+                    <LinearLayout
+                        android:id="@+id/profileTabs"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:scrollbars="none">
-                        <LinearLayout
-                            android:id="@+id/profileTabs"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:orientation="horizontal" />
-                    </HorizontalScrollView>
-
-                    <TextView
-                        android:id="@+id/addProfileBtn"
-                        android:layout_width="38dp"
-                        android:layout_height="38dp"
-                        android:layout_marginStart="6dp"
-                        android:background="@drawable/bg_button"
-                        android:gravity="center"
-                        android:textSize="18sp"
-                        android:textColor="@color/text"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:text="+"
-                        android:contentDescription="@string/add_server" />
-
-                    <TextView
-                        android:id="@+id/removeProfileBtn"
-                        android:layout_width="38dp"
-                        android:layout_height="38dp"
-                        android:layout_marginStart="6dp"
-                        android:background="@drawable/bg_button"
-                        android:gravity="center"
-                        android:textSize="18sp"
-                        android:textColor="@color/text"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:text="−"
-                        android:contentDescription="@string/remove_server" />
-                </LinearLayout>
+                        android:orientation="horizontal" />
+                </HorizontalScrollView>
 
                 <!-- Два способа настроить телефон за раз: из буфера обмена или
                      сканированием QR-кода, показанного панелью на компьютере. -->
@@ -413,7 +379,7 @@
                         style="@style/SecondaryButton"
                         android:layout_width="0dp"
                         android:layout_weight="1"
-                        android:layout_height="wrap_content"
+                        android:layout_height="match_parent"
                         android:textSize="12.5sp"
                         android:paddingTop="9dp"
                         android:paddingBottom="9dp"
@@ -426,10 +392,12 @@
                         style="@style/SecondaryButton"
                         android:layout_width="0dp"
                         android:layout_weight="1"
-                        android:layout_height="wrap_content"
+                        android:layout_height="match_parent"
                         android:textSize="12.5sp"
                         android:paddingTop="9dp"
                         android:paddingBottom="9dp"
+                        android:drawableStart="@drawable/ic_qr"
+                        android:drawablePadding="6dp"
                         android:text="@string/scan_config" />
                 </LinearLayout>
 
@@ -510,12 +478,31 @@
                         android:focusable="true" />
                 </LinearLayout>
 
-                <Button
-                    android:id="@+id/selectServerBtn"
-                    style="@style/SecondaryButton"
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:layout_marginBottom="14dp"
-                    android:text="@string/select_this_server" />
+                    android:orientation="horizontal">
+
+                    <Button
+                        android:id="@+id/selectServerBtn"
+                        style="@style/SecondaryButton"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="match_parent"
+                        android:text="@string/select_this_server" />
+
+                    <Space android:layout_width="8dp" android:layout_height="1dp" />
+
+                    <Button
+                        android:id="@+id/removeProfileBtn"
+                        style="@style/SecondaryButton"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="match_parent"
+                        android:text="@string/remove_server" />
+                </LinearLayout>
 
                 <!-- Настройки сервера (сворачиваемый блок) -->
                 <LinearLayout
@@ -728,13 +715,7 @@
                     <EditText android:id="@+id/direct" style="@style/Field"
                         android:inputType="textMultiLine" android:minLines="2"
                         android:gravity="top" android:hint="@string/direct_hint"
-                        android:textColorHint="@color/dim" android:autofillHints=""
-                        android:layout_marginBottom="14dp" />
-
-                    <Button
-                        android:id="@+id/save"
-                        style="@style/PrimaryButton"
-                        android:text="@string/save" />
+                        android:textColorHint="@color/dim" android:autofillHints="" />
                 </LinearLayout>
 
                 <!-- Общие настройки приложения (сворачиваемый блок) -->
@@ -847,6 +828,14 @@
                         android:textColor="@color/text"
                         android:text="@string/show_picker" />
                 </LinearLayout>
+
+                <!-- Сохраняет и сервер, и общие настройки разом — поэтому
+                     кнопка внизу, после обоих блоков, а не между ними. -->
+                <Button
+                    android:id="@+id/save"
+                    style="@style/PrimaryButton"
+                    android:layout_marginTop="18dp"
+                    android:text="@string/save" />
             </LinearLayout>
         </ScrollView>
     </ViewFlipper>
