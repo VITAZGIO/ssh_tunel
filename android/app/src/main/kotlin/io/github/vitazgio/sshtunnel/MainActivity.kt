@@ -73,6 +73,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var adBlockAllowlistEdit: EditText
     private lateinit var adBlockUpdateButton: Button
     private lateinit var adBlockStatusView: TextView
+    private lateinit var udpRelayEnabledCheck: CheckBox
 
     private lateinit var selfCheckSteps: LinearLayout
     private lateinit var selfCheckStartButton: Button
@@ -126,6 +127,7 @@ class MainActivity : AppCompatActivity() {
         adBlockAllowlistEdit = findViewById(R.id.adBlockAllowlist)
         adBlockUpdateButton = findViewById(R.id.adBlockUpdate)
         adBlockStatusView = findViewById(R.id.adBlockStatus)
+        udpRelayEnabledCheck = findViewById(R.id.udpRelayEnabled)
 
         selfCheckSteps = findViewById(R.id.selfCheckSteps)
         selfCheckStartButton = findViewById(R.id.selfCheckStart)
@@ -213,6 +215,7 @@ class MainActivity : AppCompatActivity() {
         adBlockEnabledCheck.isChecked = settings.adBlockEnabled
         adBlockSourcesEdit.setText(settings.adBlockSources)
         adBlockAllowlistEdit.setText(settings.adBlockAllowlist)
+        udpRelayEnabledCheck.isChecked = settings.udpRelayEnabled
     }
 
     private fun saveSettings() {
@@ -226,6 +229,7 @@ class MainActivity : AppCompatActivity() {
         settings.adBlockEnabled = adBlockEnabledCheck.isChecked
         settings.adBlockSources = adBlockSourcesEdit.text.toString()
         settings.adBlockAllowlist = adBlockAllowlistEdit.text.toString()
+        settings.udpRelayEnabled = udpRelayEnabledCheck.isChecked
 
         // Ключ вводится один раз: после сохранения поле очищается, чтобы он не
         // лежал на экране у всех на виду.

@@ -101,6 +101,7 @@ func (t *Tunnel) Configure(
 	knownHostsPath string, poolSize int,
 	directHosts string, localViaTunnel bool,
 	adBlockEnabled bool, adBlockListPath string, adBlockAllowlist string,
+	udpRelayEnabled bool,
 ) error {
 	if strings.TrimSpace(host) == "" {
 		return fmt.Errorf("не задан адрес сервера")
@@ -130,15 +131,16 @@ func (t *Tunnel) Configure(
 	t.direct = routing.NewDirectList(routing.SplitEntries(directHosts))
 	t.block = block
 	t.cfg = tunnel.Config{
-		Host:           host,
-		SSHPort:        sshPort,
-		User:           user,
-		KeyPath:        keyPath,
-		KnownHostsPath: knownHostsPath,
-		PoolSize:       poolSize,
-		Direct:         t.direct,
-		LocalViaTunnel: localViaTunnel,
-		ProtectSocket:  t.protect,
+		Host:            host,
+		SSHPort:         sshPort,
+		User:            user,
+		KeyPath:         keyPath,
+		KnownHostsPath:  knownHostsPath,
+		PoolSize:        poolSize,
+		Direct:          t.direct,
+		LocalViaTunnel:  localViaTunnel,
+		ProtectSocket:   t.protect,
+		UDPRelayEnabled: udpRelayEnabled,
 
 		// Локальных прокси на телефоне нет: соединения приходят из пакетов,
 		// а не с портов 1080 и 1081.
@@ -299,6 +301,11 @@ func (t *Tunnel) StartStack(tunFD int, mtu int) error {
 				cb.OnLog(line)
 			}
 		},
+		// UDPRelay — тот же клиент, что и на компьютере (см.
+		// tunnel.Tunnel.UDPRelay): звонит по требованию, кеширует и сам
+		// переподключается. Значение проверяется на каждый новый поток, не
+		// один раз, — поэтому здесь достаточно функции-обёртки без вызова.
+		UDPRelay: tun.UDPRelay,
 	})
 	if err != nil {
 		return err

@@ -64,6 +64,7 @@ class TunnelService : VpnService(), Callbacks {
                     settings.keyFile.absolutePath, settings.knownHostsFile.absolutePath,
                     settings.poolSize.toLong(), settings.directHosts, settings.localViaTunnel,
                     settings.adBlockEnabled, settings.adBlockListFile.absolutePath, settings.adBlockAllowlist,
+                    settings.udpRelayEnabled,
                 )
                 tmp.selfCheck()
             } catch (e: Exception) {
@@ -236,6 +237,7 @@ class TunnelService : VpnService(), Callbacks {
                     settings.adBlockEnabled,
                     settings.adBlockListFile.absolutePath,
                     settings.adBlockAllowlist,
+                    settings.udpRelayEnabled,
                 )
                 tunnel.startCore()
 

@@ -39,12 +39,13 @@ import (
 
 // vpsSetupParams — то, что вводится в мастере настройки VPS.
 type vpsSetupParams struct {
-	Host         string
-	Port         int
-	User         string
-	Password     string
-	KeyPath      string
-	InstallPanel bool
+	Host            string
+	Port            int
+	User            string
+	Password        string
+	KeyPath         string
+	InstallPanel    bool
+	InstallUDPRelay bool
 }
 
 const vpsDialTimeout = 20 * time.Second
@@ -133,6 +134,15 @@ func runVpsSetup(bus *events.Bus, p vpsSetupParams) (err error) {
 			bus.VpsSetupLine("panel", fmt.Sprintf(
 				"Панель: %s   пользователь: vpsadmin   пароль (одноразовый, спросит сменить при входе): %s",
 				panelAddr, panelPass))
+		}
+	}
+
+	if p.InstallUDPRelay {
+		bus.VpsSetupLine("udprelay", "Ставлю ретранслятор UDP (звонки, игры, QUIC через туннель)")
+		if err := installUDPRelay(keyClient, func(line string) { bus.VpsSetupLine("udprelay", line) }); err != nil {
+			bus.VpsSetupLine("udprelay", "Ретранслятор UDP не установлен: "+err.Error())
+		} else {
+			bus.VpsSetupLine("udprelay", "Готово — включи «Пробрасывать UDP через сервер» в настройках сервера")
 		}
 	}
 
@@ -278,6 +288,57 @@ func (w *lineWriter) Flush() {
 // советует не ставить веб-панели ради самой безопасности сервера — поэтому
 // это отдельная явная галочка, выключенная по умолчанию, а не часть
 // обязательных шагов.
+// installUDPRelay ставит ретранслятор UDP (см. sshtunnel/cmd/udprelay,
+// sshtunnel/internal/udprelay): SSH умеет пробрасывать только TCP, поэтому
+// звонки, игры и QUIC без него не проходят через туннель. Ретранслятор
+// компилируется прямо на сервере из исходника, который мастер сюда
+// закладывает, — так не нужно ни кросс-компилировать бинарник на компьютере
+// человека, ни подбирать архитектуру сервера. Слушает только 127.0.0.1:
+// отдельно открывать порт в файрволе не нужно, достучаться до него можно
+// только через уже прошедший SSH-аутентификацию туннель.
+func installUDPRelay(client *ssh.Client, onLine func(string)) error {
+	src, err := udpRelayServerSource()
+	if err != nil {
+		return fmt.Errorf("не нашёл исходник ретранслятора: %w", err)
+	}
+
+	const marker = "EOF_UDPRELAY_SOURCE_39fa2c"
+	script := fmt.Sprintf(`set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+command -v go >/dev/null || { echo "ставлю Go"; apt-get -y -qq install golang-go >/dev/null; }
+mkdir -p /root/udprelay
+cat > /root/udprelay/main.go <<'%s'
+%s
+%s
+cd /root/udprelay
+go build -o /usr/local/bin/udprelay main.go
+echo "ретранслятор собран"
+
+cat > /etc/systemd/system/udprelay.service <<'EOF_UNIT'
+[Unit]
+Description=ssh_tunnel - ретранслятор UDP (только 127.0.0.1)
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/udprelay
+Restart=always
+RestartSec=2
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF_UNIT
+systemctl daemon-reload
+systemctl enable --now udprelay.service
+echo "udprelay запущен"
+`, marker, src, marker)
+
+	return runRemoteScript(client, script, onLine)
+}
+
 func installPanel(client *ssh.Client, host string, onLine func(string)) (addr, password string, err error) {
 	const script = `set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive

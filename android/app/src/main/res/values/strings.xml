@@ -85,6 +85,9 @@
     <string name="sc_external_ip_matches">%1$s — совпадает с адресом сервера</string>
     <string name="sc_external_ip_mismatch">%1$s — не совпадает с адресом сервера, это ожидаемо для некоторых хостингов (CDN, несколько адресов на сервер)</string>
     <string name="sc_external_ip_check_failed">не удалось узнать внешний адрес: %1$s</string>
+
+    <string name="udp_relay_enabled">Пробрасывать UDP (звонки, игры) через сервер</string>
+    <string name="udp_relay_note">Требует ретранслятор, установленный на сервере (мастер настройки VPS на компьютере, вкладка веб-панели). Пока его нет — включение этой галочки ничего не меняет, UDP по-прежнему не проходит.</string>
     <string name="need_settings">Заполните адрес сервера, пользователя и ключ</string>
     <string name="saved">Сохранено</string>
     <string name="back">Назад</string>

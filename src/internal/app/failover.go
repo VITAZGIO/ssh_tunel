@@ -113,18 +113,19 @@ func (a *App) buildTunnel(cfg config.Config, p config.Profile) (tun *tunnel.Tunn
 	socksAddr = net.JoinHostPort("127.0.0.1", strconv.Itoa(p.SocksPort))
 	httpAddr = net.JoinHostPort("127.0.0.1", strconv.Itoa(p.HTTPPort))
 	tun = tunnel.New(tunnel.Config{
-		Host:           p.Host,
-		SSHPort:        p.SSHPort,
-		User:           p.User,
-		KeyPath:        p.KeyPath,
-		SocksAddr:      socksAddr,
-		HTTPAddr:       httpAddr,
-		PoolSize:       p.PoolSize,
-		KnownHostsPath: config.KnownHostsPath(),
-		Verbose:        cfg.Verbose,
-		Policy:         a.policy,
-		Direct:         a.direct,
-		LocalViaTunnel: p.LocalViaTunnel,
+		Host:            p.Host,
+		SSHPort:         p.SSHPort,
+		User:            p.User,
+		KeyPath:         p.KeyPath,
+		SocksAddr:       socksAddr,
+		HTTPAddr:        httpAddr,
+		PoolSize:        p.PoolSize,
+		KnownHostsPath:  config.KnownHostsPath(),
+		Verbose:         cfg.Verbose,
+		Policy:          a.policy,
+		Direct:          a.direct,
+		LocalViaTunnel:  p.LocalViaTunnel,
+		UDPRelayEnabled: p.UDPRelayEnabled,
 	}, a.Bus)
 	return tun, socksAddr, httpAddr
 }

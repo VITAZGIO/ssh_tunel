@@ -92,6 +92,16 @@ class Settings(context: Context) {
      */
     val adBlockListFile: File get() = File(filesDir, "adblock.list")
 
+    /**
+     * Проброс UDP (звонки, игры, QUIC) через ретранслятор на сервере вместо
+     * молчаливого отказа. Выключено по умолчанию: пока ретранслятор не
+     * установлен на сервере (мастер настройки VPS на компьютере), включать
+     * нечего — соединение до него просто не поднимется.
+     */
+    var udpRelayEnabled: Boolean
+        get() = prefs.getBoolean("udpRelayEnabled", false)
+        set(v) = prefs.edit().putBoolean("udpRelayEnabled", v).apply()
+
     val keyFile: File get() = File(filesDir, "id_ed25519")
     val knownHostsFile: File get() = File(filesDir, "known_hosts")
 

@@ -498,6 +498,21 @@
                     android:textColor="@color/dim"
                     android:text="@string/ad_block_note" />
 
+                <CheckBox
+                    android:id="@+id/udpRelayEnabled"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="@color/text"
+                    android:text="@string/udp_relay_enabled" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingBottom="14dp"
+                    android:textSize="11.5sp"
+                    android:textColor="@color/dim"
+                    android:text="@string/udp_relay_note" />
+
                 <Button
                     android:id="@+id/save"
                     style="@style/PrimaryButton"

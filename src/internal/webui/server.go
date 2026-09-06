@@ -557,12 +557,13 @@ func (s *Server) handleBootStart(w http.ResponseWriter, r *http.Request) {
 // уходит прямо в runVpsSetup и не возвращается в ответе ни в каком виде.
 func (s *Server) handleVpsSetupStart(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Host         string `json:"host"`
-		Port         int    `json:"port"`
-		User         string `json:"user"`
-		Password     string `json:"password"`
-		KeyPath      string `json:"keyPath"`
-		InstallPanel bool   `json:"installPanel"`
+		Host            string `json:"host"`
+		Port            int    `json:"port"`
+		User            string `json:"user"`
+		Password        string `json:"password"`
+		KeyPath         string `json:"keyPath"`
+		InstallPanel    bool   `json:"installPanel"`
+		InstallUDPRelay bool   `json:"installUdpRelay"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, map[string]string{"error": "не разобрал запрос: " + err.Error()})
@@ -587,12 +588,13 @@ func (s *Server) handleVpsSetupStart(w http.ResponseWriter, r *http.Request) {
 		port = 22
 	}
 	params := vpsSetupParams{
-		Host:         strings.TrimSpace(req.Host),
-		Port:         port,
-		User:         strings.TrimSpace(req.User),
-		Password:     req.Password,
-		KeyPath:      keyPath,
-		InstallPanel: req.InstallPanel,
+		Host:            strings.TrimSpace(req.Host),
+		Port:            port,
+		User:            strings.TrimSpace(req.User),
+		Password:        req.Password,
+		KeyPath:         keyPath,
+		InstallPanel:    req.InstallPanel,
+		InstallUDPRelay: req.InstallUDPRelay,
 	}
 	go func() {
 		defer func() {

@@ -163,6 +163,19 @@ func sendExit(ch ssh.Channel, code uint32) {
 
 var keyLineRe = regexp.MustCompile(`'([^']*)'`)
 
+// drainStdin сливает стандартный вход команды в фоне и закрывает возвращённый
+// канал, когда клиент дописал и закрыл запись (или канал оборвался). Кому
+// это важно (chpasswd) — дожидается закрытия канала перед ответом; кому нет
+// — просто не ждёт, поведение то же самое, что и раньше.
+func drainStdin(ch ssh.Channel) <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		io.Copy(io.Discard, ch)
+		close(done)
+	}()
+	return done
+}
+
 func (s *fakeAdminServer) runExec(ch ssh.Channel, cmd string) {
 	defer ch.Close()
 
@@ -172,9 +185,11 @@ func (s *fakeAdminServer) runExec(ch ssh.Channel, cmd string) {
 		return
 	}
 
-	// Прочие команды стандартный вход не читают — не ждём его закрытия,
-	// просто сливаем, если что-то всё же придёт.
-	go io.Copy(io.Discard, ch)
+	// Большинство команд стандартный вход не читают — не ждём его закрытия,
+	// просто сливаем в фоне, если что-то всё же придёт. Исключение —
+	// chpasswd ниже: там клиент правда пишет и явно закрывает запись, и это
+	// важно дождаться перед ответом (см. комментарий там же).
+	stdinDrained := drainStdin(ch)
 
 	s.mu.Lock()
 	s.calls = append(s.calls, execCall{cmd: cmd})
@@ -190,6 +205,16 @@ func (s *fakeAdminServer) runExec(ch ssh.Channel, cmd string) {
 		}
 		sendExit(ch, 0)
 	case strings.HasPrefix(cmd, "chpasswd"):
+		// В отличие от остальных команд здесь клиент действительно пишет в
+		// stdin (пароль) и сам закрывает запись, когда дописал. Раньше эта
+		// ветка сразу слала exit-status и закрывала канал (общий фоновый
+		// io.Copy выше просто отбрасывал байты параллельно) — оттого
+		// изредка обгоняла ещё не дописанные клиентом данные, и
+		// session.Run на его стороне возвращал ошибку записи вместо кода
+		// выхода. Дожидаемся EOF по стандартному входу явно, прежде чем
+		// отвечать, — тот самый фоновый io.Copy выше это и делает, просто
+		// нужно на него дождаться, а не гонять его в фоне бесконтрольно.
+		<-stdinDrained
 		sendExit(ch, 0)
 	default:
 		fmt.Fprintf(ch.Stderr(), "неизвестная команда: %s\n", cmd)
@@ -213,6 +238,9 @@ func (s *fakeAdminServer) handleScript(ch ssh.Channel, script string) {
 		sendExit(ch, tunnelExit)
 	case strings.Contains(script, "cockpit"):
 		fmt.Fprintln(ch, "cockpit установлен")
+		sendExit(ch, 0)
+	case strings.Contains(script, "udprelay"):
+		fmt.Fprintln(ch, "udprelay собран")
 		sendExit(ch, 0)
 	default:
 		fmt.Fprintln(ch.Stderr(), "неизвестный скрипт")
@@ -279,7 +307,7 @@ func TestRunVpsSetupFullFlow(t *testing.T) {
 
 	params := vpsSetupParams{
 		Host: host, Port: port, User: "root",
-		Password: "root-pass", KeyPath: testKeyPath(t), InstallPanel: true,
+		Password: "root-pass", KeyPath: testKeyPath(t), InstallPanel: true, InstallUDPRelay: true,
 	}
 
 	var runErr error
@@ -299,6 +327,9 @@ func TestRunVpsSetupFullFlow(t *testing.T) {
 	}
 	if !srv.hasScriptContaining("cockpit") {
 		t.Error("установка панели не запросилась, хотя InstallPanel=true")
+	}
+	if !srv.hasScriptContaining("udprelay") {
+		t.Error("установка ретранслятора UDP не запросилась, хотя InstallUDPRelay=true")
 	}
 
 	var sawDone bool

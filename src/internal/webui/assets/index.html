@@ -548,6 +548,17 @@
         <span class="lbl" data-i18n="local_via_tunnel">Локальную сеть тоже вести через сервер</span></label>
       <button class="qmark" id="localHelpBtn" title="Подробнее">?</button>
     </div>
+    <div class="chk-row">
+      <label class="chk"><input type="checkbox" id="udpRelayEnabled">
+        <span class="lbl" data-i18n="udp_relay_enabled">Пробрасывать UDP (звонки, игры) через сервер</span></label>
+      <button class="qmark" id="udpRelayHelpBtn" title="Подробнее">?</button>
+    </div>
+    <div class="help" id="udpRelayHelp" hidden>
+      <p data-i18n="udp_relay_help">SSH умеет пробрасывать только TCP, поэтому по умолчанию видеозвонки, игры и
+        QUIC (быстрый HTTP/3) не проходят через туннель. Эта галочка включает проброс через отдельный
+        ретранслятор на сервере — ставится один раз, в мастере настройки VPS (кнопка «Настроить сервер по SSH»
+        в этом же меню). Пока он не установлен, галочка ничего не меняет: UDP по-прежнему не проходит.</p>
+    </div>
     <div class="help" id="localHelp" hidden>
       <p>Обычно не нужно. Домашние и офисные адреса (роутер, NAS,
         Home&nbsp;Assistant, рабочие сервисы) и так идут напрямую и остаются
@@ -712,6 +723,13 @@
       администрирования сервера (систeмные службы, сеть, диски) — новый открытый порт наружу. Показывает
       адрес и одноразовый пароль после установки.</p>
 
+    <label class="chk" style="margin:4px 0 14px">
+      <input type="checkbox" id="vpsInstallUdpRelay">
+      <span class="lbl" data-i18n="vps_install_udprelay">Заодно поставить ретранслятор UDP (звонки, игры)</span></label>
+    <p class="note" style="margin-top:-8px" data-i18n="vps_install_udprelay_note">Слушает только 127.0.0.1 —
+      отдельный порт наружу не открывается, достучаться до него можно только через уже настроенный туннель.
+      После установки включи «Пробрасывать UDP через сервер» в настройках сервера.</p>
+
     <div style="display:flex;gap:9px;align-items:center;margin-top:6px">
       <button class="btn primary" id="vpsSetupStart" data-i18n="vps_setup_start">Настроить сервер</button>
       <span class="hint" id="vpsSetupNote"></span>
@@ -846,12 +864,21 @@ const I18N = {
     vps_install_panel:'Заодно поставить веб-панель Cockpit',
     vps_install_panel_note:'Отдельная веб-страница для администрирования сервера (системные службы, '+
       'сеть, диски) — новый открытый порт наружу. Показывает адрес и одноразовый пароль после установки.',
+    vps_install_udprelay:'Заодно поставить ретранслятор UDP (звонки, игры)',
+    vps_install_udprelay_note:'Слушает только 127.0.0.1 — отдельный порт наружу не открывается, '+
+      'достучаться до него можно только через уже настроенный туннель. После установки включи '+
+      '«Пробрасывать UDP через сервер» в настройках сервера.',
     vps_setup_start:'Настроить сервер',
     vps_setup_need_fields:'заполни адрес сервера и пароль root',
     vps_setup_done_ok:'готово',
     vps_setup_done_fail:'не получилось:',
     filter_title:'Какие программы вести через туннель',
     local_via_tunnel:'Локальную сеть тоже вести через сервер',
+    udp_relay_enabled:'Пробрасывать UDP (звонки, игры) через сервер',
+    udp_relay_help:'SSH умеет пробрасывать только TCP, поэтому по умолчанию видеозвонки, игры и QUIC '+
+      '(быстрый HTTP/3) не проходят через туннель. Эта галочка включает проброс через отдельный '+
+      'ретранслятор на сервере — ставится один раз, в мастере настройки VPS (кнопка «Настроить сервер по '+
+      'SSH» в этом же меню). Пока он не установлен, галочка ничего не меняет: UDP по-прежнему не проходит.',
     direct_label:'Всегда напрямую', scan_net:'Проверить сеть',
     direct_ph:'10.8.0.0/16, 172.30.*, .corp.local, vitazgio.ru',
     direct_help_html:'<p>Сети и домены, которые не надо вести через сервер. Домашние и офисные '+
@@ -953,12 +980,21 @@ const I18N = {
     vps_install_panel:'Also install the Cockpit web panel',
     vps_install_panel_note:'A separate web page for administering the server (system services, network, '+
       'disks) — one more open port. Shows the address and a one-time password once installed.',
+    vps_install_udprelay:'Also install the UDP relay (calls, games)',
+    vps_install_udprelay_note:"Listens only on 127.0.0.1 — no separate port opens up; it's reachable only "+
+      'through the tunnel that\'s already set up. Once installed, turn on "Route UDP through the server" '+
+      'in the server settings.',
     vps_setup_start:'Set up server',
     vps_setup_need_fields:'fill in the server address and the root password',
     vps_setup_done_ok:'done',
     vps_setup_done_fail:'failed:',
     filter_title:'Which apps go through the tunnel',
     local_via_tunnel:'Route the local network through the server too',
+    udp_relay_enabled:'Route UDP (calls, games) through the server',
+    udp_relay_help:'SSH can only forward TCP, so by default video calls, games, and QUIC (fast HTTP/3) '+
+      "don't get through the tunnel. This checkbox turns on forwarding through a separate relay on the "+
+      'server — set up once, in the VPS setup wizard ("Set up the server over SSH" button in this same '+
+      "menu). Until it's installed, this checkbox changes nothing: UDP still doesn't get through.",
     direct_label:'Always direct', scan_net:'Scan network',
     direct_ph:'10.8.0.0/16, 172.30.*, .corp.local, vitazgio.ru',
     direct_help_html:'<p>Networks and domains that shouldn\'t go through the server. Home and office '+
@@ -1026,7 +1062,7 @@ $('language').addEventListener('change', () => {
 });
 
 const FIELDS = ['host','user','keyPath','sshPort','socksPort','httpPort','poolSize'];
-const PROFILE_CHECKS = ['localViaTunnel'];
+const PROFILE_CHECKS = ['localViaTunnel', 'udpRelayEnabled'];
 const CHECKS = ['verbose'];
 
 /* Правила фильтра живут отдельно от полей формы: они правятся на своём
@@ -1553,6 +1589,7 @@ $('vpsSetupStart').onclick = async () => {
     host, port, user, password,
     keyPath: $('keyPath').value || undefined,
     installPanel: $('vpsInstallPanel').checked,
+    installUdpRelay: $('vpsInstallUdpRelay').checked,
   });
   if(r.error){
     vpsSetupRunning = false;
@@ -1775,6 +1812,7 @@ function toggleHelp(btnId, boxId, onShow){
 }
 toggleHelp('keyHelpBtn', 'keyHelp', renderSetupCmd);
 toggleHelp('localHelpBtn', 'localHelp');
+toggleHelp('udpRelayHelpBtn', 'udpRelayHelp');
 toggleHelp('directHelpBtn', 'directHelp');
 
 function hideKeyHelp(){
