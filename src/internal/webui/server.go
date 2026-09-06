@@ -185,6 +185,7 @@ func (s *Server) Serve() error {
 	mux.HandleFunc("/api/scannet", s.guard(s.handleScanNet))
 	mux.HandleFunc("/api/vpssetup/start", s.guard(s.handleVpsSetupStart))
 	mux.HandleFunc("/api/selfcheck", s.guard(s.handleSelfCheck))
+	mux.HandleFunc("/api/profile/latency", s.guard(s.handleProfileLatency))
 
 	srv := &http.Server{
 		Handler:           mux,
@@ -291,19 +292,24 @@ type statusResp struct {
 	// SeenApps — программы, замеченные за этот запуск: из них удобно
 	// собирать список фильтра, не вспоминая имена вручную.
 	SeenApps []string `json:"seenApps"`
+	// EffectiveProfile — какой сервер реально подключён сейчас. Пусто, если
+	// туннель не работает. Отличается от Config.ActiveProfile после
+	// автовыбора самого быстрого сервера или перехода на запасной.
+	EffectiveProfile string `json:"effectiveProfile,omitempty"`
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, statusResp{
-		State:    s.app.State(),
-		Running:  s.app.Running(),
-		Config:   s.app.Config(),
-		Stats:    s.app.Stats(),
-		SysProxy: sysproxy.Current(),
-		EnvHint:  s.app.EnvHint(),
-		ProxyURL: s.app.ProxyURL(),
-		SeenApps: s.app.SeenApps(),
-		OS:       runtime.GOOS,
+		State:            s.app.State(),
+		Running:          s.app.Running(),
+		Config:           s.app.Config(),
+		Stats:            s.app.Stats(),
+		SysProxy:         sysproxy.Current(),
+		EnvHint:          s.app.EnvHint(),
+		ProxyURL:         s.app.ProxyURL(),
+		SeenApps:         s.app.SeenApps(),
+		OS:               runtime.GOOS,
+		EffectiveProfile: s.app.EffectiveProfileID(),
 	})
 }
 
@@ -419,6 +425,14 @@ func (s *Server) handleSelfCheck(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	steps := s.app.SelfCheck(ctx)
 	writeJSON(w, map[string]any{"steps": steps})
+}
+
+// handleProfileLatency меряет отклик всех серверов рядом с вкладками — не
+// влияет на выбор при подключении, только на то, что видно человеку.
+func (s *Server) handleProfileLatency(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	writeJSON(w, map[string]any{"results": s.app.LatencyReport(ctx)})
 }
 
 func (s *Server) handleCheckIP(w http.ResponseWriter, r *http.Request) {

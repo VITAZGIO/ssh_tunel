@@ -226,6 +226,7 @@
   .netline.bad .mark{color:#ff8a5c}
   .netline.ok .mark{color:#4bd07a}
   .netline .cidr{font-family:ui-monospace,Consolas,monospace}
+  .tab .lat{font-size:10.5px;color:var(--dim);margin-left:5px}
   .netline.pending .mark{color:var(--dim)}
   .netline.skip{opacity:.5}
   .netline .why{color:var(--dim);margin-left:4px}
@@ -587,6 +588,15 @@
           <span class="lbl" data-i18n="show_picker">Показывать выбор сервера на главном экране</span></label>
       </div>
 
+      <div class="chk-row" id="autoPickRow" style="display:none">
+        <label class="chk"><input type="checkbox" id="autoPickFastest">
+          <span class="lbl" data-i18n="auto_pick_fastest">Подключаться к самому быстрому серверу</span></label>
+      </div>
+      <p class="note" id="autoPickNote" style="display:none;margin:-4px 0 10px" data-i18n="auto_pick_fastest_note">
+        При подключении программа измерит отклик всех серверов и выберет самый быстрый. Если он не поднимется
+        или упадёт — перейдёт на следующий по отклику, об этом будет видно в журнале. Возврат на выбранный
+        вручную сервер — кнопкой «Выбрать этот сервер» или при следующем подключении.</p>
+
       <div id="bootBlock" hidden>
         <label class="chk"><input type="checkbox" id="bootStart">
           <span class="lbl" data-i18n="boot_start">Запускать при старте системы</span></label>
@@ -855,6 +865,13 @@ const I18N = {
       'компьютера и скажет, сломается что-нибудь или нет.</p>',
     verbose:'Подробный журнал', connect_on_launch:'Подключаться сразу при запуске',
     show_picker:'Показывать выбор сервера на главном экране',
+    auto_pick_fastest:'Подключаться к самому быстрому серверу',
+    auto_pick_fastest_note:'При подключении программа измерит отклик всех серверов и выберет самый '+
+      'быстрый. Если он не поднимется или упадёт — перейдёт на следующий по отклику, об этом будет видно '+
+      'в журнале. Возврат на выбранный вручную сервер — кнопкой «Выбрать этот сервер» или при следующем '+
+      'подключении.',
+    latency_measuring:'…', latency_unreachable:'нет ответа',
+    backup_server_note:'запасной',
     boot_start:'Запускать при старте системы',
     boot_note:'Программа сама поставит службу systemd и разрешит ей работать без входа в систему — служба будет подниматься при загрузке машины.',
     autoconnect_note:'Туннель поднимется сам, как только программа стартует (сейчас или после перезагрузки) — жать «Подключить» в панели не придётся. Выключи, если хочешь запускать вручную.',
@@ -955,6 +972,12 @@ const I18N = {
       'adapters and tell you if anything would break.</p>',
     verbose:'Verbose log', connect_on_launch:'Connect immediately on launch',
     show_picker:'Show server picker on the home screen',
+    auto_pick_fastest:'Connect to the fastest server',
+    auto_pick_fastest_note:"When connecting, the program measures every server's response time and picks "+
+      "the fastest one. If it doesn't come up or drops, it moves on to the next-best one — visible in the "+
+      'log. Returning to the manually chosen server: the "Select this server" button, or the next connect.',
+    latency_measuring:'…', latency_unreachable:"no answer",
+    backup_server_note:'backup',
     boot_start:'Start at system boot',
     boot_note:'The program will install a systemd service itself and allow it to run without logging in — the service will come up at boot.',
     autoconnect_note:'The tunnel comes up on its own as soon as the program starts (now or after a reboot) — no need to press "Connect" in the panel. Turn it off if you\'d rather start it by hand.',
@@ -2088,6 +2111,24 @@ function liveRetitleEditingTab(){
   if(icon) icon.innerHTML = tabFlagHTML(flag);
 }
 
+// refreshLatencyBadges — отклик у каждой вкладки. Не влияет на то, к какому
+// серверу подключается программа, — только показывает цифры рядом с именем.
+let latencyRunning = false;
+async function refreshLatencyBadges(){
+  if(latencyRunning) return;
+  latencyRunning = true;
+  document.querySelectorAll('.tab .lat').forEach(el => el.textContent = tr('latency_measuring'));
+  try{
+    const r = await api('/api/profile/latency', {});
+    (r.results || []).forEach(res => {
+      const el = document.querySelector('.tab .lat[data-lat-id="' + CSS.escape(res.id) + '"]');
+      if(!el) return;
+      el.textContent = res.error ? tr('latency_unreachable') : res.ms + ' мс';
+    });
+  } catch(e){ /* тихо: это необязательное украшение вкладок */ }
+  latencyRunning = false;
+}
+
 /* ---------- вкладки серверов ---------- */
 // tabFlagHTML принимает код страны (или пусто — тогда логотип-заглушка).
 function tabFlagHTML(code){
@@ -2103,11 +2144,13 @@ function renderTabs(){
     b.dataset.id = p.id;
     b.innerHTML = '<span class="flagicon">' + tabFlagHTML(resolveFlagCode(p.flag)) + '</span>' +
       '<span class="nm"></span>' +
+      '<span class="lat" data-lat-id="' + p.id + '"></span>' +
       (p.id === cfg.activeProfile ? '<span class="dot" title="' + tr('current_server') + '"></span>' : '');
     b.querySelector('.nm').textContent = p.name;
     b.onclick = () => selectEditingTab(p.id);
     box.appendChild(b);
   });
+  if((cfg.profiles || []).length > 1) refreshLatencyBadges();
   const plus = document.createElement('button');
   plus.className = 'tab tabAdd';
   plus.textContent = '+';
@@ -2125,6 +2168,8 @@ function renderGeneralVisibility(){
   // .chk-row задаёт свой display:flex — как и с #curBadge/#homePicker, обычный
   // hidden тут не подействует.
   $('showPickerRow').style.display = many ? 'flex' : 'none';
+  $('autoPickRow').style.display = many ? 'flex' : 'none';
+  $('autoPickNote').style.display = many ? 'block' : 'none';
   $('removeServerBtn').hidden = !many;
 }
 
@@ -2276,6 +2321,7 @@ $('save').onclick = async () => {
   doc.autoStart = $('autoStart').checked;
   doc.language = LANG;
   doc.showServerPicker = $('showServerPicker').checked;
+  doc.autoPickFastest = $('autoPickFastest').checked;
 
   const r = await api('/api/config', doc);
   if(r.error){ showError(r.error, 'setError'); return; }
@@ -2306,6 +2352,7 @@ function fillGeneralForm(c){
   $('autoConnect').checked = c.autoConnect === undefined || c.autoConnect === null
     ? true : !!c.autoConnect;
   $('showServerPicker').checked = !!c.showServerPicker;
+  $('autoPickFastest').checked = !!c.autoPickFastest;
   if(c.language && c.language !== LANG){
     LANG = c.language === 'en' ? 'en' : 'ru';
   }
@@ -2332,8 +2379,15 @@ function applyDoc(newCfg, keepEditing){
 
 async function refresh(){
   const st = await api('/api/status');
-  const active = (st.config.profiles || []).find(p => p.id === st.config.activeProfile) || {};
-  setState(st.state, st.state === 'connected' ? active.host : '');
+  // На главном экране показываем сервер, к которому подключены на самом
+  // деле, — после автовыбора самого быстрого или перехода на запасной он
+  // может отличаться от выбранного вручную (st.config.activeProfile).
+  const usingBackup = st.effectiveProfile && st.effectiveProfile !== st.config.activeProfile;
+  const shownId = st.state === 'connected' && st.effectiveProfile ? st.effectiveProfile : st.config.activeProfile;
+  const active = (st.config.profiles || []).find(p => p.id === shownId) || {};
+  let detail = st.state === 'connected' ? active.host : '';
+  if(detail && usingBackup) detail += ' (' + tr('backup_server_note') + ')';
+  setState(st.state, detail);
   // Пока пользователь правит форму, обновление с сервера её не трогает —
   // иначе набранный, но ещё не сохранённый адрес затирался бы.
   seenApps = (st.seenApps || []);
