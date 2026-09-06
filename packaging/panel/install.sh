@@ -5,9 +5,16 @@
 #                                                      слушает 127.0.0.1:47823
 #   install.sh ./ssh_tunnel_panel --lan                панель на всех интерфейсах,
 #                                                      порт 47823 открывается в ufw
-#   install.sh ./ssh_tunnel_panel --domain panel.example.com
+#   install.sh ./ssh_tunnel_panel --domain=panel.example.com
 #                                                      свой HTTPS с автосертификатом
 #                                                      Let's Encrypt, порты 80 и 443
+#
+# С --domain адрес для SSH-подключения клиентов панель берёт из того же
+# домена — отдельно указывать не нужно. Без --domain (--lan или обычный
+# режим за реверс-прокси) конфиги для новых клиентов не соберутся, пока не
+# добавишь --ssh-host=АДРЕС_СЕРВЕРА:
+#
+#   install.sh ./ssh_tunnel_panel --lan --ssh-host=203.0.113.10
 #
 # Панель работает от root — иначе она не сможет заводить пользователей и
 # управлять доступом клиентов. Юнит намеренно сужает ей права на всё
@@ -17,10 +24,12 @@ set -euo pipefail
 BIN="./ssh_tunnel_panel"
 MODE="local"   # local | lan | domain
 DOMAIN=""
+SSH_HOST=""
 for arg in "$@"; do
   case "$arg" in
     --lan) MODE="lan" ;;
     --domain=*) MODE="domain"; DOMAIN="${arg#--domain=}" ;;
+    --ssh-host=*) SSH_HOST="${arg#--ssh-host=}" ;;
     *) BIN="$arg" ;;
   esac
 done
@@ -48,12 +57,20 @@ echo "Ставлю службу..."
 UNIT=/etc/systemd/system/ssh_tunnel_panel.service
 install -m 644 "$(dirname "$0")/ssh_tunnel_panel.service" "$UNIT"
 
+EXTRA=""
+if [ -n "$SSH_HOST" ]; then EXTRA=" -ssh-host $SSH_HOST"; fi
+
 case "$MODE" in
   lan)
-    sed -i 's|^ExecStart=.*|ExecStart=/usr/local/bin/ssh_tunnel_panel -listen 0.0.0.0:47823|' "$UNIT"
+    sed -i "s|^ExecStart=.*|ExecStart=/usr/local/bin/ssh_tunnel_panel -listen 0.0.0.0:47823$EXTRA|" "$UNIT"
     ;;
   domain)
-    sed -i "s|^ExecStart=.*|ExecStart=/usr/local/bin/ssh_tunnel_panel -domain $DOMAIN|" "$UNIT"
+    sed -i "s|^ExecStart=.*|ExecStart=/usr/local/bin/ssh_tunnel_panel -domain $DOMAIN$EXTRA|" "$UNIT"
+    ;;
+  local)
+    if [ -n "$EXTRA" ]; then
+      sed -i "s|^ExecStart=.*|ExecStart=/usr/local/bin/ssh_tunnel_panel$EXTRA|" "$UNIT"
+    fi
     ;;
 esac
 
@@ -89,6 +106,16 @@ if [ "$MODE" = "local" ]; then
   cat <<MSG
   (слушает 127.0.0.1:47823 — заведи в nginx/Caddy проксирование на этот адрес
    и свой сертификат для домена панели)
+MSG
+fi
+
+if [ "$MODE" != "domain" ] && [ -z "$SSH_HOST" ]; then
+  cat <<MSG
+
+Внимание: адрес для SSH-подключения клиентов не задан. Пока не перезапустишь
+службу с -ssh-host=АДРЕС_СЕРВЕРА (поправь ExecStart в $UNIT и
+"systemctl daemon-reload && systemctl restart ssh_tunnel_panel"), конфиги
+для новых клиентов не соберутся.
 MSG
 fi
 

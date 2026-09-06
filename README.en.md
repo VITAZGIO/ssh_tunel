@@ -24,12 +24,14 @@ standard SSH mechanism.
 | **Windows** | [**ssh_tunnel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe) | window with a button, tray icon |
 | **Android** | [**ssh_tunnel.apk**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.apk) | VPN connection, quick-settings tile |
 | **Linux** | [**Installing on Linux**](docs/LINUX_SETUP.en.md) | console + web interface, systemd service, commands for every major distro |
-| **VPS server** | [**First-time setup**](docs/SERVER_SETUP.md) | what to do on a fresh server: the `tunnel` user, keys, firewall |
+| **VPS server** | [**Installing the panel**](docs/PANEL_SETUP.md) (in Russian) | a web panel on the server itself: adds clients with a button, no console needed |
 
 Windows and Android are direct file links. Linux and VPS server open an
 instructions page instead: Linux has too many different systems for one
 command to cover, and a VPS isn't a file at all — it's a sequence of steps on
-a fresh server.
+a fresh server. Manual server setup without the panel (one shared tunnel
+user, set up over SSH) is in the
+[first-time server setup](docs/SERVER_SETUP.md) (in Russian).
 
 The ARM build and the checksums are on the
 [release page](https://github.com/VITAZGIO/ssh_tunel/releases/latest).
