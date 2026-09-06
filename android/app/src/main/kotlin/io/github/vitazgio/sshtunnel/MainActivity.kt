@@ -117,6 +117,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var adBlockUpdateButton: Button
     private lateinit var adBlockStatusView: TextView
     private lateinit var udpRelayEnabledCheck: CheckBox
+    private lateinit var showServerPickerCheck: CheckBox
+
+    private lateinit var homePicker: View
+    private lateinit var homePickerFlag: FlagView
+    private lateinit var homePickerName: TextView
 
     private lateinit var selfCheckSteps: LinearLayout
     private lateinit var selfCheckStartButton: Button
@@ -206,6 +211,12 @@ class MainActivity : AppCompatActivity() {
         adBlockUpdateButton = findViewById(R.id.adBlockUpdate)
         adBlockStatusView = findViewById(R.id.adBlockStatus)
         udpRelayEnabledCheck = findViewById(R.id.udpRelayEnabled)
+        showServerPickerCheck = findViewById(R.id.showServerPicker)
+
+        homePicker = findViewById(R.id.homePicker)
+        homePickerFlag = findViewById(R.id.homePickerFlag)
+        homePickerName = findViewById(R.id.homePickerName)
+        homePicker.setOnClickListener { showServerPickerMenu() }
 
         selfCheckSteps = findViewById(R.id.selfCheckSteps)
         selfCheckStartButton = findViewById(R.id.selfCheckStart)
@@ -380,19 +391,74 @@ class MainActivity : AppCompatActivity() {
         profileTabs.removeAllViews()
         val active = settings.activeProfileId
         for (p in settings.profiles) {
-            val tab = LayoutInflater.from(this).inflate(android.R.layout.simple_list_item_1, profileTabs, false) as TextView
-            tab.text = (if (p.flag.isNotBlank()) "⚑ " else "") + p.name
-            tab.setPadding(28, 16, 28, 16)
-            tab.setTextColor(ContextCompat.getColor(this, R.color.text))
-            tab.textSize = 12.5f
+            val tab = LinearLayout(this)
+            tab.orientation = LinearLayout.HORIZONTAL
+            tab.gravity = Gravity.CENTER_VERTICAL
+            tab.setPadding(dp(14), dp(8), dp(14), dp(8))
             tab.setBackgroundResource(if (p.id == editingProfileId) R.drawable.bg_button_primary else R.drawable.bg_button)
-            if (p.id == active) tab.text = "● " + tab.text
+
+            val flag = FlagView(this)
+            flag.code = p.flag
+            val flagLp = LinearLayout.LayoutParams(dp(18), dp(13))
+            flagLp.gravity = Gravity.CENTER_VERTICAL
+            flag.layoutParams = flagLp
+            tab.addView(flag)
+
+            val label = TextView(this)
+            label.text = (if (p.id == active) "● " else "") + p.name
+            label.setTextColor(ContextCompat.getColor(this, R.color.text))
+            label.textSize = 12.5f
+            val labelLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            labelLp.marginStart = dp(6)
+            label.layoutParams = labelLp
+            tab.addView(label)
+
             val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-            lp.marginEnd = 6
+            lp.marginEnd = dp(6)
             tab.layoutParams = lp
             tab.setOnClickListener { onTabClicked(p.id) }
             profileTabs.addView(tab)
         }
+        renderHomePicker()
+    }
+
+    /** Виджет «город и флаг активного сервера» под кнопкой на главном
+     *  экране — как #homePicker в панели на компьютере. */
+    private fun renderHomePicker() {
+        val show = settings.showServerPicker && settings.profiles.size > 1
+        homePicker.visibility = if (show) View.VISIBLE else View.GONE
+        if (!show) return
+        val active = settings.profiles.find { it.id == settings.activeProfileId } ?: settings.active()
+        homePickerFlag.code = active.flag
+        homePickerName.text = active.name
+    }
+
+    private fun showServerPickerMenu() {
+        val list = LinearLayout(this)
+        list.orientation = LinearLayout.VERTICAL
+        for (p in settings.profiles) {
+            list.addView(cityRow(FlagViewIcon(p.flag), p.name) {
+                switchActiveProfile(p.id)
+            })
+        }
+        val popup = PopupWindow(list, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, true)
+        popup.setBackgroundDrawable(ContextCompat.getDrawable(this, R.drawable.bg_card))
+        popup.elevation = 12f
+        popup.showAsDropDown(homePicker, 0, 4)
+    }
+
+    /** Переключает активный сервер (не обязательно тот, что сейчас в форме
+     *  настроек) — общий код для «Выбрать этот сервер» и виджета на главной. */
+    private fun switchActiveProfile(id: String) {
+        if (id == settings.activeProfileId) return
+        if (TunnelService.state != "stopped") {
+            startService(Intent(this, TunnelService::class.java).setAction(TunnelService.ACTION_STOP))
+            Toast.makeText(this, R.string.tunnel_stopped_for_switch, Toast.LENGTH_LONG).show()
+        }
+        settings.setActive(id)
+        renderProfileTabs()
+        Toast.makeText(this, R.string.server_switched, Toast.LENGTH_SHORT).show()
+        refresh()
     }
 
     private fun onTabClicked(id: String) {
@@ -436,14 +502,7 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, R.string.server_switched, Toast.LENGTH_SHORT).show()
             return
         }
-        if (TunnelService.state != "stopped") {
-            startService(Intent(this, TunnelService::class.java).setAction(TunnelService.ACTION_STOP))
-            Toast.makeText(this, R.string.tunnel_stopped_for_switch, Toast.LENGTH_LONG).show()
-        }
-        settings.setActive(editingProfileId)
-        renderProfileTabs()
-        Toast.makeText(this, R.string.server_switched, Toast.LENGTH_SHORT).show()
-        refresh()
+        switchActiveProfile(editingProfileId)
     }
 
     // ---------------------------------------------------------------------
@@ -600,6 +659,7 @@ class MainActivity : AppCompatActivity() {
         adBlockSourcesEdit.setText(settings.adBlockSources)
         adBlockAllowlistEdit.setText(settings.adBlockAllowlist)
         udpRelayEnabledCheck.isChecked = settings.udpRelayEnabled
+        showServerPickerCheck.isChecked = settings.showServerPicker
     }
 
     private fun saveAppSettings() {
@@ -607,6 +667,9 @@ class MainActivity : AppCompatActivity() {
         settings.adBlockSources = adBlockSourcesEdit.text.toString()
         settings.adBlockAllowlist = adBlockAllowlistEdit.text.toString()
         settings.udpRelayEnabled = udpRelayEnabledCheck.isChecked
+        val pickerChanged = settings.showServerPicker != showServerPickerCheck.isChecked
+        settings.showServerPicker = showServerPickerCheck.isChecked
+        if (pickerChanged) renderHomePicker()
     }
 
     private fun saveSettings() {

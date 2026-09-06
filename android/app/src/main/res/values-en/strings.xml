@@ -121,6 +121,7 @@
     <string name="always_on_label">Auto-start and always-on VPN — in system settings</string>
 
     <string name="udp_relay_enabled">Route UDP (calls, games) through the server</string>
+    <string name="show_picker">Show server picker on the home screen</string>
     <string name="udp_relay_note">Needs the relay installed on the server (the VPS setup wizard on the computer, web panel tab). Until it is there, turning this on changes nothing — UDP still doesn\'t go through.</string>
 
     <string name="selfcheck_title">Self-check</string>

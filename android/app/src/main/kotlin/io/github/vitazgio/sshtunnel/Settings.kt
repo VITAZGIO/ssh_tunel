@@ -251,6 +251,12 @@ class Settings(context: Context) {
         get() = prefs.getBoolean("udpRelayEnabled", false)
         set(v) = prefs.edit().putBoolean("udpRelayEnabled", v).apply()
 
+    /** Виджет «город и флаг активного сервера» на главном экране — виден
+     *  только вместе с этой галочкой и когда серверов больше одного. */
+    var showServerPicker: Boolean
+        get() = prefs.getBoolean("showServerPicker", false)
+        set(v) = prefs.edit().putBoolean("showServerPicker", v).apply()
+
     val knownHostsFile: File get() = File(filesDir, "known_hosts")
 
     // ---------------------------------------------------------------------
