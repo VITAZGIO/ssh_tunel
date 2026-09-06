@@ -45,6 +45,11 @@
             android:exported="false"
             android:label="@string/apps_title" />
 
+        <activity
+            android:name=".AdBlockActivity"
+            android:exported="false"
+            android:label="@string/ad_block_title" />
+
         <!--
             Кнопка в шторке быстрых настроек. Разрешение выдаёт система: с ним
             запускать её может только она сама.

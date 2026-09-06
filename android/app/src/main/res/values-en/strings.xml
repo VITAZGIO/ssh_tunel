@@ -115,6 +115,13 @@
     <string name="ad_block_updating">Updating…</string>
     <string name="ad_block_updated">names loaded: %1$d</string>
     <string name="ad_block_update_failed">failed: %1$s</string>
+    <string name="ad_block_title">Ad blocking</string>
+    <string name="ad_block_tab_block">Block list</string>
+    <string name="ad_block_tab_allow">Allow list</string>
+    <string name="adblock_paste">Paste from clipboard</string>
+    <string name="adblock_copy">Copy</string>
+    <string name="adblock_copied">List copied</string>
+    <string name="ad_block_off">Off</string>
     <string name="tile_blocked">BLOCKED</string>
 
     <string name="always_on_hint">Want the tunnel to come up on its own when the phone starts and never drop — in the system settings: Settings → Network and internet → VPN → the gear next to this app → \"Always-on VPN\". The same screen has \"Block connections without VPN\": with it on, all traffic stops if the tunnel breaks instead of going around it — the system does this itself, the app stays out of it.</string>

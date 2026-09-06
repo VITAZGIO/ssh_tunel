@@ -64,6 +64,13 @@
     <string name="ad_block_updating">Обновляю…</string>
     <string name="ad_block_updated">загружено имён: %1$d</string>
     <string name="ad_block_update_failed">не получилось: %1$s</string>
+    <string name="ad_block_title">Блокировка рекламы</string>
+    <string name="ad_block_tab_block">Чёрный список</string>
+    <string name="ad_block_tab_allow">Белый список</string>
+    <string name="adblock_paste">Вставить из буфера</string>
+    <string name="adblock_copy">Скопировать</string>
+    <string name="adblock_copied">Список скопирован</string>
+    <string name="ad_block_off">Выключена</string>
 
     <string name="selfcheck_open">Самопроверка</string>
     <string name="selfcheck_title">Самопроверка</string>

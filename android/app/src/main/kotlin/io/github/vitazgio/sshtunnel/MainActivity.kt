@@ -33,7 +33,6 @@ import androidx.core.content.ContextCompat
 import androidx.core.os.LocaleListCompat
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
-import mobile.Mobile
 import org.json.JSONObject
 
 /**
@@ -73,7 +72,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tileUp: TextView
     private lateinit var tileConns: TextView
     private lateinit var tileLinks: TextView
-    private lateinit var tileBlocked: TextView
 
     private lateinit var issuedByPanel: TextView
     private lateinit var hostEdit: EditText
@@ -111,11 +109,8 @@ class MainActivity : AppCompatActivity() {
     /** Выбранный в выпадающем списке город, либо null — своё имя без флага. */
     private var pickedCity: Cities.City? = null
 
-    private lateinit var adBlockEnabledCheck: CheckBox
-    private lateinit var adBlockSourcesEdit: EditText
-    private lateinit var adBlockAllowlistEdit: EditText
-    private lateinit var adBlockUpdateButton: Button
-    private lateinit var adBlockStatusView: TextView
+    private lateinit var adBlockRow: View
+    private lateinit var adBlockSummary: TextView
     private lateinit var udpRelayEnabledCheck: CheckBox
     private lateinit var showServerPickerCheck: CheckBox
 
@@ -173,7 +168,6 @@ class MainActivity : AppCompatActivity() {
         tileUp = findViewById(R.id.tileUp)
         tileConns = findViewById(R.id.tileConns)
         tileLinks = findViewById(R.id.tileLinks)
-        tileBlocked = findViewById(R.id.tileBlocked)
 
         issuedByPanel = findViewById(R.id.issuedByPanel)
         hostEdit = findViewById(R.id.host)
@@ -205,11 +199,9 @@ class MainActivity : AppCompatActivity() {
         generalPanelChevron = findViewById(R.id.generalPanelChevron)
         generalPanelBody = findViewById(R.id.generalPanelBody)
 
-        adBlockEnabledCheck = findViewById(R.id.adBlockEnabled)
-        adBlockSourcesEdit = findViewById(R.id.adBlockSources)
-        adBlockAllowlistEdit = findViewById(R.id.adBlockAllowlist)
-        adBlockUpdateButton = findViewById(R.id.adBlockUpdate)
-        adBlockStatusView = findViewById(R.id.adBlockStatus)
+        adBlockRow = findViewById(R.id.adBlockRow)
+        adBlockSummary = findViewById(R.id.adBlockSummary)
+        adBlockRow.setOnClickListener { startActivity(Intent(this, AdBlockActivity::class.java)) }
         udpRelayEnabledCheck = findViewById(R.id.udpRelayEnabled)
         showServerPickerCheck = findViewById(R.id.showServerPicker)
 
@@ -232,7 +224,6 @@ class MainActivity : AppCompatActivity() {
         power.setOnClickListener { onToggle() }
         speedButton.setOnClickListener { runSpeedTest() }
         findViewById<Button>(R.id.save).setOnClickListener { saveSettings() }
-        adBlockUpdateButton.setOnClickListener { updateBlockLists() }
         selfCheckStartButton.setOnClickListener { runSelfCheck() }
         findViewById<View>(R.id.toSelfCheck).setOnClickListener {
             flipper.displayedChild = SELFCHECK
@@ -251,8 +242,6 @@ class MainActivity : AppCompatActivity() {
         scanConfigBtn.setOnClickListener { onScanConfig() }
         localCheckInfo.setOnClickListener { showTip(it, getString(R.string.local_via_tunnel_note)) }
         bindInfo(R.id.alwaysOnInfo, R.string.always_on_hint)
-        bindInfo(R.id.adBlockSourcesInfo, R.string.ad_block_sources_note)
-        bindInfo(R.id.adBlockUpdateInfo, R.string.ad_block_note)
         bindInfo(R.id.udpRelayInfo, R.string.udp_relay_note)
         bindInfo(R.id.poolInfo, R.string.pool_note)
         bindInfo(R.id.directInfo, R.string.direct_note)
@@ -310,6 +299,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         TunnelService.onUpdate = { runOnUiThread { refresh() } }
+        renderAdBlockSummary()
         refresh()
     }
 
@@ -655,17 +645,22 @@ class MainActivity : AppCompatActivity() {
     // отдельному серверу: они не переезжают вместе с профилем и читаются один
     // раз при открытии экрана.
     private fun loadAppSettings() {
-        adBlockEnabledCheck.isChecked = settings.adBlockEnabled
-        adBlockSourcesEdit.setText(settings.adBlockSources)
-        adBlockAllowlistEdit.setText(settings.adBlockAllowlist)
+        renderAdBlockSummary()
         udpRelayEnabledCheck.isChecked = settings.udpRelayEnabled
         showServerPickerCheck.isChecked = settings.showServerPicker
     }
 
+    /** Список блокировки и белый список редактируются в AdBlockActivity —
+     *  здесь только сводка в строке, которую надо освежить после возврата. */
+    private fun renderAdBlockSummary() {
+        adBlockSummary.text = if (settings.adBlockEnabled) {
+            getString(R.string.ad_block_enabled) + " · " + getString(R.string.tile_blocked) + ": " + settings.adBlockTotal
+        } else {
+            getString(R.string.ad_block_off)
+        }
+    }
+
     private fun saveAppSettings() {
-        settings.adBlockEnabled = adBlockEnabledCheck.isChecked
-        settings.adBlockSources = adBlockSourcesEdit.text.toString()
-        settings.adBlockAllowlist = adBlockAllowlistEdit.text.toString()
         settings.udpRelayEnabled = udpRelayEnabledCheck.isChecked
         val pickerChanged = settings.showServerPicker != showServerPickerCheck.isChecked
         settings.showServerPicker = showServerPickerCheck.isChecked
@@ -862,41 +857,6 @@ class MainActivity : AppCompatActivity() {
     // дёргается при каждом появлении результата.
     private val hideSpeed = Runnable { rowSpeed.visibility = View.INVISIBLE }
 
-    /**
-     * Загружает списки блокировки по нажатию кнопки — не сама по себе, не по
-     * расписанию. Сеть небыстрая, поэтому в отдельном потоке; результат
-     * (сколько имён загружено, или ошибка) сохраняется на телефон самим ядром
-     * и тут же показывается человеку.
-     */
-    private fun updateBlockLists() {
-        val sources = adBlockSourcesEdit.text.toString()
-        if (sources.isBlank()) {
-            adBlockStatusView.text = ""
-            Toast.makeText(this, R.string.ad_block_sources_hint, Toast.LENGTH_SHORT).show()
-            return
-        }
-        settings.adBlockSources = sources
-        adBlockUpdateButton.isEnabled = false
-        adBlockStatusView.setText(R.string.ad_block_updating)
-        Thread {
-            val result = try {
-                Mobile.updateBlockLists(sources, settings.adBlockListFile.absolutePath)
-            } catch (e: Exception) {
-                """{"error":"${e.message}"}"""
-            }
-            runOnUiThread {
-                adBlockUpdateButton.isEnabled = true
-                val o = try { JSONObject(result) } catch (e: Exception) { JSONObject() }
-                val err = o.optString("error")
-                adBlockStatusView.text = if (err.isNotBlank()) {
-                    getString(R.string.ad_block_update_failed, err)
-                } else {
-                    getString(R.string.ad_block_updated, o.optInt("count"))
-                }
-            }
-        }.start()
-    }
-
     private val SELFCHECK_STEP_NAMES = listOf("dns", "port", "key", "forward", "dns_tunnel", "sites", "external_ip")
 
     private fun selfCheckStepLabelRes(name: String): Int = when (name) {
@@ -1082,11 +1042,18 @@ class MainActivity : AppCompatActivity() {
         tileLinks.text = if (running) "${o.optInt("healthy")} / ${o.optInt("links")}" else "—"
         // Сессия — с текущего подключения (её считает ядро и обнуляет при
         // каждом новом старте), «всего» — копится на телефоне между сеансами,
-        // см. Settings.adBlockTotal и TunnelService.poll.
-        tileBlocked.text = getString(R.string.tile_blocked) + ": " + if (running && settings.adBlockEnabled) {
-            "${o.optInt("adsBlocked")} (всего ${settings.adBlockTotal})"
+        // см. Settings.adBlockTotal и TunnelService.poll. Сама строка блокировки
+        // рекламы теперь на отдельном экране (AdBlockActivity), здесь только
+        // сводка в её карточке на экране настроек.
+        if (settings.adBlockEnabled) {
+            adBlockSummary.text = if (running) {
+                getString(R.string.ad_block_enabled) + " · ${o.optInt("adsBlocked")} (" +
+                    getString(R.string.tile_blocked) + ": ${settings.adBlockTotal})"
+            } else {
+                getString(R.string.ad_block_enabled) + " · " + getString(R.string.tile_blocked) + ": ${settings.adBlockTotal}"
+            }
         } else {
-            "—"
+            adBlockSummary.text = getString(R.string.ad_block_off)
         }
 
         showPing(if (state == "connected") o.optLong("pingMs") else 0L)

@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg"
+    android:padding="16dp">
+
+    <LinearLayout style="@style/HeadRow">
+        <ImageView
+            android:id="@+id/backFromAdBlock"
+            style="@style/HeadIcon"
+            android:src="@drawable/ic_back"
+            android:contentDescription="@string/back" />
+
+        <TextView style="@style/HeadTitle" android:text="@string/ad_block_title" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <CheckBox
+                android:id="@+id/adBlockEnabled"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text"
+                android:text="@string/ad_block_enabled" />
+
+            <TextView
+                android:id="@+id/tileBlocked"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:paddingBottom="8dp"
+                android:textSize="12.5sp"
+                android:textColor="@color/dim" />
+
+            <!-- Две вкладки, как у экрана приложений: список блокировки
+                 отдельно от списка исключений — оба применяются одновременно. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:orientation="horizontal">
+                <Button
+                    android:id="@+id/tabBlockBtn"
+                    style="@style/SecondaryButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:textSize="12.5sp"
+                    android:paddingTop="9dp"
+                    android:paddingBottom="9dp"
+                    android:text="@string/ad_block_tab_block" />
+                <Space android:layout_width="8dp" android:layout_height="1dp" />
+                <Button
+                    android:id="@+id/tabAllowBtn"
+                    style="@style/SecondaryButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:textSize="12.5sp"
+                    android:paddingTop="9dp"
+                    android:paddingBottom="9dp"
+                    android:text="@string/ad_block_tab_allow" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center_vertical">
+                <TextView
+                    android:id="@+id/tabLabel"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:textSize="12sp"
+                    android:textColor="@color/dim" />
+                <TextView
+                    android:id="@+id/tabInfo"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:background="@drawable/bg_infoq"
+                    android:gravity="center"
+                    android:textSize="9sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/dim"
+                    android:text="?"
+                    android:clickable="true"
+                    android:focusable="true" />
+            </LinearLayout>
+
+            <EditText
+                android:id="@+id/listEdit"
+                style="@style/Field"
+                android:inputType="textMultiLine"
+                android:minLines="6"
+                android:gravity="top"
+                android:textColorHint="@color/dim"
+                android:autofillHints="" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <Button
+                    android:id="@+id/pasteListBtn"
+                    style="@style/SecondaryButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:textSize="12sp"
+                    android:paddingTop="9dp"
+                    android:paddingBottom="9dp"
+                    android:text="@string/adblock_paste" />
+                <Space android:layout_width="6dp" android:layout_height="1dp" />
+                <Button
+                    android:id="@+id/copyListBtn"
+                    style="@style/SecondaryButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:textSize="12sp"
+                    android:paddingTop="9dp"
+                    android:paddingBottom="9dp"
+                    android:text="@string/adblock_copy" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+                <Button
+                    android:id="@+id/adBlockUpdate"
+                    style="@style/SecondaryButton"
+                    android:layout_width="wrap_content"
+                    android:text="@string/ad_block_update" />
+                <TextView
+                    android:id="@+id/adBlockStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:textSize="12.5sp"
+                    android:textColor="@color/dim" />
+                <TextView
+                    android:id="@+id/adBlockUpdateInfo"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_infoq"
+                    android:gravity="center"
+                    android:textSize="9sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/dim"
+                    android:text="?"
+                    android:clickable="true"
+                    android:focusable="true" />
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>
