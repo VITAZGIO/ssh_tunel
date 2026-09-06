@@ -61,6 +61,15 @@ type Server struct {
 	// системы», чтобы после перезагрузки панель работала в том же режиме, а
 	// не в угаданном.
 	bootFlags []string
+
+	// vpsSetup — идёт ли сейчас настройка VPS. Мастер занимает минуту-две и
+	// трогает sshd на сервере; запускать второй одновременно с первым — верный
+	// способ всё перепутать, поэтому второй запрос отклоняется, пока первый
+	// не закончился.
+	vpsSetup struct {
+		mu      sync.Mutex
+		running bool
+	}
 }
 
 // App — то, что интерфейс умеет делать с программой.
@@ -173,6 +182,7 @@ func (s *Server) Serve() error {
 	mux.HandleFunc("/api/genkey", s.guard(s.handleGenKey))
 	mux.HandleFunc("/api/bootstart", s.guard(s.handleBootStart))
 	mux.HandleFunc("/api/scannet", s.guard(s.handleScanNet))
+	mux.HandleFunc("/api/vpssetup/start", s.guard(s.handleVpsSetupStart))
 
 	srv := &http.Server{
 		Handler:           mux,
@@ -513,6 +523,60 @@ func (s *Server) handleBootStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]any{"ok": true, "state": currentBootState()})
+}
+
+// handleVpsSetupStart запускает мастер настройки VPS в фоне и сразу отвечает
+// — ход работы (построчный вывод скриптов, ошибки, готовность) смотрят через
+// уже существующий поток /events, событиями events.KindVpsSetup. Пароль root
+// уходит прямо в runVpsSetup и не возвращается в ответе ни в каком виде.
+func (s *Server) handleVpsSetupStart(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Host         string `json:"host"`
+		Port         int    `json:"port"`
+		User         string `json:"user"`
+		Password     string `json:"password"`
+		KeyPath      string `json:"keyPath"`
+		InstallPanel bool   `json:"installPanel"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, map[string]string{"error": "не разобрал запрос: " + err.Error()})
+		return
+	}
+
+	s.vpsSetup.mu.Lock()
+	if s.vpsSetup.running {
+		s.vpsSetup.mu.Unlock()
+		writeJSON(w, map[string]string{"error": "настройка сервера уже идёт"})
+		return
+	}
+	s.vpsSetup.running = true
+	s.vpsSetup.mu.Unlock()
+
+	keyPath := strings.TrimSpace(req.KeyPath)
+	if keyPath == "" {
+		keyPath = config.DetectKeyPath()
+	}
+	port := req.Port
+	if port <= 0 {
+		port = 22
+	}
+	params := vpsSetupParams{
+		Host:         strings.TrimSpace(req.Host),
+		Port:         port,
+		User:         strings.TrimSpace(req.User),
+		Password:     req.Password,
+		KeyPath:      keyPath,
+		InstallPanel: req.InstallPanel,
+	}
+	go func() {
+		defer func() {
+			s.vpsSetup.mu.Lock()
+			s.vpsSetup.running = false
+			s.vpsSetup.mu.Unlock()
+		}()
+		runVpsSetup(s.app.Bus, params)
+	}()
+	writeJSON(w, map[string]bool{"ok": true})
 }
 
 // handleEvents — поток событий в окно (Server-Sent Events). Проще вебсокетов

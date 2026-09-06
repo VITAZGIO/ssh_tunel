@@ -507,6 +507,12 @@
       <p class="note" id="cmd3note"></p>
     </div>
 
+    <button class="row-link" id="toVpsSetup" style="margin:2px 0 14px">
+      <span class="t"><span data-i18n="vps_setup_row">Настроить сервер по SSH</span>
+        <div class="v" data-i18n="vps_setup_row_sub">Ключ, firewall и отдельный пользователь — одной кнопкой</div>
+      </span>
+    </button>
+
     <div class="two">
       <div class="field"><label for="sshPort">SSH-порт</label>
         <input type="number" id="sshPort" min="1" max="65535"></div>
@@ -657,6 +663,48 @@
     </div>
   </div>
 
+  <!-- НАСТРОЙКА VPS -->
+  <div class="view" id="viewVpsSetup">
+    <div class="head">
+      <button class="ico" id="backFromVpsSetup" title="Назад в настройки" data-i18n-title="back_to_settings">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <span class="t" data-i18n="vps_setup_title">Настройка сервера по SSH</span>
+    </div>
+
+    <p class="note" style="margin-top:0" data-i18n="vps_setup_intro">Программа сама подключится по паролю
+      root, положит на сервер свой ключ, проверит, что вход по нему работает, и только после этого
+      выполнит те же шаги, что описаны в docs/SERVER_SETUP.md: базовую защиту (firewall, бан за перебор,
+      отключение входа по паролю) и отдельного пользователя, которому можно только пробрасывать
+      соединения. Пароль root нигде не сохраняется и не показывается повторно.</p>
+
+    <div class="field"><label for="vpsHost" data-i18n="host_label">Адрес сервера</label>
+      <input type="text" id="vpsHost" spellcheck="false" data-i18n-ph="host_ph"></div>
+    <div class="two">
+      <div class="field"><label for="vpsPort" data-i18n="vps_port_label">SSH-порт</label>
+        <input type="number" id="vpsPort" min="1" max="65535" value="22"></div>
+      <div class="field"><label for="vpsUser" data-i18n="vps_user_label">Пользователь</label>
+        <input type="text" id="vpsUser" spellcheck="false" value="root"></div>
+    </div>
+    <div class="field"><label for="vpsPassword" data-i18n="vps_password_label">Пароль root</label>
+      <input type="password" id="vpsPassword" autocomplete="off" spellcheck="false"></div>
+
+    <label class="chk" style="margin:4px 0 14px">
+      <input type="checkbox" id="vpsInstallPanel">
+      <span class="lbl" data-i18n="vps_install_panel">Заодно поставить веб-панель Cockpit</span></label>
+    <p class="note" style="margin-top:-8px" data-i18n="vps_install_panel_note">Отдельная веб-страница для
+      администрирования сервера (систeмные службы, сеть, диски) — новый открытый порт наружу. Показывает
+      адрес и одноразовый пароль после установки.</p>
+
+    <div style="display:flex;gap:9px;align-items:center;margin-top:6px">
+      <button class="btn primary" id="vpsSetupStart" data-i18n="vps_setup_start">Настроить сервер</button>
+      <span class="hint" id="vpsSetupNote"></span>
+    </div>
+
+    <div class="help" id="vpsSetupLog" hidden style="margin-top:14px;max-height:320px;overflow:auto;
+      white-space:pre-wrap;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace"></div>
+  </div>
+
   <!-- ЖУРНАЛ -->
   <div class="view" id="viewLog">
     <div class="head">
@@ -723,6 +771,22 @@ const I18N = {
     discard_unsaved:'Есть несохранённые правки — переключиться и потерять их?',
     host_label:'Адрес сервера', host_ph:'адрес или домен сервера',
     user_label:'Пользователь SSH', key_label:'Приватный ключ',
+    vps_setup_row:'Настроить сервер по SSH',
+    vps_setup_row_sub:'Ключ, firewall и отдельный пользователь — одной кнопкой',
+    vps_setup_title:'Настройка сервера по SSH',
+    vps_setup_intro:'Программа сама подключится по паролю root, положит на сервер свой ключ, '+
+      'проверит, что вход по нему работает, и только после этого выполнит те же шаги, что описаны в '+
+      'docs/SERVER_SETUP.md: базовую защиту (firewall, бан за перебор, отключение входа по паролю) и '+
+      'отдельного пользователя, которому можно только пробрасывать соединения. Пароль root нигде не '+
+      'сохраняется и не показывается повторно.',
+    vps_port_label:'SSH-порт', vps_user_label:'Пользователь', vps_password_label:'Пароль root',
+    vps_install_panel:'Заодно поставить веб-панель Cockpit',
+    vps_install_panel_note:'Отдельная веб-страница для администрирования сервера (системные службы, '+
+      'сеть, диски) — новый открытый порт наружу. Показывает адрес и одноразовый пароль после установки.',
+    vps_setup_start:'Настроить сервер',
+    vps_setup_need_fields:'заполни адрес сервера и пароль root',
+    vps_setup_done_ok:'готово',
+    vps_setup_done_fail:'не получилось:',
     filter_title:'Какие программы вести через туннель',
     local_via_tunnel:'Локальную сеть тоже вести через сервер',
     direct_label:'Всегда напрямую', scan_net:'Проверить сеть',
@@ -778,6 +842,22 @@ const I18N = {
     discard_unsaved:'There are unsaved changes — switch and lose them?',
     host_label:'Server address', host_ph:'server address or domain',
     user_label:'SSH user', key_label:'Private key',
+    vps_setup_row:'Set up the server over SSH',
+    vps_setup_row_sub:'Key, firewall and a dedicated user — one button',
+    vps_setup_title:'Server setup over SSH',
+    vps_setup_intro:'The program connects with the root password itself, installs its own key on the '+
+      'server, checks that logging in with it actually works, and only then runs the same steps described '+
+      'in docs/SERVER_SETUP.md: basic hardening (firewall, brute-force ban, disabling password login) and '+
+      'a dedicated user that can only forward connections. The root password is never saved and never '+
+      'shown again.',
+    vps_port_label:'SSH port', vps_user_label:'User', vps_password_label:'Root password',
+    vps_install_panel:'Also install the Cockpit web panel',
+    vps_install_panel_note:'A separate web page for administering the server (system services, network, '+
+      'disks) — one more open port. Shows the address and a one-time password once installed.',
+    vps_setup_start:'Set up server',
+    vps_setup_need_fields:'fill in the server address and the root password',
+    vps_setup_done_ok:'done',
+    vps_setup_done_fail:'failed:',
     filter_title:'Which apps go through the tunnel',
     local_via_tunnel:'Route the local network through the server too',
     direct_label:'Always direct', scan_net:'Scan network',
@@ -1042,7 +1122,7 @@ function docWithProfile(p){
 }
 
 /* ---------- переключение экранов ---------- */
-const VIEWS = ['viewMain','viewSettings','viewFilter','viewLog'];
+const VIEWS = ['viewMain','viewSettings','viewFilter','viewVpsSetup','viewLog'];
 let current = 'viewMain';
 
 function show(name){
@@ -1069,6 +1149,13 @@ $('backFromSettings').onclick = () => show('viewMain');
 $('backFromLog').onclick = () => show('viewMain');
 $('backFromFilter').onclick = () => show('viewSettings');
 $('toFilter').onclick = () => show('viewFilter');
+$('backFromVpsSetup').onclick = () => show('viewSettings');
+$('toVpsSetup').onclick = () => {
+  if(!$('vpsHost').value) $('vpsHost').value = $('host').value;
+  if($('user').value) $('vpsUser').value = $('user').value;
+  if($('sshPort').value) $('vpsPort').value = $('sshPort').value;
+  show('viewVpsSetup');
+};
 
 /* ---------- форматирование ---------- */
 function fmtMbps(v){
@@ -1158,9 +1245,10 @@ function connectEvents(){
   const es = new EventSource('/events?t=' + encodeURIComponent(T));
   es.onmessage = ev => {
     const e = JSON.parse(ev.data);
-    if(e.kind === 'conn')  return addConn(e);
-    if(e.kind === 'speed') return onSpeed(e);
-    if(e.kind === 'log')   return addMsg(e);
+    if(e.kind === 'conn')     return addConn(e);
+    if(e.kind === 'speed')    return onSpeed(e);
+    if(e.kind === 'log')      return addMsg(e);
+    if(e.kind === 'vpssetup') return onVpsSetupEvent(e);
     if(e.kind === 'state'){
       setState(e.state, e.state === 'connected' ? e.detail : '');
       showError(e.state === 'error' ? e.detail : '');
@@ -1264,6 +1352,59 @@ $('speedtest').onclick = async () => {
   // Приём мог измериться, а отдача — нет. Это не ошибка целиком, поэтому
   // говорим об этом отдельно и результат оставляем.
   if(r.note) showError(r.note);
+};
+
+/* ---------- мастер настройки VPS ---------- */
+let vpsSetupRunning = false;
+
+function vpsLogLine(text){
+  const box = $('vpsSetupLog');
+  box.hidden = false;
+  const atBottom = box.scrollTop + box.clientHeight >= box.scrollHeight - 4;
+  box.textContent += (box.textContent ? '\n' : '') + text;
+  if(atBottom) box.scrollTop = box.scrollHeight;
+}
+
+function onVpsSetupEvent(e){
+  if(e.done){
+    vpsSetupRunning = false;
+    $('vpsSetupStart').disabled = false;
+    $('vpsPassword').value = '';
+    $('vpsSetupNote').textContent = e.failed ? '' : tr('vps_setup_done_ok');
+    if(e.failed) vpsLogLine(tr('vps_setup_done_fail') + ' ' + (e.error || ''));
+    return;
+  }
+  vpsLogLine(e.text || '');
+}
+
+$('vpsSetupStart').onclick = async () => {
+  if(vpsSetupRunning) return;
+  const host = $('vpsHost').value.trim();
+  const port = parseInt($('vpsPort').value, 10) || 22;
+  const user = $('vpsUser').value.trim() || 'root';
+  const password = $('vpsPassword').value;
+  if(!host || !password){
+    $('vpsSetupNote').textContent = tr('vps_setup_need_fields');
+    return;
+  }
+  vpsSetupRunning = true;
+  $('vpsSetupStart').disabled = true;
+  $('vpsSetupNote').textContent = '';
+  $('vpsSetupLog').hidden = true;
+  $('vpsSetupLog').textContent = '';
+
+  const r = await api('/api/vpssetup/start', {
+    host, port, user, password,
+    keyPath: $('keyPath').value || undefined,
+    installPanel: $('vpsInstallPanel').checked,
+  });
+  if(r.error){
+    vpsSetupRunning = false;
+    $('vpsSetupStart').disabled = false;
+    $('vpsSetupNote').textContent = r.error;
+  }
+  // Дальше ход работы приходит построчно через /events (onVpsSetupEvent) —
+  // здесь мы только попросили начать.
 };
 
 // Плитки со скоростью убираются сами через десять секунд: результат нужен

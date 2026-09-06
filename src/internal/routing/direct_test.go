@@ -64,9 +64,9 @@ func TestDirectListDomainPatterns(t *testing.T) {
 
 	out := []string{
 		"notvitazgio.ru", "vitazgio.ru.evil.net",
-		"sub.example.ru",      // сам поддоменный узел без записи как точного имени
-		"evilsub.example.ru",  // похожее имя без точки-разделителя не должно совпасть
-		"wild.example",        // сам домен без отдельной записи
+		"sub.example.ru",     // сам поддоменный узел без записи как точного имени
+		"evilsub.example.ru", // похожее имя без точки-разделителя не должно совпасть
+		"wild.example",       // сам домен без отдельной записи
 		"evilwild.example",
 	}
 	for _, target := range out {
