@@ -179,10 +179,17 @@ func RunSelfCheck(ctx context.Context, opt SelfCheckOptions) []CheckStep {
 	})
 
 	// 5. DNS через туннель отвечает.
+	//
+	// SSH умеет пробрасывать только TCP (client.Dial поддерживает лишь
+	// "tcp"/"tcp4"/"tcp6") — а резолвер Go по умолчанию сперва пробует UDP,
+	// из-за чего проброс падал с "unsupported protocol: udp" даже когда сам
+	// туннель и DNS-сервер были в порядке. DNS по TCP — штатная часть
+	// протокола, его поддерживает любой сервер, поэтому просто игнорируем
+	// запрошенную резолвером сеть и всегда ходим по TCP.
 	resolver := &net.Resolver{
 		PreferGo: true,
-		Dial: func(_ context.Context, network, _ string) (net.Conn, error) {
-			return dialThroughClient(client, opt.DialTimeout, network, opt.DNSAddr)
+		Dial: func(_ context.Context, _ string, _ string) (net.Conn, error) {
+			return dialThroughClient(client, opt.DialTimeout, "tcp", opt.DNSAddr)
 		},
 	}
 	ctx5, cancel := context.WithTimeout(ctx, opt.DialTimeout)
