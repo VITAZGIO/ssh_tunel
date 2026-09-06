@@ -26,6 +26,7 @@ import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import android.widget.ViewFlipper
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
@@ -87,6 +88,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var languageSpinner: Spinner
     private lateinit var profileTabs: LinearLayout
     private lateinit var addProfileBtn: View
+    private lateinit var removeProfileBtn: View
     private lateinit var pasteConfigBtn: Button
     private lateinit var scanConfigBtn: Button
     private lateinit var importNote: TextView
@@ -181,6 +183,7 @@ class MainActivity : AppCompatActivity() {
         languageSpinner = findViewById(R.id.languageSpinner)
         profileTabs = findViewById(R.id.profileTabs)
         addProfileBtn = findViewById(R.id.addProfileBtn)
+        removeProfileBtn = findViewById(R.id.removeProfileBtn)
         pasteConfigBtn = findViewById(R.id.pasteConfigBtn)
         scanConfigBtn = findViewById(R.id.scanConfigBtn)
         importNote = findViewById(R.id.importNote)
@@ -229,6 +232,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         addProfileBtn.setOnClickListener { onAddProfile() }
+        removeProfileBtn.setOnClickListener { onRemoveProfile() }
         cityBtn.setOnClickListener { showCityMenu() }
         customCityName.addOnTextChanged { liveRetitleEditingTab() }
         selectServerBtn.setOnClickListener { onSelectServer() }
@@ -237,10 +241,15 @@ class MainActivity : AppCompatActivity() {
         localCheckInfo.setOnClickListener { showTip(it, getString(R.string.local_via_tunnel_note)) }
 
         // Шапка одна на все экраны: логотип всегда возвращает на главную,
-        // значки всегда открывают своё. Так не надо помнить, где находишься.
+        // значки открывают своё, а повторное нажатие на уже открытый экран
+        // возвращает на главную — как переключатель.
         findViewById<View>(R.id.btnHome).setOnClickListener { flipper.displayedChild = MAIN }
-        findViewById<View>(R.id.btnLog).setOnClickListener { flipper.displayedChild = LOG }
-        findViewById<View>(R.id.btnSettings).setOnClickListener { openSettings() }
+        findViewById<View>(R.id.btnLog).setOnClickListener {
+            flipper.displayedChild = if (flipper.displayedChild == LOG) MAIN else LOG
+        }
+        findViewById<View>(R.id.btnSettings).setOnClickListener {
+            if (flipper.displayedChild == SETTINGS) flipper.displayedChild = MAIN else openSettings()
+        }
 
         applyInsets()
 
@@ -395,6 +404,24 @@ class MainActivity : AppCompatActivity() {
         editingProfileId = p.id
         loadProfileIntoForm(p)
         renderProfileTabs()
+    }
+
+    private fun onRemoveProfile() {
+        if (settings.profiles.size <= 1) {
+            Toast.makeText(this, R.string.remove_server_last, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val p = settings.profiles.find { it.id == editingProfileId } ?: return
+        AlertDialog.Builder(this)
+            .setMessage(getString(R.string.remove_server_confirm, p.name))
+            .setPositiveButton(R.string.remove_server) { _, _ ->
+                settings.removeProfile(p.id)
+                editingProfileId = settings.activeProfileId
+                loadProfileIntoForm(settings.profiles.find { it.id == editingProfileId } ?: settings.active())
+                renderProfileTabs()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun onSelectServer() {
@@ -983,7 +1010,7 @@ class MainActivity : AppCompatActivity() {
         // Сессия — с текущего подключения (её считает ядро и обнуляет при
         // каждом новом старте), «всего» — копится на телефоне между сеансами,
         // см. Settings.adBlockTotal и TunnelService.poll.
-        tileBlocked.text = if (running && settings.adBlockEnabled) {
+        tileBlocked.text = getString(R.string.tile_blocked) + ": " + if (running && settings.adBlockEnabled) {
             "${o.optInt("adsBlocked")} (всего ${settings.adBlockTotal})"
         } else {
             "—"

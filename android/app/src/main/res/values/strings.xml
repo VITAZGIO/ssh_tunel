@@ -124,6 +124,9 @@
 
     <!-- Список серверов и выбор города -->
     <string name="add_server">Добавить сервер</string>
+    <string name="remove_server">Удалить сервер</string>
+    <string name="remove_server_confirm">Удалить сервер «%1$s»?</string>
+    <string name="remove_server_last">Нельзя удалить единственный сервер</string>
     <string name="pick_city">Выбрать город</string>
     <string name="custom_flag_name">Свой (без флага)</string>
     <string name="select_this_server">Выбрать этот сервер</string>

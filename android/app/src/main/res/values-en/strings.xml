@@ -77,6 +77,9 @@
 
     <!-- Server list and city picker -->
     <string name="add_server">Add server</string>
+    <string name="remove_server">Remove server</string>
+    <string name="remove_server_confirm">Remove server \"%1$s\"?</string>
+    <string name="remove_server_last">Can\'t remove the only server</string>
     <string name="pick_city">Pick a city</string>
     <string name="custom_flag_name">Custom (no flag)</string>
     <string name="select_this_server">Select this server</string>
