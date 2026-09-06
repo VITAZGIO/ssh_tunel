@@ -12,11 +12,12 @@ import (
 type Kind string
 
 const (
-	KindState Kind = "state" // сменилось состояние туннеля
-	KindConn  Kind = "conn"  // приложение открыло соединение через туннель
-	KindLog   Kind = "log"   // произвольное сообщение (ошибка, предупреждение)
-	KindStats Kind = "stats" // периодическая статистика трафика
-	KindSpeed Kind = "speed" // ход и результат теста скорости
+	KindState    Kind = "state"    // сменилось состояние туннеля
+	KindConn     Kind = "conn"     // приложение открыло соединение через туннель
+	KindLog      Kind = "log"      // произвольное сообщение (ошибка, предупреждение)
+	KindStats    Kind = "stats"    // периодическая статистика трафика
+	KindSpeed    Kind = "speed"    // ход и результат теста скорости
+	KindVpsSetup Kind = "vpssetup" // строка вывода мастера настройки сервера
 )
 
 // Состояния туннеля.
@@ -85,6 +86,12 @@ type Event struct {
 	Phase string  `json:"phase,omitempty"` // down / up
 	Mbps  float64 `json:"mbps,omitempty"`
 	Done  bool    `json:"done,omitempty"`
+
+	// KindVpsSetup. Stage называет текущий шаг ("key"/"harden"/"tunnel-user"/
+	// "panel"), Text — одна строка вывода. Done=true — мастер закончил работу
+	// (успешно или нет; при неудаче заполнен Error). Пароль root сюда никогда
+	// не попадает: он не покидает функцию, которая открывает SSH-соединение.
+	Stage string `json:"stage,omitempty"`
 }
 
 // Speed сообщает ход теста скорости: какое направление меряется сейчас и
@@ -139,9 +146,11 @@ func (b *Bus) Publish(e Event) {
 		e.Time = time.Now()
 	}
 	b.mu.Lock()
-	// Статистика и ход теста скорости идут часто и в истории не нужны:
-	// иначе они вытеснят из неё осмысленные сообщения.
-	if e.Kind != KindStats && e.Kind != KindSpeed {
+	// Статистика, ход теста скорости и построчный вывод мастера настройки
+	// сервера идут часто и в истории не нужны: иначе они вытеснят из неё
+	// осмысленные сообщения. Окно, открытое посреди настройки сервера, всё
+	// равно должно оставаться открытым — поток событий и так не прервётся.
+	if e.Kind != KindStats && e.Kind != KindSpeed && e.Kind != KindVpsSetup {
 		b.history = append(b.history, e)
 		if len(b.history) > b.maxHist {
 			b.history = b.history[len(b.history)-b.maxHist:]
@@ -164,6 +173,16 @@ func (b *Bus) State(state, detail string) {
 // ErrorKind), для переходов в StateError/StateReconnecting.
 func (b *Bus) StateErr(state, detail, errorKind string) {
 	b.Publish(Event{Kind: KindState, State: state, Detail: detail, ErrorKind: errorKind})
+}
+
+// VpsSetupLine публикует одну строку вывода мастера настройки сервера.
+func (b *Bus) VpsSetupLine(stage, text string) {
+	b.Publish(Event{Kind: KindVpsSetup, Stage: stage, Text: text})
+}
+
+// VpsSetupDone сообщает об окончании работы мастера — успешном или нет.
+func (b *Bus) VpsSetupDone(errMsg string) {
+	b.Publish(Event{Kind: KindVpsSetup, Done: true, Failed: errMsg != "", Error: errMsg})
 }
 
 func (b *Bus) Infof(format string, args ...any)  { b.logf("info", format, args...) }

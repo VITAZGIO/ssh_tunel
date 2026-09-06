@@ -71,7 +71,10 @@ func (t *Tunnel) handleSOCKS5(conn net.Conn) {
 		conn.Close()
 		return
 	}
-	if buf[0] != 0x05 || buf[1] != 0x01 { // поддерживаем только CONNECT
+	// CONNECT (0x01) и UDP ASSOCIATE (0x03) — оба разбирают одинаковый
+	// ADDR+PORT дальше, различаются только тем, что с ним делать в конце.
+	cmd := buf[1]
+	if buf[0] != 0x05 || (cmd != 0x01 && cmd != 0x03) {
 		writeSOCKS5Reply(conn, 0x07)
 		conn.Close()
 		return
@@ -115,6 +118,16 @@ func (t *Tunnel) handleSOCKS5(conn net.Conn) {
 		return
 	}
 	port := int(buf[0])<<8 | int(buf[1])
+
+	// ADDR+PORT в запросе UDP ASSOCIATE — это адрес, с которого клиент
+	// собирается слать датаграммы (обычно 0.0.0.0:0, «ещё не знаю»). RFC 1928
+	// разрешает прокси использовать его для фильтрации; мы, как и большинство
+	// реализаций, его не проверяем — раз клиент уже прошёл SOCKS5-рукопожатие
+	// на этом порту, дальше ему доверяем.
+	if cmd == 0x03 {
+		t.handleSOCKS5UDPAssociate(conn)
+		return
+	}
 
 	t.serve(request{
 		conn:     conn,

@@ -6,7 +6,10 @@ import (
 )
 
 func TestVPSScriptSubstitution(t *testing.T) {
-	out := vpsScript("admin2", "2222", "Europe/Amsterdam", "tun", "ssh-ed25519 AAAAtest key")
+	out, err := vpsScript("admin2", 2222, "Europe/Amsterdam", "tun", "ssh-ed25519 AAAAtest key")
+	if err != nil {
+		t.Fatalf("vpsScript: %v", err)
+	}
 
 	for _, want := range []string{
 		`NEW_USER="admin2"`,

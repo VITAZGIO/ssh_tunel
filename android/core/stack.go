@@ -27,6 +27,8 @@ import (
 	"gvisor.dev/gvisor/pkg/tcpip/transport/tcp"
 	"gvisor.dev/gvisor/pkg/tcpip/transport/udp"
 	"gvisor.dev/gvisor/pkg/waiter"
+
+	"sshtunnel/internal/udprelay"
 )
 
 // Core — то, чем на самом деле является наш internal/tunnel.Tunnel.
@@ -52,6 +54,7 @@ type Stats struct {
 	udpDrop   int
 	dnsAsked  int
 	v6Blocked int
+	blocked   int
 	targets   []string
 
 	// seenUDP помнит, о каких адресах уже сообщили: QUIC шлёт пакеты пачками,
@@ -84,6 +87,12 @@ func (s *Stats) dns() {
 	s.dnsAsked++
 }
 
+func (s *Stats) block() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.blocked++
+}
+
 // Snapshot — копия счётчиков без гонок.
 func (s *Stats) Snapshot() (tcpOpen, udpDrop, dnsAsked int, targets []string) {
 	s.mu.Lock()
@@ -92,10 +101,10 @@ func (s *Stats) Snapshot() (tcpOpen, udpDrop, dnsAsked int, targets []string) {
 }
 
 // Counts — счётчики для показа человеку.
-func (s *Stats) Counts() (tcpOpen, udpDrop, dnsAsked, v6Blocked int) {
+func (s *Stats) Counts() (tcpOpen, udpDrop, dnsAsked, v6Blocked, adsBlocked int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.tcpOpen, s.udpDrop, s.dnsAsked, s.v6Blocked
+	return s.tcpOpen, s.udpDrop, s.dnsAsked, s.v6Blocked, s.blocked
 }
 
 // Handler — мост между сетевым стеком и ядром туннеля.
@@ -111,6 +120,13 @@ type Handler struct {
 	// Log показывает человеку то, что отвергнуто. Без этого отказы невидимы:
 	// приложение просто «не работает», а причина остаётся только в счётчике.
 	Log func(line string)
+
+	// UDPRelay отдаёт клиента проброса UDP через сервер (см.
+	// sshtunnel/internal/udprelay) — вызывается заново на каждый новый поток,
+	// потому что сама функция уже кеширует и переподключает соединение (см.
+	// tunnel.Tunnel.UDPRelay). nil, либо когда сам вызов вернул nil, — UDP
+	// кроме DNS по-прежнему отбрасывается, как и раньше.
+	UDPRelay func() *udprelay.Client
 }
 
 func (h *Handler) logf(format string, a ...any) {
@@ -210,10 +226,31 @@ func Start(fd int, mtu uint32, h *Handler) (*Engine, error) {
 		go h.serveDNS(gonet.NewUDPConn(&wq, ep))
 		return true
 	})
+
+	// Остальной UDP — через ретранслятор на сервере, если включено (см.
+	// UDPRelay). Отдельный forwarder, а не общий с DNS: тому всегда нужен
+	// serveDNS, а этому — только когда клиент ретранслятора вообще поднят.
+	udpRelayFwd := udp.NewForwarder(s, func(r *udp.ForwarderRequest) bool {
+		relay := h.UDPRelay()
+		if relay == nil {
+			return false
+		}
+		var wq waiter.Queue
+		ep, epErr := r.CreateEndpoint(&wq)
+		if epErr != nil {
+			return false
+		}
+		go h.serveUDPRelay(gonet.NewUDPConn(&wq, ep), r.ID(), relay)
+		return true
+	})
+
 	s.SetTransportProtocolHandler(udp.ProtocolNumber,
 		func(id stack.TransportEndpointID, pkt *stack.PacketBuffer) bool {
 			if id.LocalPort == 53 && h.DNS != nil {
 				return udpFwd.HandlePacket(id, pkt)
+			}
+			if h.UDPRelay != nil && udpRelayFwd.HandlePacket(id, pkt) {
+				return true
 			}
 			h.Stats.udp()
 			h.logUDP(id)
@@ -302,6 +339,45 @@ func (h *Handler) serveDNS(conn net.Conn) {
 		return
 	}
 	conn.Write(reply)
+}
+
+// udpRelayIdle — сколько ждать следующей датаграммы от приложения, прежде
+// чем закрыть сессию: сама сессия долгоживущая (звонок, игра), в отличие от
+// одноразового DNS-запроса.
+const udpRelayIdle = 60 * time.Second
+
+// serveUDPRelay ведёт один UDP-поток приложения через ретранслятор на
+// сервере, пока тот не замолчит дольше udpRelayIdle или соединение до
+// ретранслятора не оборвётся.
+func (h *Handler) serveUDPRelay(conn net.Conn, id stack.TransportEndpointID, relay *udprelay.Client) {
+	defer conn.Close()
+
+	host := id.LocalAddress.String()
+	if h.Resolve != nil {
+		if name, ok := h.Resolve(host); ok {
+			// Имя восстановлено из таблицы fake-IP — как и для TCP: дальше
+			// его разрешит сам сервер, а не телефон.
+			host = name
+		}
+	}
+	port := id.LocalPort
+
+	sessionID := relay.Open(func(data []byte, fromHost string, fromPort uint16) {
+		conn.Write(data)
+	})
+	defer relay.Close(sessionID)
+
+	buf := make([]byte, 65535)
+	for {
+		conn.SetReadDeadline(time.Now().Add(udpRelayIdle))
+		n, err := conn.Read(buf)
+		if err != nil {
+			return
+		}
+		if err := relay.Send(sessionID, host, port, buf[:n]); err != nil {
+			return
+		}
+	}
 }
 
 func (e *Engine) Close() {

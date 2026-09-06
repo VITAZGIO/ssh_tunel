@@ -32,6 +32,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.os.LocaleListCompat
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
+import mobile.Mobile
 import org.json.JSONObject
 
 /**
@@ -45,8 +46,9 @@ class MainActivity : AppCompatActivity() {
 
     private companion object {
         const val MAIN = 0
-        const val LOG = 1
-        const val SETTINGS = 2
+        const val SELFCHECK = 1
+        const val LOG = 2
+        const val SETTINGS = 3
     }
 
     private lateinit var settings: Settings
@@ -70,6 +72,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tileUp: TextView
     private lateinit var tileConns: TextView
     private lateinit var tileLinks: TextView
+    private lateinit var tileBlocked: TextView
 
     private lateinit var issuedByPanel: TextView
     private lateinit var hostEdit: EditText
@@ -105,6 +108,16 @@ class MainActivity : AppCompatActivity() {
 
     /** Выбранный в выпадающем списке город, либо null — своё имя без флага. */
     private var pickedCity: Cities.City? = null
+
+    private lateinit var adBlockEnabledCheck: CheckBox
+    private lateinit var adBlockSourcesEdit: EditText
+    private lateinit var adBlockAllowlistEdit: EditText
+    private lateinit var adBlockUpdateButton: Button
+    private lateinit var adBlockStatusView: TextView
+    private lateinit var udpRelayEnabledCheck: CheckBox
+
+    private lateinit var selfCheckSteps: LinearLayout
+    private lateinit var selfCheckStartButton: Button
 
     private val vpnPermission = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
@@ -153,6 +166,7 @@ class MainActivity : AppCompatActivity() {
         tileUp = findViewById(R.id.tileUp)
         tileConns = findViewById(R.id.tileConns)
         tileLinks = findViewById(R.id.tileLinks)
+        tileBlocked = findViewById(R.id.tileBlocked)
 
         issuedByPanel = findViewById(R.id.issuedByPanel)
         hostEdit = findViewById(R.id.host)
@@ -183,15 +197,33 @@ class MainActivity : AppCompatActivity() {
         generalPanelChevron = findViewById(R.id.generalPanelChevron)
         generalPanelBody = findViewById(R.id.generalPanelBody)
 
+        adBlockEnabledCheck = findViewById(R.id.adBlockEnabled)
+        adBlockSourcesEdit = findViewById(R.id.adBlockSources)
+        adBlockAllowlistEdit = findViewById(R.id.adBlockAllowlist)
+        adBlockUpdateButton = findViewById(R.id.adBlockUpdate)
+        adBlockStatusView = findViewById(R.id.adBlockStatus)
+        udpRelayEnabledCheck = findViewById(R.id.udpRelayEnabled)
+
+        selfCheckSteps = findViewById(R.id.selfCheckSteps)
+        selfCheckStartButton = findViewById(R.id.selfCheckStart)
+        renderSelfCheckSteps(null)
+
         editingProfileId = settings.activeProfileId.ifBlank { settings.active().id }
         setupLanguageSpinner()
         setupPanels()
         renderProfileTabs()
         loadProfileIntoForm(settings.active())
+        loadAppSettings()
 
         power.setOnClickListener { onToggle() }
         speedButton.setOnClickListener { runSpeedTest() }
         findViewById<Button>(R.id.save).setOnClickListener { saveSettings() }
+        adBlockUpdateButton.setOnClickListener { updateBlockLists() }
+        selfCheckStartButton.setOnClickListener { runSelfCheck() }
+        findViewById<View>(R.id.toSelfCheck).setOnClickListener {
+            flipper.displayedChild = SELFCHECK
+            runSelfCheck()
+        }
         findViewById<View>(R.id.apps).setOnClickListener {
             startActivity(Intent(this, AppsActivity::class.java))
         }
@@ -527,8 +559,26 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Блокировка рекламы и проброс UDP относятся ко всему приложению, а не к
+    // отдельному серверу: они не переезжают вместе с профилем и читаются один
+    // раз при открытии экрана.
+    private fun loadAppSettings() {
+        adBlockEnabledCheck.isChecked = settings.adBlockEnabled
+        adBlockSourcesEdit.setText(settings.adBlockSources)
+        adBlockAllowlistEdit.setText(settings.adBlockAllowlist)
+        udpRelayEnabledCheck.isChecked = settings.udpRelayEnabled
+    }
+
+    private fun saveAppSettings() {
+        settings.adBlockEnabled = adBlockEnabledCheck.isChecked
+        settings.adBlockSources = adBlockSourcesEdit.text.toString()
+        settings.adBlockAllowlist = adBlockAllowlistEdit.text.toString()
+        settings.udpRelayEnabled = udpRelayEnabledCheck.isChecked
+    }
+
     private fun saveSettings() {
         saveCurrentFormInto(editingProfileId)
+        saveAppSettings()
         renderProfileTabs()
         loadProfileIntoForm(settings.profiles.find { it.id == editingProfileId } ?: settings.active())
         refresh()
@@ -710,6 +760,134 @@ class MainActivity : AppCompatActivity() {
     // дёргается при каждом появлении результата.
     private val hideSpeed = Runnable { rowSpeed.visibility = View.INVISIBLE }
 
+    /**
+     * Загружает списки блокировки по нажатию кнопки — не сама по себе, не по
+     * расписанию. Сеть небыстрая, поэтому в отдельном потоке; результат
+     * (сколько имён загружено, или ошибка) сохраняется на телефон самим ядром
+     * и тут же показывается человеку.
+     */
+    private fun updateBlockLists() {
+        val sources = adBlockSourcesEdit.text.toString()
+        if (sources.isBlank()) {
+            adBlockStatusView.text = ""
+            Toast.makeText(this, R.string.ad_block_sources_hint, Toast.LENGTH_SHORT).show()
+            return
+        }
+        settings.adBlockSources = sources
+        adBlockUpdateButton.isEnabled = false
+        adBlockStatusView.setText(R.string.ad_block_updating)
+        Thread {
+            val result = try {
+                Mobile.updateBlockLists(sources, settings.adBlockListFile.absolutePath)
+            } catch (e: Exception) {
+                """{"error":"${e.message}"}"""
+            }
+            runOnUiThread {
+                adBlockUpdateButton.isEnabled = true
+                val o = try { JSONObject(result) } catch (e: Exception) { JSONObject() }
+                val err = o.optString("error")
+                adBlockStatusView.text = if (err.isNotBlank()) {
+                    getString(R.string.ad_block_update_failed, err)
+                } else {
+                    getString(R.string.ad_block_updated, o.optInt("count"))
+                }
+            }
+        }.start()
+    }
+
+    private val SELFCHECK_STEP_NAMES = listOf("dns", "port", "key", "forward", "dns_tunnel", "sites", "external_ip")
+
+    private fun selfCheckStepLabelRes(name: String): Int = when (name) {
+        "dns" -> R.string.selfcheck_step_dns
+        "port" -> R.string.selfcheck_step_port
+        "key" -> R.string.selfcheck_step_key
+        "forward" -> R.string.selfcheck_step_forward
+        "dns_tunnel" -> R.string.selfcheck_step_dns_tunnel
+        "sites" -> R.string.selfcheck_step_sites
+        else -> R.string.selfcheck_step_external_ip
+    }
+
+    /**
+     * Текст причины по коду шага. Именование ресурса ("sc_" + шаг + "_" + код)
+     * зеркалит то же самое в JS-словаре на компьютере — так у обеих сторон
+     * общая логика без необходимости заводить общий Go-код специально ради
+     * текста. Ресурса нет (обычно для "успешных" кодов вроде "resolved") —
+     * значит вся нужная информация уже в detail, его и показываем как есть.
+     */
+    private fun selfCheckCodeText(name: String, code: String, detail: String): String {
+        val resId = resources.getIdentifier("sc_${name}_$code", "string", packageName)
+        if (resId != 0) {
+            return try { getString(resId, detail) } catch (e: Exception) { getString(resId) }
+        }
+        return detail.ifBlank { code }
+    }
+
+    /** steps=null — все семь «в ожидании», как до первого запуска. */
+    private fun renderSelfCheckSteps(steps: List<JSONObject>?) {
+        selfCheckSteps.removeAllViews()
+        val byName = HashMap<String, JSONObject>()
+        steps?.forEach { byName[it.optString("name")] = it }
+
+        for (name in SELFCHECK_STEP_NAMES) {
+            val s = byName[name]
+            val mark: String
+            val colorRes: Int
+            when {
+                s == null -> { mark = "…"; colorRes = R.color.dim }
+                s.optBoolean("skipped") -> { mark = "–"; colorRes = R.color.dim }
+                s.optBoolean("ok") -> { mark = "✓"; colorRes = R.color.ok }
+                else -> { mark = "✗"; colorRes = R.color.err }
+            }
+            val label = getString(selfCheckStepLabelRes(name))
+            val why = if (s != null && !s.optBoolean("skipped")) {
+                selfCheckCodeText(name, s.optString("code"), s.optString("detail"))
+            } else ""
+
+            val row = LinearLayout(this)
+            row.orientation = LinearLayout.HORIZONTAL
+            row.setPadding(0, 8, 0, 8)
+
+            val markView = TextView(this)
+            markView.text = mark
+            markView.minEms = 2
+            markView.setTextColor(ContextCompat.getColor(this, colorRes))
+
+            val textView = TextView(this)
+            textView.text = if (why.isNotBlank()) "$label — $why" else label
+            textView.setTextColor(ContextCompat.getColor(this, R.color.text))
+            textView.textSize = 13.5f
+
+            row.addView(markView)
+            row.addView(textView)
+            selfCheckSteps.addView(row)
+        }
+    }
+
+    private fun runSelfCheck() {
+        selfCheckStartButton.isEnabled = false
+        selfCheckStartButton.setText(R.string.selfcheck_running)
+        renderSelfCheckSteps(null)
+        val ctx = applicationContext
+        Thread {
+            val result = try {
+                TunnelService.selfCheck(ctx)
+            } catch (e: Exception) {
+                """{"error":"${e.message}"}"""
+            }
+            val steps = try {
+                val arr = JSONObject(result).optJSONArray("steps")
+                if (arr == null) null else (0 until arr.length()).map { arr.getJSONObject(it) }
+            } catch (e: Exception) {
+                null
+            }
+            runOnUiThread {
+                selfCheckStartButton.isEnabled = true
+                selfCheckStartButton.setText(R.string.selfcheck_start)
+                renderSelfCheckSteps(steps)
+            }
+        }.start()
+    }
+
     /** Задержка до сервера. Цвет важнее числа: зелёный, жёлтый, красный. */
     private fun showPing(ms: Long) {
         if (ms <= 0) {
@@ -800,6 +978,14 @@ class MainActivity : AppCompatActivity() {
         val running = state != "stopped"
         tileConns.text = if (running) o.optLong("total").toString() else "—"
         tileLinks.text = if (running) "${o.optInt("healthy")} / ${o.optInt("links")}" else "—"
+        // Сессия — с текущего подключения (её считает ядро и обнуляет при
+        // каждом новом старте), «всего» — копится на телефоне между сеансами,
+        // см. Settings.adBlockTotal и TunnelService.poll.
+        tileBlocked.text = if (running && settings.adBlockEnabled) {
+            "${o.optInt("adsBlocked")} (всего ${settings.adBlockTotal})"
+        } else {
+            "—"
+        }
 
         showPing(if (state == "connected") o.optLong("pingMs") else 0L)
         if (!running) {

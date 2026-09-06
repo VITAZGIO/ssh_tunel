@@ -34,6 +34,20 @@ type App struct {
 	running  bool
 	proxyURL string
 
+	// gen растёт на каждой Stop() и на каждом переходе на запасной сервер —
+	// фоновый наблюдатель failover (см. failover.go) по нему узнаёт, что его
+	// подключение больше не актуально, и не мешает тому, что произошло после.
+	gen int64
+	// transitioning — идёт подключение или переход на запасной сервер прямо
+	// сейчас. Отдельно от running: во время перехода тун временно nil, но
+	// второй Start() при этом всё равно не ко двору.
+	transitioning bool
+	// effectiveProfile — какой профиль реально подключён сейчас; может
+	// отличаться от cfg.ActiveProfile после автовыбора самого быстрого или
+	// перехода на запасной. Не сохраняется в конфиг: следующий Start() снова
+	// начинает с ActiveProfile.
+	effectiveProfile string
+
 	speedRunning atomic.Bool
 
 	// policy живёт отдельно от туннеля: правила фильтра меняются на ходу,
@@ -223,68 +237,47 @@ func (a *App) RecoverStaleProxy() {
 	}
 }
 
+// Start поднимает туннель. Без автовыбора (cfg.AutoPickFastest) ведёт себя
+// как раньше — подключается к ActiveProfile. С автовыбором и несколькими
+// серверами сначала меряет отклик у всех и подключается к тому, что ответил
+// быстрее; если он не поднимется, по очереди пробует остальных — см.
+// failover.go.
 func (a *App) Start() error {
 	a.mu.Lock()
-	if a.running {
+	if a.running || a.transitioning {
 		a.mu.Unlock()
 		return errors.New("туннель уже запущен")
 	}
+	a.transitioning = true
 	cfg := a.cfg
+	a.gen++
+	gen := a.gen
 	a.mu.Unlock()
-	active := cfg.Active()
 
-	if active.Host == "" {
+	candidates := a.connectCandidates(cfg)
+	if len(candidates) == 0 {
+		a.mu.Lock()
+		a.transitioning = false
+		a.mu.Unlock()
 		return errors.New("не указан адрес сервера")
 	}
 
-	socksAddr := net.JoinHostPort("127.0.0.1", strconv.Itoa(active.SocksPort))
-	httpAddr := net.JoinHostPort("127.0.0.1", strconv.Itoa(active.HTTPPort))
-
-	tun := tunnel.New(tunnel.Config{
-		Host:           active.Host,
-		SSHPort:        active.SSHPort,
-		User:           active.User,
-		KeyPath:        active.KeyPath,
-		SocksAddr:      socksAddr,
-		HTTPAddr:       httpAddr,
-		PoolSize:       active.PoolSize,
-		KnownHostsPath: config.KnownHostsPath(),
-		Verbose:        cfg.Verbose,
-		Policy:         a.policy,
-		Direct:         a.direct,
-		LocalViaTunnel: active.LocalViaTunnel,
-	}, a.Bus)
-
-	if err := tun.Start(); err != nil {
-		return err
-	}
-
+	err := a.connectFrom(cfg, candidates, 0, gen)
 	a.mu.Lock()
-	a.tun = tun
-	a.running = true
-	a.proxyURL = "http://" + httpAddr
+	a.transitioning = false
 	a.mu.Unlock()
-
-	if cfg.SysProxy {
-		if err := a.sys.Enable(httpAddr, socksAddr, cfg.SetEnvVars, !active.LocalViaTunnel, active.DirectHosts); err != nil {
-			a.Bus.Warnf("Не удалось включить системный прокси: %v. Туннель работает, но приложения надо настроить вручную.", err)
-		} else {
-			a.mu.Lock()
-			a.sysOn = true
-			a.mu.Unlock()
-			a.Bus.Infof("Системный прокси включён: %s (SOCKS доступен на %s)", httpAddr, socksAddr)
-			if cfg.SetEnvVars {
-				a.Bus.Infof("HTTPS_PROXY прописан в переменные среды — программы вроде Claude Code подхватят его при следующем запуске")
-			}
-		}
-	}
-	return nil
+	return err
 }
 
 func (a *App) Stop() {
 	a.mu.Lock()
 	tun, sysOn := a.tun, a.sysOn
 	a.tun, a.running, a.sysOn = nil, false, false
+	a.effectiveProfile = ""
+	// Отменяет любой фоновый переход на запасной сервер, который мог быть в
+	// процессе: connectFrom проверяет gen перед тем, как зафиксировать успех,
+	// и сам остановит то, что успел поднять.
+	a.gen++
 	a.mu.Unlock()
 
 	if sysOn {
@@ -297,6 +290,15 @@ func (a *App) Stop() {
 	if tun != nil {
 		tun.Stop()
 	}
+}
+
+// EffectiveProfileID — какой сервер реально подключён сейчас. Пусто, если
+// туннель не работает. Отличается от Config().ActiveProfile после автовыбора
+// самого быстрого сервера или перехода на запасной.
+func (a *App) EffectiveProfileID() string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.effectiveProfile
 }
 
 func (a *App) Stats() events.Stats {

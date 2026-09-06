@@ -191,11 +191,74 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <Button
-                android:id="@+id/speedtest"
-                style="@style/SecondaryButton"
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:layout_marginTop="14dp"
-                android:text="@string/speedtest" />
+                android:orientation="horizontal">
+
+                <LinearLayout style="@style/Tile">
+                    <TextView style="@style/TileKey" android:text="@string/tile_blocked" />
+                    <TextView android:id="@+id/tileBlocked" style="@style/TileValue" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:orientation="horizontal">
+                <Button
+                    android:id="@+id/speedtest"
+                    style="@style/SecondaryButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:text="@string/speedtest" />
+                <Space android:layout_width="10dp" android:layout_height="1dp" />
+                <Button
+                    android:id="@+id/toSelfCheck"
+                    style="@style/SecondaryButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:text="@string/selfcheck_open" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- ================= самопроверка ================= -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:paddingBottom="16dp">
+
+            <TextView style="@style/Head" android:text="@string/selfcheck_title" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="10dp"
+                android:textSize="11.5sp"
+                android:textColor="@color/dim"
+                android:text="@string/selfcheck_intro" />
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+                <LinearLayout
+                    android:id="@+id/selfCheckSteps"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </ScrollView>
+
+            <Button
+                android:id="@+id/selfCheckStart"
+                style="@style/PrimaryButton"
+                android:layout_marginTop="10dp"
+                android:text="@string/selfcheck_start" />
         </LinearLayout>
 
         <!-- ================= журнал ================= -->
@@ -375,6 +438,87 @@
                     android:layout_marginTop="8dp"
                     android:inputType="text" android:hint="@string/custom_flag_name"
                     android:textColorHint="@color/dim" android:autofillHints="" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:paddingBottom="14dp"
+                    android:textSize="11.5sp"
+                    android:textColor="@color/dim"
+                    android:text="@string/always_on_hint" />
+
+                <CheckBox
+                    android:id="@+id/adBlockEnabled"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:textColor="@color/text"
+                    android:text="@string/ad_block_enabled" />
+
+                <TextView style="@style/FieldLabel"
+                    android:layout_marginTop="8dp" android:text="@string/ad_block_sources" />
+                <EditText android:id="@+id/adBlockSources" style="@style/Field"
+                    android:inputType="textMultiLine" android:minLines="2"
+                    android:gravity="top" android:hint="@string/ad_block_sources_hint"
+                    android:textColorHint="@color/dim" android:autofillHints="" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingBottom="10dp"
+                    android:textSize="11.5sp"
+                    android:textColor="@color/dim"
+                    android:text="@string/ad_block_sources_note" />
+
+                <TextView style="@style/FieldLabel"
+                    android:text="@string/ad_block_allowlist" />
+                <EditText android:id="@+id/adBlockAllowlist" style="@style/Field"
+                    android:inputType="textMultiLine" android:minLines="1"
+                    android:gravity="top" android:hint="@string/ad_block_allowlist_hint"
+                    android:textColorHint="@color/dim" android:autofillHints="" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+                    <Button
+                        android:id="@+id/adBlockUpdate"
+                        style="@style/SecondaryButton"
+                        android:layout_width="wrap_content"
+                        android:text="@string/ad_block_update" />
+                    <TextView
+                        android:id="@+id/adBlockStatus"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:textSize="12.5sp"
+                        android:textColor="@color/dim" />
+                </LinearLayout>
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:paddingBottom="14dp"
+                    android:textSize="11.5sp"
+                    android:textColor="@color/dim"
+                    android:text="@string/ad_block_note" />
+
+                <CheckBox
+                    android:id="@+id/udpRelayEnabled"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="@color/text"
+                    android:text="@string/udp_relay_enabled" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingBottom="14dp"
+                    android:textSize="11.5sp"
+                    android:textColor="@color/dim"
+                    android:text="@string/udp_relay_note" />
 
                 <Button
                     android:id="@+id/selectServerBtn"

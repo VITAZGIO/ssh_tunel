@@ -269,3 +269,49 @@ func TestHandleStartReportsConnErrorKind(t *testing.T) {
 			tunnel.ConnErrorRefused, resp.ErrorKind, resp.Error)
 	}
 }
+
+// Самопроверка работает и без поднятого туннеля: адрес недоступен (порт
+// закрыт), поэтому первый же сетевой шаг проваливается быстро, а не висит —
+// сама глубина цепочки уже проверена отдельно в internal/tunnel.
+func TestSelfCheckEndpoint(t *testing.T) {
+	cfg := withHost("127.0.0.1")
+	p := cfg.Active()
+	p.SSHPort = 1 // закрытый порт — «отказано в соединении» почти сразу
+	cfg.SetProfile(p)
+
+	s, err := NewOn(app.New(cfg), "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	rec := httptest.NewRecorder()
+	s.handleSelfCheck(rec, httptest.NewRequest(http.MethodGet, "/api/selfcheck", nil))
+
+	var resp struct {
+		Steps []struct {
+			Name    string `json:"name"`
+			OK      bool   `json:"ok"`
+			Skipped bool   `json:"skipped"`
+			Code    string `json:"code"`
+		} `json:"steps"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("не разобрал ответ: %v, тело: %s", err, rec.Body.String())
+	}
+	if len(resp.Steps) == 0 {
+		t.Fatal("шагов не пришло")
+	}
+	if resp.Steps[0].Name != "dns" || !resp.Steps[0].OK {
+		t.Errorf("шаг DNS для 127.0.0.1 обязан пройти сразу: %+v", resp.Steps[0])
+	}
+	var sawFailure bool
+	for _, s := range resp.Steps {
+		if !s.OK && !s.Skipped {
+			sawFailure = true
+		}
+	}
+	if !sawFailure {
+		t.Error("закрытый порт должен был провалить один из шагов")
+	}
+}

@@ -30,7 +30,7 @@
     <string name="key_saved">Ключ сохранён</string>
 
     <string name="direct">Всегда напрямую</string>
-    <string name="direct_hint">10.8.0.0/16, 172.30.*, .corp.local</string>
+    <string name="direct_hint">10.8.0.0/16, 172.30.*, .corp.local, vitazgio.ru</string>
     <string name="local_via_tunnel">Локальную сеть тоже вести через сервер</string>
 
     <string name="apps_title">Приложения</string>
@@ -47,7 +47,54 @@
     <string name="tile_conns">СОЕДИНЕНИЙ</string>
     <string name="tile_links">КАНАЛОВ SSH</string>
     <string name="pool_hint">каналов SSH</string>
-    <string name="direct_note">Адреса и сети, которым туннель не нужен. Локальная сеть и так идёт напрямую.</string>
+    <string name="direct_note">Адреса, сети и домены, которым туннель не нужен. Локальная сеть и так идёт напрямую. Домен целиком — vitazgio.ru; поддомены — .vitazgio.ru или *.vitazgio.ru (это одно и то же и не включает сам домен — впишите оба варианта, если нужно и то, и другое).</string>
+    <string name="always_on_hint">Хочешь, чтобы туннель поднимался сам при включении телефона и не выключался ни при каких обстоятельствах — в системных настройках: Настройки → Сеть и интернет → VPN → шестерёнка рядом с этим приложением → «Всегда включённый VPN». Там же — «Блокировать соединения без VPN»: если он включён, при обрыве туннеля весь трафик останавливается, а не идёт в обход, — это делает сама система, приложение в это не вмешивается.</string>
+
+    <string name="tile_blocked">ЗАБЛОКИРОВАНО</string>
+
+    <string name="ad_block_enabled">Блокировать рекламу и слежку</string>
+    <string name="ad_block_sources">Списки блокировки</string>
+    <string name="ad_block_sources_hint">ссылка https://… или путь к файлу, по одному в строке</string>
+    <string name="ad_block_sources_note">Форматы hosts и «одно имя в строке» — оба понимаются сразу, можно смешивать. Встроенных списков нет: работает только то, что добавлено здесь.</string>
+    <string name="ad_block_allowlist">Никогда не блокировать</string>
+    <string name="ad_block_allowlist_hint">свои исключения, через запятую или с новой строки</string>
+    <string name="ad_block_update">Обновить список</string>
+    <string name="ad_block_note">Списки загружаются и сохраняются на телефоне только по этой кнопке — сами по себе они не обновляются. После обновления список применится при следующем подключении.</string>
+    <string name="ad_block_updating">Обновляю…</string>
+    <string name="ad_block_updated">загружено имён: %1$d</string>
+    <string name="ad_block_update_failed">не получилось: %1$s</string>
+
+    <string name="selfcheck_open">Самопроверка</string>
+    <string name="selfcheck_title">Самопроверка</string>
+    <string name="selfcheck_intro">Семь шагов подряд, от имени сервера до внешнего адреса. Первая же неудача останавливает цепочку — дальше проверять бессмысленно, зато сразу видно, где сломалось. Работает и без включённого туннеля: соединение для проверки своё, отдельное.</string>
+    <string name="selfcheck_start">Проверить</string>
+    <string name="selfcheck_running">Проверяю…</string>
+    <string name="selfcheck_step_dns">Адрес сервера разрешается в IP</string>
+    <string name="selfcheck_step_port">Порт SSH отвечает</string>
+    <string name="selfcheck_step_key">Ключ принят сервером</string>
+    <string name="selfcheck_step_forward">Проброс через туннель работает</string>
+    <string name="selfcheck_step_dns_tunnel">DNS через туннель отвечает</string>
+    <string name="selfcheck_step_sites">Известные сайты открываются</string>
+    <string name="selfcheck_step_external_ip">Внешний адрес совпадает с сервером</string>
+    <string name="sc_dns_resolve_failed">не разрешилось: %1$s</string>
+    <string name="sc_port_timeout">сервер не ответил вовремя</string>
+    <string name="sc_port_refused">сервер отказал в соединении</string>
+    <string name="sc_port_unreachable">сервер недоступен по сети</string>
+    <string name="sc_key_auth_failed">ключ не подошёл — проверь путь к файлу и что он добавлен на сервере</string>
+    <string name="sc_key_host_key_changed">ключ сервера изменился — возможна подмена, подробности: %1$s</string>
+    <string name="sc_key_timeout">сервер не ответил вовремя</string>
+    <string name="sc_key_refused">сервер отказал в соединении</string>
+    <string name="sc_key_unreachable">сервер недоступен по сети</string>
+    <string name="sc_forward_forward_failed">не удалось открыть тестовое соединение: %1$s</string>
+    <string name="sc_dns_tunnel_ok">отвечает</string>
+    <string name="sc_dns_tunnel_no_answer">нет ответа от DNS через туннель: %1$s</string>
+    <string name="sc_sites_all_failed">ни один сайт не открылся</string>
+    <string name="sc_external_ip_matches">%1$s — совпадает с адресом сервера</string>
+    <string name="sc_external_ip_mismatch">%1$s — не совпадает с адресом сервера, это ожидаемо для некоторых хостингов (CDN, несколько адресов на сервер)</string>
+    <string name="sc_external_ip_check_failed">не удалось узнать внешний адрес: %1$s</string>
+
+    <string name="udp_relay_enabled">Пробрасывать UDP (звонки, игры) через сервер</string>
+    <string name="udp_relay_note">Требует ретранслятор, установленный на сервере (мастер настройки VPS на компьютере, вкладка веб-панели). Пока его нет — включение этой галочки ничего не меняет, UDP по-прежнему не проходит.</string>
     <string name="need_settings">Заполните адрес сервера, пользователя и ключ</string>
     <string name="saved">Сохранено</string>
     <string name="back">Назад</string>

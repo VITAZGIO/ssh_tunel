@@ -544,6 +544,41 @@ func TestPoolSurvivesDeadLink(t *testing.T) {
 	}
 }
 
+// Kick пересобирает пул немедленно, а не через до двадцати секунд, которые
+// нужны обычной проверке живости, — ровно это нужно после смены сети на
+// телефоне (Wi-Fi ↔ мобильная), когда старый сокет почти наверняка уже мёртв.
+func TestKickReconnectsWithoutWaitingCheckInterval(t *testing.T) {
+	tun, socksAddr, _, srv := startTunnel(t, 1)
+	target := echoServer(t)
+
+	if !tun.WaitReady(1, 5*time.Second) {
+		t.Fatal("пул не поднялся")
+	}
+	before := srv.accepted.Load()
+
+	tun.Kick()
+
+	// Слот обнуляется сразу же, синхронно с вызовом Kick — это видно ещё до
+	// того, как переподключение вообще успело случиться.
+	if tun.links[0].get() != nil {
+		t.Fatal("Kick не пометил соединение оборванным")
+	}
+
+	// Без сигнала Kick горутина спала бы в ожидании своей проверки живости до
+	// двадцати секунд — три секунды здесь именно проверяют, что этого не
+	// произошло.
+	if !tun.WaitReady(1, 3*time.Second) {
+		t.Fatal("пул не переподключился за разумное время после Kick")
+	}
+	if got := srv.accepted.Load(); got <= before {
+		t.Error("после Kick сервер не принял новое соединение — переподключения не было")
+	}
+
+	c := socks5Connect(t, socksAddr, target.IP.String(), target.Port, false)
+	assertHTTPBody(t, c, target.String(), "/hello", "привет от ")
+	c.Close()
+}
+
 func TestStatsCounted(t *testing.T) {
 	tun, socksAddr, _, _ := startTunnel(t, 1)
 	target := echoServer(t)
@@ -735,9 +770,15 @@ func TestRemoteTargetStillGoesThroughTunnel(t *testing.T) {
 // программа знать не может.
 func TestDirectListSkipsTunnel(t *testing.T) {
 	tun, _, _, srv := startTunnel(t, 1)
-	tun.SetDirect(routing.NewDirectList([]string{"example.invalid", "203.0.113.0/24"}))
+	tun.SetDirect(routing.NewDirectList([]string{
+		"example.invalid", "203.0.113.0/24", "*.wild.invalid",
+	}))
 
-	for _, target := range []string{"example.invalid:80", "203.0.113.9:443"} {
+	// Решение принимается по имени из запроса, до какого-либо резолва DNS:
+	// dialFor получает ровно ту строку, что SOCKS5/CONNECT разобрали из
+	// запроса клиента, поэтому и поддомен по шаблону "*.wild.invalid" тоже
+	// обязан уйти напрямую, не открывая канал в туннеле.
+	for _, target := range []string{"example.invalid:80", "203.0.113.9:443", "a.wild.invalid:443"} {
 		before := srv.channels.Load()
 		conn, direct, _ := tun.dialFor("chrome.exe", target)
 		if conn != nil {
