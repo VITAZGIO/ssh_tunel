@@ -226,6 +226,9 @@
   .netline.bad .mark{color:#ff8a5c}
   .netline.ok .mark{color:#4bd07a}
   .netline .cidr{font-family:ui-monospace,Consolas,monospace}
+  .netline.pending .mark{color:var(--dim)}
+  .netline.skip{opacity:.5}
+  .netline .why{color:var(--dim);margin-left:4px}
   textarea{width:100%;box-sizing:border-box;resize:vertical;
        background:var(--card);border:1px solid var(--line);border-radius:8px;
        padding:7px 10px;color:var(--text);font:inherit;line-height:1.4}
@@ -376,7 +379,10 @@
       <div class="tile"><div class="k" data-i18n="channels">Каналов SSH</div><div class="v" id="links">—</div></div>
     </div>
 
-    <button class="btn speed" id="speedtest" data-i18n="speedtest">Тест скорости</button>
+    <div style="display:flex;gap:9px;margin-top:0">
+      <button class="btn speed" id="speedtest" style="flex:1" data-i18n="speedtest">Тест скорости</button>
+      <button class="btn" id="toSelfCheck" style="flex:1" data-i18n="selfcheck_open">Самопроверка</button>
+    </div>
   </div>
 
   <!-- НАСТРОЙКИ -->
@@ -705,6 +711,24 @@
       white-space:pre-wrap;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace"></div>
   </div>
 
+  <!-- САМОПРОВЕРКА -->
+  <div class="view" id="viewSelfCheck">
+    <div class="head">
+      <button class="ico" id="backFromSelfCheck" title="Назад" data-i18n-title="back">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <span class="t" data-i18n="selfcheck_title">Самопроверка</span>
+    </div>
+    <p class="note" style="margin-top:0" data-i18n="selfcheck_intro">Семь шагов подряд, от имени сервера до
+      внешнего адреса. Первая же неудача останавливает цепочку — дальше проверять бессмысленно, зато сразу
+      видно, где сломалось. Работает и без включённого туннеля: соединение для проверки своё, отдельное.</p>
+
+    <div id="selfCheckSteps"></div>
+
+    <button class="btn primary" id="selfCheckStart" style="margin-top:10px"
+      data-i18n="selfcheck_start">Проверить</button>
+  </div>
+
   <!-- ЖУРНАЛ -->
   <div class="view" id="viewLog">
     <div class="head">
@@ -762,6 +786,35 @@ const I18N = {
     check_ip_hint:'нажми, чтобы проверить настоящий внешний адрес',
     down:'Приём', up:'Отдача', connections:'Соединений', channels:'Каналов SSH',
     speedtest:'Тест скорости',
+    selfcheck_open:'Самопроверка',
+    selfcheck_title:'Самопроверка',
+    selfcheck_intro:'Семь шагов подряд, от имени сервера до внешнего адреса. Первая же неудача '+
+      'останавливает цепочку — дальше проверять бессмысленно, зато сразу видно, где сломалось. '+
+      'Работает и без включённого туннеля: соединение для проверки своё, отдельное.',
+    selfcheck_start:'Проверить', selfcheck_running:'Проверяю…',
+    selfcheck_step_dns:'Адрес сервера разрешается в IP',
+    selfcheck_step_port:'Порт SSH отвечает',
+    selfcheck_step_key:'Ключ принят сервером',
+    selfcheck_step_forward:'Проброс через туннель работает',
+    selfcheck_step_dns_tunnel:'DNS через туннель отвечает',
+    selfcheck_step_sites:'Известные сайты открываются',
+    selfcheck_step_external_ip:'Внешний адрес совпадает с сервером',
+    sc_dns_resolved:'{detail}', sc_dns_resolve_failed:'не разрешилось: {detail}',
+    sc_port_responded:'{detail}',
+    sc_port_timeout:'сервер не ответил вовремя', sc_port_refused:'сервер отказал в соединении',
+    sc_port_unreachable:'сервер недоступен по сети', sc_port_error:'{detail}',
+    sc_key_accepted:'принят',
+    sc_key_auth_failed:'ключ не подошёл — проверь путь к файлу и что он добавлен на сервере',
+    sc_key_host_key_changed:'ключ сервера изменился — возможна подмена, подробности: {detail}',
+    sc_key_timeout:'сервер не ответил вовремя', sc_key_refused:'сервер отказал в соединении',
+    sc_key_unreachable:'сервер недоступен по сети', sc_key_error:'{detail}',
+    sc_forward_ok:'{detail}', sc_forward_forward_failed:'не удалось открыть тестовое соединение: {detail}',
+    sc_dns_tunnel_ok:'отвечает', sc_dns_tunnel_no_answer:'нет ответа от DNS через туннель: {detail}',
+    sc_sites_ok:'{detail}', sc_sites_all_failed:'ни один сайт не открылся',
+    sc_external_ip_matches:'{detail} — совпадает с адресом сервера',
+    sc_external_ip_mismatch:'{detail} — не совпадает с адресом сервера, это ожидаемо для некоторых '+
+      'хостингов (CDN, несколько адресов на сервер)',
+    sc_external_ip_check_failed:'не удалось узнать внешний адрес: {detail}',
     language_label:'Язык интерфейса',
     add_server:'Добавить сервер',
     server_settings:'Настройки сервера', general_settings:'Общие настройки приложения',
@@ -833,6 +886,35 @@ const I18N = {
     check_ip_hint:'click to check the real external address',
     down:'Down', up:'Up', connections:'Connections', channels:'SSH channels',
     speedtest:'Speed test',
+    selfcheck_open:'Self-check',
+    selfcheck_title:'Self-check',
+    selfcheck_intro:'Seven steps in a row, from the server address to the external IP. The first '+
+      'failure stops the chain — no point checking further, and it shows exactly where it broke. '+
+      'Works even with the tunnel off: the check uses its own separate connection.',
+    selfcheck_start:'Check', selfcheck_running:'Checking…',
+    selfcheck_step_dns:'Server address resolves to an IP',
+    selfcheck_step_port:'SSH port responds',
+    selfcheck_step_key:'Key accepted by the server',
+    selfcheck_step_forward:'Port-forward through the tunnel works',
+    selfcheck_step_dns_tunnel:'DNS through the tunnel responds',
+    selfcheck_step_sites:'Known sites open',
+    selfcheck_step_external_ip:'External address matches the server',
+    sc_dns_resolved:'{detail}', sc_dns_resolve_failed:"didn't resolve: {detail}",
+    sc_port_responded:'{detail}',
+    sc_port_timeout:"the server didn't answer in time", sc_port_refused:'the server refused the connection',
+    sc_port_unreachable:'the server is unreachable', sc_port_error:'{detail}',
+    sc_key_accepted:'accepted',
+    sc_key_auth_failed:"the key didn't work — check the file path and that it's on the server",
+    sc_key_host_key_changed:'the server key changed — possible spoofing, details: {detail}',
+    sc_key_timeout:"the server didn't answer in time", sc_key_refused:'the server refused the connection',
+    sc_key_unreachable:'the server is unreachable', sc_key_error:'{detail}',
+    sc_forward_ok:'{detail}', sc_forward_forward_failed:"couldn't open a test connection: {detail}",
+    sc_dns_tunnel_ok:'responds', sc_dns_tunnel_no_answer:'no answer from DNS through the tunnel: {detail}',
+    sc_sites_ok:'{detail}', sc_sites_all_failed:'no site opened',
+    sc_external_ip_matches:'{detail} — matches the server address',
+    sc_external_ip_mismatch:'{detail} — does not match the server address, which is expected for some '+
+      'hosting setups (CDN, multiple addresses per server)',
+    sc_external_ip_check_failed:"couldn't check the external address: {detail}",
     language_label:'Interface language',
     add_server:'Add server',
     server_settings:'Server settings', general_settings:'General app settings',
@@ -906,6 +988,7 @@ function applyI18n(){
   document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = tr(el.dataset.i18nPh); });
   const dh = $('directHelp');
   if(dh) dh.innerHTML = tr('direct_help_html');
+  if(typeof renderSelfCheckSteps === 'function') renderSelfCheckSteps(lastSelfCheckSteps);
   renderModes();
   renderApps();
   if(typeof renderCityBtn === 'function') renderCityBtn();
@@ -1122,7 +1205,7 @@ function docWithProfile(p){
 }
 
 /* ---------- переключение экранов ---------- */
-const VIEWS = ['viewMain','viewSettings','viewFilter','viewVpsSetup','viewLog'];
+const VIEWS = ['viewMain','viewSettings','viewFilter','viewVpsSetup','viewSelfCheck','viewLog'];
 let current = 'viewMain';
 
 function show(name){
@@ -1149,6 +1232,8 @@ $('backFromSettings').onclick = () => show('viewMain');
 $('backFromLog').onclick = () => show('viewMain');
 $('backFromFilter').onclick = () => show('viewSettings');
 $('toFilter').onclick = () => show('viewFilter');
+$('backFromSelfCheck').onclick = () => show('viewMain');
+$('toSelfCheck').onclick = () => { show('viewSelfCheck'); runSelfCheck(); };
 $('backFromVpsSetup').onclick = () => show('viewSettings');
 $('toVpsSetup').onclick = () => {
   if(!$('vpsHost').value) $('vpsHost').value = $('host').value;
@@ -1353,6 +1438,54 @@ $('speedtest').onclick = async () => {
   // говорим об этом отдельно и результат оставляем.
   if(r.note) showError(r.note);
 };
+
+/* ---------- самопроверка ---------- */
+const SELFCHECK_STEPS = ['dns','port','key','forward','dns_tunnel','sites','external_ip'];
+
+function selfCheckCodeText(name, code, detail){
+  const key = 'sc_' + name + '_' + code;
+  const tpl = tr(key);
+  if (tpl === key) return detail || code || '';
+  return tpl.replace('{detail}', detail || '');
+}
+
+let lastSelfCheckSteps = [];
+function renderSelfCheckSteps(steps){
+  lastSelfCheckSteps = steps || [];
+  const box = $('selfCheckSteps');
+  const byName = {};
+  (steps || []).forEach(s => { byName[s.name] = s; });
+  box.innerHTML = SELFCHECK_STEPS.map(name => {
+    const s = byName[name] || null;
+    let cls = 'pending', mark = '…';
+    if (s){
+      if (s.skipped){ cls = 'skip'; mark = '–'; }
+      else if (s.ok){ cls = 'ok'; mark = '✓'; }
+      else { cls = 'bad'; mark = '✗'; }
+    }
+    const label = tr('selfcheck_step_' + name);
+    const why = (s && !s.skipped) ? selfCheckCodeText(name, s.code, s.detail) : '';
+    return '<div class="netline ' + cls + '">' +
+      '<span class="mark">' + mark + '</span>' +
+      '<span>' + label + (why ? '<span class="why">— ' + why + '</span>' : '') + '</span>' +
+      '</div>';
+  }).join('');
+}
+
+async function runSelfCheck(){
+  renderSelfCheckSteps([]); // все «в ожидании»
+  $('selfCheckStart').disabled = true;
+  $('selfCheckStart').textContent = tr('selfcheck_running');
+  try{
+    const r = await api('/api/selfcheck');
+    renderSelfCheckSteps(r.steps);
+  } catch(e){
+    renderSelfCheckSteps([]);
+  }
+  $('selfCheckStart').disabled = false;
+  $('selfCheckStart').textContent = tr('selfcheck_start');
+}
+$('selfCheckStart').onclick = runSelfCheck;
 
 /* ---------- мастер настройки VPS ---------- */
 let vpsSetupRunning = false;

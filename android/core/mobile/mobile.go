@@ -390,6 +390,33 @@ func (t *Tunnel) NetworkChanged() {
 	}
 }
 
+// SelfCheck прогоняет ту же цепочку самопроверки, что и на компьютере (см.
+// sshtunnel/internal/tunnel.RunSelfCheck), и отдаёт результат строкой JSON:
+// {"steps":[{"name":"dns","ok":true,"code":"resolved","detail":"..."}, ...]}.
+// Соединение для проверки отдельное от уже поднятого пула — работает и
+// объясняет причину, даже когда туннель выключен. Configure нужно вызвать
+// заранее: отсюда берутся адрес, пользователь и путь к ключу.
+func (t *Tunnel) SelfCheck() string {
+	t.mu.Lock()
+	cfg := t.cfg
+	t.mu.Unlock()
+	if cfg.Host == "" {
+		return `{"error":"сначала нужно задать настройки"}`
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	steps := tunnel.RunSelfCheck(ctx, tunnel.SelfCheckOptions{Config: cfg})
+
+	b, err := json.Marshal(struct {
+		Steps []tunnel.CheckStep `json:"steps"`
+	}{Steps: steps})
+	if err != nil {
+		return `{"error":"не удалось разобрать результат"}`
+	}
+	return string(b)
+}
+
 // SpeedTest мерит скорость через туннель — тот же тест, что в окне на
 // компьютере. Возвращает результат строкой JSON.
 //

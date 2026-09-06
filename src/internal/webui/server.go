@@ -23,6 +23,7 @@
 package webui
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"embed"
@@ -183,6 +184,7 @@ func (s *Server) Serve() error {
 	mux.HandleFunc("/api/bootstart", s.guard(s.handleBootStart))
 	mux.HandleFunc("/api/scannet", s.guard(s.handleScanNet))
 	mux.HandleFunc("/api/vpssetup/start", s.guard(s.handleVpsSetupStart))
+	mux.HandleFunc("/api/selfcheck", s.guard(s.handleSelfCheck))
 
 	srv := &http.Server{
 		Handler:           mux,
@@ -407,6 +409,16 @@ func (s *Server) handleScanNet(w http.ResponseWriter, r *http.Request) {
 		"nets":     checks,
 		"problems": app.Problems(checks),
 	})
+}
+
+// handleSelfCheck прогоняет цепочку самопроверки для текущего активного
+// сервера. Не требует поднятого туннеля — соединение для проверки отдельное,
+// поэтому экран работает и объясняет причину, даже когда всё выключено.
+func (s *Server) handleSelfCheck(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
+	defer cancel()
+	steps := s.app.SelfCheck(ctx)
+	writeJSON(w, map[string]any{"steps": steps})
 }
 
 func (s *Server) handleCheckIP(w http.ResponseWriter, r *http.Request) {

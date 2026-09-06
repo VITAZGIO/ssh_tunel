@@ -34,6 +34,7 @@ import (
 	"sshtunnel/internal/config"
 	"sshtunnel/internal/events"
 	"sshtunnel/internal/hostkey"
+	"sshtunnel/internal/tunnel"
 )
 
 // vpsSetupParams — то, что вводится в мастере настройки VPS.
@@ -329,7 +330,7 @@ func shQuote(s string) string {
 func classifySSHErr(err error) error {
 	msg := err.Error()
 	switch {
-	case strings.Contains(msg, "unable to authenticate"):
+	case tunnel.IsAuthError(err):
 		return errors.New("неверный пароль (или пользователь)")
 	case strings.Contains(msg, "connection refused"):
 		return errors.New("сервер отказал в соединении — проверь адрес и порт")

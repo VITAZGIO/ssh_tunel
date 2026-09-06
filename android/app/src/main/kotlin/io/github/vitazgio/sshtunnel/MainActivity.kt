@@ -11,6 +11,7 @@ import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -31,8 +32,9 @@ class MainActivity : AppCompatActivity() {
 
     private companion object {
         const val MAIN = 0
-        const val LOG = 1
-        const val SETTINGS = 2
+        const val SELFCHECK = 1
+        const val LOG = 2
+        const val SETTINGS = 3
     }
 
     private lateinit var settings: Settings
@@ -71,6 +73,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var adBlockAllowlistEdit: EditText
     private lateinit var adBlockUpdateButton: Button
     private lateinit var adBlockStatusView: TextView
+
+    private lateinit var selfCheckSteps: LinearLayout
+    private lateinit var selfCheckStartButton: Button
 
     private val vpnPermission = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
@@ -122,12 +127,21 @@ class MainActivity : AppCompatActivity() {
         adBlockUpdateButton = findViewById(R.id.adBlockUpdate)
         adBlockStatusView = findViewById(R.id.adBlockStatus)
 
+        selfCheckSteps = findViewById(R.id.selfCheckSteps)
+        selfCheckStartButton = findViewById(R.id.selfCheckStart)
+        renderSelfCheckSteps(null)
+
         loadSettings()
 
         power.setOnClickListener { onToggle() }
         speedButton.setOnClickListener { runSpeedTest() }
         findViewById<Button>(R.id.save).setOnClickListener { saveSettings() }
         adBlockUpdateButton.setOnClickListener { updateBlockLists() }
+        selfCheckStartButton.setOnClickListener { runSelfCheck() }
+        findViewById<View>(R.id.toSelfCheck).setOnClickListener {
+            flipper.displayedChild = SELFCHECK
+            runSelfCheck()
+        }
         findViewById<View>(R.id.apps).setOnClickListener {
             startActivity(Intent(this, AppsActivity::class.java))
         }
@@ -324,6 +338,99 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     getString(R.string.ad_block_updated, o.optInt("count"))
                 }
+            }
+        }.start()
+    }
+
+    private val SELFCHECK_STEP_NAMES = listOf("dns", "port", "key", "forward", "dns_tunnel", "sites", "external_ip")
+
+    private fun selfCheckStepLabelRes(name: String): Int = when (name) {
+        "dns" -> R.string.selfcheck_step_dns
+        "port" -> R.string.selfcheck_step_port
+        "key" -> R.string.selfcheck_step_key
+        "forward" -> R.string.selfcheck_step_forward
+        "dns_tunnel" -> R.string.selfcheck_step_dns_tunnel
+        "sites" -> R.string.selfcheck_step_sites
+        else -> R.string.selfcheck_step_external_ip
+    }
+
+    /**
+     * Текст причины по коду шага. Именование ресурса ("sc_" + шаг + "_" + код)
+     * зеркалит то же самое в JS-словаре на компьютере — так у обеих сторон
+     * общая логика без необходимости заводить общий Go-код специально ради
+     * текста. Ресурса нет (обычно для "успешных" кодов вроде "resolved") —
+     * значит вся нужная информация уже в detail, его и показываем как есть.
+     */
+    private fun selfCheckCodeText(name: String, code: String, detail: String): String {
+        val resId = resources.getIdentifier("sc_${name}_$code", "string", packageName)
+        if (resId != 0) {
+            return try { getString(resId, detail) } catch (e: Exception) { getString(resId) }
+        }
+        return detail.ifBlank { code }
+    }
+
+    /** steps=null — все семь «в ожидании», как до первого запуска. */
+    private fun renderSelfCheckSteps(steps: List<JSONObject>?) {
+        selfCheckSteps.removeAllViews()
+        val byName = HashMap<String, JSONObject>()
+        steps?.forEach { byName[it.optString("name")] = it }
+
+        for (name in SELFCHECK_STEP_NAMES) {
+            val s = byName[name]
+            val mark: String
+            val colorRes: Int
+            when {
+                s == null -> { mark = "…"; colorRes = R.color.dim }
+                s.optBoolean("skipped") -> { mark = "–"; colorRes = R.color.dim }
+                s.optBoolean("ok") -> { mark = "✓"; colorRes = R.color.ok }
+                else -> { mark = "✗"; colorRes = R.color.err }
+            }
+            val label = getString(selfCheckStepLabelRes(name))
+            val why = if (s != null && !s.optBoolean("skipped")) {
+                selfCheckCodeText(name, s.optString("code"), s.optString("detail"))
+            } else ""
+
+            val row = LinearLayout(this)
+            row.orientation = LinearLayout.HORIZONTAL
+            row.setPadding(0, 8, 0, 8)
+
+            val markView = TextView(this)
+            markView.text = mark
+            markView.minEms = 2
+            markView.setTextColor(ContextCompat.getColor(this, colorRes))
+
+            val textView = TextView(this)
+            textView.text = if (why.isNotBlank()) "$label — $why" else label
+            textView.setTextColor(ContextCompat.getColor(this, R.color.text))
+            textView.textSize = 13.5f
+
+            row.addView(markView)
+            row.addView(textView)
+            selfCheckSteps.addView(row)
+        }
+    }
+
+    private fun runSelfCheck() {
+        selfCheckStartButton.isEnabled = false
+        selfCheckStartButton.setText(R.string.selfcheck_running)
+        renderSelfCheckSteps(null)
+        val ctx = applicationContext
+        Thread {
+            val result = try {
+                TunnelService.selfCheck(ctx)
+            } catch (e: Exception) {
+                """{"error":"${e.message}"}"""
+            }
+            val steps = try {
+                val arr = JSONObject(result).optJSONArray("steps")
+                if (arr == null) null else (0 until arr.length()).map { arr.getJSONObject(it) }
+            } catch (e: Exception) {
+                null
+            }
+            runOnUiThread {
+                selfCheckStartButton.isEnabled = true
+                selfCheckStartButton.setText(R.string.selfcheck_start)
+                renderSelfCheckSteps(steps)
             }
         }.start()
     }

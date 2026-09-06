@@ -44,6 +44,33 @@ class TunnelService : VpnService(), Callbacks {
         fun speedTest(): String =
             current?.tunnel?.speedTest() ?: """{"error":"туннель выключен"}"""
 
+        /**
+         * Самопроверка не требует поднятого туннеля — соединение для неё
+         * отдельное — но всё равно идёт через уже настроенный tunnel, чтобы
+         * не заводить второй экземпляр ядра и второй набор настроек.
+         * Настройки, если служба не запущена, применяются здесь же, прямо
+         * перед вызовом: Configure сам по себе ничего не поднимает.
+         */
+        fun selfCheck(context: Context): String {
+            val svc = current
+            if (svc != null) return svc.tunnel.selfCheck()
+
+            val settings = Settings(context)
+            if (!settings.ready()) return """{"error":"не заполнены настройки"}"""
+            val tmp = Mobile.newTunnel()
+            return try {
+                tmp.configure(
+                    settings.host, settings.sshPort.toLong(), settings.user,
+                    settings.keyFile.absolutePath, settings.knownHostsFile.absolutePath,
+                    settings.poolSize.toLong(), settings.directHosts, settings.localViaTunnel,
+                    settings.adBlockEnabled, settings.adBlockListFile.absolutePath, settings.adBlockAllowlist,
+                )
+                tmp.selfCheck()
+            } catch (e: Exception) {
+                """{"error":"${e.message}"}"""
+            }
+        }
+
         private const val TAG = "ssh_tunnel"
         private const val CHANNEL = "tunnel"
         private const val NOTIFICATION_ID = 1
