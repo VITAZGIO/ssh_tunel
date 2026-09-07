@@ -1,6 +1,7 @@
 package io.github.vitazgio.sshtunnel
 
 import android.Manifest
+import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
@@ -87,6 +88,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var profileTabs: LinearLayout
     private lateinit var profileTabsScroll: android.widget.HorizontalScrollView
     private lateinit var removeProfileBtn: View
+    private lateinit var exportProfileClipBtn: View
     private lateinit var pasteConfigBtn: Button
     private lateinit var scanConfigBtn: Button
     private lateinit var importNote: TextView
@@ -183,6 +185,7 @@ class MainActivity : AppCompatActivity() {
         profileTabs = findViewById(R.id.profileTabs)
         profileTabsScroll = findViewById(R.id.profileTabsScroll)
         removeProfileBtn = findViewById(R.id.removeProfileBtn)
+        exportProfileClipBtn = findViewById(R.id.exportProfileClipBtn)
         pasteConfigBtn = findViewById(R.id.pasteConfigBtn)
         scanConfigBtn = findViewById(R.id.scanConfigBtn)
         importNote = findViewById(R.id.importNote)
@@ -234,6 +237,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         removeProfileBtn.setOnClickListener { onRemoveProfile() }
+        exportProfileClipBtn.setOnClickListener { onExportProfileClip() }
         cityBtn.setOnClickListener { showCityMenu() }
         customCityName.addOnTextChanged { liveRetitleEditingTab() }
         selectServerBtn.setOnClickListener { onSelectServer() }
@@ -496,6 +500,30 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    /** Тот же формат JSON, что читает импорт (и панель на компьютере) —
+     *  чтобы этим сервером можно было поделиться, вставив текст на другом
+     *  устройстве. Сначала сохраняет форму — экспортируется то, что видно
+     *  на экране, а не последнее сохранённое состояние. */
+    private fun onExportProfileClip() {
+        saveCurrentFormInto(editingProfileId)
+        val p = settings.profiles.find { it.id == editingProfileId } ?: return
+        val keyFile = settings.keyFile(p.id)
+        val keyContents = if (keyFile.exists() && keyFile.length() > 0) keyFile.readText() else ""
+        val json = try {
+            mobile.Mobile.buildConfig(
+                p.name, p.flag, p.host, p.sshPort.toLong(), p.user, p.poolSize.toLong(),
+                p.filterMode, p.filterApps.joinToString("\n"), p.directHosts,
+                p.localViaTunnel, keyContents.isNotBlank(), keyContents, p.panel, p.deviceName,
+            )
+        } catch (e: Exception) {
+            Toast.makeText(this, e.message ?: getString(R.string.import_bad_apps), Toast.LENGTH_SHORT).show()
+            return
+        }
+        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        cm?.setPrimaryClip(ClipData.newPlainText(getString(R.string.export_server_clip), json))
+        Toast.makeText(this, R.string.export_server_copied, Toast.LENGTH_SHORT).show()
+    }
+
     private fun onSelectServer() {
         saveCurrentFormInto(editingProfileId)
         if (editingProfileId == settings.activeProfileId) {
@@ -713,6 +741,11 @@ class MainActivity : AppCompatActivity() {
                 .setOrientationLocked(true)
                 .setBeepEnabled(false)
                 .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                // Стандартная подсказка снизу экрана сканера у zxing не
+                // учитывает системные отступы (жесты/панель навигации) — на
+                // Android 15+ с обязательным edge-to-edge текст съезжает за
+                // край экрана. Рамка видоискателя и так понятна без слов.
+                .setPrompt("")
         )
     }
 
@@ -767,10 +800,12 @@ class MainActivity : AppCompatActivity() {
             settings.saveKeyFor(p.id, keyContents)
         }
 
-        if (TunnelService.state != "stopped") {
-            startService(Intent(this, TunnelService::class.java).setAction(TunnelService.ACTION_STOP))
-        }
-        settings.setActive(p.id)
+        // Раньше здесь сразу переключали активный сервер на только что
+        // импортированный — с уже подключённым туннелем это выглядело так,
+        // будто данные текущего сервера подменились, хотя на самом деле
+        // просто переключилось подключение. Импорт теперь только добавляет
+        // вкладку и открывает её для проверки — какой сервер активен,
+        // выбирает отдельно кнопка «Выбрать этот сервер».
         editingProfileId = p.id
         renderProfileTabs()
         loadProfileIntoForm(p)

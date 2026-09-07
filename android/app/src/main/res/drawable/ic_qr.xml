@@ -1,14 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Значок QR-кода — три угловых квадрата и точки внутри, узнаваемый силуэт
-     без притязаний на настоящую QR-сетку. -->
+<!-- Значок сканера — уголки рамки видоискателя, как у камеры QR-сканера в
+     большинстве приложений. Простая геометрия без вырезов (fillType) —
+     то же, что вызывало проблемы с рендером у предыдущей версии значка. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="16dp" android:height="16dp"
+    android:width="18dp" android:height="18dp"
     android:viewportWidth="24" android:viewportHeight="24">
-    <path android:fillColor="@color/text" android:fillType="evenOdd" android:pathData="M3,3 H10 V10 H3 Z M5,5 V8 H8 V5 Z" />
-    <path android:fillColor="@color/text" android:fillType="evenOdd" android:pathData="M14,3 H21 V10 H14 Z M16,5 V8 H19 V5 Z" />
-    <path android:fillColor="@color/text" android:fillType="evenOdd" android:pathData="M3,14 H10 V21 H3 Z M5,16 V19 H8 V16 Z" />
-    <path android:fillColor="@color/text" android:pathData="M14,14 H16 V16 H14 Z" />
-    <path android:fillColor="@color/text" android:pathData="M18,14 H21 V17 H18 Z" />
-    <path android:fillColor="@color/text" android:pathData="M14,18 H17 V21 H14 Z" />
-    <path android:fillColor="@color/text" android:pathData="M19,19 H21 V21 H19 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M2,2 L9,2 L9,4.2 L4.2,4.2 L4.2,9 L2,9 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M15,2 L22,2 L22,9 L19.8,9 L19.8,4.2 L15,4.2 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M2,15 L4.2,15 L4.2,19.8 L9,19.8 L9,22 L2,22 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M19.8,15 L22,15 L22,22 L15,22 L15,19.8 L19.8,19.8 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M10.5,10.5 L13.5,10.5 L13.5,13.5 L10.5,13.5 Z" />
 </vector>

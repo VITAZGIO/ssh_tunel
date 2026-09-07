@@ -98,18 +98,5 @@
             android:paddingTop="9dp"
             android:paddingBottom="9dp"
             android:text="@string/import_apps" />
-
-        <Space android:layout_width="6dp" android:layout_height="1dp" />
-
-        <Button
-            android:id="@+id/pasteAppsBtn"
-            style="@style/SecondaryButton"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:textSize="12sp"
-            android:paddingTop="9dp"
-            android:paddingBottom="9dp"
-            android:text="@string/paste_apps_list" />
     </LinearLayout>
 </LinearLayout>

@@ -134,6 +134,8 @@
     <!-- Список серверов и выбор города -->
     <string name="add_server">Добавить сервер</string>
     <string name="remove_server">Удалить сервер</string>
+    <string name="export_server_clip">Экспортировать в буфер</string>
+    <string name="export_server_copied">Настройки сервера скопированы в буфер</string>
     <string name="remove_server_confirm">Удалить сервер «%1$s»?</string>
     <string name="remove_server_last">Нельзя удалить единственный сервер</string>
     <string name="pick_city">Выбрать город</string>
@@ -156,6 +158,6 @@
     <string name="import_apps">Импортировать список</string>
     <string name="paste_apps_list">Вставить список из буфера</string>
     <string name="apps_imported">список программ импортирован</string>
-    <string name="apps_exported">список сохранён и скопирован в буфер</string>
+    <string name="apps_exported">список скопирован в буфер</string>
     <string name="import_bad_apps">это не похоже на список программ ssh_tunnel</string>
 </resources>

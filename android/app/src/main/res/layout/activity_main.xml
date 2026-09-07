@@ -82,7 +82,7 @@
             <Space
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_weight="0.8" />
+                android:layout_weight="0.55" />
 
             <LinearLayout
                 android:id="@+id/power"
@@ -187,7 +187,7 @@
             <Space
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_weight="1.2" />
+                android:layout_weight="1.45" />
 
             <!-- Приём и отдача появляются после замера скорости и через десять
                  секунд исчезают: сразу после теста цифры интересны, а через
@@ -457,15 +457,21 @@
                     android:layout_marginBottom="14dp">
                     <Button
                         android:id="@+id/removeProfileBtn"
+                        style="@style/DangerButton"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:textSize="12.5sp"
+                        android:text="@string/remove_server" />
+                    <Space android:layout_width="8dp" android:layout_height="1dp" />
+                    <Button
+                        android:id="@+id/exportProfileClipBtn"
                         style="@style/SecondaryButton"
                         android:layout_width="0dp"
                         android:layout_weight="1"
                         android:layout_height="wrap_content"
-                        android:text="@string/remove_server" />
-                    <Space
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="1dp" />
+                        android:textSize="12.5sp"
+                        android:text="@string/export_server_clip" />
                 </LinearLayout>
 
                 <Button

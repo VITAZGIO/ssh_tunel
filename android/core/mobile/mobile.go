@@ -577,6 +577,44 @@ func ParseConfig(text string) (*ParsedConfig, error) {
 	}, nil
 }
 
+// BuildConfig собирает тот же текст, что ParseConfig разбирает обратно —
+// нужен экрану настроек для кнопки «Экспортировать сервер» (копия в буфер
+// обмена и в файл того же формата, что использует и панель на компьютере).
+// Поля flat: gomobile не умеет передавать структуры аргументом, только
+// плоский набор скаляров, как и во всех остальных функциях этого пакета.
+func BuildConfig(name, flag, host string, sshPort int, user string, poolSize int,
+	filterMode, filterApps, directHosts string, localViaTunnel, keyIncluded bool,
+	keyContents, panel, deviceName string) (string, error) {
+	doc := share.Doc{
+		Name: name, Flag: flag, Host: host, SSHPort: sshPort, User: user,
+		SocksPort: 1080, HTTPPort: 1081, PoolSize: poolSize,
+		FilterMode:     filterMode,
+		FilterApps:     splitNonEmpty(filterApps),
+		DirectHosts:    splitNonEmpty(directHosts),
+		LocalViaTunnel: localViaTunnel,
+		KeyIncluded:    keyIncluded,
+		KeyContents:    keyContents,
+		Panel:          panel,
+		DeviceName:     deviceName,
+	}
+	data, err := share.Build(doc)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+func splitNonEmpty(text string) []string {
+	var out []string
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			out = append(out, line)
+		}
+	}
+	return out
+}
+
 // UpdateBlockLists загружает списки блокировки рекламы и слежки по адресам
 // или путям из sourcesText (через запятую или с новой строки, вперемешку
 // http(s)-ссылки и локальные файлы), сохраняет объединённый и очищенный от

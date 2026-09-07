@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
-import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -18,12 +17,9 @@ import android.widget.ListView
 import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
 
 /**
  * Выбор приложений.
@@ -50,13 +46,6 @@ class AppsActivity : AppCompatActivity() {
     private lateinit var note: TextView
     private var apps: List<App> = emptyList()
 
-    private val createDocument = registerForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json")
-    ) { uri -> if (uri != null) writeExportTo(uri) }
-
-    private val openDocument = registerForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri -> if (uri != null) readImportFrom(uri) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -97,10 +86,7 @@ class AppsActivity : AppCompatActivity() {
         }
 
         findViewById<View>(R.id.exportAppsBtn).setOnClickListener { exportApps() }
-        findViewById<View>(R.id.importAppsBtn).setOnClickListener {
-            openDocument.launch(arrayOf("application/json", "text/plain", "*/*"))
-        }
-        findViewById<View>(R.id.pasteAppsBtn).setOnClickListener { pasteApps() }
+        findViewById<View>(R.id.importAppsBtn).setOnClickListener { pasteApps() }
 
         fillList()
     }
@@ -180,18 +166,7 @@ class AppsActivity : AppCompatActivity() {
 
     private fun exportApps() {
         copyToClipboard(exportDocText())
-        createDocument.launch("ssh_tunnel-apps.json")
-    }
-
-    private fun writeExportTo(uri: Uri) {
-        try {
-            contentResolver.openOutputStream(uri)?.use { out ->
-                out.write(exportDocText().toByteArray(Charsets.UTF_8))
-            }
-            note.text = getString(R.string.apps_exported)
-        } catch (e: Exception) {
-            note.text = e.message ?: getString(R.string.import_bad_apps)
-        }
+        note.text = getString(R.string.apps_exported)
     }
 
     private fun pasteApps() {
@@ -203,17 +178,6 @@ class AppsActivity : AppCompatActivity() {
             return
         }
         applyImportText(text)
-    }
-
-    private fun readImportFrom(uri: Uri) {
-        try {
-            val text = contentResolver.openInputStream(uri)?.use { input ->
-                BufferedReader(InputStreamReader(input, Charsets.UTF_8)).readText()
-            } ?: ""
-            applyImportText(text)
-        } catch (e: Exception) {
-            note.text = e.message ?: getString(R.string.import_bad_apps)
-        }
     }
 
     /**

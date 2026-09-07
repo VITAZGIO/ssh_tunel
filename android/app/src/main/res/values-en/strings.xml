@@ -78,6 +78,8 @@
     <!-- Server list and city picker -->
     <string name="add_server">Add server</string>
     <string name="remove_server">Remove server</string>
+    <string name="export_server_clip">Export to clipboard</string>
+    <string name="export_server_copied">Server settings copied to clipboard</string>
     <string name="remove_server_confirm">Remove server \"%1$s\"?</string>
     <string name="remove_server_last">Can\'t remove the only server</string>
     <string name="pick_city">Pick a city</string>
@@ -100,7 +102,7 @@
     <string name="import_apps">Import list</string>
     <string name="paste_apps_list">Paste list from clipboard</string>
     <string name="apps_imported">app list imported</string>
-    <string name="apps_exported">list saved and copied to clipboard</string>
+    <string name="apps_exported">list copied to clipboard</string>
     <string name="import_bad_apps">this doesn\'t look like an ssh_tunnel app list</string>
     <!-- Блокировка рекламы, самопроверка и UDP: строки пришли из ветки, где
          английского файла ещё не было. -->
