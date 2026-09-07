@@ -49,7 +49,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:orientation="horizontal">
-                <Button
+                <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/tabBlockBtn"
                     style="@style/SecondaryButton"
                     android:layout_width="0dp"
@@ -60,7 +60,7 @@
                     android:paddingBottom="9dp"
                     android:text="@string/ad_block_tab_block" />
                 <Space android:layout_width="8dp" android:layout_height="1dp" />
-                <Button
+                <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/tabAllowBtn"
                     style="@style/SecondaryButton"
                     android:layout_width="0dp"
@@ -111,7 +111,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal">
-                <Button
+                <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/pasteListBtn"
                     style="@style/SecondaryButton"
                     android:layout_width="0dp"
@@ -122,7 +122,7 @@
                     android:paddingBottom="9dp"
                     android:text="@string/adblock_paste" />
                 <Space android:layout_width="6dp" android:layout_height="1dp" />
-                <Button
+                <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/copyListBtn"
                     style="@style/SecondaryButton"
                     android:layout_width="0dp"
@@ -140,7 +140,7 @@
                 android:layout_marginTop="14dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
-                <Button
+                <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/adBlockUpdate"
                     style="@style/SecondaryButton"
                     android:layout_width="wrap_content"

@@ -79,115 +79,124 @@
                 android:textColor="@color/err"
                 android:visibility="gone" />
 
-            <Space
+            <!-- Круглая кнопка ровно по центру свободного места, а надписи под
+                 ней — уже поверх нижней половины. Раньше кнопка и надписи шли
+                 одной колонкой между двумя распорками, и центр приходился на
+                 середину всей этой колонки: сама кнопка из-за текста под ней
+                 всегда оказывалась выше середины экрана, а подбор весов
+                 распорок на глаз каждый раз промахивался. -->
+            <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_weight="0.55" />
+                android:layout_weight="1">
 
-            <LinearLayout
-                android:id="@+id/power"
-                android:layout_width="190dp"
-                android:layout_height="190dp"
-                android:layout_gravity="center_horizontal"
-                android:orientation="vertical"
-                android:gravity="center"
-                android:clickable="true"
-                android:focusable="true"
-                android:background="@drawable/bg_power_off">
+                <LinearLayout
+                    android:id="@+id/power"
+                    android:layout_width="190dp"
+                    android:layout_height="190dp"
+                    android:layout_centerInParent="true"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:background="@drawable/bg_power_off">
 
-                <ImageView
-                    android:id="@+id/powerIcon"
-                    android:layout_width="95dp"
-                    android:layout_height="95dp"
-                    android:src="@drawable/ic_power"
-                    android:contentDescription="@string/start" />
+                    <ImageView
+                        android:id="@+id/powerIcon"
+                        android:layout_width="95dp"
+                        android:layout_height="95dp"
+                        android:src="@drawable/ic_power"
+                        android:contentDescription="@string/start" />
 
-                <TextView
-                    android:id="@+id/powerCap"
-                    android:layout_width="wrap_content"
+                    <TextView
+                        android:id="@+id/powerCap"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="13sp"
+                        android:textStyle="bold"
+                        android:text="@string/start" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textSize="13sp"
-                    android:textStyle="bold"
-                    android:text="@string/start" />
-            </LinearLayout>
+                    android:layout_below="@id/power"
+                    android:orientation="vertical">
 
-            <!-- Появляется только когда серверов больше одного и включена галочка
-                 «Показывать выбор сервера на главном экране» — иначе GONE, чтобы
-                 не сдвигать остальное. -->
-            <LinearLayout
-                android:id="@+id/homePicker"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginTop="10dp"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:background="@drawable/bg_button"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:paddingTop="6dp"
-                android:paddingBottom="6dp"
-                android:clickable="true"
-                android:focusable="true"
-                android:visibility="gone">
+                    <!-- Появляется только когда серверов больше одного и включена
+                         галочка «Показывать выбор сервера на главном экране» —
+                         иначе GONE, чтобы не сдвигать остальное. -->
+                    <LinearLayout
+                        android:id="@+id/homePicker"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_horizontal"
+                        android:layout_marginTop="10dp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:background="@drawable/bg_button"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp"
+                        android:paddingTop="6dp"
+                        android:paddingBottom="6dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:visibility="gone">
 
-                <io.github.vitazgio.sshtunnel.FlagView
-                    android:id="@+id/homePickerFlag"
-                    android:layout_width="20dp"
-                    android:layout_height="14dp" />
+                        <io.github.vitazgio.sshtunnel.FlagView
+                            android:id="@+id/homePickerFlag"
+                            android:layout_width="20dp"
+                            android:layout_height="14dp" />
 
-                <TextView
-                    android:id="@+id/homePickerName"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:textSize="13sp"
-                    android:textColor="@color/text" />
+                        <TextView
+                            android:id="@+id/homePickerName"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:textSize="13sp"
+                            android:textColor="@color/text" />
 
-                <ImageView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="4dp"
-                    android:src="@drawable/ic_chevron"
-                    android:rotation="90"
-                    android:contentDescription="@string/select_this_server" />
-            </LinearLayout>
+                        <ImageView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="4dp"
+                            android:src="@drawable/ic_chevron"
+                            android:rotation="90"
+                            android:contentDescription="@string/select_this_server" />
+                    </LinearLayout>
 
-            <TextView
-                android:id="@+id/state"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:gravity="center"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:textColor="@color/text"
-                android:text="@string/state_stopped" />
+                    <TextView
+                        android:id="@+id/state"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:gravity="center"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/text"
+                        android:text="@string/state_stopped" />
 
-            <TextView
-                android:id="@+id/detail"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:gravity="center"
-                android:textSize="12.5sp"
-                android:textColor="@color/dim" />
+                    <TextView
+                        android:id="@+id/detail"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:gravity="center"
+                        android:textSize="12.5sp"
+                        android:textColor="@color/dim" />
 
-            <!-- Задержка до сервера: важно не точное число, а «нормально это
-                 или нет», поэтому цветом. -->
-            <TextView
-                android:id="@+id/ping"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:gravity="center"
-                android:fontFamily="monospace"
-                android:textSize="12.5sp" />
-
-            <Space
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1.45" />
+                    <!-- Задержка до сервера: важно не точное число, а «нормально
+                         это или нет», поэтому цветом. -->
+                    <TextView
+                        android:id="@+id/ping"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:gravity="center"
+                        android:fontFamily="monospace"
+                        android:textSize="12.5sp" />
+                </LinearLayout>
+            </RelativeLayout>
 
             <!-- Приём и отдача появляются после замера скорости и через десять
                  секунд исчезают: сразу после теста цифры интересны, а через
@@ -238,14 +247,14 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="14dp"
                 android:orientation="horizontal">
-                <Button
+                <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/speedtest"
                     style="@style/SecondaryButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
                     android:text="@string/speedtest" />
                 <Space android:layout_width="10dp" android:layout_height="1dp" />
-                <Button
+                <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/toSelfCheck"
                     style="@style/SecondaryButton"
                     android:layout_width="0dp"
@@ -284,7 +293,7 @@
                     android:orientation="vertical" />
             </ScrollView>
 
-            <Button
+            <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/selfCheckStart"
                 style="@style/PrimaryButton"
                 android:layout_marginTop="10dp"
@@ -366,49 +375,6 @@
                         android:orientation="horizontal" />
                 </HorizontalScrollView>
 
-                <!-- Два способа настроить телефон за раз: из буфера обмена или
-                     сканированием QR-кода, показанного панелью на компьютере. -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:orientation="horizontal">
-
-                    <Button
-                        android:id="@+id/pasteConfigBtn"
-                        style="@style/SecondaryButton"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:textSize="12.5sp"
-                        android:paddingTop="9dp"
-                        android:paddingBottom="9dp"
-                        android:text="@string/paste_config" />
-
-                    <Space android:layout_width="8dp" android:layout_height="1dp" />
-
-                    <Button
-                        android:id="@+id/scanConfigBtn"
-                        style="@style/SecondaryButton"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:textSize="12.5sp"
-                        android:paddingTop="9dp"
-                        android:paddingBottom="9dp"
-                        android:drawableStart="@drawable/ic_qr"
-                        android:drawablePadding="6dp"
-                        android:text="@string/scan_config" />
-                </LinearLayout>
-
-                <TextView
-                    android:id="@+id/importNote"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:layout_marginBottom="6dp"
-                    android:textSize="12sp"
-                    android:textColor="@color/dim" />
 
                 <!-- Выбор города и флага для подписи вкладки — не точка выхода,
                      сервер всё равно только свой, по адресу ниже. -->
@@ -451,30 +417,83 @@
                     android:inputType="text" android:hint="@string/custom_flag_name"
                     android:textColorHint="@color/dim" android:autofillHints="" />
 
+                <!-- Четыре действия над серверами одной сеткой 2×2: слева то,
+                     что добавляет новый сервер (из буфера, по QR-коду), справа
+                     то, что делает с текущим (отдать настройки, удалить).
+                     Высота у всех четырёх задана явно — иначе кнопка с текстом
+                     в две строки оказывается выше соседки по ряду. -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="14dp">
-                    <Button
-                        android:id="@+id/removeProfileBtn"
-                        style="@style/DangerButton"
+                    android:layout_marginTop="4dp"
+                    android:orientation="horizontal">
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/pasteConfigBtn"
+                        style="@style/SecondaryButton"
                         android:layout_width="0dp"
                         android:layout_weight="1"
-                        android:layout_height="wrap_content"
+                        android:layout_height="56dp"
+                        android:maxLines="2"
                         android:textSize="12.5sp"
-                        android:text="@string/remove_server" />
+                        android:text="@string/paste_config" />
+
                     <Space android:layout_width="8dp" android:layout_height="1dp" />
-                    <Button
+
+                    <androidx.appcompat.widget.AppCompatButton
                         android:id="@+id/exportProfileClipBtn"
                         style="@style/SecondaryButton"
                         android:layout_width="0dp"
                         android:layout_weight="1"
-                        android:layout_height="wrap_content"
+                        android:layout_height="56dp"
+                        android:maxLines="2"
                         android:textSize="12.5sp"
                         android:text="@string/export_server_clip" />
                 </LinearLayout>
 
-                <Button
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="14dp"
+                    android:orientation="horizontal">
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/scanConfigBtn"
+                        style="@style/SecondaryButton"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="56dp"
+                        android:maxLines="2"
+                        android:textSize="12.5sp"
+                        android:drawableStart="@drawable/ic_qr"
+                        android:drawablePadding="6dp"
+                        android:text="@string/scan_config" />
+
+                    <Space android:layout_width="8dp" android:layout_height="1dp" />
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/removeProfileBtn"
+                        style="@style/DangerButton"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="56dp"
+                        android:maxLines="2"
+                        android:textSize="12.5sp"
+                        android:text="@string/remove_server" />
+                </LinearLayout>
+
+                <!-- Ответ на «Вставить из буфера»/«Сканировать QR-код» — сразу
+                     под ними, а не выше по экрану. -->
+                <TextView
+                    android:id="@+id/importNote"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:textSize="12sp"
+                    android:textColor="@color/dim" />
+
+                <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/selectServerBtn"
                     style="@style/SecondaryButton"
                     android:layout_marginTop="4dp"
@@ -836,7 +855,7 @@
 
                 <!-- Сохраняет и сервер, и общие настройки разом — поэтому
                      кнопка внизу, после обоих блоков, а не между ними. -->
-                <Button
+                <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/save"
                     style="@style/PrimaryButton"
                     android:layout_marginTop="18dp"

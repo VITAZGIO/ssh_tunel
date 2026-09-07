@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Обычная кнопка. Ровно тот же приглушённый синий, каким их до сих пор
+    красил MaterialButton своим backgroundTint (colorPrimary) — вид на экране
+    не меняется, но теперь цвет задаём мы сами, а не тема, и рядом может
+    стоять кнопка другого цвета (например, красная «Удалить сервер»).
+
+    bg_button (тёмная карточка с рамкой) остаётся вкладкам серверов и «+»:
+    они рисуются кодом из TextView, там подмены на MaterialButton не было.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/accent_muted" />
+    <corners android:radius="9dp" />
+</shape>

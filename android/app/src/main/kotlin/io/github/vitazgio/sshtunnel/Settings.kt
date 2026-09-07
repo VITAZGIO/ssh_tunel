@@ -86,10 +86,23 @@ class Settings(context: Context) {
 
     fun addProfile(name: String, flag: String): Profile {
         val list = profiles
-        val p = newProfile(name.ifBlank { "Server ${list.size + 1}" }, flag)
+        val p = newProfile(name.ifBlank { freeDefaultName(list) }, flag)
         list.add(p)
         saveAll(list, activeProfileId.ifBlank { p.id })
         return p
+    }
+
+    /**
+     * Имя для сервера без своего названия — «Server N» с наименьшим свободным
+     * номером, а не просто «на один больше, чем сейчас в списке». Иначе после
+     * «завёл второй, удалил первый» следующий добавленный снова назывался бы
+     * «Server 2», и в списке оказывалось бы два сервера с одним именем.
+     */
+    private fun freeDefaultName(list: List<Profile>): String {
+        val taken = list.map { it.name }.toSet()
+        var n = 1
+        while ("Server $n" in taken) n++
+        return "Server $n"
     }
 
     /** Последний сервер удалить нельзя — подключаться должно быть куда. */

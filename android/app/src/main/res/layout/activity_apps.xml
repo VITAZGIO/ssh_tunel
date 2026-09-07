@@ -75,7 +75,7 @@
         android:layout_marginTop="6dp"
         android:orientation="horizontal">
 
-        <Button
+        <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/exportAppsBtn"
             style="@style/SecondaryButton"
             android:layout_width="0dp"
@@ -88,7 +88,7 @@
 
         <Space android:layout_width="6dp" android:layout_height="1dp" />
 
-        <Button
+        <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/importAppsBtn"
             style="@style/SecondaryButton"
             android:layout_width="0dp"
