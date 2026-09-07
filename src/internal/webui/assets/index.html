@@ -419,11 +419,12 @@
         <div class="k" data-i18n="up">Отдача</div><div class="v" id="up">—</div></div>
       <div class="tile"><div class="k" data-i18n="connections">Соединений</div><div class="v" id="act">—</div></div>
       <div class="tile"><div class="k" data-i18n="channels">Каналов SSH</div><div class="v" id="links">—</div></div>
-    </div>
 
-    <div style="display:flex;gap:9px;margin-top:0">
-      <button class="btn speed" id="speedtest" style="flex:1" data-i18n="speedtest">Тест скорости</button>
-      <button class="btn" id="toSelfCheck" style="flex:1" data-i18n="selfcheck_open">Самопроверка</button>
+      <!-- Кнопки — ячейки той же сетки, что и плитки: так у всех одинаковая
+           ширина и одинаковые промежутки со всех сторон, без отдельного ряда
+           со своими отступами, который раньше прилипал к плиткам вплотную. -->
+      <button class="btn speed" id="speedtest" data-i18n="speedtest">Тест скорости</button>
+      <button class="btn" id="toSelfCheck" data-i18n="selfcheck_open">Самопроверка</button>
     </div>
   </div>
 
@@ -978,6 +979,19 @@
 </div>
 
 <script>
+const T = new URLSearchParams(location.search).get('t') || '';
+const $ = id => document.getElementById(id);
+const api = (path, body) => fetch(path, {
+  method: body ? 'POST' : 'GET',
+  headers: {'X-Token': T, 'Content-Type': 'application/json'},
+  body: body ? JSON.stringify(body) : undefined
+}).then(r => r.json());
+
+/* ---------- своё окно подтверждения вместо системного confirm() ---------- */
+/* Объявлено сразу после $ и до всего остального: обращаться к $ раньше, чем
+   он объявлен, нельзя — const до своей строки недоступен, и такая попытка
+   роняет разбор всего файла целиком, вместе со всеми обработчиками нажатий
+   ниже. Ровно это и случилось: окно рисовалось, но не нажималось ничего. */
 let confirmResolve = null;
 function appConfirm(message){
   $('confirmText').textContent = message;
@@ -992,14 +1006,6 @@ function closeConfirm(result){
 }
 $('confirmOkBtn').onclick = () => closeConfirm(true);
 $('confirmCancelBtn').onclick = () => closeConfirm(false);
-
-const T = new URLSearchParams(location.search).get('t') || '';
-const $ = id => document.getElementById(id);
-const api = (path, body) => fetch(path, {
-  method: body ? 'POST' : 'GET',
-  headers: {'X-Token': T, 'Content-Type': 'application/json'},
-  body: body ? JSON.stringify(body) : undefined
-}).then(r => r.json());
 
 /* ---------- язык интерфейса ---------- */
 /* Переключает подписи, кнопки и заголовки. Журнал соединений и сообщения,
