@@ -473,10 +473,10 @@
                data-i18n-ph="custom_name_ph">
       </div>
 
-      <div class="rowbtns">
+      <span class="curBadge" id="curBadge" style="display:none;margin-bottom:8px">✓ <span data-i18n="current_server">Текущий сервер</span></span>
+      <div class="two" style="margin-bottom:12px">
         <button class="btn" id="selectServerBtn" data-i18n="select_server">Выбрать этот сервер</button>
-        <span class="curBadge" id="curBadge" style="display:none">✓ <span data-i18n="current_server">Текущий сервер</span></span>
-        <button class="btn" id="removeServerBtn" style="margin-left:auto" hidden
+        <button class="btn" id="removeServerBtn" hidden
           data-i18n="remove_server">Удалить сервер</button>
       </div>
 
@@ -961,7 +961,38 @@
   </div>
 </div>
 
+<!-- Замена системному confirm(): тот рисуется самой ОС отдельным окошком
+     поверх приложения (с адресом вроде "Сообщение с 127.0.0.1:64366" в
+     заголовке) — не в стиле программы и может вылезать за её границы.
+     Этот диалог — просто скрытый оверлей внутри того же окна. -->
+<div class="overlay" id="confirmOverlay" hidden>
+  <div class="dialog" style="max-width:340px">
+    <div class="db" style="padding:16px 16px 0">
+      <p id="confirmText" style="margin:0 0 14px;font-size:13.5px;line-height:1.4"></p>
+      <div class="two" style="margin-bottom:16px">
+        <button class="btn" id="confirmCancelBtn" data-i18n="cancel">Отмена</button>
+        <button class="btn primary" id="confirmOkBtn">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
+let confirmResolve = null;
+function appConfirm(message){
+  $('confirmText').textContent = message;
+  $('confirmOverlay').hidden = false;
+  return new Promise(resolve => { confirmResolve = resolve; });
+}
+function closeConfirm(result){
+  $('confirmOverlay').hidden = true;
+  const r = confirmResolve;
+  confirmResolve = null;
+  if(r) r(result);
+}
+$('confirmOkBtn').onclick = () => closeConfirm(true);
+$('confirmCancelBtn').onclick = () => closeConfirm(false);
+
 const T = new URLSearchParams(location.search).get('t') || '';
 const $ = id => document.getElementById(id);
 const api = (path, body) => fetch(path, {
@@ -1024,7 +1055,7 @@ const I18N = {
     issued_by_panel:'Этот сервер выдан панелью · {name}',
     location_label:'Расположение', custom_name_ph:'Название сервера',
     select_server:'Выбрать этот сервер', current_server:'Текущий сервер',
-    remove_server:'Удалить сервер', confirm_remove_server:'Удалить этот сервер из списка?',
+    remove_server:'Удалить сервер', confirm_remove_server:'Удалить этот сервер из списка?', cancel:'Отмена',
     discard_unsaved:'Есть несохранённые правки — переключиться и потерять их?',
     host_label:'Адрес сервера', host_ph:'адрес или домен сервера',
     user_label:'Пользователь SSH', key_label:'Приватный ключ',
@@ -1171,7 +1202,7 @@ const I18N = {
     issued_by_panel:'This server was issued by a panel · {name}',
     location_label:'Location', custom_name_ph:'Server name',
     select_server:'Select this server', current_server:'Current server',
-    remove_server:'Remove server', confirm_remove_server:'Remove this server from the list?',
+    remove_server:'Remove server', confirm_remove_server:'Remove this server from the list?', cancel:'Cancel',
     discard_unsaved:'There are unsaved changes — switch and lose them?',
     host_label:'Server address', host_ph:'server address or domain',
     user_label:'SSH user', key_label:'Private key',
@@ -2637,6 +2668,7 @@ function renderGeneralVisibility(){
   $('autoPickRow').style.display = many ? 'flex' : 'none';
   $('autoPickNote').style.display = many ? 'block' : 'none';
   $('removeServerBtn').hidden = !many;
+  updateServerButtonsSpan();
 }
 
 function renderSelectServerBtn(){
@@ -2646,11 +2678,23 @@ function renderSelectServerBtn(){
   // приоритету источника стилей — обычным hidden тут не спрятать,
   // переключаем display в JS напрямую (как и с рядом других таких блоков).
   $('curBadge').style.display = isActive ? 'flex' : 'none';
+  updateServerButtonsSpan();
 }
 
-function selectEditingTab(id){
+// Строка «Выбрать этот сервер» / «Удалить сервер» — сетка на 2 равные
+// колонки (.two), чтобы кнопки не гуляли по ширине как попало. Когда видна
+// только одна из них (текущий сервер уже выбран, или сервер всего один) —
+// растягиваем оставшуюся на всю строку, а не оставляем половину пустой.
+function updateServerButtonsSpan(){
+  const select = $('selectServerBtn'), remove = $('removeServerBtn');
+  const visible = [select, remove].filter(b => !b.hidden);
+  select.style.gridColumn = remove.style.gridColumn =
+    visible.length === 1 ? '1 / -1' : '';
+}
+
+async function selectEditingTab(id){
   if(id === editingProfileId) return;
-  if(formDirty && !confirm(tr('discard_unsaved'))) return;
+  if(formDirty && !await appConfirm(tr('discard_unsaved'))) return;
   editingProfileId = id;
   formDirty = false;
   fillProfileForm(currentProfile());
@@ -2680,7 +2724,7 @@ $('selectServerBtn').onclick = async () => {
 
 $('removeServerBtn').onclick = async () => {
   if((cfg.profiles || []).length <= 1) return;
-  if(!confirm(tr('confirm_remove_server'))) return;
+  if(!await appConfirm(tr('confirm_remove_server'))) return;
   const r = await api('/api/profile/remove', { id: editingProfileId });
   if(r.error){ showError(r.error, 'setError'); return; }
   applyDoc(r.config, /*keepEditing*/false);
