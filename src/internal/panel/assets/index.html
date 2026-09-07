@@ -8,6 +8,10 @@
   :root{
     --bg:#0d1017; --card:#161a23; --card2:#1d222d; --line:#272d3a;
     --text:#e8ebf2; --dim:#828b9e; --accent:#4c8dff;
+    /* Приглушённый синий — тот же приём, что в программе на компьютере и на
+       телефоне: крупные заливки и знаки берут его, а яркий --accent остаётся
+       мелким акцентам (рамка при наведении, ссылка). */
+    --accent-muted:#3d5f8a; --accent-muted-dark:#2c4665;
     --ok:#2fbf71; --warn:#e8b339; --err:#e5484d;
     --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
   }
@@ -19,33 +23,78 @@
   html,body{height:100%}
   body{margin:0;background:var(--bg);color:var(--text);
        font:14px/1.45 "Segoe UI",-apple-system,Roboto,sans-serif}
-  .wrap{max-width:520px;margin:0 auto;padding:24px 16px 60px}
-  .bar{display:flex;align-items:center;gap:8px;padding:6px 0 18px}
-  .bar .brand{font-weight:650;font-size:16px}
-  .bar .sp{flex:1}
-  select{background:var(--card);border:1px solid var(--line);border-radius:8px;
+  [hidden]{display:none!important}
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  /* ---------- шапка: одна на все вкладки и на экран входа ---------- */
+  .topbar{position:sticky;top:0;z-index:20;background:var(--card);
+          border-bottom:1px solid var(--line)}
+  .topbar .inner{max-width:1180px;margin:0 auto;padding:10px 16px;
+                 display:flex;align-items:center;gap:12px}
+  .topbar svg{display:block}
+  .topbar .logo{width:30px;height:auto;fill:var(--accent-muted);flex:none}
+  .topbar .shield{width:19px;height:19px;fill:var(--accent-muted);flex:none}
+  .topbar .site{font-size:13.5px;font-weight:600}
+  .topbar .app-name{font-weight:650;font-size:15px}
+  .topbar .sp{flex:1}
+  .topbar .lang-label{font-size:12px;color:var(--dim)}
+  @media (max-width:560px){
+    .topbar .site,.topbar .lang-label{display:none}
+  }
+
+  select{background:var(--card2);border:1px solid var(--line);border-radius:8px;
          padding:6px 8px;color:var(--text);font:inherit}
   select:focus{outline:none;border-color:var(--accent)}
 
+  /* ---------- каркас: содержимое слева, выбор раздела справа ---------- */
+  .app{max-width:1180px;margin:0 auto;padding:18px 16px 60px;
+       display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:18px;align-items:start}
+  .side{position:sticky;top:64px;display:flex;flex-direction:column;gap:6px}
+  .side button{display:flex;align-items:center;gap:9px;width:100%;text-align:left;
+               background:transparent;border:1px solid transparent;border-radius:10px;
+               padding:10px 12px;color:var(--dim);font:inherit;font-weight:600;cursor:pointer}
+  .side button:hover{color:var(--text);background:var(--card)}
+  .side button.on{background:var(--card);border-color:var(--line);color:var(--text)}
+  .side button svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;
+                   stroke-linecap:round;stroke-linejoin:round;flex:none}
+  @media (max-width:860px){
+    .app{grid-template-columns:minmax(0,1fr)}
+    /* На телефоне тот же выбор разделов, но строкой сверху: колонка сбоку на
+       узком экране съела бы половину ширины. */
+    .side{order:-1;position:static;flex-direction:row;gap:8px;overflow-x:auto}
+    .side button{justify-content:center;padding:9px 12px}
+  }
+
+  /* ---------- карточки ---------- */
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
-        padding:18px;margin-bottom:14px}
+        padding:18px;margin-bottom:14px;
+        /* шапка «прилипшая», поэтому у прокрутки к карточке должен быть запас
+           сверху — иначе её заголовок уезжает под шапку */
+        scroll-margin-top:72px}
   .card h1{font-size:16px;margin:0 0 4px}
+  .card h2{font-size:13px;margin:0 0 10px;color:var(--dim);font-weight:600;
+           text-transform:uppercase;letter-spacing:.6px}
   .card p.note{color:var(--dim);font-size:12.5px;margin:0 0 14px;line-height:1.4}
+  .page-title{font-size:20px;font-weight:700;margin:0 0 4px}
+  .page-sub{color:var(--dim);font-size:13px;margin:0 0 16px}
 
   .field{margin-bottom:12px}
   .field label{display:block;font-size:12px;color:var(--dim);margin-bottom:4px}
-  input[type=text],input[type=password]{width:100%;background:var(--card2);
+  input[type=text],input[type=password],textarea{width:100%;background:var(--card2);
        border:1px solid var(--line);border-radius:8px;padding:9px 10px;
        color:var(--text);font:inherit}
-  input:focus{outline:none;border-color:var(--accent)}
+  input:focus,textarea:focus{outline:none;border-color:var(--accent)}
 
-  button.btn{width:100%;padding:10px;border-radius:9px;border:1px solid var(--line);
-             background:var(--accent);color:#fff;font:inherit;font-weight:600;
-             cursor:pointer}
-  button.btn:hover{filter:brightness(1.08)}
-  button.btn:disabled{opacity:.6;cursor:default}
-  button.btn.ghost{background:transparent;color:var(--text)}
-  button.btn.danger{background:var(--err)}
+  button.btn{padding:10px 14px;border-radius:9px;border:1px solid var(--accent-muted);
+             background:linear-gradient(180deg,var(--accent-muted),var(--accent-muted-dark));
+             color:#fff;font:inherit;font-weight:600;cursor:pointer}
+  button.btn:hover{filter:brightness(1.12)}
+  button.btn:disabled{opacity:.6;cursor:default;filter:none}
+  button.btn.wide{width:100%}
+  button.btn.ghost{background:var(--card2);border-color:var(--line);color:var(--text)}
+  button.btn.danger{background:var(--err);border-color:var(--err)}
+  button.btn.small{padding:6px 10px;font-size:12px;font-weight:600}
 
   .msg{font-size:12.5px;border-radius:8px;padding:9px 10px;margin-bottom:12px}
   .msg.err{background:rgba(229,72,77,.12);color:var(--err)}
@@ -58,38 +107,101 @@
   .kv .v{font-family:var(--mono)}
 
   .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;
-         font-weight:600}
+         font-weight:600;white-space:nowrap}
   .badge.ok{background:rgba(47,191,113,.15);color:var(--ok)}
   .badge.warn{background:rgba(232,179,57,.16);color:var(--warn)}
   .badge.dim{background:rgba(130,139,158,.16);color:var(--dim)}
 
   .empty{text-align:center;color:var(--dim);padding:26px 10px;font-size:13px}
 
-  .client-row{padding:12px 0;border-bottom:1px solid var(--line)}
-  .client-row:last-child{border-bottom:none}
-  .client-row .top{display:flex;align-items:center;gap:8px}
-  .client-row .name{font-weight:600;font-size:13.5px;flex:1;overflow:hidden;
-                     text-overflow:ellipsis;white-space:nowrap}
-  .client-row .meta{font-size:11.5px;color:var(--dim);margin-top:4px}
-  .client-row .actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
-  .client-row button.small{width:auto;padding:6px 10px;font-size:12px}
+  /* ---------- главная: сводка подключений и трафик ---------- */
+  .sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;
+       margin-bottom:14px}
+  .sum .box{background:var(--card2);border:1px solid var(--line);border-radius:10px;
+            padding:12px 14px}
+  .sum .box .k{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px}
+  .sum .box .v{font-size:20px;font-weight:700;font-family:var(--mono);margin-top:3px}
 
-  [hidden]{display:none!important}
+  .periods{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+  .periods button{padding:6px 11px;border-radius:8px;border:1px solid var(--line);
+                  background:var(--card2);color:var(--dim);font:inherit;font-size:12.5px;
+                  font-weight:600;cursor:pointer}
+  .periods button.on{background:var(--accent-muted);border-color:var(--accent-muted);color:#fff}
+
+  table.list{width:100%;border-collapse:collapse;font-size:13px}
+  table.list th{text-align:left;font-size:11px;color:var(--dim);font-weight:600;
+                text-transform:uppercase;letter-spacing:.6px;padding:6px 8px 6px 0;
+                border-bottom:1px solid var(--line)}
+  table.list td{padding:9px 8px 9px 0;border-bottom:1px solid var(--line);vertical-align:top}
+  table.list tr:last-child td{border-bottom:none}
+  table.list td.num{font-family:var(--mono);white-space:nowrap}
+  table.list .sub{color:var(--dim);font-size:11.5px}
+  .scroll-x{overflow-x:auto}
+
+  /* ---------- устройства: три колонки по системам ---------- */
+  .cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+  @media (max-width:1000px){ .cols{grid-template-columns:minmax(0,1fr)} }
+  .col h2{display:flex;align-items:center;gap:8px}
+  .col .count{background:var(--card2);border-radius:999px;padding:1px 8px;font-size:11px}
+
+  .dev{background:var(--card2);border:1px solid var(--line);border-radius:10px;
+       padding:12px;margin-bottom:10px}
+  .dev .top{display:flex;align-items:center;gap:8px}
+  .dev .name{font-weight:600;font-size:13.5px;flex:1;overflow:hidden;
+             text-overflow:ellipsis;white-space:nowrap}
+  .dev .meta{font-size:11.5px;color:var(--dim);margin-top:5px;line-height:1.5}
+  .dev .actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
+
+  /* ---------- QR: маленький в карточке, во весь экран по нажатию ---------- */
+  #qrThumb{width:190px;height:190px;border-radius:8px;background:#fff;padding:8px;
+           cursor:zoom-in}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:40;
+           display:flex;align-items:center;justify-content:center;padding:18px}
+  .overlay[hidden]{display:none!important}
+  #qrFullImg{width:min(75vw,75vh);height:min(75vw,75vh);background:#fff;border-radius:14px;
+             padding:16px}
+  .overlay .close{position:absolute;top:14px;right:16px;width:40px;height:40px;
+                  border-radius:10px;border:1px solid var(--line);background:var(--card);
+                  color:var(--text);font-size:22px;line-height:1;cursor:pointer}
+  .dialog{background:var(--card);border:1px solid var(--line);border-radius:13px;
+          width:100%;max-width:360px;padding:18px}
+
+  .row-inline{display:flex;gap:8px;flex-wrap:wrap}
+  .chk{display:flex;align-items:flex-start;gap:9px;font-size:13px;cursor:pointer}
+  .chk input{margin-top:2px;accent-color:var(--accent-muted)}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="bar">
-    <span class="brand">ssh_tunnel panel</span>
+
+<header class="topbar">
+  <div class="inner">
+    <!-- Тот же знак, что в программе на компьютере и на телефоне. -->
+    <svg class="logo" viewBox="0 0 626 520" role="img" aria-label="Vitaz Gio">
+      <path d="M0 0 137 449 180 308 86 0Z"/>
+      <path d="M159 520 221 520 246 437 354 83 379 0 293 0 190 338 146 479Z"/>
+      <path d="M468 520 524 337 437 337 406 437 264 437 239 520Z"/>
+      <path d="M554 236 394 236 368 319 442 319 529 319Z"/>
+      <path d="M373 83 601 83 626 0 398 0Z"/>
+    </svg>
+    <a class="site" href="https://vitazgio.ru" target="_blank" rel="noopener">vitazgio.ru</a>
+    <!-- Щит с замочной скважиной — тот же значок, что у программы на
+         телефоне и на компьютере, здесь просто как знак. -->
+    <svg class="shield" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 1.7 4 4.6v6.2c0 5 3.4 9.6 8 11.5 4.6-1.9 8-6.5 8-11.5V4.6L12 1.7Zm0 8.1a1.9 1.9 0 0 1 1 3.5v2.4a1 1 0 0 1-2 0v-2.4a1.9 1.9 0 0 1 1-3.5Z"/>
+    </svg>
+    <span class="app-name">ssh_tunnel</span>
     <span class="sp"></span>
+    <span class="lang-label">Язык / Language</span>
     <select id="lang">
-      <option value="ru">RU</option>
-      <option value="en">EN</option>
+      <option value="ru">Русский</option>
+      <option value="en">English</option>
     </select>
   </div>
+</header>
 
-  <!-- ---------- вход ---------- -->
-  <section id="viewLogin" class="card" hidden>
+<!-- ---------- вход ---------- -->
+<div id="viewLogin" hidden style="max-width:420px;margin:40px auto;padding:0 16px">
+  <section class="card">
     <h1 data-i18n="login_title">Вход в панель</h1>
     <p class="note" data-i18n="login_note">Панель управляет этим сервером и клиентами,
       подключёнными к нему, поэтому доступ защищён паролем.</p>
@@ -102,11 +214,13 @@
       <label for="loginPass" data-i18n="password_label">Пароль</label>
       <input type="password" id="loginPass" autocomplete="current-password">
     </div>
-    <button class="btn" id="loginBtn" data-i18n="sign_in">Войти</button>
+    <button class="btn wide" id="loginBtn" data-i18n="sign_in">Войти</button>
   </section>
+</div>
 
-  <!-- ---------- обязательная смена пароля ---------- -->
-  <section id="viewMustChange" class="card" hidden>
+<!-- ---------- обязательная смена пароля ---------- -->
+<div id="viewMustChange" hidden style="max-width:420px;margin:40px auto;padding:0 16px">
+  <section class="card">
     <h1 data-i18n="must_change_title">Смени пароль</h1>
     <p class="note" data-i18n="must_change_note">Это одноразовый пароль из журнала
       программы. Прежде чем продолжить, задай свой.</p>
@@ -123,108 +237,244 @@
       <label for="newPass2" data-i18n="repeat_password_label">Повтори новый пароль</label>
       <input type="password" id="newPass2" autocomplete="new-password">
     </div>
-    <button class="btn" id="changeBtn" data-i18n="set_password">Задать пароль</button>
+    <button class="btn wide" id="changeBtn" data-i18n="set_password">Задать пароль</button>
   </section>
+</div>
 
-  <!-- ---------- панель ---------- -->
-  <section id="viewMain" hidden>
-    <div class="card">
-      <h1 data-i18n="server_status">Состояние сервера</h1>
-      <div class="kv"><span class="k" data-i18n="status_label">Статус</span>
-        <span class="v"><span class="badge ok" data-i18n="running">работает</span></span></div>
-      <div class="kv"><span class="k" data-i18n="os_label">Система</span>
-        <span class="v" id="stOS">—</span></div>
-      <div class="kv"><span class="k" data-i18n="uptime_label">Время работы</span>
-        <span class="v" id="stUptime">—</span></div>
-      <div class="kv"><span class="k" data-i18n="version_label">Версия панели</span>
-        <span class="v" id="stVersion">—</span></div>
+<!-- ---------- сама панель ---------- -->
+<div class="app" id="viewMain" hidden>
+  <main>
+    <!-- ======== ГЛАВНАЯ ======== -->
+    <section id="tabHome">
+      <h1 class="page-title" data-i18n="nav_home">Главная</h1>
+      <p class="page-sub" data-i18n="home_sub">Что сейчас с сервером и кто через него ходит.</p>
+
+      <div class="card">
+        <h1 data-i18n="server_status">Состояние сервера</h1>
+        <div class="kv"><span class="k" data-i18n="status_label">Статус</span>
+          <span class="v"><span class="badge ok" data-i18n="running">работает</span></span></div>
+        <div class="kv"><span class="k" data-i18n="os_label">Система</span>
+          <span class="v" id="stOS">—</span></div>
+        <div class="kv"><span class="k" data-i18n="uptime_label">Время работы</span>
+          <span class="v" id="stUptime">—</span></div>
+        <div class="kv"><span class="k" data-i18n="version_label">Версия панели</span>
+          <span class="v" id="stVersion">—</span></div>
+        <div class="kv"><span class="k" data-i18n="repo_label">Исходный код</span>
+          <span class="v">
+            <a href="https://github.com/VITAZGIO/ssh_tunel" target="_blank" rel="noopener"
+               style="display:inline-flex;align-items:center;gap:6px">
+              <svg viewBox="0 0 16 16" style="width:15px;height:15px;fill:currentColor">
+                <path d="M8 0a8 8 0 0 0-2.5 15.6c.4.1.5-.2.5-.4v-1.4C3.8 14.2 3.3 13 3.3 13c-.4-1-.9-1.2-.9-1.2-.8-.5 0-.5 0-.5.8.1 1.3.9 1.3.9.7 1.2 1.9.9 2.4.7.1-.5.3-.9.5-1.1-1.8-.2-3.6-.9-3.6-3.9 0-.9.3-1.6.8-2.1-.1-.2-.4-1 .1-2.1 0 0 .7-.2 2.2.8a7.5 7.5 0 0 1 4 0c1.5-1 2.2-.8 2.2-.8.5 1.1.2 1.9.1 2.1.5.5.8 1.2.8 2.1 0 3-1.8 3.7-3.6 3.9.3.3.6.8.6 1.6v2.3c0 .2.1.5.5.4A8 8 0 0 0 8 0Z"/>
+              </svg>GitHub</a>
+          </span></div>
+      </div>
+
+      <div class="card">
+        <h1 data-i18n="clients_title">Подключённые клиенты</h1>
+        <p class="note" data-i18n="home_clients_note">Здесь только показ. Заводить, замораживать
+          и удалять устройства — во вкладке «Устройства».</p>
+        <div class="scroll-x">
+          <table class="list" id="homeClients"></table>
+        </div>
+        <div class="empty" id="homeClientsEmpty" data-i18n="clients_empty">Клиентов пока нет</div>
+      </div>
+
+      <div class="card">
+        <h1 data-i18n="traffic_title">Трафик</h1>
+        <p class="note" data-i18n="traffic_note">Считается по правилам nftables на самом сервере,
+          отдельно по каждому клиенту. «За всё время» — с момента, когда клиент был заведён.</p>
+        <div class="periods" id="periods">
+          <button data-period="day" data-i18n="period_day">За день</button>
+          <button data-period="week" data-i18n="period_week">За неделю</button>
+          <button data-period="month" class="on" data-i18n="period_month">В этом месяце</button>
+          <button data-period="all" data-i18n="period_all">За всё время</button>
+        </div>
+        <div class="sum">
+          <div class="box"><div class="k" data-i18n="traffic_down_total">Принято</div>
+            <div class="v" id="trafficRx">—</div></div>
+          <div class="box"><div class="k" data-i18n="traffic_up_total">Отдано</div>
+            <div class="v" id="trafficTx">—</div></div>
+          <div class="box"><div class="k" data-i18n="traffic_sum_total">Всего</div>
+            <div class="v" id="trafficAll">—</div></div>
+        </div>
+        <div class="scroll-x">
+          <table class="list" id="trafficByClient"></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======== УСТРОЙСТВА ======== -->
+    <section id="tabDevices" hidden>
+      <h1 class="page-title" data-i18n="nav_devices">Устройства</h1>
+      <p class="page-sub" data-i18n="devices_sub">У каждого устройства свой ключ и своя системная
+        учётная запись на сервере — панель заводит и удаляет их сама, без консоли.</p>
+
+      <div class="card">
+        <h1 data-i18n="add_device_title">Добавить устройство</h1>
+        <p class="note" data-i18n="add_device_note">Выбери, на чём стоит программа, и придумай имя,
+          по которому потом узнаешь это устройство в списке. Сразу после создания панель один раз
+          покажет готовые настройки вместе с ключом: для телефона — QR-кодом, для компьютера —
+          кнопкой «Скопировать» или файлом.</p>
+        <div id="addClientMsg"></div>
+        <button class="btn" id="addClientBtn" data-i18n="add_client">+ Добавить устройство</button>
+
+        <div id="addClientForm" hidden style="margin-top:14px">
+          <div class="field">
+            <label for="newClientName" data-i18n="client_name_label">Имя устройства</label>
+            <input type="text" id="newClientName" placeholder="Ноутбук, Телефон…">
+          </div>
+          <div class="field">
+            <label for="newClientType" data-i18n="client_type_label">Тип устройства</label>
+            <select id="newClientType" style="width:100%">
+              <option value="windows">Windows</option>
+              <option value="linux">Linux</option>
+              <option value="android">Android</option>
+            </select>
+          </div>
+          <div class="row-inline">
+            <button class="btn" id="createClientBtn" data-i18n="create_client">Создать</button>
+            <button class="btn ghost" id="cancelClientBtn" data-i18n="cancel">Отмена</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- настройки клиента: QR (только Android), буфер, файл -->
+      <div class="card" id="clientConfigCard" hidden>
+        <h1 id="clientConfigTitle" data-i18n="client_key_title">Ключ клиента готов</h1>
+        <p class="note" id="clientConfigNote" data-i18n="client_key_note">Это единственный раз, когда
+          панель показывает приватный ключ сам, без нажатия «Показать настройки» в списке.
+          Сохрани его сейчас — он понадобится, чтобы подключить устройство.</p>
+        <div id="clientConfigMsg"></div>
+
+        <div id="clientConfigQRBox" style="text-align:center;margin-bottom:14px">
+          <img id="qrThumb" alt="QR">
+          <p class="note" style="margin:8px 0 0" data-i18n="qr_hint">Нажми на код, чтобы открыть
+            во весь экран — так его проще отсканировать телефоном.</p>
+        </div>
+
+        <div class="row-inline" style="margin-bottom:14px">
+          <button class="btn" id="copyClientConfigBtn" data-i18n="copy_config">Скопировать</button>
+          <button class="btn ghost" id="downloadClientConfigBtn" data-i18n="download_config">Скачать файл</button>
+        </div>
+
+        <h2 data-i18n="manual_entry_title">Или впиши руками</h2>
+        <div class="field"><label data-i18n="host_label">Адрес сервера</label>
+          <input type="text" id="clientConfigHost" readonly></div>
+        <div class="field"><label data-i18n="port_label">Порт</label>
+          <input type="text" id="clientConfigPort" readonly></div>
+        <div class="field"><label data-i18n="user_label">Пользователь</label>
+          <input type="text" id="clientConfigUser" readonly></div>
+        <div class="field">
+          <label data-i18n="private_key_label">Приватный ключ</label>
+          <textarea id="clientConfigKey" readonly rows="6"
+            style="font-family:var(--mono);font-size:11.5px;resize:vertical"></textarea>
+        </div>
+        <button class="btn ghost" id="closeClientConfigBtn" data-i18n="close">Закрыть</button>
+      </div>
+
+      <div id="devicesMsg"></div>
+      <div class="cols">
+        <div class="col card"><h2>Windows <span class="count" id="cntWindows">0</span></h2>
+          <div id="colWindows"></div></div>
+        <div class="col card"><h2>Linux <span class="count" id="cntLinux">0</span></h2>
+          <div id="colLinux"></div></div>
+        <div class="col card"><h2>Android <span class="count" id="cntAndroid">0</span></h2>
+          <div id="colAndroid"></div></div>
+      </div>
+    </section>
+
+    <!-- ======== НАСТРОЙКИ ======== -->
+    <section id="tabSettings" hidden>
+      <h1 class="page-title" data-i18n="nav_settings">Настройки</h1>
+      <p class="page-sub" data-i18n="settings_sub">Настройки самой панели — они не влияют на уже
+        подключённые устройства.</p>
+
+      <div class="card">
+        <h1 data-i18n="version_label">Версия панели</h1>
+        <div class="kv"><span class="k" data-i18n="version_installed">Установлена</span>
+          <span class="v" id="setVersion">—</span></div>
+        <p class="note" style="margin:12px 0 0" data-i18n="update_planned">Проверка обновлений
+          прямо из панели пока не сделана — задача описана в docs/UPDATE_SPEC.md и будет одинаковой
+          для панели, компьютера и телефона.</p>
+      </div>
+
+      <div class="card">
+        <h1 data-i18n="autostart_title">Автозапуск</h1>
+        <p class="note" id="autostartNote" hidden data-i18n="autostart_note">Включено — панель поднимется сама после
+          перезагрузки сервера. Снятая галочка не выключает панель прямо сейчас, а только не даёт
+          ей стартовать в следующий раз.</p>
+        <div id="autostartMsg"></div>
+        <label class="chk" id="autostartRow" hidden>
+          <input type="checkbox" id="autostartCheck">
+          <span data-i18n="autostart_label">Запускать при старте системы</span>
+        </label>
+        <p class="note" id="autostartUnsupported" hidden style="margin:0"
+           data-i18n="autostart_unsupported">Панель запущена не через systemd — управлять
+          автозапуском отсюда нечем.</p>
+      </div>
+
+      <div class="card">
+        <h1 data-i18n="account_title">Учётная запись</h1>
+        <div id="accountMsg"></div>
+        <button class="btn ghost" id="showPassFormBtn" data-i18n="change_password">Сменить пароль</button>
+        <div id="passForm" hidden style="margin-top:14px">
+          <div class="field">
+            <label for="curPass2" data-i18n="current_password_label">Текущий пароль</label>
+            <input type="password" id="curPass2" autocomplete="current-password">
+          </div>
+          <div class="field">
+            <label for="newPass21" data-i18n="new_password_label">Новый пароль</label>
+            <input type="password" id="newPass21" autocomplete="new-password">
+          </div>
+          <div class="field">
+            <label for="newPass22" data-i18n="repeat_password_label">Повтори новый пароль</label>
+            <input type="password" id="newPass22" autocomplete="new-password">
+          </div>
+          <div class="row-inline">
+            <button class="btn" id="accountChangeBtn" data-i18n="set_password">Задать пароль</button>
+            <button class="btn ghost" id="cancelPassBtn" data-i18n="cancel">Отмена</button>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn danger wide" id="logoutBtn" data-i18n="sign_out">Выйти</button>
+    </section>
+  </main>
+
+  <nav class="side">
+    <button data-tab="Home" class="on">
+      <svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.8V21h14V9.8"/></svg>
+      <span data-i18n="nav_home">Главная</span>
+    </button>
+    <button data-tab="Devices">
+      <svg viewBox="0 0 24 24"><rect x="2.5" y="4.5" width="13" height="10" rx="1.6"/>
+        <path d="M6 19h7"/><rect x="17.5" y="9.5" width="4" height="10" rx="1.2"/></svg>
+      <span data-i18n="nav_devices">Устройства</span>
+    </button>
+    <button data-tab="Settings">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span data-i18n="nav_settings">Настройки</span>
+    </button>
+  </nav>
+</div>
+
+<!-- QR во весь экран: маленький код в карточке телефоном сканируется плохо. -->
+<div class="overlay" id="qrOverlay" hidden>
+  <button class="close" id="qrClose" aria-label="close">×</button>
+  <img id="qrFullImg" alt="QR">
+</div>
+
+<!-- Своё окно подтверждения: системное confirm() рисуется браузером поверх
+     страницы со своим адресом в заголовке и выпадает из оформления панели. -->
+<div class="overlay" id="confirmOverlay" hidden>
+  <div class="dialog">
+    <p id="confirmText" style="margin:0 0 14px;font-size:13.5px;line-height:1.45"></p>
+    <div class="row-inline" style="justify-content:flex-end">
+      <button class="btn ghost" id="confirmCancelBtn" data-i18n="cancel">Отмена</button>
+      <button class="btn danger" id="confirmOkBtn" data-i18n="confirm_yes">Удалить</button>
     </div>
-
-    <div class="card">
-      <h1 data-i18n="clients_title">Подключённые клиенты</h1>
-      <p class="note" data-i18n="clients_note">У каждого клиента свой ключ и своя
-        системная учётная запись — заводится и удаляется прямо здесь, без консоли.</p>
-      <div id="clientsMsg"></div>
-      <div id="clientsList" class="empty" data-i18n="clients_empty">Клиентов пока нет</div>
-      <button class="btn" id="addClientBtn" style="margin-top:12px" data-i18n="add_client">+ Добавить клиента</button>
-    </div>
-
-    <!-- ---------- добавление клиента ---------- -->
-    <div class="card" id="addClientForm" hidden>
-      <h1 data-i18n="add_client_title">Новый клиент</h1>
-      <div id="addClientMsg"></div>
-      <div class="field">
-        <label for="newClientName" data-i18n="client_name_label">Имя устройства</label>
-        <input type="text" id="newClientName" placeholder="Ноутбук, Телефон…">
-      </div>
-      <div class="field">
-        <label for="newClientType" data-i18n="client_type_label">Тип устройства</label>
-        <select id="newClientType" style="width:100%">
-          <option value="windows">Windows</option>
-          <option value="linux">Linux</option>
-          <option value="android">Android</option>
-        </select>
-      </div>
-      <button class="btn" id="createClientBtn" data-i18n="create_client">Создать</button>
-      <button class="btn ghost" id="cancelClientBtn" style="margin-top:8px" data-i18n="cancel">Отмена</button>
-    </div>
-
-    <!-- ---------- настройки клиента: QR, буфер обмена, файл ---------- -->
-    <div class="card" id="clientConfigCard" hidden>
-      <h1 id="clientConfigTitle" data-i18n="client_key_title">Ключ клиента готов</h1>
-      <p class="note" id="clientConfigNote" data-i18n="client_key_note">Это единственный раз, когда панель
-        показывает приватный ключ сам, без нажатия «Показать настройки» в списке.
-        Сохрани его сейчас — он понадобится, чтобы подключить устройство.</p>
-      <div id="clientConfigMsg"></div>
-
-      <div id="clientConfigQRBox" style="text-align:center;margin-bottom:14px">
-        <img id="clientConfigQR" alt="QR" style="width:200px;height:200px;border-radius:8px;
-             background:#fff;padding:8px">
-        <p class="note" style="margin:8px 0 0" data-i18n="qr_hint">Отсканируй в приложении на телефоне</p>
-      </div>
-
-      <div style="display:flex;gap:8px;margin-bottom:14px">
-        <button class="btn" id="copyClientConfigBtn" data-i18n="copy_config">Скопировать</button>
-        <button class="btn ghost" id="downloadClientConfigBtn" data-i18n="download_config">Скачать файл</button>
-      </div>
-
-      <p class="ptitle" style="font-size:12px;color:var(--dim);text-transform:uppercase;
-         letter-spacing:.6px;margin:0 0 8px" data-i18n="manual_entry_title">Или впиши руками</p>
-      <div class="field"><label data-i18n="host_label">Адрес сервера</label>
-        <input type="text" id="clientConfigHost" readonly></div>
-      <div class="field"><label data-i18n="port_label">Порт</label>
-        <input type="text" id="clientConfigPort" readonly></div>
-      <div class="field"><label data-i18n="user_label">Пользователь</label>
-        <input type="text" id="clientConfigUser" readonly></div>
-      <div class="field">
-        <label data-i18n="private_key_label">Приватный ключ</label>
-        <textarea id="clientConfigKey" readonly rows="6"
-          style="width:100%;font-family:var(--mono);font-size:11.5px;background:var(--card2);
-                 border:1px solid var(--line);border-radius:8px;padding:8px;resize:vertical"></textarea>
-      </div>
-      <button class="btn ghost" id="closeClientConfigBtn" data-i18n="close">Закрыть</button>
-    </div>
-
-    <div class="card">
-      <h1 data-i18n="account_title">Учётная запись</h1>
-      <div id="accountMsg"></div>
-      <div class="field">
-        <label for="curPass2" data-i18n="current_password_label">Текущий пароль</label>
-        <input type="password" id="curPass2" autocomplete="current-password">
-      </div>
-      <div class="field">
-        <label for="newPass21" data-i18n="new_password_label">Новый пароль</label>
-        <input type="password" id="newPass21" autocomplete="new-password">
-      </div>
-      <div class="field">
-        <label for="newPass22" data-i18n="repeat_password_label">Повтори новый пароль</label>
-        <input type="password" id="newPass22" autocomplete="new-password">
-      </div>
-      <button class="btn ghost" id="accountChangeBtn" data-i18n="set_password">Задать пароль</button>
-    </div>
-
-    <button class="btn danger" id="logoutBtn" data-i18n="sign_out">Выйти</button>
-  </section>
+  </div>
 </div>
 
 <script>
@@ -236,10 +486,31 @@ const api = (path, body) => fetch(path, {
   body: body ? JSON.stringify(body) : undefined
 }).then(async r => ({ok: r.ok, status: r.status, data: await r.json().catch(() => ({}))}));
 
+/* ---------- своё окно подтверждения ---------- */
+let confirmResolve = null;
+function appConfirm(message){
+  $('confirmText').textContent = message;
+  $('confirmOverlay').hidden = false;
+  return new Promise(resolve => { confirmResolve = resolve; });
+}
+function closeConfirm(result){
+  $('confirmOverlay').hidden = true;
+  const r = confirmResolve;
+  confirmResolve = null;
+  if (r) r(result);
+}
+$('confirmOkBtn').addEventListener('click', () => closeConfirm(true));
+$('confirmCancelBtn').addEventListener('click', () => closeConfirm(false));
+
 /* ---------- язык интерфейса ---------- */
 let LANG = localStorage.getItem('panelLang') || 'ru';
 const I18N = {
   ru: {
+    nav_home:'Главная', nav_devices:'Устройства', nav_settings:'Настройки',
+    home_sub:'Что сейчас с сервером и кто через него ходит.',
+    devices_sub:'У каждого устройства свой ключ и своя системная учётная запись на сервере — '+
+      'панель заводит и удаляет их сама, без консоли.',
+    settings_sub:'Настройки самой панели — они не влияют на уже подключённые устройства.',
     login_title:'Вход в панель', login_note:'Панель управляет этим сервером и клиентами, '+
       'подключёнными к нему, поэтому доступ защищён паролем.',
     username_label:'Логин', password_label:'Пароль', sign_in:'Войти',
@@ -247,36 +518,55 @@ const I18N = {
     must_change_note:'Это одноразовый пароль из журнала программы. Прежде чем продолжить, задай свой.',
     current_password_label:'Текущий пароль', new_password_label:'Новый пароль',
     repeat_password_label:'Повтори новый пароль', set_password:'Задать пароль',
+    change_password:'Сменить пароль',
     server_status:'Состояние сервера', status_label:'Статус', running:'работает',
     os_label:'Система', uptime_label:'Время работы', version_label:'Версия панели',
+    version_installed:'Установлена', repo_label:'Исходный код',
+    update_planned:'Проверка обновлений прямо из панели пока не сделана — задача описана в '+
+      'docs/UPDATE_SPEC.md и будет одинаковой для панели, компьютера и телефона.',
+    autostart_title:'Автозапуск', autostart_label:'Запускать при старте системы',
+    autostart_note:'Включено — панель поднимется сама после перезагрузки сервера. Снятая галочка '+
+      'не выключает панель прямо сейчас, а только не даёт ей стартовать в следующий раз.',
+    autostart_unsupported:'Панель запущена не через systemd — управлять автозапуском отсюда нечем.',
     clients_title:'Подключённые клиенты',
-    clients_note:'У каждого клиента свой ключ и своя системная учётная запись — '+
-      'заводится и удаляется прямо здесь, без консоли.',
+    home_clients_note:'Здесь только показ. Заводить, замораживать и удалять устройства — '+
+      'во вкладке «Устройства».',
     clients_empty:'Клиентов пока нет',
-    add_client:'+ Добавить клиента', add_client_title:'Новый клиент',
-    client_name_label:'Имя устройства', client_type_label:'Тип устройства',
-    create_client:'Создать', cancel:'Отмена', close:'Закрыть',
+    col_device:'Устройство', col_state:'Состояние', col_traffic:'Трафик', col_online:'Связь',
+    traffic_title:'Трафик',
+    traffic_note:'Считается по правилам nftables на самом сервере, отдельно по каждому клиенту. '+
+      '«За всё время» — с момента, когда клиент был заведён.',
+    period_day:'За день', period_week:'За неделю', period_month:'В этом месяце',
+    period_all:'За всё время',
+    traffic_down_total:'Принято', traffic_up_total:'Отдано', traffic_sum_total:'Всего',
+    add_device_title:'Добавить устройство',
+    add_device_note:'Выбери, на чём стоит программа, и придумай имя, по которому потом узнаешь это '+
+      'устройство в списке. Сразу после создания панель один раз покажет готовые настройки вместе '+
+      'с ключом: для телефона — QR-кодом, для компьютера — кнопкой «Скопировать» или файлом.',
+    add_client:'+ Добавить устройство', client_name_label:'Имя устройства',
+    client_type_label:'Тип устройства', create_client:'Создать', cancel:'Отмена', close:'Закрыть',
+    confirm_yes:'Удалить',
     client_key_title:'Ключ клиента готов',
     client_key_note:'Это единственный раз, когда панель показывает приватный ключ сам, '+
       'без нажатия «Показать настройки» в списке. Сохрани его сейчас — он понадобится, '+
       'чтобы подключить устройство.',
     private_key_label:'Приватный ключ',
-    delete_client:'Удалить', confirm_delete_client:'Удалить этого клиента? '+
+    delete_client:'Удалить', confirm_delete_client:'Удалить это устройство? '+
       'Его ключ перестанет работать, системная учётная запись будет стёрта.',
     freeze_client:'Заморозить', unfreeze_client:'Разморозить', disconnect_client:'Отключить',
     show_settings:'Показать настройки',
     client_settings_title:'Настройки клиента',
     client_settings_note:'Приватный ключ клиента — храни его так же бережно, как пароль от '+
       'сервера: с ним можно подключиться от имени этого устройства.',
-    qr_hint:'Отсканируй в приложении на телефоне',
+    qr_hint:'Нажми на код, чтобы открыть во весь экран — так его проще отсканировать телефоном.',
     copy_config:'Скопировать', download_config:'Скачать файл',
     manual_entry_title:'Или впиши руками',
     host_label:'Адрес сервера', port_label:'Порт', user_label:'Пользователь',
     copied:'Скопировано в буфер обмена', copy_failed:'Не удалось скопировать — используй файл',
-    state_active:'активен', state_frozen:'заморожен',
+    state_active:'активен', state_frozen:'заморожен', state_disabled:'отключён',
     traffic_down:'принято', traffic_up:'отдано',
     sessions_online:'на связи ({n})', last_seen:'был на связи', never_connected:'ещё не подключался',
-    created_on:'создан',
+    created_on:'создан', devices_empty:'пусто',
     device_windows:'Windows', device_linux:'Linux', device_android:'Android',
     account_title:'Учётная запись', sign_out:'Выйти',
     err_bad_credentials:'Неверный логин или пароль',
@@ -284,9 +574,15 @@ const I18N = {
     err_bad_request:'Не разобрал запрос', err_internal:'Внутренняя ошибка',
     err_password_too_short:'Пароль должен быть не короче 8 символов',
     err_password_mismatch:'Пароли не совпадают',
+    err_autostart_unsupported:'Автозапуском отсюда управлять нечем',
     password_changed:'Пароль изменён',
   },
   en: {
+    nav_home:'Home', nav_devices:'Devices', nav_settings:'Settings',
+    home_sub:'How the server is doing and who goes through it.',
+    devices_sub:'Every device gets its own key and its own system account on the server — '+
+      'the panel creates and removes them itself, no console needed.',
+    settings_sub:'Settings of the panel itself — they do not affect already connected devices.',
     login_title:'Sign in', login_note:'The panel controls this server and the clients '+
       'connected to it, so access is protected by a password.',
     username_label:'Username', password_label:'Password', sign_in:'Sign in',
@@ -294,36 +590,55 @@ const I18N = {
     must_change_note:'This is the one-time password from the program log. Set your own before continuing.',
     current_password_label:'Current password', new_password_label:'New password',
     repeat_password_label:'Repeat new password', set_password:'Set password',
+    change_password:'Change password',
     server_status:'Server status', status_label:'Status', running:'running',
     os_label:'OS', uptime_label:'Uptime', version_label:'Panel version',
+    version_installed:'Installed', repo_label:'Source code',
+    update_planned:'Checking for updates from the panel is not built yet — the task is written '+
+      'down in docs/UPDATE_SPEC.md and will work the same on the panel, desktop and phone.',
+    autostart_title:'Autostart', autostart_label:'Start on system boot',
+    autostart_note:'On — the panel comes back by itself after the server reboots. Turning it off '+
+      'does not stop the panel now, it only keeps it from starting next time.',
+    autostart_unsupported:'The panel was not started through systemd — there is nothing to switch here.',
     clients_title:'Connected clients',
-    clients_note:'Every client gets its own key and its own system account — '+
-      'created and removed right here, no console needed.',
+    home_clients_note:'Read-only here. Adding, freezing and deleting devices lives in the '+
+      '"Devices" tab.',
     clients_empty:'No clients yet',
-    add_client:'+ Add client', add_client_title:'New client',
-    client_name_label:'Device name', client_type_label:'Device type',
-    create_client:'Create', cancel:'Cancel', close:'Close',
+    col_device:'Device', col_state:'State', col_traffic:'Traffic', col_online:'Link',
+    traffic_title:'Traffic',
+    traffic_note:'Counted by nftables rules on the server itself, per client. "All time" means '+
+      'since the client was created.',
+    period_day:'Today', period_week:'This week', period_month:'This month',
+    period_all:'All time',
+    traffic_down_total:'Received', traffic_up_total:'Sent', traffic_sum_total:'Total',
+    add_device_title:'Add a device',
+    add_device_note:'Pick what the program runs on and give it a name you will recognise in the '+
+      'list. Right after creating it the panel shows the ready settings together with the key '+
+      'once: a QR code for a phone, "Copy" or a file for a computer.',
+    add_client:'+ Add device', client_name_label:'Device name',
+    client_type_label:'Device type', create_client:'Create', cancel:'Cancel', close:'Close',
+    confirm_yes:'Delete',
     client_key_title:'Client key ready',
     client_key_note:'This is the only time the panel shows the private key on its own, '+
       'without pressing "Show settings" in the list. Save it now — you\'ll need it to '+
       'connect the device.',
     private_key_label:'Private key',
-    delete_client:'Delete', confirm_delete_client:'Delete this client? '+
+    delete_client:'Delete', confirm_delete_client:'Delete this device? '+
       'Its key will stop working and the system account will be erased.',
     freeze_client:'Freeze', unfreeze_client:'Unfreeze', disconnect_client:'Disconnect',
     show_settings:'Show settings',
     client_settings_title:'Client settings',
     client_settings_note:'The client\'s private key — keep it as safely as the server '+
       'password: it lets someone connect as this device.',
-    qr_hint:'Scan it in the app on the phone',
+    qr_hint:'Tap the code to open it full screen — easier to scan with a phone.',
     copy_config:'Copy', download_config:'Download file',
     manual_entry_title:'Or enter it by hand',
     host_label:'Server address', port_label:'Port', user_label:'User',
     copied:'Copied to clipboard', copy_failed:'Could not copy — use the file instead',
-    state_active:'active', state_frozen:'frozen',
+    state_active:'active', state_frozen:'frozen', state_disabled:'disconnected',
     traffic_down:'down', traffic_up:'up',
     sessions_online:'online ({n})', last_seen:'last seen', never_connected:'never connected',
-    created_on:'created',
+    created_on:'created', devices_empty:'empty',
     device_windows:'Windows', device_linux:'Linux', device_android:'Android',
     account_title:'Account', sign_out:'Sign out',
     err_bad_credentials:'Wrong username or password',
@@ -331,6 +646,7 @@ const I18N = {
     err_bad_request:'Could not parse the request', err_internal:'Internal error',
     err_password_too_short:'Password must be at least 8 characters',
     err_password_mismatch:'Passwords do not match',
+    err_autostart_unsupported:'There is nothing to switch here',
     password_changed:'Password changed',
   },
 };
@@ -339,6 +655,8 @@ function applyI18N(){
   document.documentElement.lang = LANG;
   document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
   $('lang').value = LANG;
+  // Списки собираются кодом, поэтому их надо перерисовать целиком.
+  if (!$('viewMain').hidden){ renderAll(); }
 }
 $('lang').addEventListener('change', e => {
   LANG = e.target.value;
@@ -352,26 +670,91 @@ function errText(code, extra){
   return s;
 }
 function showMsg(el, text, kind){
-  el.innerHTML = text ? `<div class="msg ${kind}">${text}</div>` : '';
+  el.innerHTML = '';
+  if (!text) return;
+  const div = document.createElement('div');
+  div.className = 'msg ' + kind;
+  div.textContent = text;
+  el.appendChild(div);
 }
 
+/* ---------- переключение экранов и вкладок ---------- */
 function showView(name){
   ['Login','MustChange','Main'].forEach(v => { $('view'+v).hidden = (v !== name); });
 }
+
+let TAB = localStorage.getItem('panelTab') || 'Home';
+function showTab(name){
+  TAB = name;
+  localStorage.setItem('panelTab', name);
+  ['Home','Devices','Settings'].forEach(v => { $('tab'+v).hidden = (v !== name); });
+  document.querySelectorAll('.side button').forEach(b => {
+    b.classList.toggle('on', b.dataset.tab === name);
+  });
+  if (name === 'Settings') loadAutostart();
+}
+document.querySelectorAll('.side button').forEach(b => {
+  b.addEventListener('click', () => showTab(b.dataset.tab));
+});
 
 function fmtUptime(sec){
   sec = Math.max(0, sec|0);
   const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
   return [h,m,s].map(x => String(x).padStart(2,'0')).join(':');
 }
+function fmtDate(iso){
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  return d.toLocaleDateString(LANG === 'ru' ? 'ru-RU' : 'en-US');
+}
+function fmtBytes(n){
+  n = Number(n) || 0;
+  const u = LANG === 'ru' ? ['Б','КБ','МБ','ГБ','ТБ'] : ['B','KB','MB','GB','TB'];
+  let i = 0;
+  while (n >= 1024 && i < u.length - 1){ n /= 1024; i++; }
+  return (i === 0 ? n : n.toFixed(1)) + ' ' + u[i];
+}
+// Пустое время в Go — не пустая строка, а «01.01.0001»: клиент, который ещё
+// ни разу не подключался, приезжает сюда как 0001-01-01T00:00:00Z. Без этой
+// проверки в карточке оказывается «был на связи 01.01.1».
+function neverSeen(iso){
+  return !iso || String(iso).startsWith('0001-01-01');
+}
+function onlineText(c){
+  return c.sessions > 0
+    ? t('sessions_online').replace('{n}', c.sessions)
+    : (neverSeen(c.lastSeenAt) ? t('never_connected') : t('last_seen') + ' ' + fmtDate(c.lastSeenAt));
+}
+function stateBadge(state){
+  const span = document.createElement('span');
+  span.className = 'badge ' + (state === 'active' ? 'ok' : state === 'frozen' ? 'warn' : 'dim');
+  span.textContent = t('state_' + state);
+  return span;
+}
+// cell — ячейка таблицы с уже готовым текстом: собираем узлы, а не строки
+// HTML, чтобы имя устройства от человека не могло превратиться в разметку.
+function cell(row, text, cls){
+  const td = document.createElement('td');
+  if (cls) td.className = cls;
+  td.textContent = text;
+  row.appendChild(td);
+  return td;
+}
+
+/* ---------- данные ---------- */
+let CLIENTS = [];
+let TRAFFIC = null;
+let PERIOD = localStorage.getItem('panelPeriod') || 'month';
 
 async function loadSession(){
   const {data} = await api('/api/session');
   if (!data.authenticated){ showView('Login'); return; }
   if (data.mustChange){ showView('MustChange'); return; }
   showView('Main');
+  showTab(TAB);
   loadStatus();
-  loadClients();
+  await loadClients();
+  loadTraffic();
 }
 
 async function loadStatus(){
@@ -380,114 +763,203 @@ async function loadStatus(){
   $('stOS').textContent = data.os;
   $('stUptime').textContent = fmtUptime(data.uptimeSeconds);
   $('stVersion').textContent = data.version;
-}
-
-/* ---------- клиенты ---------- */
-function fmtDate(iso){
-  const d = new Date(iso);
-  if (isNaN(d)) return iso;
-  return d.toLocaleDateString(LANG === 'ru' ? 'ru-RU' : 'en-US');
-}
-
-function fmtBytes(n){
-  n = Number(n) || 0;
-  const units = ['Б','КБ','МБ','ГБ','ТБ'];
-  const unitsEn = ['B','KB','MB','GB','TB'];
-  const u = LANG === 'ru' ? units : unitsEn;
-  let i = 0;
-  while (n >= 1024 && i < u.length - 1){ n /= 1024; i++; }
-  return (i === 0 ? n : n.toFixed(1)) + ' ' + u[i];
-}
-
-// stateBadge — состояние словом и цветом сразу: зелёный "активен", жёлтый
-// "заморожен" — по одному взгляду на список понятно, у кого стоит разбираться.
-function stateBadge(state){
-  const span = document.createElement('span');
-  span.className = 'badge ' + (state === 'frozen' ? 'warn' : 'ok');
-  span.textContent = t('state_' + state);
-  return span;
-}
-
-function renderClients(list){
-  const el = $('clientsList');
-  if (!list || list.length === 0){
-    el.className = 'empty';
-    el.textContent = t('clients_empty');
-    return;
-  }
-  el.className = '';
-  el.innerHTML = '';
-  list.forEach(c => {
-    const row = document.createElement('div');
-    row.className = 'client-row';
-
-    const top = document.createElement('div');
-    top.className = 'top';
-    const name = document.createElement('div');
-    name.className = 'name';
-    name.textContent = c.name;
-    top.appendChild(name);
-    top.appendChild(stateBadge(c.state));
-
-    const meta = document.createElement('div');
-    meta.className = 'meta';
-    const online = c.sessions > 0
-      ? t('sessions_online').replace('{n}', c.sessions)
-      : (c.lastSeenAt ? t('last_seen') + ' ' + fmtDate(c.lastSeenAt) : t('never_connected'));
-    meta.textContent = t('device_' + c.deviceType) + ' · ' + t('created_on') + ' ' + fmtDate(c.createdAt) +
-      ' · ' + t('traffic_down') + ' ' + fmtBytes(c.rxBytes) + ' / ' + t('traffic_up') + ' ' + fmtBytes(c.txBytes) +
-      ' · ' + online;
-
-    const actions = document.createElement('div');
-    actions.className = 'actions';
-    const freezeBtn = document.createElement('button');
-    freezeBtn.className = 'btn ghost small';
-    if (c.state === 'frozen'){
-      freezeBtn.textContent = t('unfreeze_client');
-      freezeBtn.addEventListener('click', () => clientAction('unfreeze', c.id));
-    } else {
-      freezeBtn.textContent = t('freeze_client');
-      freezeBtn.addEventListener('click', () => clientAction('freeze', c.id));
-    }
-    const disconnectBtn = document.createElement('button');
-    disconnectBtn.className = 'btn ghost small';
-    disconnectBtn.textContent = t('disconnect_client');
-    disconnectBtn.addEventListener('click', () => clientAction('disconnect', c.id));
-    const settingsBtn = document.createElement('button');
-    settingsBtn.className = 'btn ghost small';
-    settingsBtn.textContent = t('show_settings');
-    settingsBtn.addEventListener('click', () => showClientConfig(c.id, false));
-    const del = document.createElement('button');
-    del.className = 'btn danger small';
-    del.textContent = t('delete_client');
-    del.addEventListener('click', () => deleteClient(c.id));
-    actions.appendChild(freezeBtn); actions.appendChild(disconnectBtn);
-    actions.appendChild(settingsBtn); actions.appendChild(del);
-
-    row.appendChild(top); row.appendChild(meta); row.appendChild(actions);
-    el.appendChild(row);
-  });
+  $('setVersion').textContent = data.version;
 }
 
 async function loadClients(){
   const {ok, data} = await api('/api/clients');
   if (!ok) return;
-  renderClients(data.clients);
+  CLIENTS = data.clients || [];
+  renderHomeClients();
+  renderDevices();
+}
+
+async function loadTraffic(){
+  const {ok, data} = await api('/api/traffic?period=' + encodeURIComponent(PERIOD));
+  if (!ok) return;
+  TRAFFIC = data;
+  renderTraffic();
+}
+
+function renderAll(){
+  renderHomeClients();
+  renderDevices();
+  renderTraffic();
+}
+
+/* ---------- главная: список подключений (только показ) ---------- */
+function renderHomeClients(){
+  const table = $('homeClients');
+  table.innerHTML = '';
+  $('homeClientsEmpty').hidden = CLIENTS.length > 0;
+  table.hidden = CLIENTS.length === 0;
+  if (!CLIENTS.length) return;
+
+  const head = document.createElement('tr');
+  [t('col_device'), t('col_state'), t('col_traffic'), t('col_online')].forEach(name => {
+    const th = document.createElement('th');
+    th.textContent = name;
+    head.appendChild(th);
+  });
+  table.appendChild(head);
+
+  CLIENTS.forEach(c => {
+    const row = document.createElement('tr');
+
+    const nameCell = document.createElement('td');
+    const nm = document.createElement('div');
+    nm.style.fontWeight = '600';
+    nm.textContent = c.name;
+    const sub = document.createElement('div');
+    sub.className = 'sub';
+    sub.textContent = t('device_' + c.deviceType) + ' · ' + t('created_on') + ' ' + fmtDate(c.createdAt);
+    nameCell.appendChild(nm); nameCell.appendChild(sub);
+    row.appendChild(nameCell);
+
+    const stateCell = document.createElement('td');
+    stateCell.appendChild(stateBadge(c.state));
+    row.appendChild(stateCell);
+
+    cell(row, '↓ ' + fmtBytes(c.rxBytes) + '  ↑ ' + fmtBytes(c.txBytes), 'num');
+    cell(row, onlineText(c));
+    table.appendChild(row);
+  });
+}
+
+/* ---------- главная: трафик за период ---------- */
+$('periods').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  PERIOD = btn.dataset.period;
+  localStorage.setItem('panelPeriod', PERIOD);
+  document.querySelectorAll('#periods button').forEach(b => b.classList.toggle('on', b === btn));
+  loadTraffic();
+});
+
+function renderTraffic(){
+  document.querySelectorAll('#periods button').forEach(b => {
+    b.classList.toggle('on', b.dataset.period === PERIOD);
+  });
+  const table = $('trafficByClient');
+  table.innerHTML = '';
+  if (!TRAFFIC){ return; }
+
+  $('trafficRx').textContent = fmtBytes(TRAFFIC.rxBytes);
+  $('trafficTx').textContent = fmtBytes(TRAFFIC.txBytes);
+  $('trafficAll').textContent = fmtBytes((TRAFFIC.rxBytes || 0) + (TRAFFIC.txBytes || 0));
+
+  const list = TRAFFIC.clients || [];
+  if (!list.length) return;
+  const head = document.createElement('tr');
+  [t('col_device'), t('traffic_down_total'), t('traffic_up_total')].forEach(name => {
+    const th = document.createElement('th');
+    th.textContent = name;
+    head.appendChild(th);
+  });
+  table.appendChild(head);
+  list.forEach(c => {
+    const row = document.createElement('tr');
+    const nameCell = document.createElement('td');
+    const nm = document.createElement('div');
+    nm.textContent = c.name;
+    const sub = document.createElement('div');
+    sub.className = 'sub';
+    sub.textContent = t('device_' + c.deviceType);
+    nameCell.appendChild(nm); nameCell.appendChild(sub);
+    row.appendChild(nameCell);
+    cell(row, fmtBytes(c.rxBytes), 'num');
+    cell(row, fmtBytes(c.txBytes), 'num');
+    table.appendChild(row);
+  });
+}
+
+/* ---------- устройства: три колонки по системам ---------- */
+function renderDevices(){
+  const cols = {windows: $('colWindows'), linux: $('colLinux'), android: $('colAndroid')};
+  const counts = {windows: 0, linux: 0, android: 0};
+  Object.values(cols).forEach(el => { el.innerHTML = ''; });
+
+  CLIENTS.forEach(c => {
+    const col = cols[c.deviceType];
+    if (!col) return;
+    counts[c.deviceType]++;
+    col.appendChild(deviceCard(c));
+  });
+
+  Object.keys(cols).forEach(k => {
+    $('cnt' + k[0].toUpperCase() + k.slice(1)).textContent = counts[k];
+    if (!counts[k]){
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.style.padding = '14px 6px';
+      empty.textContent = t('devices_empty');
+      cols[k].appendChild(empty);
+    }
+  });
+}
+
+function deviceCard(c){
+  const box = document.createElement('div');
+  box.className = 'dev';
+
+  const top = document.createElement('div');
+  top.className = 'top';
+  const name = document.createElement('div');
+  name.className = 'name';
+  name.textContent = c.name;
+  top.appendChild(name);
+  top.appendChild(stateBadge(c.state));
+
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  meta.textContent = t('created_on') + ' ' + fmtDate(c.createdAt) + '\n' +
+    t('traffic_down') + ' ' + fmtBytes(c.rxBytes) + ' · ' + t('traffic_up') + ' ' + fmtBytes(c.txBytes) +
+    '\n' + onlineText(c);
+  meta.style.whiteSpace = 'pre-line';
+
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+  const freeze = document.createElement('button');
+  freeze.className = 'btn ghost small';
+  if (c.state === 'frozen'){
+    freeze.textContent = t('unfreeze_client');
+    freeze.addEventListener('click', () => clientAction('unfreeze', c.id));
+  } else {
+    freeze.textContent = t('freeze_client');
+    freeze.addEventListener('click', () => clientAction('freeze', c.id));
+  }
+  const disconnect = document.createElement('button');
+  disconnect.className = 'btn ghost small';
+  disconnect.textContent = t('disconnect_client');
+  disconnect.addEventListener('click', () => clientAction('disconnect', c.id));
+  const settings = document.createElement('button');
+  settings.className = 'btn ghost small';
+  settings.textContent = t('show_settings');
+  settings.addEventListener('click', () => showClientConfig(c.id, false));
+  const del = document.createElement('button');
+  del.className = 'btn danger small';
+  del.textContent = t('delete_client');
+  del.addEventListener('click', () => deleteClient(c.id));
+  [freeze, disconnect, settings, del].forEach(b => actions.appendChild(b));
+
+  box.appendChild(top); box.appendChild(meta); box.appendChild(actions);
+  return box;
 }
 
 async function clientAction(action, id){
-  showMsg($('clientsMsg'), '', '');
+  showMsg($('devicesMsg'), '', '');
   const {ok, data} = await api('/api/clients/' + action, {id});
-  if (!ok){ showMsg($('clientsMsg'), errText(data.error, data), 'err'); return; }
+  if (!ok){ showMsg($('devicesMsg'), errText(data.error, data), 'err'); return; }
   loadClients();
 }
 
 async function deleteClient(id){
-  if (!confirm(t('confirm_delete_client'))) return;
-  showMsg($('clientsMsg'), '', '');
+  if (!await appConfirm(t('confirm_delete_client'))) return;
+  showMsg($('devicesMsg'), '', '');
   const {ok, data} = await api('/api/clients/delete', {id});
-  if (!ok){ showMsg($('clientsMsg'), errText(data.error, data), 'err'); return; }
+  if (!ok){ showMsg($('devicesMsg'), errText(data.error, data), 'err'); return; }
   loadClients();
+  loadTraffic();
 }
 
 $('addClientBtn').addEventListener('click', () => {
@@ -509,11 +981,11 @@ $('createClientBtn').addEventListener('click', async () => {
   $('createClientBtn').disabled = false;
   if (!ok){ showMsg($('addClientMsg'), errText(data.error, data), 'err'); return; }
   $('addClientForm').hidden = true;
-  loadClients();
+  await loadClients();
   showClientConfig(data.client.id, true);
 });
 
-/* ---------- показать настройки: QR / буфер / файл ---------- */
+/* ---------- настройки клиента: QR / буфер / файл ---------- */
 let currentConfigFilename = 'ssh_tunnel.json';
 let currentConfigJSON = '';
 
@@ -524,10 +996,15 @@ async function showClientConfig(id, justCreated){
   const {ok, data} = await api('/api/clients/config?id=' + encodeURIComponent(id));
   if (!ok){ showMsg($('clientConfigMsg'), errText(data.error, data), 'err'); return; }
   const cfg = data.config;
-  // QR — только для телефона: сканировать его на самом компьютере, для
-  // которого он показан, нечем и незачем — там нужен файл или буфер обмена.
-  $('clientConfigQRBox').hidden = cfg.deviceType !== 'android';
-  $('clientConfigQR').src = 'data:image/png;base64,' + cfg.qrPngBase64;
+  // QR — только телефону: сканировать код на том же компьютере, для которого
+  // он показан, нечем и незачем — там нужен буфер обмена или файл.
+  const isPhone = cfg.deviceType === 'android';
+  $('clientConfigQRBox').hidden = !isPhone;
+  if (isPhone){
+    const src = 'data:image/png;base64,' + cfg.qrPngBase64;
+    $('qrThumb').src = src;
+    $('qrFullImg').src = src;
+  }
   $('clientConfigHost').value = cfg.host;
   $('clientConfigPort').value = cfg.sshPort;
   $('clientConfigUser').value = cfg.user;
@@ -535,13 +1012,25 @@ async function showClientConfig(id, justCreated){
   currentConfigFilename = 'ssh_tunnel-' + cfg.user + '.json';
   currentConfigJSON = cfg.json;
   $('clientConfigCard').hidden = false;
+  $('clientConfigCard').scrollIntoView({behavior: 'smooth', block: 'start'});
 }
 
-// navigator.clipboard требует безопасный контекст (HTTPS или localhost) —
-// панель в режиме --lan без домена отдаётся по голому HTTP на адрес в сети,
-// и там этого API у браузера просто нет. Второй способ — временный textarea
-// и document.execCommand('copy') — устарел, но работает и без HTTPS, поэтому
-// это не запасной вариант «на всякий случай», а основной путь для --lan.
+$('qrThumb').addEventListener('click', () => { $('qrOverlay').hidden = false; });
+$('qrClose').addEventListener('click', () => { $('qrOverlay').hidden = true; });
+$('qrOverlay').addEventListener('click', e => {
+  if (e.target === $('qrOverlay')) $('qrOverlay').hidden = true;
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  $('qrOverlay').hidden = true;
+  if (!$('confirmOverlay').hidden) closeConfirm(false);
+});
+
+// navigator.clipboard требует безопасный контекст (HTTPS или localhost) — в
+// режиме --lan панель отдаётся по голому HTTP на адрес в сети, и там этого
+// API у браузера просто нет. Временный textarea с document.execCommand
+// устарел, но работает и без HTTPS: для --lan это основной путь, а не
+// запасной.
 async function copyText(text){
   if (navigator.clipboard && window.isSecureContext) {
     try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* попробуем иначе */ }
@@ -549,10 +1038,12 @@ async function copyText(text){
   const ta = document.createElement('textarea');
   ta.value = text;
   ta.style.position = 'fixed';
+  ta.style.top = '0';
   ta.style.opacity = '0';
   document.body.appendChild(ta);
   ta.focus();
   ta.select();
+  ta.setSelectionRange(0, ta.value.length);
   let ok = false;
   try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
   document.body.removeChild(ta);
@@ -582,6 +1073,30 @@ $('closeClientConfigBtn').addEventListener('click', () => {
   $('clientConfigCard').hidden = true;
 });
 
+/* ---------- настройки: автозапуск ---------- */
+async function loadAutostart(){
+  const {ok, data} = await api('/api/autostart');
+  if (!ok) return;
+  $('autostartRow').hidden = !data.supported;
+  $('autostartNote').hidden = !data.supported;
+  $('autostartUnsupported').hidden = !!data.supported;
+  $('autostartCheck').checked = !!data.enabled;
+}
+$('autostartCheck').addEventListener('change', async e => {
+  showMsg($('autostartMsg'), '', '');
+  const want = e.target.checked;
+  e.target.disabled = true;
+  const {ok, data} = await api('/api/autostart', {enabled: want});
+  e.target.disabled = false;
+  if (!ok){
+    e.target.checked = !want;
+    showMsg($('autostartMsg'), errText(data.error, data), 'err');
+    return;
+  }
+  $('autostartCheck').checked = !!data.enabled;
+});
+
+/* ---------- вход, пароль, выход ---------- */
 $('loginBtn').addEventListener('click', async () => {
   showMsg($('loginMsg'), '', '');
   const username = $('loginUser').value.trim();
@@ -613,9 +1128,23 @@ async function doChangePassword(curId, p1Id, p2Id, msgEl, btn, onDone){
 $('changeBtn').addEventListener('click', () => doChangePassword(
   'curPass','newPass1','newPass2', $('changeMsg'), $('changeBtn'), loadSession));
 
+$('showPassFormBtn').addEventListener('click', () => {
+  $('passForm').hidden = false;
+  $('showPassFormBtn').hidden = true;
+  $('curPass2').focus();
+});
+$('cancelPassBtn').addEventListener('click', () => {
+  $('passForm').hidden = true;
+  $('showPassFormBtn').hidden = false;
+  showMsg($('accountMsg'), '', '');
+});
 $('accountChangeBtn').addEventListener('click', () => doChangePassword(
   'curPass2','newPass21','newPass22', $('accountMsg'), $('accountChangeBtn'),
-  () => showMsg($('accountMsg'), t('password_changed'), 'ok')));
+  () => {
+    $('passForm').hidden = true;
+    $('showPassFormBtn').hidden = false;
+    showMsg($('accountMsg'), t('password_changed'), 'ok');
+  }));
 
 $('logoutBtn').addEventListener('click', async () => {
   await api('/api/logout', {});
@@ -625,9 +1154,13 @@ $('logoutBtn').addEventListener('click', async () => {
 applyI18N();
 loadSession();
 // Трафик и число сессий на сервере пересчитываются раз в 15 секунд
-// (см. cmd/ssh_tunnel_panel/main.go, syncClientsLoop) — обновляем список не
-// чаще, чем меняются сами цифры.
-setInterval(() => { if (!$('viewMain').hidden) loadClients(); }, 15000);
+// (cmd/ssh_tunnel_panel, syncClientsLoop) — чаще обновлять нечего.
+setInterval(() => {
+  if ($('viewMain').hidden) return;
+  loadStatus();
+  loadClients();
+  loadTraffic();
+}, 15000);
 </script>
 </body>
 </html>

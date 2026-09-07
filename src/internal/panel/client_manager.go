@@ -20,6 +20,11 @@ type ClientManager struct {
 	// обрабатывает WarnAccountingFailure ниже: это разные вещи — "правила
 	// учёта не нужны" и "нужны, но nft недоступен".
 	traffic TrafficAccountant
+	// history копит тот же прирост трафика по дням, чтобы панель могла
+	// показать «за сегодня/неделю/месяц», а не только вечный итог. Может быть
+	// nil (тесты, запуск без папки данных) — тогда прирост просто никуда не
+	// откладывается, всё остальное работает как прежде.
+	history *TrafficHistory
 	// warnf получает некритичные ошибки (не удалось завести правило учёта
 	// трафика, не удалось прочитать /proc и т.п.) — по умолчанию no-op,
 	// cmd/ssh_tunnel_panel подставляет log.Printf, чтобы они были видны в
@@ -36,6 +41,12 @@ func NewClientManager(store *ClientStore, provisioner Provisioner) *ClientManage
 // доступен в проде (nftables может быть не установлен).
 func (m *ClientManager) WithTraffic(t TrafficAccountant) *ClientManager {
 	m.traffic = t
+	return m
+}
+
+// WithHistory подключает историю трафика по дням (см. traffic_history.go).
+func (m *ClientManager) WithHistory(h *TrafficHistory) *ClientManager {
+	m.history = h
 	return m
 }
 
@@ -247,16 +258,25 @@ func (m *ClientManager) SyncTraffic(accountant TrafficAccountant) error {
 	if err != nil {
 		return err
 	}
+	// Тот же прирост, что ложится в вечные счётчики клиента, попутно
+	// раскладывается по дням — иначе панель умеет отвечать только «за всё
+	// время» (см. traffic_history.go).
+	deltas := map[string]DayTraffic{}
 	for _, c := range m.store.List() {
 		raw, ok := counters[c.ID]
 		if !ok {
 			continue
 		}
+		beforeRx, beforeTx := c.RxBytes, c.TxBytes
 		c.LastRawRx, c.RxBytes = AccumulateCounter(c.LastRawRx, c.RxBytes, raw.RxBytes)
 		c.LastRawTx, c.TxBytes = AccumulateCounter(c.LastRawTx, c.TxBytes, raw.TxBytes)
+		deltas[c.ID] = DayTraffic{RxBytes: c.RxBytes - beforeRx, TxBytes: c.TxBytes - beforeTx}
 		if err := m.store.Put(c); err != nil {
 			m.warn("не удалось сохранить трафик клиента %s: %v", c.ID, err)
 		}
+	}
+	if err := m.history.Record(time.Now(), deltas); err != nil {
+		m.warn("не удалось сохранить историю трафика: %v", err)
 	}
 	return nil
 }

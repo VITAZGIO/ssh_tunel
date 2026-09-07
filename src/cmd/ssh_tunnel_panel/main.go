@@ -84,8 +84,17 @@ func main() {
 		// TrafficAccountant в internal/panel/nft.go).
 		log.Printf("учёт трафика недоступен: %v", err)
 	}
+	// История трафика по дням — чтобы панель показывала не только вечный
+	// итог, но и «за сегодня/неделю/месяц». Не фатально, если не открылась:
+	// без неё периоды просто пустые, всё остальное работает.
+	history, err := panel.OpenTrafficHistory(filepath.Join(*dataDir, "traffic.json"))
+	if err != nil {
+		log.Printf("история трафика недоступна: %v", err)
+		history = nil
+	}
 	clients := panel.NewClientManager(clientStore, panel.NewSystemProvisioner()).
 		WithTraffic(accountant).
+		WithHistory(history).
 		WithWarnf(func(format string, args ...any) { log.Printf(format, args...) })
 	go syncClientsLoop(clients, accountant)
 
@@ -102,7 +111,9 @@ func main() {
 			"придётся донастраивать вручную, пока один из флагов не будет задан")
 	}
 
-	srv := panel.NewServer(store, clients).WithClientDefaults(effectiveSSHHost, *sshPort, effectivePublicURL)
+	srv := panel.NewServer(store, clients).
+		WithClientDefaults(effectiveSSHHost, *sshPort, effectivePublicURL).
+		WithHistory(history)
 	handler := srv.Handler()
 
 	if *domain != "" {

@@ -35,6 +35,18 @@ type Server struct {
 	sshHost  string
 	sshPort  int
 	panelURL string
+
+	// history — трафик по дням для выборки за период на главном экране.
+	// Может быть nil (тесты, запуск без папки данных): тогда за периоды
+	// панель отвечает нулями, а «за всё время» — вечными счётчиками
+	// клиентов, которые есть всегда.
+	history *TrafficHistory
+}
+
+// WithHistory подключает историю трафика по дням (traffic_history.go).
+func (s *Server) WithHistory(h *TrafficHistory) *Server {
+	s.history = h
+	return s
 }
 
 func NewServer(store *Store, clients *ClientManager) *Server {
@@ -72,6 +84,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/clients/unfreeze", s.requireAuth(s.handleClientUnfreeze))
 	mux.HandleFunc("/api/clients/disconnect", s.requireAuth(s.handleClientDisconnect))
 	mux.HandleFunc("/api/clients/config", s.requireAuth(s.handleClientConfig))
+	mux.HandleFunc("/api/traffic", s.requireAuth(s.handleTraffic))
+	mux.HandleFunc("/api/autostart", s.requireAuth(s.handleAutostart))
 	return mux
 }
 
@@ -341,6 +355,94 @@ func (s *Server) handleClientConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "config": payload})
+}
+
+// clientTraffic — сколько клиент принял и отдал за выбранный период.
+type clientTraffic struct {
+	ID         string     `json:"id"`
+	Name       string     `json:"name"`
+	DeviceType DeviceType `json:"deviceType"`
+	RxBytes    uint64     `json:"rxBytes"`
+	TxBytes    uint64     `json:"txBytes"`
+}
+
+// handleTraffic — итог трафика за период для главного экрана панели.
+//
+// «За всё время» отвечаем вечными счётчиками самих клиентов, а не суммой
+// истории: история заведена позже панели, и складывать её дни означало бы
+// показать заниженное «всё время» у тех, кто обновился с прошлых версий.
+// Остальные периоды собираются из дневных корзин.
+func (s *Server) handleTraffic(w http.ResponseWriter, r *http.Request) {
+	period := r.URL.Query().Get("period")
+	switch period {
+	case "day", "week", "month", "all":
+	default:
+		period = "month"
+	}
+	now := time.Now()
+	since := PeriodStart(period, now)
+
+	var byClient map[string]DayTraffic
+	if period != "all" {
+		byClient = s.history.SumSince(since)
+	}
+
+	list := s.clients.List()
+	out := make([]clientTraffic, 0, len(list))
+	var totalRx, totalTx uint64
+	for _, c := range list {
+		t := clientTraffic{ID: c.ID, Name: c.Name, DeviceType: c.DeviceType}
+		if period == "all" {
+			t.RxBytes, t.TxBytes = c.RxBytes, c.TxBytes
+		} else {
+			d := byClient[c.ID]
+			t.RxBytes, t.TxBytes = d.RxBytes, d.TxBytes
+		}
+		totalRx += t.RxBytes
+		totalTx += t.TxBytes
+		out = append(out, t)
+	}
+
+	resp := map[string]any{
+		"period":  period,
+		"rxBytes": totalRx,
+		"txBytes": totalTx,
+		"clients": out,
+	}
+	if period != "all" {
+		resp["since"] = since.Format(time.RFC3339)
+		resp["days"] = s.history.Days(since)
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// handleAutostart читает (GET) и переключает (POST) автозапуск панели после
+// перезагрузки сервера — то же, что systemctl enable/disable, но кнопкой.
+func (s *Server) handleAutostart(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		writeJSON(w, http.StatusOK, Autostart())
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "bad_request"})
+		return
+	}
+	if !Autostart().Supported {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "autostart_unsupported"})
+		return
+	}
+	if err := SetAutostart(req.Enabled); err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, Autostart())
 }
 
 // handleClientAction — общий каркас для ручек, которые принимают только id
