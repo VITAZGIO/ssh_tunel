@@ -466,7 +466,7 @@
                         android:layout_height="56dp"
                         android:maxLines="2"
                         android:textSize="12.5sp"
-                        android:drawableStart="@drawable/ic_qr"
+                        android:drawableEnd="@drawable/ic_qr"
                         android:drawablePadding="6dp"
                         android:text="@string/scan_config" />
 
@@ -482,6 +482,16 @@
                         android:textSize="12.5sp"
                         android:text="@string/remove_server" />
                 </LinearLayout>
+
+                <!-- Сканирование заменяет сервер, с чьей вкладки его начали:
+                     об этом надо предупредить до нажатия, а не после. -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:textSize="12sp"
+                    android:textColor="@color/dim"
+                    android:text="@string/scan_replaces_note" />
 
                 <!-- Ответ на «Вставить из буфера»/«Сканировать QR-код» — сразу
                      под ними, а не выше по экрану. -->
@@ -851,6 +861,147 @@
                         android:layout_marginTop="4dp"
                         android:textColor="@color/text"
                         android:text="@string/show_picker" />
+
+                    <!-- Перенос всех настроек разом на другой телефон или
+                         компьютер: серверы с ключами, выбор приложений, DNS и
+                         белый список рекламы. Сами списки блокировки не
+                         переносятся — в них десятки тысяч строк, ни в одно
+                         сообщение это не влезет. -->
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="18dp"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/text"
+                        android:text="@string/all_settings" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:layout_marginBottom="8dp"
+                        android:textSize="12sp"
+                        android:textColor="@color/dim"
+                        android:text="@string/all_settings_note" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <androidx.appcompat.widget.AppCompatButton
+                            android:id="@+id/bundleImportBtn"
+                            style="@style/SecondaryButton"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="56dp"
+                            android:maxLines="2"
+                            android:textSize="12.5sp"
+                            android:text="@string/import_settings" />
+
+                        <Space android:layout_width="8dp" android:layout_height="1dp" />
+
+                        <androidx.appcompat.widget.AppCompatButton
+                            android:id="@+id/bundleExportBtn"
+                            style="@style/SecondaryButton"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="56dp"
+                            android:maxLines="2"
+                            android:textSize="12.5sp"
+                            android:text="@string/export_settings" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/bundleNote"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textSize="12sp"
+                        android:textColor="@color/dim" />
+
+                    <!-- Обновление: приложение не ставится само (Android не даст
+                         без отдельного разрешения на установку пакетов), поэтому
+                         кнопка скачивает APK в «Загрузки», а ставит его человек. -->
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="18dp"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/text"
+                        android:text="@string/update_title" />
+
+                    <TextView
+                        android:id="@+id/versionLine"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:layout_marginBottom="8dp"
+                        android:textSize="12sp"
+                        android:textColor="@color/dim" />
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/updateCheckBtn"
+                        style="@style/SecondaryButton"
+                        android:text="@string/update_check" />
+
+                    <TextView
+                        android:id="@+id/updateNote"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:textSize="12sp"
+                        android:textColor="@color/dim" />
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/updateDownloadBtn"
+                        style="@style/SecondaryButton"
+                        android:layout_marginTop="8dp"
+                        android:visibility="gone"
+                        android:text="@string/update_download" />
+
+                    <!-- Автор: логотип и ссылка на сайт — в самом низу общих
+                         настроек, чтобы не мешать тому, ради чего сюда заходят. -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="22dp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <ImageView
+                            android:layout_width="34dp"
+                            android:layout_height="34dp"
+                            android:src="@drawable/ic_logo"
+                            android:contentDescription="@string/author_label" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textSize="12sp"
+                                android:textColor="@color/dim"
+                                android:text="@string/author_label" />
+
+                            <TextView
+                                android:id="@+id/authorSite"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textSize="14sp"
+                                android:textColor="@color/accent"
+                                android:clickable="true"
+                                android:focusable="true"
+                                android:text="@string/author_site" />
+                        </LinearLayout>
+                    </LinearLayout>
                 </LinearLayout>
 
                 <!-- Сохраняет и сервер, и общие настройки разом — поэтому

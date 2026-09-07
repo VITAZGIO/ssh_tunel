@@ -13,6 +13,14 @@ mkdir -p "$OUT/windows" "$OUT/linux"
 # сборочной машине.
 export CGO_ENABLED=0
 
+# Версия сборки вшивается линковщиком: кнопке «Проверить обновления» надо с
+# чем-то сравнивать тег последнего релиза (см. internal/updater и
+# docs/UPDATE_SPEC.md). При сборке руками переменной нет — остаётся "dev", и
+# программа честно говорит, что версию определить не может.
+VERSION="${VERSION:-${GITHUB_REF_NAME:-dev}}"
+LDVERSION="-X sshtunnel/internal/updater.Version=${VERSION}"
+echo "Версия сборки: $VERSION"
+
 echo "Проверяю тесты..."
 go test ./...
 
@@ -32,7 +40,7 @@ go run github.com/akavel/rsrc@v0.10.2 \
 
 echo "Windows: окно..."
 GOOS=windows GOARCH=amd64 go build \
-  -ldflags="-s -w -H windowsgui" \
+  -ldflags="-s -w -H windowsgui $LDVERSION" \
   -o "$OUT/windows/ssh_tunnel.exe" ./cmd/ssh_tunnel
 
 # Консольная версия для Windows в релиз не идёт: окно умеет всё то же самое, а
@@ -44,12 +52,12 @@ GOOS=windows GOARCH=amd64 go build \
 # облачные ARM-машины, домашние мини-серверы).
 echo "Linux: amd64..."
 GOOS=linux GOARCH=amd64 go build \
-  -ldflags="-s -w" \
+  -ldflags="-s -w $LDVERSION" \
   -o "$OUT/linux/ssh_tunnel_linux" ./cmd/ssh_tunnel_linux
 
 echo "Linux: arm64..."
 GOOS=linux GOARCH=arm64 go build \
-  -ldflags="-s -w" \
+  -ldflags="-s -w $LDVERSION" \
   -o "$OUT/linux/ssh_tunnel_linux_arm64" ./cmd/ssh_tunnel_linux
 
 # Веб-панель и ретранслятор UDP работают только на самом сервере, поэтому
@@ -61,11 +69,11 @@ for arch in amd64 arm64; do
   [ "$arch" = arm64 ] && suffix="_arm64"
   echo "Linux: панель ($arch)..."
   GOOS=linux GOARCH="$arch" go build \
-    -ldflags="-s -w" \
+    -ldflags="-s -w $LDVERSION" \
     -o "$OUT/linux/ssh_tunnel_panel$suffix" ./cmd/ssh_tunnel_panel
   echo "Linux: ретранслятор UDP ($arch)..."
   GOOS=linux GOARCH="$arch" go build \
-    -ldflags="-s -w" \
+    -ldflags="-s -w $LDVERSION" \
     -o "$OUT/linux/udprelay$suffix" ./cmd/udprelay
 done
 

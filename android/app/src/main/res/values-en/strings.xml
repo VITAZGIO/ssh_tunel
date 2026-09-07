@@ -161,4 +161,33 @@
     <string name="sc_external_ip_matches">%1$s — matches the server address</string>
     <string name="sc_external_ip_mismatch">%1$s — doesn\'t match the server address; that is expected with some hosting providers (CDN, several addresses per server)</string>
     <string name="sc_external_ip_check_failed">couldn\'t determine the external address: %1$s</string>
+
+    <!-- Moving all settings and updating the app -->
+    <string name="all_settings">All settings at once</string>
+    <string name="all_settings_note">Moves every server (keys included), the app selection, DNS and the ad-block allow list to another device in one paste. The block lists themselves stay behind — they are huge.</string>
+    <string name="import_settings">Import settings</string>
+    <string name="export_settings">Export settings</string>
+    <string name="bundle_copied">settings copied, %1$d server(s); paste them on the other device</string>
+    <string name="bundle_imported">settings applied: %1$d server(s)</string>
+    <string name="bundle_replace_confirm">Replace all current settings and servers with the ones in the clipboard? This cannot be undone.</string>
+    <string name="bundle_bad">the clipboard does not hold an ssh_tunnel settings export</string>
+    <string name="bundle_one_server">the clipboard holds one server — paste it with "Paste from clipboard"</string>
+
+    <string name="update_title">Update</string>
+    <string name="version_line">Installed version %1$s</string>
+    <string name="update_check">Check for updates</string>
+    <string name="update_checking">checking…</string>
+    <string name="update_latest">you have the latest version</string>
+    <string name="update_available">version %1$s is out — you can download it</string>
+    <string name="update_ahead">your build is newer than the published one (%1$s)</string>
+    <string name="update_failed">could not reach GitHub — check your connection</string>
+    <string name="update_rate_limited">GitHub is rate-limiting requests, try again later</string>
+    <string name="update_download">Download APK to Downloads</string>
+    <string name="update_downloading">downloading the APK to Downloads — open it from the notification and install</string>
+    <string name="update_open_release">opening the release page — grab the APK there</string>
+
+    <string name="author_label">Author</string>
+    <string name="author_site">vitazgio.ru</string>
+    <string name="scan_replaces_note">The scanned server is added as a new tab and this one is removed.</string>
+    <string name="server_switched_reconnecting">Server switched — connecting to it</string>
 </resources>

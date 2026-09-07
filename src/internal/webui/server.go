@@ -47,6 +47,7 @@ import (
 	"sshtunnel/internal/procinfo"
 	"sshtunnel/internal/sysproxy"
 	"sshtunnel/internal/tunnel"
+	"sshtunnel/internal/updater"
 )
 
 //go:embed assets/*
@@ -190,6 +191,10 @@ func (s *Server) Serve() error {
 	mux.HandleFunc("/api/vpssetup/start", s.guard(s.handleVpsSetupStart))
 	mux.HandleFunc("/api/selfcheck", s.guard(s.handleSelfCheck))
 	mux.HandleFunc("/api/profile/latency", s.guard(s.handleProfileLatency))
+	mux.HandleFunc("/api/settings/export", s.guard(s.handleSettingsExport))
+	mux.HandleFunc("/api/settings/import", s.guard(s.handleSettingsImport))
+	mux.HandleFunc("/api/update/check", s.guard(s.handleUpdateCheck))
+	mux.HandleFunc("/api/update/download", s.guard(s.handleUpdateDownload))
 
 	srv := &http.Server{
 		Handler:           mux,
@@ -300,6 +305,9 @@ type statusResp struct {
 	// туннель не работает. Отличается от Config.ActiveProfile после
 	// автовыбора самого быстрого сервера или перехода на запасной.
 	EffectiveProfile string `json:"effectiveProfile,omitempty"`
+	// Version — версия сборки, её же показывает кнопка проверки обновлений.
+	// "dev" у сборки не из релиза (см. internal/updater).
+	Version string `json:"version"`
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -314,6 +322,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		SeenApps:         s.app.SeenApps(),
 		OS:               runtime.GOOS,
 		EffectiveProfile: s.app.EffectiveProfileID(),
+		Version:          updater.Version,
 	})
 }
 

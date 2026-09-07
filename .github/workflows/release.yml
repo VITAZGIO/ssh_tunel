@@ -38,6 +38,10 @@ jobs:
 
       - name: Собрать
         working-directory: src
+        env:
+          # Версия попадает в сами файлы: по ней кнопка «Проверить обновления»
+          # понимает, стоит ли уже последняя (см. docs/UPDATE_SPEC.md).
+          VERSION: ${{ inputs.tag || github.ref_name }}
         run: ./build.sh
 
       - uses: actions/upload-artifact@v4

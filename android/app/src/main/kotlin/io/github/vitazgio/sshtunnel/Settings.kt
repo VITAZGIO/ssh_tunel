@@ -116,6 +116,27 @@ class Settings(context: Context) {
         return true
     }
 
+    /**
+     * Полностью заменяет список серверов вставленной выгрузкой (см.
+     * SettingsBundle). Каждому серверу выдаётся новый id и свой файл ключа;
+     * старые файлы ключей удаляются, чтобы на телефоне не оставались
+     * приватные ключи от серверов, которых в настройках уже нет.
+     */
+    fun replaceProfiles(incoming: List<Pair<Profile, String>>, activeIndex: Int) {
+        if (incoming.isEmpty()) return
+        for (old in profiles) keyFile(old.id).delete()
+
+        val list = mutableListOf<Profile>()
+        for ((p, key) in incoming) {
+            val fresh = p.copy(id = UUID.randomUUID().toString(),
+                name = p.name.ifBlank { "Server ${list.size + 1}" })
+            list.add(fresh)
+            if (key.isNotBlank()) saveKeyFor(fresh.id, key)
+        }
+        val active = list.getOrNull(activeIndex) ?: list.first()
+        saveAll(list, active.id)
+    }
+
     fun saveProfile(p: Profile) {
         val list = profiles
         val i = list.indexOfFirst { it.id == p.id }
@@ -346,21 +367,4 @@ class Settings(context: Context) {
         get() = prefs.getString("language", "ru") ?: "ru"
         set(v) = prefs.edit().putString("language", v).apply()
 
-    // ---------------------------------------------------------------------
-    // Свёрнутость блоков настроек: при самом первом открытии экрана оба
-    // развёрнуты, дальше по умолчанию свёрнуты — но ручной выбор человека
-    // запоминается навсегда, поверх этого умолчания.
-    // ---------------------------------------------------------------------
-
-    var settingsEverOpened: Boolean
-        get() = prefs.getBoolean("settingsEverOpened", false)
-        set(v) = prefs.edit().putBoolean("settingsEverOpened", v).apply()
-
-    var serverPanelExpanded: Boolean
-        get() = prefs.getBoolean("serverPanelExpanded", false)
-        set(v) = prefs.edit().putBoolean("serverPanelExpanded", v).apply()
-
-    var generalPanelExpanded: Boolean
-        get() = prefs.getBoolean("generalPanelExpanded", false)
-        set(v) = prefs.edit().putBoolean("generalPanelExpanded", v).apply()
 }

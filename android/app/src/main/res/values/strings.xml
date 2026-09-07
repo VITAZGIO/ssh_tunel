@@ -160,4 +160,33 @@
     <string name="apps_imported">список программ импортирован</string>
     <string name="apps_exported">список скопирован в буфер</string>
     <string name="import_bad_apps">это не похоже на список программ ssh_tunnel</string>
+
+    <!-- Перенос всех настроек и обновление приложения -->
+    <string name="all_settings">Все настройки целиком</string>
+    <string name="all_settings_note">Переносит на другое устройство разом все серверы (вместе с ключами), выбор приложений, DNS и белый список рекламы — одной вставкой из буфера обмена. Сами списки блокировки не переносятся: они огромные.</string>
+    <string name="import_settings">Импорт настроек</string>
+    <string name="export_settings">Экспорт настроек</string>
+    <string name="bundle_copied">настройки скопированы, серверов — %1$d; вставь их на другом устройстве</string>
+    <string name="bundle_imported">настройки применены: серверов — %1$d</string>
+    <string name="bundle_replace_confirm">Заменить все текущие настройки и серверы теми, что в буфере обмена? Отменить это будет нечем.</string>
+    <string name="bundle_bad">в буфере не выгрузка настроек ssh_tunnel</string>
+    <string name="bundle_one_server">в буфере настройки одного сервера — вставь их кнопкой «Вставить из буфера»</string>
+
+    <string name="update_title">Обновление</string>
+    <string name="version_line">Установлена версия %1$s</string>
+    <string name="update_check">Проверить обновления</string>
+    <string name="update_checking">проверяю…</string>
+    <string name="update_latest">у тебя последняя версия</string>
+    <string name="update_available">вышла версия %1$s — можно скачать</string>
+    <string name="update_ahead">у тебя версия новее опубликованной (%1$s)</string>
+    <string name="update_failed">не получилось связаться с GitHub — проверь интернет</string>
+    <string name="update_rate_limited">GitHub временно ограничил число запросов, попробуй позже</string>
+    <string name="update_download">Скачать APK в «Загрузки»</string>
+    <string name="update_downloading">скачиваю APK в «Загрузки» — потом открой его из шторки и установи</string>
+    <string name="update_open_release">открываю страницу релиза — скачай APK оттуда</string>
+
+    <string name="author_label">Автор</string>
+    <string name="author_site">vitazgio.ru</string>
+    <string name="scan_replaces_note">Отсканированный сервер добавится новой вкладкой, а этот будет удалён.</string>
+    <string name="server_switched_reconnecting">Сервер переключён — подключаюсь к нему</string>
 </resources>

@@ -306,6 +306,13 @@
   .menu.cityMenu{max-height:280px;overflow-y:auto}
   .menu .flagrow{display:flex;align-items:center;gap:9px}
 
+  /* Ряд вкладок серверов на своей подложке: без неё вкладки висели в воздухе
+     и при нескольких серверах упирались в кнопку буфера, выглядя обрезанными.
+     flex-wrap важнее overflow: строка переносится, а не режется. */
+  .srvbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+          background:var(--card2);border:1px solid var(--line);border-radius:11px;
+          padding:8px;margin-bottom:14px}
+  .srvbar .tabbar{flex-wrap:wrap;overflow:visible;padding-bottom:0}
   .tabbar{display:flex;gap:6px;overflow-x:auto;padding-bottom:3px;margin-bottom:12px}
   .tabbar::-webkit-scrollbar{height:6px}
   .tabbar::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
@@ -323,9 +330,13 @@
 
   .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;
          padding:13px 13px 3px;margin-bottom:16px}
+  /* line-height:1 обязателен: у заглавных букв в этой строке пустое место
+     снизу, из-за которого подпись выглядела сдвинутой вниз относительно
+     стрелки. */
   .panel .ptitle{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none;
                  font-size:11.5px;font-weight:700;text-transform:uppercase;
-                 letter-spacing:.5px;color:var(--dim);margin:0 0 11px;padding:2px 0}
+                 letter-spacing:.5px;color:var(--dim);margin:0 0 11px;padding:2px 0;
+                 line-height:1}
   .panel .ptitle .chev{transition:transform .15s;font-size:10px;flex:none}
   .panel.collapsed .ptitle{margin-bottom:2px}
   .panel.collapsed .ptitle .chev{transform:rotate(-90deg)}
@@ -447,16 +458,15 @@
       </select>
     </div>
 
-    <div style="display:flex;align-items:center;gap:8px">
+    <div class="srvbar">
       <div class="tabbar" id="profileTabs" style="flex:1;margin-bottom:0"></div>
-      <button class="btn" id="importBtn" title="Импортировать сервер из файла"
-        data-i18n-title="import_title" style="font-size:12.5px;padding:8px 12px;flex:none">
-        <span data-i18n="import_short">Импорт</span></button>
       <button class="btn" id="pasteBtn" title="Вставить настройки сервера из буфера обмена"
         data-i18n-title="paste_title" style="font-size:12.5px;padding:8px 10px;flex:none">📋</button>
-      <input type="file" id="importFile" accept=".json,application/json" hidden>
+      <span class="infoq" onclick="event.preventDefault();event.stopPropagation();toggleInfoq(this)"
+        >?<span class="tip" data-i18n="paste_note">Кнопка с буфером добавляет новый сервер из
+        настроек, которые тебе прислали: скопируй присланный текст и нажми её. Работать с
+        файлами не нужно.</span></span>
     </div>
-    <div style="margin-bottom:12px"></div>
 
     <div class="panel" id="serverPanel">
       <p class="ptitle" id="serverPanelTitle"><span class="chev">▾</span>
@@ -482,11 +492,8 @@
       </div>
 
       <div class="field" style="margin-bottom:14px">
-        <label data-i18n="export_server">Экспортировать сервер</label>
-        <div class="rowbtns" style="margin-top:0">
-          <button class="btn" id="exportFileBtn" style="flex:1" data-i18n="export_to_file">В файл</button>
-          <button class="btn" id="exportClipBtn" style="flex:1" data-i18n="export_to_clipboard">В буфер</button>
-        </div>
+        <button class="btn" id="exportClipBtn" style="width:100%"
+          data-i18n="export_server_clip">Экспортировать сервер в буфер</button>
       </div>
 
       <div id="issuedByPanel" hidden style="margin:-4px 0 14px;font-size:12.5px;
@@ -654,12 +661,13 @@
 
       <div class="chk-row" id="autoPickRow" style="display:none">
         <label class="chk"><input type="checkbox" id="autoPickFastest">
-          <span class="lbl" data-i18n="auto_pick_fastest">Подключаться к самому быстрому серверу</span></label>
+          <span class="lbl" data-i18n="auto_pick_fastest">Подключаться к самому быстрому серверу</span>
+          <span class="infoq" onclick="event.preventDefault();event.stopPropagation();toggleInfoq(this)"
+            >?<span class="tip" data-i18n="auto_pick_fastest_note">При подключении программа измерит
+            отклик всех серверов и выберет самый быстрый. Если он не поднимется или упадёт — перейдёт
+            на следующий по отклику, об этом будет видно в журнале. Возврат на выбранный вручную
+            сервер — кнопкой «Выбрать этот сервер» или при следующем подключении.</span></span></label>
       </div>
-      <p class="note" id="autoPickNote" style="display:none;margin:-4px 0 10px" data-i18n="auto_pick_fastest_note">
-        При подключении программа измерит отклик всех серверов и выберет самый быстрый. Если он не поднимется
-        или упадёт — перейдёт на следующий по отклику, об этом будет видно в журнале. Возврат на выбранный
-        вручную сервер — кнопкой «Выбрать этот сервер» или при следующем подключении.</p>
 
       <div id="bootBlock" hidden>
         <label class="chk"><input type="checkbox" id="bootStart">
@@ -686,6 +694,36 @@
       </div>
       </div><!-- /.pbody -->
     </div><!-- /.panel общих настроек -->
+
+    <div class="panel" id="backupPanel">
+      <p class="ptitle" style="cursor:default"><span data-i18n="all_settings">Все настройки целиком</span></p>
+      <div class="pbody">
+      <p class="note" style="margin:0 0 9px" data-i18n="all_settings_note">Переносит на другое
+        устройство разом все серверы (вместе с ключами), выбор программ и общие галочки — одной
+        вставкой из буфера обмена. Списки блокировки рекламы не переносятся: они огромные.</p>
+      <div class="two">
+        <button class="btn" id="bundleImportBtn" data-i18n="import_settings">Импорт настроек</button>
+        <button class="btn" id="bundleExportBtn" data-i18n="export_settings">Экспорт настроек</button>
+      </div>
+      <span class="hint" id="bundleNote" style="display:block;margin-top:7px"></span>
+      </div><!-- /.pbody -->
+    </div>
+
+    <div class="panel" id="updatePanel">
+      <p class="ptitle" style="cursor:default"><span data-i18n="update_title">Обновление</span></p>
+      <div class="pbody">
+      <p class="note" style="margin:0 0 9px">
+        <span data-i18n="version_installed">Установлена версия</span>
+        <b id="appVersion">—</b></p>
+      <button class="btn" id="updateCheckBtn" style="width:100%"
+        data-i18n="update_check">Проверить обновления</button>
+      <span class="hint" id="updateNote" style="display:block;margin-top:7px"></span>
+      <button class="btn" id="updateDownloadBtn" hidden style="width:100%;margin-top:8px"
+        data-i18n="update_download">Скачать в «Загрузки»</button>
+      <button class="btn" id="updateOpenBtn" hidden style="width:100%;margin-top:8px"
+        data-i18n="update_open_release">Открыть страницу релиза</button>
+      </div><!-- /.pbody -->
+    </div>
 
     <div style="margin-top:14px">
       <button class="btn primary" id="save" style="width:100%" data-i18n="save">Сохранить</button>
@@ -981,10 +1019,13 @@
 <script>
 const T = new URLSearchParams(location.search).get('t') || '';
 const $ = id => document.getElementById(id);
-const api = (path, body) => fetch(path, {
+/* raw=true — тело уходит как есть, без JSON.stringify: так отправляется
+   вставленный человеком текст выгрузки настроек, который сервер разбирает
+   сам и должен видеть ровно в том виде, в каком его скопировали. */
+const api = (path, body, raw) => fetch(path, {
   method: body ? 'POST' : 'GET',
   headers: {'X-Token': T, 'Content-Type': 'application/json'},
-  body: body ? JSON.stringify(body) : undefined
+  body: body ? (raw ? body : JSON.stringify(body)) : undefined
 }).then(r => r.json());
 
 /* ---------- своё окно подтверждения вместо системного confirm() ---------- */
@@ -1128,8 +1169,33 @@ const I18N = {
     who_is_online:'Кто ходит в интернет', clear:'Очистить',
     pick_app:'Выбери программу', close:'Закрыть', search_app:'Поиск по имени или пути…',
     custom_flag_name:'Свой (без флага)',
-    import_title:'Импортировать сервер из файла', import_short:'Импорт',
-    export_server:'Экспортировать сервер', export_to_file:'В файл', export_to_clipboard:'В буфер',
+    export_server_clip:'Экспортировать сервер в буфер',
+    export_no_key:'Приватный ключ прочитать не удалось — на другом устройстве его надо указать самому.',
+    paste_note:'Кнопка с буфером добавляет новый сервер из настроек, которые тебе прислали: '+
+      'скопируй присланный текст и нажми её. Работать с файлами не нужно.',
+    all_settings:'Все настройки целиком',
+    all_settings_note:'Переносит на другое устройство разом все серверы (вместе с ключами), '+
+      'выбор программ и общие галочки — одной вставкой из буфера обмена. Списки блокировки '+
+      'рекламы не переносятся: они огромные.',
+    import_settings:'Импорт настроек', export_settings:'Экспорт настроек',
+    bundle_copied:'настройки скопированы, серверов — {n}; вставь их на другом устройстве.',
+    bundle_imported:'настройки применены: серверов — {n}',
+    bundle_keys_missing:'Серверов без ключа: {n} — их приватный ключ придётся указать на месте.',
+    bundle_replace_confirm:'Заменить все текущие настройки и серверы теми, что в буфере обмена? '+
+      'Отменить это будет нечем.',
+    update_title:'Обновление', version_installed:'Установлена версия',
+    version_dev:'сборка не из релиза',
+    update_check:'Проверить обновления', update_checking:'проверяю…',
+    update_latest:'у тебя последняя версия',
+    update_available:'вышла версия {v} — можно скачать',
+    update_ahead:'у тебя версия новее опубликованной ({v})',
+    update_unknown:'версию этой сборки определить не могу; последняя опубликованная — {v}',
+    update_failed:'не получилось связаться с GitHub — проверь интернет',
+    update_rate_limited:'GitHub временно ограничил число запросов, попробуй позже',
+    update_download:'Скачать в «Загрузки»', update_downloading:'скачиваю…',
+    update_downloaded:'скачано: {path} — закрой программу и замени ею старый файл',
+    update_download_failed:'скачать не вышло — открой страницу релиза и скачай вручную',
+    update_open_release:'Открыть страницу релиза',
     import_ok_with_key:'сервер импортирован вместе с ключом — можно нажимать «Подключить»',
     import_ok_no_key:'сервер импортирован без ключа — укажи свой приватный ключ перед подключением',
     import_bad_file:'этот файл не похож на экспорт ssh_tunnel',
@@ -1274,8 +1340,32 @@ const I18N = {
     who_is_online:'Who is online', clear:'Clear',
     pick_app:'Pick an app', close:'Close', search_app:'Search by name or path…',
     custom_flag_name:'Custom (no flag)',
-    import_title:'Import a server from a file', import_short:'Import',
-    export_server:'Export server', export_to_file:'To file', export_to_clipboard:'To clipboard',
+    export_server_clip:'Copy server settings',
+    export_no_key:'The private key could not be read — set it by hand on the other device.',
+    paste_note:'The clipboard button adds a NEW server from settings somebody sent you: copy the '+
+      'text they sent and press it. No files involved.',
+    all_settings:'All settings at once',
+    all_settings_note:'Moves every server (keys included), the app selection and the general '+
+      'checkboxes to another device in one paste. Ad-block lists are left out — they are huge.',
+    import_settings:'Import settings', export_settings:'Export settings',
+    bundle_copied:'settings copied, {n} server(s); paste them on the other device.',
+    bundle_imported:'settings applied: {n} server(s)',
+    bundle_keys_missing:'{n} server(s) have no key — point them at one by hand.',
+    bundle_replace_confirm:'Replace all current settings and servers with the ones in the clipboard? '+
+      'This cannot be undone.',
+    update_title:'Update', version_installed:'Installed version',
+    version_dev:'built from source',
+    update_check:'Check for updates', update_checking:'checking…',
+    update_latest:'you have the latest version',
+    update_available:'version {v} is out — you can download it',
+    update_ahead:'your build is newer than the published one ({v})',
+    update_unknown:"can't tell which version this build is; the latest published one is {v}",
+    update_failed:'could not reach GitHub — check your connection',
+    update_rate_limited:'GitHub is rate-limiting requests, try again later',
+    update_download:'Download to Downloads', update_downloading:'downloading…',
+    update_downloaded:'saved to {path} — close the program and replace the old file with it',
+    update_download_failed:'download failed — open the release page and grab it by hand',
+    update_open_release:'Open the release page',
     import_ok_with_key:'server imported along with its key — you can hit "Connect"',
     import_ok_no_key:'server imported without a key — point it at your own private key before connecting',
     import_bad_file:'this file doesn\'t look like an ssh_tunnel export',
@@ -2672,7 +2762,6 @@ function renderGeneralVisibility(){
   // hidden тут не подействует.
   $('showPickerRow').style.display = many ? 'flex' : 'none';
   $('autoPickRow').style.display = many ? 'flex' : 'none';
-  $('autoPickNote').style.display = many ? 'block' : 'none';
   $('removeServerBtn').hidden = !many;
   updateServerButtonsSpan();
 }
@@ -2737,35 +2826,21 @@ $('removeServerBtn').onclick = async () => {
   if(r.note){ $('savedNote').textContent = r.note; setTimeout(() => $('savedNote').textContent = '', 6000); }
 };
 
-/* ---------- экспорт и импорт сервера файлом ---------- */
-/* Экспортируется тот сервер, что сейчас показан в форме (editingProfileId),
-   вместе с приватным ключом — файл готовится для передачи тому, кому уже
-   доверяешь (другу, знакомому), поэтому лишний вопрос «включать ли ключ»
-   только мешал бы. Несохранённые правки в файл не попадают — только то,
-   что уже лежит на диске, поэтому перед экспортом стоит сперва нажать
-   «Сохранить». */
-$('exportFileBtn').onclick = async () => {
-  const r = await api('/api/profile/export', { id: editingProfileId, includeKey: true });
-  if(r.error){ showError(r.error, 'setError'); return; }
-  const blob = new Blob([r.data], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = r.filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
-  $('savedNote').textContent = tr('exported');
-  setTimeout(() => $('savedNote').textContent = '', 4000);
-};
-
+/* ---------- экспорт и импорт сервера через буфер обмена ---------- */
+/* Файлов здесь больше нет: настройки передают сообщением в мессенджере, и
+   промежуточный файл на диске был лишним шагом в обе стороны.
+   Экспортируется тот сервер, что сейчас показан в форме (editingProfileId),
+   вместе с приватным ключом — текст готовится для того, кому уже доверяешь.
+   Несохранённые правки в него не попадают, только то, что уже на диске:
+   перед экспортом стоит нажать «Сохранить». */
 $('exportClipBtn').onclick = async () => {
   const r = await api('/api/profile/export', { id: editingProfileId, includeKey: true });
   if(r.error){ showError(r.error, 'setError'); return; }
   const copied = await copyToClipboard(r.data);
-  $('savedNote').textContent = copied ? tr('copied') : tr('copy_manually');
-  setTimeout(() => $('savedNote').textContent = '', 4000);
+  let msg = copied ? tr('copied') : tr('copy_manually');
+  if(copied && !r.keyIncluded) msg += ' ' + tr('export_no_key');
+  $('savedNote').textContent = msg;
+  setTimeout(() => $('savedNote').textContent = '', 8000);
 };
 
 // isServerExportDoc — тот же критерий, что и на сервере (config.Host==""):
@@ -2784,22 +2859,6 @@ async function importProfileDoc(doc){
   $('savedNote').textContent = r.keyImported ? tr('import_ok_with_key') : tr('import_ok_no_key');
   setTimeout(() => $('savedNote').textContent = '', 8000);
 }
-
-$('importBtn').onclick = () => $('importFile').click();
-$('importFile').addEventListener('change', async () => {
-  const file = $('importFile').files[0];
-  $('importFile').value = ''; // чтобы повторный выбор того же файла тоже сработал
-  if(!file) return;
-
-  let doc;
-  try {
-    doc = JSON.parse(await file.text());
-  } catch(e) {
-    showError(tr('import_bad_file'), 'setError');
-    return;
-  }
-  await importProfileDoc(doc);
-});
 
 $('pasteBtn').onclick = async () => {
   let text;
@@ -2969,6 +3028,7 @@ async function refresh(){
     if(editingProfileId === null) editingProfileId = st.config.activeProfile;
     applyDoc(st.config);
   }
+  if(st.version) $('appVersion').textContent = st.version === 'dev' ? tr('version_dev') : st.version;
   if(st.os && st.os !== OS){
     OS = st.os;
     // Галочка «Подключаться сразу при запуске» в верхней части настроек —
@@ -2984,29 +3044,106 @@ async function refresh(){
 }
 
 /* ---------- сворачиваемые блоки настроек ---------- */
-/* При первом запуске оба блока открыты — надо всё увидеть и заполнить.
-   Дальше, раз всё уже настроено, они по умолчанию свёрнуты, чтобы не
-   листать то, что и так работает. Ручной выбор запоминается насовсем —
-   это чисто локальное удобство браузера, не часть конфига на диске. */
+/* При каждом запуске оба блока свёрнуты: экран настроек открывают чаще всего
+   ради одной вкладки сервера или одной галочки, а не ради всего списка полей.
+   Выбор намеренно НЕ запоминается между запусками — иначе один раз
+   развернув блок, человек получал бы простыню полей и дальше каждый раз. */
 function initCollapsible(panelId, titleId){
   const panel = $(panelId), title = $(titleId);
-  const key = 'ssh_tunnel_collapsed_' + panelId;
-  let collapsed = false;
-  try {
-    if(localStorage.getItem('ssh_tunnel_settings_seen')){
-      const v = localStorage.getItem(key);
-      collapsed = v === null ? true : v === '1';
-    }
-  } catch(e) {}
-  panel.classList.toggle('collapsed', collapsed);
-  title.onclick = () => {
-    const now = panel.classList.toggle('collapsed');
-    try { localStorage.setItem(key, now ? '1' : '0'); } catch(e) {}
-  };
+  panel.classList.add('collapsed');
+  title.onclick = () => panel.classList.toggle('collapsed');
 }
 initCollapsible('serverPanel', 'serverPanelTitle');
 initCollapsible('generalPanel', 'generalPanelTitle');
-try { localStorage.setItem('ssh_tunnel_settings_seen', '1'); } catch(e) {}
+
+/* ---------- все настройки целиком: перенос на другое устройство ---------- */
+/* Экспорт кладёт в буфер весь конфиг вместе с ключами: смысл кнопки — «пусть
+   у мамы будет ровно так же», а конфиг без ключей на новом устройстве не
+   подключится. Поэтому же рядом стоит предупреждение — этот текст такой же
+   секрет, как сам ключ. */
+$('bundleExportBtn').onclick = async () => {
+  const r = await api('/api/settings/export', {});
+  if(r.error){ showError(r.error, 'setError'); return; }
+  const copied = await copyToClipboard(r.data);
+  let msg = copied ? tr('bundle_copied').replace('{n}', r.servers) : tr('copy_manually');
+  if(copied && r.keysMissing) msg += ' ' + tr('bundle_keys_missing').replace('{n}', r.keysMissing);
+  $('bundleNote').textContent = msg;
+  setTimeout(() => $('bundleNote').textContent = '', 12000);
+};
+
+/* Импорт ЗАМЕНЯЕТ всё: и серверы, и галочки. Дописывание чужих серверов к
+   своим давало бы список, в котором не разобраться, поэтому спрашиваем
+   подтверждение — отменить это нечем. */
+$('bundleImportBtn').onclick = async () => {
+  let text;
+  try {
+    text = await navigator.clipboard.readText();
+  } catch(e) {
+    showError(tr('paste_failed'), 'setError');
+    return;
+  }
+  if(!(await appConfirm(tr('bundle_replace_confirm')))) return;
+  const r = await api('/api/settings/import', text, true);
+  if(r.error){ showError(r.error, 'setError'); return; }
+  showError('', 'setError');
+  editingProfileId = '';
+  applyDoc(r.config);
+  let msg = tr('bundle_imported').replace('{n}', r.servers);
+  if(r.keysMissing) msg += ' ' + tr('bundle_keys_missing').replace('{n}', r.keysMissing);
+  $('bundleNote').textContent = msg;
+  setTimeout(() => $('bundleNote').textContent = '', 12000);
+};
+
+/* ---------- проверка обновлений ---------- */
+/* Ходит на GitHub сама программа, а не страница: со страницы запрос к чужому
+   домену упрётся в CORS. Установить обновление за человека мы не можем (файл
+   занят собственным процессом), поэтому в лучшем случае кладём его в
+   «Загрузки», в худшем — открываем страницу релиза (docs/UPDATE_SPEC.md). */
+let updateResult = null;
+$('updateCheckBtn').onclick = async () => {
+  $('updateCheckBtn').disabled = true;
+  $('updateNote').textContent = tr('update_checking');
+  $('updateDownloadBtn').hidden = true;
+  $('updateOpenBtn').hidden = true;
+  const r = await api('/api/update/check', {});
+  $('updateCheckBtn').disabled = false;
+  if(r.error){
+    $('updateNote').textContent = r.code === 'update_rate_limited'
+      ? tr('update_rate_limited') : tr('update_failed');
+    return;
+  }
+  updateResult = r.result;
+  if(r.result.newer){
+    $('updateNote').textContent = tr('update_available').replace('{v}', r.result.latest);
+    $('updateDownloadBtn').hidden = !r.result.assetUrl;
+    $('updateOpenBtn').hidden = false;
+  } else if(r.result.ahead){
+    $('updateNote').textContent = tr('update_ahead').replace('{v}', r.result.latest);
+    $('updateOpenBtn').hidden = false;
+  } else if(r.result.unknown){
+    $('updateNote').textContent = tr('update_unknown').replace('{v}', r.result.latest);
+    $('updateOpenBtn').hidden = false;
+  } else {
+    $('updateNote').textContent = tr('update_latest');
+  }
+};
+
+$('updateDownloadBtn').onclick = async () => {
+  $('updateDownloadBtn').disabled = true;
+  $('updateNote').textContent = tr('update_downloading');
+  const r = await api('/api/update/download', {});
+  $('updateDownloadBtn').disabled = false;
+  if(r.error){
+    $('updateNote').textContent = tr('update_download_failed');
+    $('updateOpenBtn').hidden = false;
+    return;
+  }
+  $('updateNote').textContent = tr('update_downloaded').replace('{path}', r.path);
+};
+
+$('updateOpenBtn').onclick = () => {
+  if(updateResult && updateResult.url) window.open(updateResult.url, '_blank');
+};
 
 /* ---------- мастер настройки: Android + VPS ---------- */
 $('toWizard').onclick = () => {

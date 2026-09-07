@@ -98,6 +98,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var customCityName: EditText
     private lateinit var selectServerBtn: Button
 
+    private lateinit var bundleNote: TextView
+    private lateinit var updateNote: TextView
+    private lateinit var updateDownloadBtn: View
+
     private lateinit var serverPanelHeader: View
     private lateinit var serverPanelChevron: View
     private lateinit var serverPanelBody: View
@@ -140,9 +144,19 @@ class MainActivity : AppCompatActivity() {
         else importNote.text = getString(R.string.camera_denied)
     }
 
+    /**
+     * id сервера, вкладка которого была открыта, когда человек нажал
+     * «Сканировать QR-код». После успешного сканирования этот сервер
+     * удаляется: смысл сканирования — «перенастрой вот этот сервер по коду»,
+     * а не «заведи ещё один рядом». Новый профиль всё равно создаётся заново
+     * (в коде приезжает и ключ, и имя), поэтому старый просто убирается.
+     */
+    private var scanSourceProfileId: String = ""
+
     private val scanLauncher = registerForActivityResult(ScanContract()) { result ->
         val text = result.contents
-        if (text != null) applyImportedText(text)
+        if (text != null) applyImportedText(text, replaceSourceProfileId = scanSourceProfileId)
+        scanSourceProfileId = ""
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -194,6 +208,19 @@ class MainActivity : AppCompatActivity() {
         cityLabelView = findViewById(R.id.cityLabelView)
         customCityName = findViewById(R.id.customCityName)
         selectServerBtn = findViewById(R.id.selectServerBtn)
+
+        bundleNote = findViewById(R.id.bundleNote)
+        updateNote = findViewById(R.id.updateNote)
+        updateDownloadBtn = findViewById(R.id.updateDownloadBtn)
+        findViewById<TextView>(R.id.versionLine).text =
+            getString(R.string.version_line, BuildConfig.VERSION_NAME)
+        findViewById<View>(R.id.bundleExportBtn).setOnClickListener { onBundleExport() }
+        findViewById<View>(R.id.bundleImportBtn).setOnClickListener { onBundleImport() }
+        findViewById<View>(R.id.updateCheckBtn).setOnClickListener { onCheckUpdates(it as Button) }
+        updateDownloadBtn.setOnClickListener { onDownloadUpdate() }
+        findViewById<View>(R.id.authorSite).setOnClickListener {
+            openLink("https://vitazgio.ru")
+        }
 
         serverPanelHeader = findViewById(R.id.serverPanelHeader)
         serverPanelChevron = findViewById(R.id.serverPanelChevron)
@@ -344,31 +371,28 @@ class MainActivity : AppCompatActivity() {
     // Сворачиваемые блоки настроек
     // ---------------------------------------------------------------------
 
+    /**
+     * Оба блока свёрнуты при каждом запуске приложения. Настройки открывают
+     * чаще всего ради одной вкладки сервера или одной галочки, а не ради
+     * всего списка полей; выбор намеренно не запоминается между запусками —
+     * иначе, развернув блок один раз, человек получал бы простыню полей
+     * каждый следующий раз.
+     */
     private fun setupPanels() {
         serverPanelHeader.setOnClickListener { togglePanel(isServer = true) }
         generalPanelHeader.setOnClickListener { togglePanel(isServer = false) }
-        applyPanelState(serverPanelBody, serverPanelChevron, settings.serverPanelExpanded)
-        applyPanelState(generalPanelBody, generalPanelChevron, settings.generalPanelExpanded)
+        applyPanelState(serverPanelBody, serverPanelChevron, false)
+        applyPanelState(generalPanelBody, generalPanelChevron, false)
     }
 
-    /** Открыть настройки: в самый первый раз оба блока развёрнуты. */
     private fun openSettings() {
-        if (!settings.settingsEverOpened) {
-            settings.settingsEverOpened = true
-            settings.serverPanelExpanded = true
-            settings.generalPanelExpanded = true
-            applyPanelState(serverPanelBody, serverPanelChevron, true)
-            applyPanelState(generalPanelBody, generalPanelChevron, true)
-        }
         flipper.displayedChild = SETTINGS
     }
 
     private fun togglePanel(isServer: Boolean) {
         val body = if (isServer) serverPanelBody else generalPanelBody
         val chevron = if (isServer) serverPanelChevron else generalPanelChevron
-        val expanded = body.visibility != View.VISIBLE
-        applyPanelState(body, chevron, expanded)
-        if (isServer) settings.serverPanelExpanded = expanded else settings.generalPanelExpanded = expanded
+        applyPanelState(body, chevron, body.visibility != View.VISIBLE)
     }
 
     private fun applyPanelState(body: View, chevron: View, expanded: Boolean) {
@@ -453,15 +477,35 @@ class MainActivity : AppCompatActivity() {
 
     /** Переключает активный сервер (не обязательно тот, что сейчас в форме
      *  настроек) — общий код для «Выбрать этот сервер» и виджета на главной. */
+    /**
+     * Переключение активного сервера. Работающий туннель принадлежит прежнему
+     * серверу, поэтому его надо остановить — но раньше на этом всё и
+     * заканчивалось, и человеку приходилось жать «Подключить» самому. Теперь,
+     * если туннель работал, он поднимается на новом сервере сам: смена
+     * сервера при включённом туннеле означает «хочу ходить через тот, другой»,
+     * а не «выключи мне интернет».
+     *
+     * Выключенный туннель так и остаётся выключенным: включать его без
+     * просьбы — сюрприз, а не удобство.
+     */
     private fun switchActiveProfile(id: String) {
         if (id == settings.activeProfileId) return
-        if (TunnelService.state != "stopped") {
+        val wasRunning = TunnelService.state != "stopped"
+        if (wasRunning) {
             startService(Intent(this, TunnelService::class.java).setAction(TunnelService.ACTION_STOP))
-            Toast.makeText(this, R.string.tunnel_stopped_for_switch, Toast.LENGTH_LONG).show()
         }
         settings.setActive(id)
         renderProfileTabs()
-        Toast.makeText(this, R.string.server_switched, Toast.LENGTH_SHORT).show()
+        if (wasRunning) {
+            Toast.makeText(this, R.string.server_switched_reconnecting, Toast.LENGTH_LONG).show()
+            // Служба останавливается не мгновенно (закрывает сессии SSH и
+            // отпускает интерфейс VPN), поэтому запуск на новом сервере —
+            // следующим сообщением, а не сразу: иначе она получила бы START
+            // раньше, чем закончила STOP.
+            power.postDelayed({ if (settings.ready()) start() }, 900)
+        } else {
+            Toast.makeText(this, R.string.server_switched, Toast.LENGTH_SHORT).show()
+        }
         refresh()
     }
 
@@ -730,6 +774,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onScanConfig() {
+        saveCurrentFormInto(editingProfileId)
+        scanSourceProfileId = editingProfileId
         val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
             PackageManager.PERMISSION_GRANTED
         if (granted) launchScanner() else cameraPermission.launch(Manifest.permission.CAMERA)
@@ -755,7 +801,7 @@ class MainActivity : AppCompatActivity() {
      * Если текст не похож на конфиг ssh_tunnel — ничего не меняем, только
      * показываем ошибку на месте.
      */
-    private fun applyImportedText(text: String) {
+    private fun applyImportedText(text: String, replaceSourceProfileId: String = "") {
         val parsed = try {
             mobile.Mobile.parseConfig(text)
         } catch (e: Exception) {
@@ -806,6 +852,15 @@ class MainActivity : AppCompatActivity() {
         // просто переключилось подключение. Импорт теперь только добавляет
         // вкладку и открывает её для проверки — какой сервер активен,
         // выбирает отдельно кнопка «Выбрать этот сервер».
+        // Сканирование QR — это «перенастрой вот этот сервер»: новый профиль
+        // уже создан выше со всеми данными из кода, а тот, с чьей вкладки
+        // сканировали, теперь лишний. Удаляем именно его и только его — и
+        // только если он вообще ещё есть и это не единственный сервер.
+        var replaced = false
+        if (replaceSourceProfileId.isNotBlank() && replaceSourceProfileId != p.id) {
+            replaced = settings.removeProfile(replaceSourceProfileId)
+        }
+
         editingProfileId = p.id
         renderProfileTabs()
         loadProfileIntoForm(p)
@@ -814,6 +869,147 @@ class MainActivity : AppCompatActivity() {
         // из вида и решить, что «ничего не добавилось».
         profileTabsScroll.post { profileTabsScroll.fullScroll(View.FOCUS_RIGHT) }
         refresh()
+    }
+
+    // ---------------------------------------------------------------------
+    // Перенос всех настроек и обновление приложения
+    // ---------------------------------------------------------------------
+
+    private fun onBundleExport() {
+        saveCurrentFormInto(editingProfileId)
+        val text = try {
+            SettingsBundle.build(settings)
+        } catch (e: Exception) {
+            bundleNote.text = e.message ?: getString(R.string.bundle_bad)
+            return
+        }
+        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        cm?.setPrimaryClip(ClipData.newPlainText(getString(R.string.export_settings), text))
+        bundleNote.text = getString(R.string.bundle_copied, settings.profiles.size)
+    }
+
+    /**
+     * Импорт заменяет всё разом, отменить это нечем — поэтому спрашиваем
+     * подтверждение, как и при удалении сервера.
+     */
+    private fun onBundleImport() {
+        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+        val text = cm?.primaryClip?.takeIf { it.itemCount > 0 }
+            ?.getItemAt(0)?.coerceToText(this)?.toString().orEmpty()
+        if (text.isBlank()) {
+            bundleNote.text = getString(R.string.paste_failed)
+            return
+        }
+        AlertDialog.Builder(this)
+            .setMessage(R.string.bundle_replace_confirm)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok) { _, _ -> applyBundle(text) }
+            .show()
+    }
+
+    private fun applyBundle(text: String) {
+        val count = try {
+            SettingsBundle.apply(settings, text)
+        } catch (e: SettingsBundle.BadBundle) {
+            bundleNote.text = getString(
+                if (e.message == "one server") R.string.bundle_one_server else R.string.bundle_bad
+            )
+            return
+        } catch (e: Exception) {
+            bundleNote.text = getString(R.string.bundle_bad)
+            return
+        }
+        editingProfileId = settings.activeProfileId
+        applyLanguage(settings.language)
+        renderProfileTabs()
+        loadProfileIntoForm(settings.active())
+        loadAppSettings()
+        bundleNote.text = getString(R.string.bundle_imported, count)
+        refresh()
+    }
+
+    /**
+     * Проверка обновлений. Сеть — в отдельном потоке: в основном Android
+     * запрещает сетевые вызовы, и приложение просто упало бы.
+     */
+    private fun onCheckUpdates(btn: Button) {
+        btn.isEnabled = false
+        updateNote.text = getString(R.string.update_checking)
+        updateDownloadBtn.visibility = View.GONE
+        Thread {
+            val result = try {
+                UpdateCheck.check(BuildConfig.VERSION_NAME)
+            } catch (e: UpdateCheck.RateLimited) {
+                runOnUiThread {
+                    btn.isEnabled = true
+                    updateNote.text = getString(R.string.update_rate_limited)
+                }
+                return@Thread
+            } catch (e: Exception) {
+                runOnUiThread {
+                    btn.isEnabled = true
+                    updateNote.text = getString(R.string.update_failed)
+                }
+                return@Thread
+            }
+            runOnUiThread {
+                btn.isEnabled = true
+                pendingUpdate = result
+                when {
+                    result.newer -> {
+                        updateNote.text = getString(R.string.update_available, result.latest)
+                        updateDownloadBtn.visibility = View.VISIBLE
+                    }
+                    result.ahead -> updateNote.text = getString(R.string.update_ahead, result.latest)
+                    else -> updateNote.text = getString(R.string.update_latest)
+                }
+            }
+        }.start()
+    }
+
+    /** Результат последней проверки — из него берётся ссылка на скачивание. */
+    private var pendingUpdate: UpdateCheck.Result? = null
+
+    /**
+     * Скачивает APK системным менеджером загрузок: он умеет докачивать,
+     * показывает прогресс в шторке и кладёт файл в общие «Загрузки», откуда
+     * человек откроет его и установит сам. Если у релиза APK почему-то нет —
+     * открываем страницу релиза в браузере.
+     */
+    private fun onDownloadUpdate() {
+        val u = pendingUpdate ?: return
+        if (u.apkUrl.isBlank()) {
+            updateNote.text = getString(R.string.update_open_release)
+            openLink(u.releaseUrl)
+            return
+        }
+        try {
+            val req = android.app.DownloadManager.Request(Uri.parse(u.apkUrl))
+                .setTitle("ssh_tunnel ${u.latest}")
+                .setMimeType("application/vnd.android.package-archive")
+                .setNotificationVisibility(
+                    android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
+                )
+                .setDestinationInExternalPublicDir(
+                    android.os.Environment.DIRECTORY_DOWNLOADS, "ssh_tunnel-${u.latest}.apk"
+                )
+            val dm = getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+            dm.enqueue(req)
+            updateNote.text = getString(R.string.update_downloading)
+        } catch (e: Exception) {
+            // Менеджер загрузок отключён (такое бывает на прошивках без
+            // сервисов Google) — тогда пусть скачивает браузер.
+            updateNote.text = getString(R.string.update_open_release)
+            openLink(u.releaseUrl)
+        }
+    }
+
+    private fun openLink(url: String) {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        } catch (e: Exception) {
+            Toast.makeText(this, url, Toast.LENGTH_LONG).show()
+        }
     }
 
     // ---------------------------------------------------------------------

@@ -49,14 +49,15 @@ func (s *Server) handleProfileExport(w http.ResponseWriter, r *http.Request) {
 		LocalViaTunnel: p.LocalViaTunnel,
 		Panel:          p.Panel, ClientID: p.ClientID, DeviceName: p.DeviceName,
 	}
+	// Нечитаемый ключ (его ещё не создали, путь указан неверно) больше не
+	// обрывает экспорт: настройки сервера сами по себе полезны, а про
+	// отсутствующий ключ интерфейс скажет отдельно — раньше на этом месте
+	// человек просто получал ошибку и ничего не получал в буфер.
 	if req.IncludeKey {
-		data, err := os.ReadFile(p.KeyPath)
-		if err != nil {
-			writeJSON(w, map[string]string{"error": "не могу прочитать приватный ключ: " + err.Error()})
-			return
+		if data, err := os.ReadFile(p.KeyPath); err == nil {
+			doc.KeyIncluded = true
+			doc.KeyContents = string(data)
 		}
-		doc.KeyIncluded = true
-		doc.KeyContents = string(data)
 	}
 
 	pretty, err := share.Build(doc)
@@ -64,7 +65,8 @@ func (s *Server) handleProfileExport(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]string{"error": err.Error()})
 		return
 	}
-	writeJSON(w, map[string]any{"ok": true, "filename": exportFilename(p.Name), "data": string(pretty)})
+	writeJSON(w, map[string]any{"ok": true, "filename": exportFilename(p.Name),
+		"data": string(pretty), "keyIncluded": doc.KeyIncluded})
 }
 
 // exportFilename — читаемое имя файла из названия сервера: только

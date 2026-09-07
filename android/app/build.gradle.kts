@@ -59,6 +59,13 @@ android {
 		}
 	}
 
+	// BuildConfig нужен ради BuildConfig.VERSION_NAME: кнопка «Проверить
+	// обновления» сравнивает установленную версию с тегом релиза на GitHub.
+	// В AGP 8 генерация этого класса по умолчанию выключена.
+	buildFeatures {
+		buildConfig = true
+	}
+
 	compileOptions {
 		sourceCompatibility = JavaVersion.VERSION_17
 		targetCompatibility = JavaVersion.VERSION_17

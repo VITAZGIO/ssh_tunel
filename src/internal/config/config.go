@@ -208,6 +208,19 @@ func Default() Config {
 	}
 }
 
+// NewProfile — новый сервер с разумными значениями по умолчанию и своим id,
+// но не привязанный к списку: нужен импорту всех настроек, который собирает
+// список серверов заново, а не дописывает по одному (см.
+// internal/webui/settingsbundle.go).
+func NewProfile(name, flag string) Profile {
+	p := defaultProfile(1)
+	if name != "" {
+		p.Name = name
+	}
+	p.Flag = flag
+	return p
+}
+
 func defaultProfile(n int) Profile {
 	name := "Сервер " + itoa(n)
 	return Profile{

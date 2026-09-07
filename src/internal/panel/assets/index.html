@@ -393,9 +393,16 @@
         <h1 data-i18n="version_label">Версия панели</h1>
         <div class="kv"><span class="k" data-i18n="version_installed">Установлена</span>
           <span class="v" id="setVersion">—</span></div>
-        <p class="note" style="margin:12px 0 0" data-i18n="update_planned">Проверка обновлений
-          прямо из панели пока не сделана — задача описана в docs/UPDATE_SPEC.md и будет одинаковой
-          для панели, компьютера и телефона.</p>
+        <button class="btn" id="updateCheckBtn" style="margin-top:12px"
+          data-i18n="update_check">Проверить обновления</button>
+        <div id="updateMsg"></div>
+        <p class="note" id="updateHow" hidden style="margin:10px 0 0">
+          <span data-i18n="update_how">Панель обновляется на самом сервере — командой из
+            docs/PANEL_SETUP.md. Сама себя она не подменяет: файл занят работающей службой,
+            и делать это за спиной у администратора нельзя.</span>
+          <a id="updateLink" href="#" target="_blank" rel="noopener"
+             data-i18n="update_open_release">Открыть страницу релиза</a>
+        </p>
       </div>
 
       <div class="card">
@@ -522,8 +529,17 @@ const I18N = {
     server_status:'Состояние сервера', status_label:'Статус', running:'работает',
     os_label:'Система', uptime_label:'Время работы', version_label:'Версия панели',
     version_installed:'Установлена', repo_label:'Исходный код',
-    update_planned:'Проверка обновлений прямо из панели пока не сделана — задача описана в '+
-      'docs/UPDATE_SPEC.md и будет одинаковой для панели, компьютера и телефона.',
+    update_check:'Проверить обновления', update_checking:'Проверяю…',
+    update_latest:'У панели последняя версия',
+    update_available:'Вышла версия {v}',
+    update_ahead:'На сервере версия новее опубликованной ({v})',
+    update_unknown:'Версию этой сборки определить не могу; последняя опубликованная — {v}',
+    update_failed:'Не удалось связаться с GitHub — проверь, есть ли у сервера выход в интернет',
+    update_rate_limited:'GitHub временно ограничил число запросов, попробуй позже',
+    update_open_release:'Открыть страницу релиза',
+    update_how:'Панель обновляется на самом сервере — командой из docs/PANEL_SETUP.md. '+
+      'Сама себя она не подменяет: файл занят работающей службой, и делать это за спиной у '+
+      'администратора нельзя.',
     autostart_title:'Автозапуск', autostart_label:'Запускать при старте системы',
     autostart_note:'Включено — панель поднимется сама после перезагрузки сервера. Снятая галочка '+
       'не выключает панель прямо сейчас, а только не даёт ей стартовать в следующий раз.',
@@ -594,8 +610,17 @@ const I18N = {
     server_status:'Server status', status_label:'Status', running:'running',
     os_label:'OS', uptime_label:'Uptime', version_label:'Panel version',
     version_installed:'Installed', repo_label:'Source code',
-    update_planned:'Checking for updates from the panel is not built yet — the task is written '+
-      'down in docs/UPDATE_SPEC.md and will work the same on the panel, desktop and phone.',
+    update_check:'Check for updates', update_checking:'Checking…',
+    update_latest:'The panel is up to date',
+    update_available:'Version {v} is out',
+    update_ahead:'This build is newer than the published one ({v})',
+    update_unknown:"Can't tell which version this build is; the latest published one is {v}",
+    update_failed:'Could not reach GitHub — check that the server has internet access',
+    update_rate_limited:'GitHub is rate-limiting requests, try again later',
+    update_open_release:'Open the release page',
+    update_how:'The panel is updated on the server itself with the command from '+
+      'docs/PANEL_SETUP.md. It never replaces itself: the file is in use by the running service, '+
+      'and doing that behind the administrator\'s back would be wrong.',
     autostart_title:'Autostart', autostart_label:'Start on system boot',
     autostart_note:'On — the panel comes back by itself after the server reboots. Turning it off '+
       'does not stop the panel now, it only keeps it from starting next time.',
@@ -1082,6 +1107,39 @@ async function loadAutostart(){
   $('autostartUnsupported').hidden = !!data.supported;
   $('autostartCheck').checked = !!data.enabled;
 }
+/* ---------- проверка обновлений ---------- */
+/* Ходит на GitHub сервер панели, а не браузер: панель может стоять там, куда
+   у браузера администратора доступа нет, да и CORS чужого домена со страницы
+   не пройдёт. Скачивать и подменять себя панель не станет — файл занят
+   работающей службой (docs/UPDATE_SPEC.md). */
+$('updateCheckBtn').addEventListener('click', async () => {
+  const btn = $('updateCheckBtn');
+  btn.disabled = true;
+  showMsg($('updateMsg'), t('update_checking'), 'ok');
+  $('updateHow').hidden = true;
+  const {ok, data} = await api('/api/update');
+  btn.disabled = false;
+  if (!ok || data.error){
+    showMsg($('updateMsg'),
+      data.code === 'update_rate_limited' ? t('update_rate_limited') : t('update_failed'), 'err');
+    return;
+  }
+  const r = data.result;
+  if (r.newer){
+    showMsg($('updateMsg'), t('update_available').replace('{v}', r.latest), 'ok');
+    $('updateLink').href = r.url;
+    $('updateHow').hidden = false;
+  } else if (r.ahead){
+    showMsg($('updateMsg'), t('update_ahead').replace('{v}', r.latest), 'ok');
+  } else if (r.unknown){
+    showMsg($('updateMsg'), t('update_unknown').replace('{v}', r.latest), 'ok');
+    $('updateLink').href = r.url;
+    $('updateHow').hidden = false;
+  } else {
+    showMsg($('updateMsg'), t('update_latest'), 'ok');
+  }
+});
+
 $('autostartCheck').addEventListener('change', async e => {
   showMsg($('autostartMsg'), '', '');
   const want = e.target.checked;

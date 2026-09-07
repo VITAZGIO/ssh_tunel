@@ -3,10 +3,13 @@ package panel
 import (
 	"embed"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"runtime"
 	"strings"
 	"time"
+
+	"sshtunnel/internal/updater"
 )
 
 //go:embed assets/*
@@ -86,6 +89,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/clients/config", s.requireAuth(s.handleClientConfig))
 	mux.HandleFunc("/api/traffic", s.requireAuth(s.handleTraffic))
 	mux.HandleFunc("/api/autostart", s.requireAuth(s.handleAutostart))
+	mux.HandleFunc("/api/update", s.requireAuth(s.handleUpdate))
 	return mux
 }
 
@@ -249,6 +253,26 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
+// handleUpdateCheck сравнивает версию панели с последним релизом на GitHub.
+// Ходит сам сервер, а не браузер: панель может стоять там, где у браузера
+// администратора нет доступа к github.com, и CORS чужого домена со страницы
+// всё равно не пройдёт. Ответ кешируется на час внутри internal/updater.
+//
+// Скачивать и подменять себя панель не будет: сервер обновляют по SSH одной
+// командой из docs/PANEL_SETUP.md — см. docs/UPDATE_SPEC.md.
+func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
+	res, err := updater.Check(r.Context())
+	if err != nil {
+		code := "update_failed"
+		if errors.Is(err, updater.ErrRateLimited) {
+			code = "update_rate_limited"
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"error": err.Error(), "code": code})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "result": res})
+}
+
 type statusResp struct {
 	OS      string `json:"os"`
 	Uptime  int64  `json:"uptimeSeconds"`
@@ -259,7 +283,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, statusResp{
 		OS:      runtime.GOOS,
 		Uptime:  int64(time.Since(s.startedAt).Seconds()),
-		Version: "0.1.0",
+		Version: updater.Version,
 	})
 }
 
