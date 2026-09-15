@@ -372,6 +372,62 @@ func describeConn(ev events.Event) string {
 	return line
 }
 
+// Drain — мягкая остановка: связь с сервером рвётся немедленно, но сетевой
+// стек и интерфейс VpnService остаются на месте и ведут трафик НАПРЯМУЮ, мимо
+// сервера, ещё seconds секунд.
+//
+// Ради чего. Закрытие интерфейса VPN рвёт разом все сокеты всех приложений,
+// и узнают они об этом не сразу: мессенджер продолжает слать в мёртвый сокет
+// до собственного таймаута. Отсюда «выключил VPN — интернет пропал». Живой
+// интерфейс, водящий напрямую, эту дыру закрывает. А если человек за это
+// время включит VPN обратно (Resume), интерфейс даже не дрогнет — и ни одно
+// приложение ничего не заметит, перезапускать их не придётся.
+//
+// Дескриптором распоряжается сторона Android: она же и решает, когда всё
+// закончится, вызывая Stop. Здесь только разрыв с сервером и переключение
+// маршрутизации на прямую.
+func (t *Tunnel) Drain(seconds int) {
+	t.mu.Lock()
+	tun := t.core
+	if tun != nil && seconds > 0 {
+		t.cfg.DrainTimeout = time.Duration(seconds) * time.Second
+		tun.SetDrainTimeout(t.cfg.DrainTimeout)
+	}
+	t.mu.Unlock()
+	if tun == nil {
+		return
+	}
+	tun.Drain()
+}
+
+// Draining — идёт ли сейчас слив. По нему сторона Android решает, поднимать
+// туннель заново (Resume) или запускать всё с нуля.
+func (t *Tunnel) Draining() bool {
+	t.mu.Lock()
+	tun := t.core
+	t.mu.Unlock()
+	return tun != nil && tun.Draining()
+}
+
+// Resume возвращает к жизни туннель, который был в сливе. Интерфейс VPN при
+// этом не пересоздаётся, поэтому уже открытые сокеты приложений продолжают
+// работать — просто снова через сервер.
+func (t *Tunnel) Resume() error {
+	t.mu.Lock()
+	tun, cfg, cb := t.core, t.cfg, t.cb
+	t.mu.Unlock()
+	if tun == nil {
+		return fmt.Errorf("туннель не запущен")
+	}
+	if err := tun.Resume(); err != nil {
+		return err
+	}
+	if cb != nil {
+		cb.OnState(tun.State(), fmt.Sprintf("%s:%d", cfg.Host, cfg.SSHPort), "")
+	}
+	return nil
+}
+
 // Stop останавливает всё и освобождает дескриптор.
 func (t *Tunnel) Stop() {
 	t.mu.Lock()

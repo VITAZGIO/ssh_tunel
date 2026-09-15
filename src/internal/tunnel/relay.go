@@ -152,7 +152,9 @@ func closeWrite(c net.Conn) {
 // режим, в котором выбранные приложения намеренно ходят мимо, и так же
 // обрабатывается локальная сеть.
 func (t *Tunnel) dialFor(process, target string) (net.Conn, bool, error) {
-	if t.useTunnel(process) && !t.localDirect(target) && !t.listedDirect(target) {
+	// Слив: сервера уже нет, но слушатели живы ради уже открытых сокетов
+	// браузера — всё, что в них прилетает, ведём напрямую (см. Drain).
+	if !t.draining.Load() && t.useTunnel(process) && !t.localDirect(target) && !t.listedDirect(target) {
 		c, err := t.Dial("tcp", target)
 		return c, false, err
 	}

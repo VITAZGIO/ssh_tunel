@@ -110,9 +110,18 @@ func (a *App) connectFrom(cfg config.Config, candidates []config.Profile, idx in
 }
 
 func (a *App) buildTunnel(cfg config.Config, p config.Profile) (tun *tunnel.Tunnel, socksAddr, httpAddr string) {
+	tunCfg, socksAddr, httpAddr := a.tunnelConfig(cfg, p)
+	return tunnel.New(tunCfg, a.Bus), socksAddr, httpAddr
+}
+
+// tunnelConfig собирает настройки туннеля отдельно от самого туннеля: те же
+// значения нужны и при переводе уже живого туннеля на другой сервер
+// (tunnel.Rebind), когда новый объект строить нельзя — локальные порты заняты
+// его же слушателями.
+func (a *App) tunnelConfig(cfg config.Config, p config.Profile) (_ tunnel.Config, socksAddr, httpAddr string) {
 	socksAddr = net.JoinHostPort("127.0.0.1", strconv.Itoa(p.SocksPort))
 	httpAddr = net.JoinHostPort("127.0.0.1", strconv.Itoa(p.HTTPPort))
-	tun = tunnel.New(tunnel.Config{
+	return tunnel.Config{
 		Host:            p.Host,
 		SSHPort:         p.SSHPort,
 		User:            p.User,
@@ -126,8 +135,7 @@ func (a *App) buildTunnel(cfg config.Config, p config.Profile) (tun *tunnel.Tunn
 		Direct:          a.direct,
 		LocalViaTunnel:  p.LocalViaTunnel,
 		UDPRelayEnabled: p.UDPRelayEnabled,
-	}, a.Bus)
-	return tun, socksAddr, httpAddr
+	}, socksAddr, httpAddr
 }
 
 func (a *App) enableSysProxy(cfg config.Config, p config.Profile, httpAddr, socksAddr string) {

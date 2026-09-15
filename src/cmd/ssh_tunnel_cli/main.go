@@ -83,7 +83,9 @@ func main() {
 
 	<-shutdown.OnExit(func() {
 		fmt.Println("\nЗавершаю...")
-		a.Stop()
+		// Резко, без слива: процесс всё равно сейчас умрёт, и донашивать
+		// соединения будет некому (docs/DRAIN_SPEC.md).
+		a.StopNow()
 	})
 	time.Sleep(150 * time.Millisecond) // дать событиям выхода допечататься
 }

@@ -76,6 +76,19 @@ class TunnelService : VpnService(), Callbacks {
         private const val CHANNEL = "tunnel"
         private const val NOTIFICATION_ID = 1
         private const val MTU = 1500
+
+        /**
+         * Сколько секунд после «Отключить» интерфейс VPN ещё живёт, ведя
+         * трафик напрямую (см. Mobile.Tunnel.Drain и docs/DRAIN_SPEC.md).
+         *
+         * Меньше, чем сорок пять секунд на компьютере, и намеренно: пока
+         * интерфейс поднят, система показывает в статусной строке свой значок
+         * VPN — даже когда наше приложение уже написало «выключено». Двадцати
+         * секунд хватает, чтобы браузер и мессенджер пережили выключение и
+         * чтобы человек успел передумать, а вводить в заблуждение значком
+         * надолго не хочется.
+         */
+        private const val DRAIN_SECONDS = 20
     }
 
     private var fd: ParcelFileDescriptor? = null
@@ -93,6 +106,13 @@ class TunnelService : VpnService(), Callbacks {
 
     /** Гашение уже идёт: второй раз ядро останавливать не надо. */
     @Volatile private var stopping = false
+
+    /**
+     * Идёт слив: для человека туннель уже выключен, но интерфейс VPN ещё
+     * поднят и водит трафик напрямую. Отдельно от stopping: сливающаяся
+     * служба ещё жива и может вернуться к работе по «Подключить».
+     */
+    @Volatile private var draining = false
 
     private val ticker = android.os.Handler(android.os.Looper.getMainLooper())
 
@@ -190,8 +210,17 @@ class TunnelService : VpnService(), Callbacks {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
-            stopTunnel()
+            // Второе «Отключить» подряд (кнопка уже показывает «выключен», но
+            // слив ещё идёт) — просьба «да выключай уже».
+            if (draining) finishDrain() else stopTunnel()
             return START_NOT_STICKY
+        }
+        // Включили обратно, пока шёл слив: интерфейс VPN никуда не девался,
+        // поэтому достаточно поднять пул. Сокеты приложений при этом не
+        // рвутся вовсе — ни браузер, ни мессенджер ничего не заметят и
+        // перезапускать их не придётся.
+        if (draining && resumeFromDrain()) {
+            return START_STICKY
         }
         // Всегда включённый VPN и система в целом могут попросить запуститься
         // ещё раз, пока туннель уже поднят или поднимается, — например, после
@@ -413,10 +442,87 @@ class TunnelService : VpnService(), Callbacks {
         report(finalState, finalDetail)
         stopForeground(STOP_FOREGROUND_REMOVE)
 
-        val iface = fd
-        fd = null
         // onDestroy вызывает нас повторно после stopSelf — второй раз гасить
         // нечего.
+        if (stopping || draining) return
+
+        // Обычное «Отключить» — со сливом: связь с сервером рвём сейчас же, а
+        // интерфейс VPN оставляем ещё на DRAIN_SECONDS, водя трафик напрямую.
+        // Закрытие интерфейса рвёт разом все сокеты всех приложений, и узнают
+        // они об этом не сразу — отсюда и берётся «выключил VPN, интернет
+        // пропал, помогает перезапуск браузера».
+        //
+        // После аварии сливать нечего: человек не просил водить трафик мимо
+        // сервера, он просил подключиться, и это не удалось.
+        if (finalState == "stopped" && fd != null) {
+            startDrain()
+            return
+        }
+        hardStop()
+    }
+
+    /** Разрыв с сервером сейчас, закрытие интерфейса — через DRAIN_SECONDS. */
+    private fun startDrain() {
+        draining = true
+        Thread {
+            try {
+                tunnel.drain(DRAIN_SECONDS.toLong())
+            } catch (e: Exception) {
+                Log.w(TAG, "слив: ${e.message}")
+                ticker.post { finishDrain() }
+                return@Thread
+            }
+        }.start()
+        ticker.postDelayed(drainDeadline, DRAIN_SECONDS * 1000L)
+    }
+
+    private val drainDeadline = Runnable { finishDrain() }
+
+    /** Конец слива — по таймеру, по второму «Отключить» или перед смертью. */
+    private fun finishDrain() {
+        if (!draining) return
+        draining = false
+        ticker.removeCallbacks(drainDeadline)
+        hardStop()
+    }
+
+    /**
+     * Включили обратно во время слива. Интерфейс VPN поднят и всё это время
+     * никуда не девался, поэтому достаточно поднять пул: открытые сокеты
+     * приложений продолжат работать как ни в чём не бывало, просто снова
+     * через сервер.
+     *
+     * false означает «так не вышло» — тогда вызывающий запускает всё заново
+     * обычным путём.
+     */
+    private fun resumeFromDrain(): Boolean {
+        if (!draining || fd == null) return false
+        draining = false
+        ticker.removeCallbacks(drainDeadline)
+
+        startForeground(NOTIFICATION_ID, notification("подключение…"))
+        report("connecting", "")
+        registerNetworkCallback()
+        Thread {
+            try {
+                tunnel.resume()
+                ticker.post(poll)
+            } catch (e: Exception) {
+                // Сервер за это время пропал. Поднимать всё заново прямо
+                // отсюда не станем: интерфейс уже держит старое ядро, и две
+                // попытки наперегонки — верный способ получить два. Человек
+                // увидит ошибку и нажмёт «Подключить» сам.
+                Log.w(TAG, "возобновление: ${e.message}")
+                ticker.post { stopTunnel("error", e.message ?: "не удалось включить обратно") }
+            }
+        }.start()
+        return true
+    }
+
+    /** Настоящая остановка: гасим ядро, закрываем интерфейс, умираем. */
+    private fun hardStop() {
+        val iface = fd
+        fd = null
         if (stopping) return
         stopping = true
 
@@ -437,12 +543,18 @@ class TunnelService : VpnService(), Callbacks {
 
     override fun onDestroy() {
         current = null
+        // Служба умирает — донашивать соединения будет некому.
+        draining = false
+        ticker.removeCallbacks(drainDeadline)
         stopTunnel()
         super.onDestroy()
     }
 
     override fun onRevoke() {
-        // Систему попросили отдать VPN другому приложению.
+        // Систему попросили отдать VPN другому приложению: интерфейс у нас
+        // отбирают, и оставлять его «на слив» невозможно.
+        draining = false
+        ticker.removeCallbacks(drainDeadline)
         stopTunnel()
         super.onRevoke()
     }

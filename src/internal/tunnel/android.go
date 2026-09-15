@@ -45,7 +45,9 @@ func (t *Tunnel) ServeConn(conn net.Conn, target string, byIP bool) {
 // dialForTun — решение «через сервер или напрямую» для трафика с телефона.
 // Отличается от dialFor только тем, что не спрашивает про программу.
 func (t *Tunnel) dialForTun(target string) (net.Conn, bool, error) {
-	if !t.localDirect(target) && !t.listedDirect(target) {
+	// Слив (см. Drain): связи с сервером уже нет, но интерфейс VPN ещё
+	// поднят ради уже открытых сокетов приложений — ведём их напрямую.
+	if !t.draining.Load() && !t.localDirect(target) && !t.listedDirect(target) {
 		c, err := t.Dial("tcp", target)
 		return c, false, err
 	}

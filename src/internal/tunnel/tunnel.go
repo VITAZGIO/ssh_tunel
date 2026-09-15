@@ -93,6 +93,12 @@ type Config struct {
 	// localhost). Пусто — значение по умолчанию, то же, что и у
 	// cmd/udprelay без флагов.
 	UDPRelayAddr string
+
+	// DrainTimeout — сколько после «Отключить» держать локальные слушатели
+	// живыми, водя трафик напрямую (см. Drain и docs/DRAIN_SPEC.md). Ноль
+	// означает defaultDrainTimeout; тесты ставят сюда миллисекунды, чтобы не
+	// ждать по-настоящему.
+	DrainTimeout time.Duration
 }
 
 var ErrNotConnected = errors.New("нет живого SSH-соединения с сервером")
@@ -150,6 +156,23 @@ type Tunnel struct {
 	// оборвётся само (см. UDPRelay).
 	udpRelayMu     sync.Mutex
 	udpRelayClient *udprelay.Client
+
+	// poolCtx живёт отдельно от ctx: слив (см. Drain) гасит пул
+	// SSH-соединений, но оставляет локальные слушатели работать. Всё, что
+	// имеет смысл только при живом сервере — keepLinkAlive, pingLoop,
+	// publishStats, — смотрит именно на него.
+	poolCtx    context.Context
+	poolCancel context.CancelFunc
+
+	// draining — идёт слив: сервера уже нет, но слушатели на месте и водят
+	// соединения напрямую. Читается на каждом дозвоне, поэтому atomic.
+	draining atomic.Bool
+	// lastAccept — когда к локальным слушателям в последний раз кто-то
+	// подключился (UnixNano). По нему слив понимает, что к нему перестали
+	// обращаться и пора закрываться.
+	lastAccept atomic.Int64
+	drainMu    sync.Mutex
+	drainTimer *time.Timer
 }
 
 type stats struct {
@@ -171,6 +194,25 @@ func New(cfg Config, bus *events.Bus) *Tunnel {
 
 // SetLocalViaTunnel переключает обработку локальной сети без перезапуска.
 func (t *Tunnel) SetLocalViaTunnel(v bool) { t.localViaTunnel.Store(v) }
+
+// Config отдаёт копию текущих настроек туннеля. После смены сервера на живом
+// туннеле (Rebind) они отличаются от тех, с которыми он был создан, — а
+// проверить, куда он теперь ведёт, надо и тестам, и вызывающему коду.
+func (t *Tunnel) Config() Config {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.cfg
+}
+
+// SetDrainTimeout меняет длительность слива на ходу. Нужен телефону: там
+// длительность выбирает сторона Android, потому что она же владеет
+// интерфейсом VpnService и гасит его по своему таймеру — расходиться в
+// сроках этим двоим нельзя.
+func (t *Tunnel) SetDrainTimeout(d time.Duration) {
+	t.mu.Lock()
+	t.cfg.DrainTimeout = d
+	t.mu.Unlock()
+}
 
 // SetDirect меняет список «всегда напрямую» на ходу, как и правила по
 // программам: переподключаться ради него не нужно.
@@ -246,24 +288,61 @@ func (t *Tunnel) Start() error {
 	t.ctx, t.cancel = context.WithCancel(context.Background())
 	t.setState(events.StateConnecting, "")
 
-	key, err := os.ReadFile(t.cfg.KeyPath)
+	if err := t.loadSigner(); err != nil {
+		t.cancel()
+		return err
+	}
+
+	if err := t.startPool(); err != nil {
+		t.cancel()
+		return err
+	}
+
+	if err := t.startListeners(); err != nil {
+		t.Stop()
+		return err
+	}
+
+	t.setState(events.StateConnected, fmt.Sprintf("%s:%d", t.cfg.Host, t.cfg.SSHPort))
+	return nil
+}
+
+// loadSigner читает приватный ключ текущего сервера. Отдельно от Start,
+// потому что после смены сервера (Rebind) ключ тоже другой.
+func (t *Tunnel) loadSigner() error {
+	t.mu.RLock()
+	path := t.cfg.KeyPath
+	t.mu.RUnlock()
+
+	if t.signer != nil {
+		return nil
+	}
+	key, err := os.ReadFile(path)
 	if err != nil {
 		t.setState(events.StateError, "нет доступа к ключу")
-		return fmt.Errorf("не могу прочитать приватный ключ %s: %w", t.cfg.KeyPath, err)
+		return fmt.Errorf("не могу прочитать приватный ключ %s: %w", path, err)
 	}
 	signer, err := ssh.ParsePrivateKey(key)
 	if err != nil {
 		t.setState(events.StateError, "плохой ключ")
-		return fmt.Errorf("ключ %s повреждён, зашифрован паролем или не в том формате: %w", t.cfg.KeyPath, err)
+		return fmt.Errorf("ключ %s повреждён, зашифрован паролем или не в том формате: %w", path, err)
 	}
 	t.signer = signer
+	return nil
+}
+
+// startPool поднимает пул SSH-соединений и всё, что имеет смысл только при
+// живом сервере. Вынесено из Start отдельно, потому что после слива пул надо
+// уметь поднять заново, не трогая локальные слушатели (см. Resume).
+func (t *Tunnel) startPool() error {
+	t.poolCtx, t.poolCancel = context.WithCancel(t.ctx)
 
 	// Первое соединение поднимаем синхронно: если сервер недоступен или ключ
 	// не подходит, пользователь должен узнать об этом сразу, а не из лога.
 	first, err := t.dial()
 	if err != nil {
 		t.reportDialErr(events.StateError, err)
-		t.cancel()
+		t.poolCancel()
 		return err
 	}
 
@@ -284,13 +363,6 @@ func (t *Tunnel) Start() error {
 		t.wg.Add(1)
 		go t.keepLinkAlive(links[i], i)
 	}
-
-	if err := t.startListeners(); err != nil {
-		t.Stop()
-		return err
-	}
-
-	t.setState(events.StateConnected, fmt.Sprintf("%s:%d", t.cfg.Host, t.cfg.SSHPort))
 	t.wg.Add(1)
 	go t.publishStats()
 	t.wg.Add(1)
@@ -333,9 +405,10 @@ func (t *Tunnel) startListeners() error {
 func (t *Tunnel) pingLoop() {
 	defer t.wg.Done()
 
+	ctx := t.poolCtx
 	for {
 		select {
-		case <-t.ctx.Done():
+		case <-ctx.Done():
 			return
 		case <-time.After(4 * time.Second):
 		}
@@ -402,6 +475,9 @@ func (t *Tunnel) acceptLoop(ln net.Listener, handle func(net.Conn)) {
 	defer t.wg.Done()
 	for {
 		conn, err := ln.Accept()
+		if err == nil {
+			t.lastAccept.Store(time.Now().UnixNano())
+		}
 		if err != nil {
 			// Закрытый слушатель — это штатная остановка, а не сбой.
 			if t.ctx.Err() != nil || errors.Is(err, net.ErrClosed) {
@@ -421,11 +497,226 @@ func (t *Tunnel) acceptLoop(ln net.Listener, handle func(net.Conn)) {
 // отменённый контекст и выйдет сама, просто чуть позже.
 const stopGrace = 3 * time.Second
 
+// defaultDrainTimeout — сколько после «Отключить» локальные слушатели ещё
+// живут, водя соединения напрямую (см. Drain). Больше обычного keep-alive
+// браузера (30 секунд) и меньше человеческого терпения.
+const defaultDrainTimeout = 45 * time.Second
+
+// drainIdleGrace — сколько тишины считать концом слива.
+//
+// Просто «нет активных соединений» здесь не годится, и это неочевидно:
+// в момент слива мы сами рвём SSH-соединения, поэтому все перекачки
+// заканчиваются разом и счётчик активных падает в ноль почти сразу. Закрыть
+// слушатели в этот момент — ровно та беда, ради которой слив и затевался:
+// браузер как раз в эту секунду постучится снова. Поэтому ждём тишины:
+// никто не подключался к нам целую паузу и сейчас никого нет.
+const drainIdleGrace = 10 * time.Second
+
+// Draining отвечает, идёт ли сейчас слив. Нужно тестам и App, который решает,
+// поднимать туннель заново или строить новый.
+func (t *Tunnel) Draining() bool { return t.draining.Load() }
+
+// Drain — «мягкое» выключение вместо Stop: связь с сервером рвётся немедленно,
+// а локальные слушатели остаются и водят трафик НАПРЯМУЮ ещё drainTimeout.
+//
+// Зачем. У браузера и любой долго живущей программы к моменту нажатия
+// «Отключить» открыт пул живых сокетов до нашего прокси (keep-alive, HTTP/2 —
+// по одному соединению идут десятки запросов). Закрыть слушатели сразу
+// означает убить эти сокеты, а программа узнает об этом не сразу: она
+// продолжит слать в них запросы до собственного таймаута. Снаружи это ровно
+// то самое «выключил туннель — интернет пропал, помогает перезапуск
+// браузера». Живой слушатель, водящий напрямую, эту дыру закрывает.
+//
+// Для внешнего мира Drain неотличим от Stop: состояние становится «выключен»
+// сразу же, слив идёт уже после этого и в интерфейсе никак не отражается
+// (docs/DRAIN_SPEC.md).
+func (t *Tunnel) Drain() {
+	if t.cancel == nil || t.State() == events.StateStopped {
+		return
+	}
+	// Отдельной проверки «а есть ли слушатели» здесь нет нарочно: на телефоне
+	// их и не бывает — там трафик приходит из интерфейса VpnService, который
+	// держит сторона Android (см. mobile.Tunnel.Drain). Пустой слив никому не
+	// мешает: обращаться к нему никто не станет, и watchDrainIdle закроет его
+	// по тишине.
+	t.drainMu.Lock()
+	if t.draining.Load() {
+		t.drainMu.Unlock()
+		return
+	}
+	t.draining.Store(true)
+
+	// Сервер отпускаем сразу: человек нажал «Отключить» и вправе считать, что
+	// связь с VPS оборвана в ту же секунду, а не «ещё 45 секунд».
+	if t.poolCancel != nil {
+		t.poolCancel()
+	}
+	for _, l := range t.snapLinks() {
+		l.set(nil)
+	}
+	t.mu.Lock()
+	t.links = nil
+	t.mu.Unlock()
+	t.closeUDPRelay()
+
+	t.mu.RLock()
+	timeout := t.cfg.DrainTimeout
+	t.mu.RUnlock()
+	if timeout <= 0 {
+		timeout = defaultDrainTimeout
+	}
+	t.drainTimer = time.AfterFunc(timeout, t.finishDrain)
+	t.drainMu.Unlock()
+
+	// Пауза тишины соразмерна самому сливу: в тестах таймаут — миллисекунды,
+	// и десятисекундная пауза означала бы, что досрочный выход там не
+	// проверить вовсе.
+	idle := drainIdleGrace
+	if idle > timeout/2 {
+		idle = timeout / 2
+	}
+
+	t.setState(events.StateStopped, "")
+	t.bus.Infof("Туннель выключен; ещё до %s старые соединения доживают напрямую, мимо сервера", timeout)
+
+	go t.watchDrainIdle(idle)
+}
+
+// watchDrainIdle добивает слив досрочно, когда к нам перестали обращаться:
+// держать порт занятым ради пустоты незачем. «Перестали» — это и ни одного
+// живого соединения, и ни одной новой попытки за паузу idle (см.
+// drainIdleGrace, почему одного счётчика активных мало).
+func (t *Tunnel) watchDrainIdle(idle time.Duration) {
+	poll := idle / 4
+	if poll < 10*time.Millisecond {
+		poll = 10 * time.Millisecond
+	}
+	tk := time.NewTicker(poll)
+	defer tk.Stop()
+	for range tk.C {
+		if !t.draining.Load() {
+			return // слив уже закончился сам или его отменил Resume
+		}
+		if t.stats.active.Load() > 0 {
+			continue
+		}
+		last := t.lastAccept.Load()
+		if last != 0 && time.Since(time.Unix(0, last)) < idle {
+			continue // кто-то стучался только что — подождём ещё
+		}
+		t.finishDrain()
+		return
+	}
+}
+
+// finishDrain доводит слив до настоящей остановки — по таймеру или потому,
+// что соединений не осталось. Флаг снимается под тем же замком, что и в
+// Resume: кто первый успел, тот и решает судьбу туннеля, а второй видит, что
+// сливать уже нечего, и молча уходит.
+func (t *Tunnel) finishDrain() {
+	t.drainMu.Lock()
+	if !t.draining.Load() {
+		t.drainMu.Unlock()
+		return // слив уже отменил Resume или завершил кто-то другой
+	}
+	t.draining.Store(false)
+	if t.drainTimer != nil {
+		t.drainTimer.Stop()
+		t.drainTimer = nil
+	}
+	t.drainMu.Unlock()
+	t.Stop()
+}
+
+// Resume возвращает к жизни туннель, который сейчас в сливе: пул поднимается
+// заново, а локальные слушатели даже не закрывались — поэтому уже открытые
+// соединения приложений не рвутся вовсе и просто снова идут через сервер.
+// Это и есть ответ на «включил VPN, а он не действует, пока не перезапустишь
+// браузер»: сокеты те же самые, менять в них ничего не нужно.
+func (t *Tunnel) Resume() error {
+	t.drainMu.Lock()
+	if !t.draining.Load() {
+		t.drainMu.Unlock()
+		return errors.New("туннель не в сливе — возобновлять нечего")
+	}
+	if t.drainTimer != nil {
+		t.drainTimer.Stop()
+		t.drainTimer = nil
+	}
+	t.draining.Store(false)
+	t.drainMu.Unlock()
+
+	t.setState(events.StateConnecting, "")
+	if err := t.loadSigner(); err != nil {
+		t.Stop()
+		return err
+	}
+	if err := t.startPool(); err != nil {
+		// Подняться не вышло — доводим до обычной остановки, иначе слушатели
+		// остались бы висеть без всякого таймера.
+		t.Stop()
+		return err
+	}
+	t.setState(events.StateConnected, fmt.Sprintf("%s:%d", t.cfg.Host, t.cfg.SSHPort))
+	t.bus.Infof("Туннель снова включён — уже открытые соединения пошли через сервер")
+	return nil
+}
+
+// Rebind переводит туннель, который сейчас в сливе, на другой сервер, не
+// закрывая локальные слушатели. Нужно при смене сервера: связь с прежним
+// сервером уже разорвана, но сокеты браузера по-прежнему живут в наших
+// слушателях, и переключение для них должно пройти незаметно.
+//
+// Локальные адреса обязаны совпадать: слушатели остались от прежних настроек,
+// и обещать трафик на другом порту они не могут. Разные порты — честная
+// ошибка, вызывающая сторона тогда строит туннель заново.
+func (t *Tunnel) Rebind(cfg Config) error {
+	if !t.draining.Load() {
+		return errors.New("туннель не в сливе — переключать нечего")
+	}
+	t.mu.Lock()
+	sameAddrs := cfg.SocksAddr == t.cfg.SocksAddr && cfg.HTTPAddr == t.cfg.HTTPAddr
+	if sameAddrs {
+		// ProtectSocket ставится один раз при создании туннеля (Android) и в
+		// настройках профиля не живёт — переносим из прежних.
+		if cfg.ProtectSocket == nil {
+			cfg.ProtectSocket = t.cfg.ProtectSocket
+		}
+		t.cfg = cfg
+		t.signer = nil // ключ у нового сервера свой, перечитаем в startPool
+	}
+	t.mu.Unlock()
+	if !sameAddrs {
+		return errors.New("у нового сервера другие локальные порты — нужен новый туннель")
+	}
+	t.localViaTunnel.Store(cfg.LocalViaTunnel)
+	return t.Resume()
+}
+
+// closeUDPRelay гасит соединение до ретранслятора UDP, если оно было поднято.
+func (t *Tunnel) closeUDPRelay() {
+	t.udpRelayMu.Lock()
+	relay := t.udpRelayClient
+	t.udpRelayClient = nil
+	t.udpRelayMu.Unlock()
+	if relay != nil {
+		relay.Shutdown()
+	}
+}
+
 // Stop гасит слушатели и пул. Безопасно вызывать повторно.
 func (t *Tunnel) Stop() {
 	if t.cancel == nil {
 		return
 	}
+	t.drainMu.Lock()
+	if t.drainTimer != nil {
+		t.drainTimer.Stop()
+		t.drainTimer = nil
+	}
+	t.draining.Store(false)
+	t.drainMu.Unlock()
+
 	t.cancel()
 	for _, ln := range t.listeners {
 		ln.Close()
@@ -449,13 +740,7 @@ func (t *Tunnel) Stop() {
 	t.links = nil
 	t.mu.Unlock()
 
-	t.udpRelayMu.Lock()
-	relay := t.udpRelayClient
-	t.udpRelayClient = nil
-	t.udpRelayMu.Unlock()
-	if relay != nil {
-		relay.Shutdown()
-	}
+	t.closeUDPRelay()
 
 	t.setState(events.StateStopped, "")
 }
@@ -466,7 +751,10 @@ func (t *Tunnel) Stop() {
 // ретранслятор не установлен на сервере) — вызывающий код в этом случае
 // просто продолжает вести себя так, будто UDP не поддерживается вовсе.
 func (t *Tunnel) UDPRelay() *udprelay.Client {
-	if !t.cfg.UDPRelayEnabled {
+	// Во время слива ретранслятора нет: он живёт на сервере, а связь с
+	// сервером уже разорвана. Подменить UDP прямым соединением нечем,
+	// поэтому ведём себя как при выключенной функции — отказом.
+	if !t.cfg.UDPRelayEnabled || t.draining.Load() {
 		return nil
 	}
 
@@ -602,9 +890,12 @@ func (t *Tunnel) directDialer(timeout time.Duration) *net.Dialer {
 func (t *Tunnel) keepLinkAlive(l *link, idx int) {
 	defer t.wg.Done()
 
+	// Контекст пула, а не всего туннеля: слив гасит пул и эти горутины
+	// должны выйти, хотя локальные слушатели продолжают работать.
+	ctx := t.poolCtx
 	backoff := time.Second
 	for {
-		if t.ctx.Err() != nil {
+		if ctx.Err() != nil {
 			return
 		}
 		kickCh := t.currentKick()
@@ -613,14 +904,14 @@ func (t *Tunnel) keepLinkAlive(l *link, idx int) {
 		if client == nil {
 			c, err := t.dial()
 			if err != nil {
-				if t.ctx.Err() != nil {
+				if ctx.Err() != nil {
 					return
 				}
 				if idx == 0 {
 					t.reportDialErr(events.StateReconnecting, err)
 				}
 				select {
-				case <-t.ctx.Done():
+				case <-ctx.Done():
 					return
 				case <-time.After(backoff):
 				case <-kickCh:
@@ -646,13 +937,13 @@ func (t *Tunnel) keepLinkAlive(l *link, idx int) {
 		// пересобрать пул немедленно (Kick уже пометил этот слот оборванным —
 		// следующий круг цикла сразу уйдёт на переподключение).
 		select {
-		case <-t.ctx.Done():
+		case <-ctx.Done():
 			return
 		case <-time.After(20 * time.Second):
 		case <-kickCh:
 		}
 
-		if t.ctx.Err() != nil {
+		if ctx.Err() != nil {
 			return
 		}
 		// Пустой глобальный запрос — стандартный способ проверить, жив ли
@@ -675,7 +966,7 @@ func (t *Tunnel) keepLinkAlive(l *link, idx int) {
 		case <-time.After(15 * time.Second):
 			t.bus.Warnf("SSH-соединение #%d не отвечает — переподключаюсь", idx+1)
 			l.set(nil)
-		case <-t.ctx.Done():
+		case <-ctx.Done():
 			return
 		}
 	}
@@ -812,11 +1103,12 @@ func (t *Tunnel) Stats() events.Stats {
 
 func (t *Tunnel) publishStats() {
 	defer t.wg.Done()
+	ctx := t.poolCtx
 	tk := time.NewTicker(time.Second)
 	defer tk.Stop()
 	for {
 		select {
-		case <-t.ctx.Done():
+		case <-ctx.Done():
 			return
 		case <-tk.C:
 			s := t.Stats()

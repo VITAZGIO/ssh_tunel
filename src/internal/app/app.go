@@ -26,9 +26,14 @@ import (
 type App struct {
 	Bus *events.Bus
 
-	mu       sync.Mutex
-	cfg      config.Config
-	tun      *tunnel.Tunnel
+	mu  sync.Mutex
+	cfg config.Config
+	tun *tunnel.Tunnel
+	// draining — туннель, который уже выключен для человека, но ещё
+	// донашивает старые соединения напрямую (tunnel.Drain). Держим ссылку,
+	// чтобы следующее «Подключить» вернуло к жизни именно его: его слушатели
+	// заняли локальные порты, и новый туннель их бы не получил.
+	draining *tunnel.Tunnel
 	sys      *sysproxy.Manager
 	sysOn    bool
 	running  bool
@@ -261,6 +266,7 @@ func (a *App) Start() error {
 	cfg := a.cfg
 	a.gen++
 	gen := a.gen
+	draining := a.draining
 	a.mu.Unlock()
 
 	candidates := a.connectCandidates(cfg)
@@ -271,6 +277,26 @@ func (a *App) Start() error {
 		return errors.New("не указан адрес сервера")
 	}
 
+	// Туннель ещё в сливе — значит его локальные слушатели живы, а в них живы
+	// сокеты браузера и всего остального. Поднимаем этот же туннель обратно
+	// вместо постройки нового: уже открытые соединения просто снова пойдут
+	// через сервер, и ничего перезапускать не надо. Это ответ на «включил
+	// VPN, а он не действует, пока не перезапустишь браузер».
+	if draining != nil && draining.Draining() {
+		if err := a.resumeDraining(draining, cfg, candidates[0]); err == nil {
+			a.mu.Lock()
+			a.transitioning = false
+			a.mu.Unlock()
+			return nil
+		}
+		// Не вышло (сервер пропал, порты у нового профиля другие) — туннель
+		// уже доведён до обычной остановки, дальше обычным путём.
+		a.mu.Lock()
+		a.gen++
+		gen = a.gen
+		a.mu.Unlock()
+	}
+
 	err := a.connectFrom(cfg, candidates, 0, gen)
 	a.mu.Lock()
 	a.transitioning = false
@@ -278,17 +304,73 @@ func (a *App) Start() error {
 	return err
 }
 
-func (a *App) Stop() {
+// resumeDraining возвращает к жизни туннель, оставшийся от слива.
+//
+// Настройки при этом всегда берутся свежие, даже если сервер тот же самый: за
+// время слива человек мог сменить вкладку сервера, поправить адрес или число
+// каналов. Поднять пул по тому, что туннель помнил с прошлого раза, значило бы
+// молча подключиться не туда, куда просили.
+//
+// Единственное, чего переиспользование не переживает, — другие локальные порты:
+// слушатели-то остались прежние. Тогда возвращается ошибка, и обычный путь
+// строит туннель заново.
+func (a *App) resumeDraining(tun *tunnel.Tunnel, cfg config.Config, p config.Profile) error {
+	newCfg, _, _ := a.tunnelConfig(cfg, p)
+	err := tun.Rebind(newCfg)
+
+	a.mu.Lock()
+	a.draining = nil
+	if err != nil {
+		a.mu.Unlock()
+		return err
+	}
+	a.tun = tun
+	a.running = true
+	a.effectiveProfile = p.ID
+	a.proxyURL = "http://" + net.JoinHostPort("127.0.0.1", strconv.Itoa(p.HTTPPort))
+	a.mu.Unlock()
+
+	a.enableSysProxy(cfg, p,
+		net.JoinHostPort("127.0.0.1", strconv.Itoa(p.HTTPPort)),
+		net.JoinHostPort("127.0.0.1", strconv.Itoa(p.SocksPort)))
+	return nil
+}
+
+// Stop — обычное «Отключить» из интерфейса: мягкая остановка со сливом.
+// Снаружи (состояние, экран, /api/status) она неотличима от прежней резкой:
+// «выключен» появляется сразу же. Разница только в том, что происходит потом
+// — см. tunnel.Drain и docs/DRAIN_SPEC.md.
+func (a *App) Stop() { a.stop(true) }
+
+// StopNow — резкая остановка без слива: авария и выход из программы. Водить
+// трафик напрямую после аварии человек не просил, а при выходе сливать нечего
+// — процесс всё равно умирает. Смена сервера идёт через обычный Stop: там
+// слив как раз и нужен, чтобы сокеты браузера пережили переключение.
+func (a *App) StopNow() { a.stop(false) }
+
+func (a *App) stop(drain bool) {
 	a.mu.Lock()
 	tun, sysOn := a.tun, a.sysOn
-	a.tun, a.running, a.sysOn = nil, false, false
+	a.running, a.sysOn = false, false
 	a.effectiveProfile = ""
+	// Ссылку на туннель при сливе сохраняем: он ещё живёт фоном, и следующий
+	// Start должен именно его вернуть к жизни, а не строить новый — иначе
+	// новый не сможет занять тот же локальный порт.
+	if drain {
+		a.draining = tun
+	} else {
+		a.draining = nil
+	}
+	a.tun = nil
 	// Отменяет любой фоновый переход на запасной сервер, который мог быть в
 	// процессе: connectFrom проверяет gen перед тем, как зафиксировать успех,
 	// и сам остановит то, что успел поднять.
 	a.gen++
 	a.mu.Unlock()
 
+	// Системный прокси снимаем первым делом в любом случае: НОВЫЕ соединения
+	// должны идти мимо нас с первой же секунды, сливом доживают только уже
+	// открытые.
 	if sysOn {
 		if err := a.sys.Disable(); err != nil {
 			a.Bus.Errorf("Не удалось вернуть настройки прокси: %v. Проверь: Параметры → Сеть и Интернет → Прокси-сервер", err)
@@ -296,9 +378,24 @@ func (a *App) Stop() {
 			a.Bus.Infof("Системный прокси выключен, трафик идёт как обычно")
 		}
 	}
-	if tun != nil {
-		tun.Stop()
+	if tun == nil {
+		// Туннеля нет, но слив ещё идёт — значит человек нажал «Отключить»
+		// второй раз (кнопка-то уже показывает «выключен»). Это просьба
+		// «да выключай уже»: добиваем слив немедленно.
+		a.mu.Lock()
+		leftover := a.draining
+		a.draining = nil
+		a.mu.Unlock()
+		if leftover != nil {
+			leftover.Stop()
+		}
+		return
 	}
+	if drain {
+		tun.Drain()
+		return
+	}
+	tun.Stop()
 }
 
 // EffectiveProfileID — какой сервер реально подключён сейчас. Пусто, если
