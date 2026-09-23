@@ -77,3 +77,29 @@ func TestParseConfigRejectsGarbage(t *testing.T) {
 		t.Error("ParseConfig должен вернуть ошибку на пустой ввод")
 	}
 }
+
+// Возобновление после слива переиспользует ядро и стек, поэтому свежие правила
+// должны попадать в тот же список, который они уже держат, а не в новый.
+func TestUpdateRoutingМеняетТотЖеСписок(t *testing.T) {
+	tun := NewTunnel()
+	if err := tun.Configure("h", 22, "u", "k", "kh", 1, "a.example", false,
+		false, "", "", false); err != nil {
+		t.Fatal(err)
+	}
+	held := tun.cfg.Direct
+	if !held.Match("a.example:443") {
+		t.Fatal("правило из Configure не действует")
+	}
+
+	tun.UpdateRouting("b.example", true)
+
+	if held.Match("a.example:443") {
+		t.Error("старое правило осталось в списке, который держит ядро")
+	}
+	if !held.Match("b.example:443") {
+		t.Error("новое правило не попало в список, который держит ядро")
+	}
+	if !tun.cfg.LocalViaTunnel {
+		t.Error("галочка «локальную сеть через сервер» не обновилась")
+	}
+}

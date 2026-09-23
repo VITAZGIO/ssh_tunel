@@ -31,13 +31,20 @@ func (t *Tunnel) ServeConn(conn net.Conn, target string, byIP bool) {
 	// значится — там имя. Узнаём его здесь (см. LearnDirect), а в журнал
 	// пишем имя: адрес человеку ничего не скажет, и это не утечка DNS — имя
 	// разрешали мы сами, по правилу.
+	//
+	// Имя сверяем с правилами каждый раз: убрали его из списка — адрес,
+	// выданный под него раньше, снова идёт через сервер, а не ждёт, пока
+	// запись в таблице устареет.
 	shown := target
-	name, learned := t.learnedName(target)
-	if learned {
+	learned := false
+	if name, ok := t.learnedName(target); ok {
+		named := name
 		if _, port, err := net.SplitHostPort(target); err == nil {
-			shown = net.JoinHostPort(name, port)
+			named = net.JoinHostPort(name, port)
 		}
-		byIP = false
+		if t.listedDirect(named) || t.localDirect(named) {
+			learned, shown, byIP = true, named, false
+		}
 	}
 
 	remote, direct, err := t.dialForTun(target, learned)

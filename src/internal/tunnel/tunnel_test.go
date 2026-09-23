@@ -807,6 +807,7 @@ func TestLearnedDirectAddressSkipsTunnel(t *testing.T) {
 	defer unsub()
 
 	host, _, _ := net.SplitHostPort(target.String())
+	tun.SetDirect(routing.NewDirectList([]string{".example.invalid"}))
 	tun.LearnDirect("api.example.invalid", []net.IP{net.ParseIP(host)})
 
 	before := srv.channels.Load()
@@ -834,6 +835,33 @@ func TestLearnedDirectAddressSkipsTunnel(t *testing.T) {
 		case <-deadline:
 			t.Fatal("нет события о соединении")
 		}
+	}
+}
+
+// Имя убрали из списка — выученный под него адрес сразу снова идёт через
+// сервер, не дожидаясь, пока запись устареет. Иначе очистка поля «всегда
+// напрямую» ещё полчаса ничего бы не меняла.
+func TestLearnedAddressFollowsCurrentList(t *testing.T) {
+	tun, _, _, srv := startTunnel(t, 1)
+	target := echoServer(t)
+	tun.SetLocalViaTunnel(true)
+
+	list := routing.NewDirectList([]string{"api.example.invalid"})
+	tun.SetDirect(list)
+	host, _, _ := net.SplitHostPort(target.String())
+	tun.LearnDirect("api.example.invalid", []net.IP{net.ParseIP(host)})
+
+	list.Set(nil)
+
+	before := srv.channels.Load()
+	app, ours := net.Pipe()
+	defer app.Close()
+	done := make(chan struct{})
+	go func() { tun.ServeConn(ours, target.String(), true); close(done) }()
+	app.Close()
+	<-done
+	if got := srv.channels.Load(); got != before+1 {
+		t.Fatalf("сервер открыл %d каналов вместо одного — адрес ушёл напрямую по старому правилу", got-before)
 	}
 }
 

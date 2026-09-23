@@ -503,8 +503,14 @@ class TunnelService : VpnService(), Callbacks {
         startForeground(NOTIFICATION_ID, notification("подключение…"))
         report("connecting", "")
         registerNetworkCallback()
+        // Настройки могли поменяться, пока шёл слив, — а ядро и стек те же.
+        // Правила маршрутизации применяем свежие, иначе «Сохранить» и
+        // переподключение в эти секунды молча оставили бы старый список.
+        val settings = Settings(this)
+        activeSettings = settings
         Thread {
             try {
+                tunnel.updateRouting(settings.directHosts, settings.localViaTunnel)
                 tunnel.resume()
                 ticker.post(poll)
             } catch (e: Exception) {
