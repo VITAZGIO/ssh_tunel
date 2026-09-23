@@ -37,11 +37,6 @@ type DNS struct {
 	// ушло бы в туннель вместо домашней сети.
 	Local LocalResolve
 
-	// Remember запоминает настоящие адреса, выданные таким именам, — чтобы
-	// соединение на них ядро узнало как «напрямую» (см. directaddrs.go).
-	// nil — не запоминать.
-	Remember *DirectAddrs
-
 	// Block — список рекламы и слежки. В отличие от Direct (имя просто идёт
 	// мимо туннеля), заблокированное имя не получает вообще никакого адреса:
 	// ни настоящего, ни подставного. nil или пустой список — блокировка
@@ -147,11 +142,7 @@ func (d *DNS) resolve(name string) ([]net.IP, error) {
 		if d.Local == nil {
 			return nil, errors.New("нет резолвера для имён, идущих мимо туннеля")
 		}
-		addrs, err := d.Local(name)
-		if err == nil && d.Remember != nil {
-			d.Remember.Add(name, addrs)
-		}
-		return addrs, err
+		return d.Local(name)
 	}
 	if d.Pool == nil {
 		return nil, errors.New("не задан пул подставных адресов")

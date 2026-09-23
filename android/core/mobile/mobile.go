@@ -139,7 +139,13 @@ func (t *Tunnel) Configure(
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	t.direct = routing.NewDirectList(routing.SplitEntries(directHosts))
+	// Список один на всё время жизни: его же держат ядро и DNS уже
+	// поднятого стека. Новый объект они бы не увидели — после слива
+	// (Resume) продолжал бы действовать прежний список.
+	if t.direct == nil {
+		t.direct = routing.NewDirectList(nil)
+	}
+	t.direct.Set(routing.SplitEntries(directHosts))
 	t.block = block
 	t.cfg = tunnel.Config{
 		Host:            host,
@@ -264,7 +270,7 @@ func (t *Tunnel) ServerHasIPv6() bool {
 // закрывает его сам. Если отдать getFd(), дескриптор закроют дважды.
 func (t *Tunnel) StartStack(tunFD int, mtu int) error {
 	t.mu.Lock()
-	tun, cfg, direct, block, cb := t.core, t.cfg, t.direct, t.block, t.cb
+	tun, block, cb := t.core, t.block, t.cb
 	t.mu.Unlock()
 
 	if tun == nil {
@@ -280,15 +286,19 @@ func (t *Tunnel) StartStack(tunFD int, mtu int) error {
 	}
 
 	stackStats := &core.Stats{}
-	directAddrs := core.NewDirectAddrs()
 
 	dns := &core.DNS{
-		Pool:     pool,
-		Remember: directAddrs,
+		Pool: pool,
 		// Мимо туннеля идут те же имена, что и на компьютере: локальная сеть
 		// и то, что человек внёс в список сам.
+		//
+		// Правила читаем в момент запроса, а не запоминаем при старте: стек
+		// переживает слив и Resume, а настройки к тому времени могли смениться.
 		Direct: func(name string) bool {
-			if !cfg.LocalViaTunnel && routing.IsLocalHost(name) {
+			t.mu.Lock()
+			direct, localViaTunnel := t.direct, t.cfg.LocalViaTunnel
+			t.mu.Unlock()
+			if !localViaTunnel && routing.IsLocalHost(name) {
 				return true
 			}
 			return direct != nil && direct.Match(name)
@@ -297,7 +307,13 @@ func (t *Tunnel) StartStack(tunFD int, mtu int) error {
 			if cb == nil {
 				return nil, fmt.Errorf("нет резолвера")
 			}
-			return parseIPs(cb.ResolveLocal(name))
+			ips, err := parseIPs(cb.ResolveLocal(name))
+			if err == nil {
+				// Приложение придёт уже с адресом, а не с именем, —
+				// ядро должно узнать его и не повести через сервер.
+				tun.LearnDirect(name, ips)
+			}
+			return ips, err
 		},
 		// Block проверяется раньше Direct и раньше Pool.Get — см. dns.go.
 		Block: block,
@@ -306,7 +322,7 @@ func (t *Tunnel) StartStack(tunFD int, mtu int) error {
 
 	eng, err := core.Start(tunFD, uint32(mtu), &core.Handler{
 		Core:    tun,
-		Resolve: core.ChainResolvers(pool.Resolver(), directAddrs.Name),
+		Resolve: pool.Resolver(),
 		DNS:     dns,
 		Stats:   stackStats,
 		Log: func(line string) {
@@ -409,6 +425,26 @@ func (t *Tunnel) Draining() bool {
 	tun := t.core
 	t.mu.Unlock()
 	return tun != nil && tun.Draining()
+}
+
+// UpdateRouting применяет правила «всегда напрямую» и «локальную сеть через
+// сервер» к уже поднятому туннелю. Нужно перед Resume: возобновление
+// переиспользует и ядро, и стек, и без этого действовали бы правила, с
+// которыми туннель поднимали в прошлый раз.
+func (t *Tunnel) UpdateRouting(directHosts string, localViaTunnel bool) {
+	t.mu.Lock()
+	if t.direct == nil {
+		t.direct = routing.NewDirectList(nil)
+	}
+	t.direct.Set(routing.SplitEntries(directHosts))
+	t.cfg.Direct = t.direct
+	t.cfg.LocalViaTunnel = localViaTunnel
+	tun, direct := t.core, t.direct
+	t.mu.Unlock()
+	if tun != nil {
+		tun.SetDirect(direct)
+		tun.SetLocalViaTunnel(localViaTunnel)
+	}
 }
 
 // Resume возвращает к жизни туннель, который был в сливе. Интерфейс VPN при

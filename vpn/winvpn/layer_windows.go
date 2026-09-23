@@ -170,14 +170,12 @@ func (l *Layer) startStack() error {
 	if err != nil {
 		return err
 	}
-	directAddrs := core.NewDirectAddrs()
 	stats := &core.Stats{}
 	resolver := l.phys.resolver()
 
 	dns := &core.DNS{
-		Pool:     pool,
-		Remember: directAddrs,
-		Stats:    stats,
+		Pool:  pool,
+		Stats: stats,
 		// Мимо туннеля — те же имена, что и в режиме прокси: локальная
 		// сеть и список «всегда напрямую».
 		Direct: func(name string) bool {
@@ -196,13 +194,18 @@ func (l *Layer) startStack() error {
 			if err != nil {
 				return nil, err
 			}
+			// Приложение придёт уже с адресом, а не с именем, — ядро должно
+			// узнать его и не повести через сервер (см. tunnel.LearnDirect).
+			if t := l.current.Load(); t != nil {
+				t.LearnDirect(name, addrs)
+			}
 			return addrs, nil
 		},
 	}
 
 	engine, err := core.StartDevice(l.dev, &core.Handler{
 		Core:    (*coreSwitch)(l),
-		Resolve: core.ChainResolvers(pool.Resolver(), directAddrs.Name),
+		Resolve: pool.Resolver(),
 		DNS:     dns,
 		Stats:   stats,
 		Log:     func(line string) { l.bus.Infof("%s", line) },
