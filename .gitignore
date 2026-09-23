@@ -27,3 +27,6 @@ android/app/build/
 android/app/libs/
 android/.gradle/
 android/build/
+
+# Драйвер Wintun: скачивается при сборке ssh_tunnel_vpn.exe (vpn/build.sh)
+vpn/winvpn/wintun/wintun.dll

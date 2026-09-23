@@ -74,6 +74,18 @@ type Config struct {
 	// nil означает «ничего помечать не надо» — так на Windows и Linux.
 	ProtectSocket func(network, address string, c syscall.RawConn) error
 
+	// Resolver разрешает имена для соединений, которые программа открывает
+	// сама: адрес сервера и цели «напрямую». nil — системный резолвер.
+	//
+	// Нужен режиму VPN на Windows: там системный DNS смотрит в наш же туннель,
+	// и адрес сервера, спрошенный у него, превратился бы в подставной.
+	Resolver *net.Resolver
+
+	// TunProcessRules — применять правила по программам и к соединениям из
+	// сетевого стека (ServeConn). На Android выбор приложений делает система,
+	// а на Windows программу-владельца видно по порту, как и у прокси.
+	TunProcessRules bool
+
 	// LocalViaTunnel — вести ли в туннель и адреса локальной сети.
 	//
 	// По умолчанию (false) 192.168.x.x, домашние имена и прочая локальная
@@ -194,6 +206,10 @@ func New(cfg Config, bus *events.Bus) *Tunnel {
 
 // SetLocalViaTunnel переключает обработку локальной сети без перезапуска.
 func (t *Tunnel) SetLocalViaTunnel(v bool) { t.localViaTunnel.Store(v) }
+
+// LocalViaTunnel — текущее значение галочки «локальную сеть тоже через
+// сервер». Нужно DNS режима VPN: решать, какие имена разрешать по-настоящему.
+func (t *Tunnel) LocalViaTunnel() bool { return t.localViaTunnel.Load() }
 
 // Config отдаёт копию текущих настроек туннеля. После смены сервера на живом
 // туннеле (Rebind) они отличаются от тех, с которыми он был создан, — а
@@ -878,7 +894,7 @@ func (t *Tunnel) dialSSH(addr string) (*ssh.Client, error) {
 // На Android каждое такое соединение должно быть помечено как идущее мимо
 // туннеля, иначе оно вернётся в него же.
 func (t *Tunnel) directDialer(timeout time.Duration) *net.Dialer {
-	return &net.Dialer{Timeout: timeout, Control: t.cfg.ProtectSocket}
+	return &net.Dialer{Timeout: timeout, Control: t.cfg.ProtectSocket, Resolver: t.cfg.Resolver}
 }
 
 // keepLinkAlive держит один слот пула живым: шлёт keepalive, замечает смерть

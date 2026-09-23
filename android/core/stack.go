@@ -152,13 +152,23 @@ func Start(fd int, mtu uint32, h *Handler) (*Engine, error) {
 	if h == nil || h.Core == nil {
 		return nil, errors.New("нужен обработчик с ядром туннеля")
 	}
-	if h.Stats == nil {
-		h.Stats = &Stats{}
-	}
-
 	dev, err := fdbased.Open(strconv.Itoa(fd), mtu, 0)
 	if err != nil {
 		return nil, fmt.Errorf("открыть устройство: %w", err)
+	}
+	return StartDevice(dev, h)
+}
+
+// StartDevice — то же, что Start, но поверх готового устройства. Так стек
+// поднимается на Windows: там пакеты приходят не из дескриптора, а из
+// адаптера Wintun. Устройство при ошибке закрывается здесь же.
+func StartDevice(dev device.Device, h *Handler) (*Engine, error) {
+	if h == nil || h.Core == nil {
+		dev.Close()
+		return nil, errors.New("нужен обработчик с ядром туннеля")
+	}
+	if h.Stats == nil {
+		h.Stats = &Stats{}
 	}
 
 	s := stack.New(stack.Options{

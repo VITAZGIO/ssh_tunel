@@ -1,20 +1,17 @@
 package tunnel
 
-// Точка входа для Android.
+// Точка входа для сетевого стека: Android и режим VPN на Windows.
 //
-// На компьютере соединение приходит от SOCKS или HTTP-прокси, и по локальному
-// порту можно узнать программу-владельца. На телефоне соединение собирается из
-// IP-пакетов, владельца по порту не определить — да и не нужно: какие
-// приложения заворачивать, решает сама система (VpnService.addAllowedApplication),
-// и то, что дошло до нас, уже отфильтровано.
-//
-// Поэтому здесь тот же путь, что и в serve(), минус определение процесса и
-// минус правила по программам. Правила «локальная сеть напрямую» и «всегда
-// напрямую» остаются: они про адрес назначения, а не про программу.
+// Здесь соединение собрано из IP-пакетов, а не пришло от SOCKS или
+// HTTP-прокси. На Android владельца по порту не определить — да и не нужно:
+// какие приложения заворачивать, решает сама система
+// (VpnService.addAllowedApplication). На Windows владелец виден по порту так же,
+// как у прокси, и правила по программам включаются через
+// Config.TunProcessRules. Правила «локальная сеть напрямую» и «всегда
+// напрямую» действуют всегда: они про адрес назначения, а не про программу.
 
 import (
 	"net"
-	"time"
 )
 
 // ServeConn обслуживает готовое соединение от приложения на телефоне:
@@ -26,32 +23,26 @@ import (
 func (t *Tunnel) ServeConn(conn net.Conn, target string, byIP bool) {
 	defer conn.Close()
 
-	remote, direct, err := t.dialForTun(target)
+	var proc string
+	var pid int
+	if t.cfg.TunProcessRules {
+		// Адрес приложения у соединения из стека — его собственный сокет,
+		// поэтому владелец находится по порту так же, как у прокси.
+		proc, pid = lookupProcess(conn)
+	}
+
+	remote, direct, err := t.dialFor(proc, target)
 	if err != nil {
-		t.bus.Publish(eventConn("", 0, target, "tun", byIP, direct, err))
+		t.bus.Publish(eventConn(proc, pid, target, "tun", byIP, direct, err))
 		return
 	}
 	defer remote.Close()
 
-	t.bus.Publish(eventConn("", 0, target, "tun", byIP, direct, nil))
+	t.bus.Publish(eventConn(proc, pid, target, "tun", byIP, direct, nil))
 
 	t.stats.active.Add(1)
 	t.stats.total.Add(1)
 	defer t.stats.active.Add(-1)
 
 	t.pump(conn, conn, remote)
-}
-
-// dialForTun — решение «через сервер или напрямую» для трафика с телефона.
-// Отличается от dialFor только тем, что не спрашивает про программу.
-func (t *Tunnel) dialForTun(target string) (net.Conn, bool, error) {
-	// Слив (см. Drain): связи с сервером уже нет, но интерфейс VPN ещё
-	// поднят ради уже открытых сокетов приложений — ведём их напрямую.
-	if !t.draining.Load() && !t.localDirect(target) && !t.listedDirect(target) {
-		c, err := t.Dial("tcp", target)
-		return c, false, err
-	}
-	d := t.directDialer(15 * time.Second)
-	c, err := d.Dial("tcp", target)
-	return c, true, err
 }

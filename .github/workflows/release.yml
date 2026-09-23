@@ -50,6 +50,29 @@ jobs:
           path: releases/
           if-no-files-found: error
 
+  vpn:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Go
+        uses: actions/setup-go@v5
+        with:
+          # Режиму VPN нужен сетевой стек gvisor, а ему — Go 1.26.
+          go-version: "1.26.x"
+
+      - name: Собрать
+        working-directory: vpn
+        env:
+          VERSION: ${{ inputs.tag || github.ref_name }}
+        run: ./build.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vpn
+          path: releases/windows/ssh_tunnel_vpn.exe
+          if-no-files-found: error
+
   android:
     runs-on: ubuntu-latest
     steps:
@@ -144,7 +167,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    needs: [desktop, android]
+    needs: [desktop, vpn, android]
     runs-on: ubuntu-latest
     steps:
       # По умолчанию выключено: разово стирать историю релизов должно быть
@@ -166,6 +189,11 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
+          name: vpn
+          path: releases/windows
+
+      - uses: actions/download-artifact@v4
+        with:
           name: android
           path: releases
 
@@ -176,6 +204,7 @@ jobs:
           mkdir -p dist
           cp releases/windows/ssh_tunnel.exe dist/
           cp releases/windows/ssh_tunnel_windows.zip dist/
+          cp releases/windows/ssh_tunnel_vpn.exe dist/
           cp releases/linux/ssh_tunnel_linux dist/
           cp releases/linux/ssh_tunnel_linux_arm64 dist/
           # Панель и ретранслятор UDP — на них ссылается мастер настройки VPS:

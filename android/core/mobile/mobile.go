@@ -280,9 +280,11 @@ func (t *Tunnel) StartStack(tunFD int, mtu int) error {
 	}
 
 	stackStats := &core.Stats{}
+	directAddrs := core.NewDirectAddrs()
 
 	dns := &core.DNS{
-		Pool: pool,
+		Pool:     pool,
+		Remember: directAddrs,
 		// Мимо туннеля идут те же имена, что и на компьютере: локальная сеть
 		// и то, что человек внёс в список сам.
 		Direct: func(name string) bool {
@@ -304,7 +306,7 @@ func (t *Tunnel) StartStack(tunFD int, mtu int) error {
 
 	eng, err := core.Start(tunFD, uint32(mtu), &core.Handler{
 		Core:    tun,
-		Resolve: pool.Resolver(),
+		Resolve: core.ChainResolvers(pool.Resolver(), directAddrs.Name),
 		DNS:     dns,
 		Stats:   stackStats,
 		Log: func(line string) {

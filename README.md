@@ -22,6 +22,7 @@
 | Система | Ссылка | |
 |---|---|---|
 | **Windows** | [**ssh_tunnel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe) | окно с кнопкой, значок у часов |
+| **Windows, режим VPN** | [**ssh_tunnel_vpn.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn.exe) | весь трафик системы, нужны права администратора — [подробнее](docs/WINDOWS_VPN.md) |
 | **Android** | [**ssh_tunnel.apk**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.apk) | VPN-подключение, кнопка в шторке |
 | **Linux** | [**Установка на Linux**](docs/LINUX_SETUP.md) | консоль + веб-интерфейс, служба systemd, команды под все основные дистрибутивы |
 | **VPS-сервер** | [**Установка панели**](docs/PANEL_SETUP.md) | веб-панель на самом сервере: заводит клиентов по кнопке, без консоли |
@@ -155,6 +156,15 @@ HTTP CONNECT, каналы SSH и определение процесса по �
 Нужна консольная версия для Windows — она есть в исходниках, собирается одной
 командой: `GOOS=windows go build -o ssh_tunnel_cli.exe ./cmd/ssh_tunnel_cli`.
 
+### Режим VPN
+
+`ssh_tunnel.exe` — прокси: через туннель идут только программы, которые умеют
+в прокси. `ssh_tunnel_vpn.exe` создаёт виртуальную сетевую карту, и через
+сервер идёт **всё** — в том числе игры, Docker и утилиты, которые про прокси
+не знают. Цена — окно UAC при каждом запуске: сетевые адаптеры Windows даёт
+создавать только администратору. Настройки и серверы у обеих версий общие.
+Как это устроено — в [WINDOWS_VPN.md](docs/WINDOWS_VPN.md).
+
 ---
 
 ## Android
@@ -274,6 +284,7 @@ go test ./... -race     # проверить, что всё работает
 ```
 src/          исходный код (модуль Go)
 android/      приложение (Kotlin) и сетевой стек к нему (Go)
+vpn/          режим VPN для Windows (свой модуль: Go 1.26, Wintun)
 packaging/    служба systemd и установщик для Linux
 docs/         архитектура, безопасность, диагностика
 ```

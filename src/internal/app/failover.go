@@ -83,16 +83,35 @@ func (a *App) connectFrom(cfg config.Config, candidates []config.Profile, idx in
 		}
 
 		a.mu.Lock()
+		netLayer := a.net
+		a.mu.Unlock()
+		if netLayer != nil {
+			// Адаптер — дело всей системы, а не одного сервера: не поднялся он
+			// у этого, не поднимется и у запасного. Пробовать дальше незачем.
+			if err := netLayer.Attach(tun, p); err != nil {
+				tun.Stop()
+				netLayer.Detach()
+				return err
+			}
+		}
+
+		a.mu.Lock()
 		if a.gen != gen {
 			// Пока подключались, кто-то нажал «стоп» или перехватил
 			// failover — поднятое никому не нужно.
 			a.mu.Unlock()
+			if netLayer != nil {
+				netLayer.Detach()
+			}
 			tun.Stop()
 			return errNotConnected
 		}
 		a.tun = tun
 		a.running = true
 		a.proxyURL = "http://" + httpAddr
+		if netLayer != nil {
+			a.proxyURL = "" // локального прокси в режиме VPN нет
+		}
 		a.effectiveProfile = p.ID
 		a.mu.Unlock()
 
@@ -102,7 +121,9 @@ func (a *App) connectFrom(cfg config.Config, candidates []config.Profile, idx in
 			a.Bus.Infof("подключились к запасному серверу: %s", p.Name)
 		}
 
-		a.enableSysProxy(cfg, p, httpAddr, socksAddr)
+		if netLayer == nil {
+			a.enableSysProxy(cfg, p, httpAddr, socksAddr)
+		}
 		go a.watchFailover(cfg, candidates, i, gen)
 		return nil
 	}
@@ -121,7 +142,7 @@ func (a *App) buildTunnel(cfg config.Config, p config.Profile) (tun *tunnel.Tunn
 func (a *App) tunnelConfig(cfg config.Config, p config.Profile) (_ tunnel.Config, socksAddr, httpAddr string) {
 	socksAddr = net.JoinHostPort("127.0.0.1", strconv.Itoa(p.SocksPort))
 	httpAddr = net.JoinHostPort("127.0.0.1", strconv.Itoa(p.HTTPPort))
-	return tunnel.Config{
+	c := tunnel.Config{
 		Host:            p.Host,
 		SSHPort:         p.SSHPort,
 		User:            p.User,
@@ -135,7 +156,14 @@ func (a *App) tunnelConfig(cfg config.Config, p config.Profile) (_ tunnel.Config
 		Direct:          a.direct,
 		LocalViaTunnel:  p.LocalViaTunnel,
 		UDPRelayEnabled: p.UDPRelayEnabled,
-	}, socksAddr, httpAddr
+	}
+	a.mu.Lock()
+	netLayer := a.net
+	a.mu.Unlock()
+	if netLayer != nil {
+		netLayer.Prepare(&c)
+	}
+	return c, socksAddr, httpAddr
 }
 
 func (a *App) enableSysProxy(cfg config.Config, p config.Profile, httpAddr, socksAddr string) {

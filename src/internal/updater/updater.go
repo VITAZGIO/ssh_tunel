@@ -197,13 +197,17 @@ func parse(v string) ([3]int, bool) {
 	return out, true
 }
 
+// WindowsAsset — имя файла для Windows. Версия с режимом VPN подменяет его
+// на свой exe: предлагать ей обычный было бы подменой одной программы другой.
+var WindowsAsset = "ssh_tunnel.exe"
+
 // AssetFor выбирает файл релиза для этой системы: на Windows — .exe (архив
 // нужен браузеру, а мы качаем сами), на Linux — файл под свою архитектуру.
 func AssetFor(rel Release, goos, goarch string) (Asset, bool) {
 	want := ""
 	switch goos {
 	case "windows":
-		want = "ssh_tunnel.exe"
+		want = WindowsAsset
 	case "linux":
 		if goarch == "arm64" {
 			want = "ssh_tunnel_linux_arm64"

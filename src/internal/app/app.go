@@ -64,6 +64,32 @@ type App struct {
 	// настройках можно было выбрать их из списка, а не вспоминать имена.
 	seenMu   sync.Mutex
 	seenApps map[string]struct{}
+
+	// net — режим VPN: трафик системы заворачивается в туннель виртуальным
+	// сетевым адаптером, а не системным прокси. nil — обычный режим прокси.
+	net NetLayer
+}
+
+// NetLayer заворачивает в туннель весь трафик системы — вместо системного
+// прокси. Так устроен режим VPN (ssh_tunnel_vpn.exe): сам он живёт в отдельном
+// модуле с тяжёлыми зависимостями, а здесь только точка подключения к нему.
+type NetLayer interface {
+	// Prepare правит настройки туннеля перед подключением: пометка своих
+	// сокетов, свой резолвер, отказ от локальных прокси.
+	Prepare(cfg *tunnel.Config)
+	// Attach поднимает адаптер (или переключает уже поднятый на новый
+	// туннель — при переходе на запасной сервер).
+	Attach(tun *tunnel.Tunnel, p config.Profile) error
+	// Detach снимает адаптер и возвращает сеть как было. Вызывать можно
+	// сколько угодно раз.
+	Detach()
+}
+
+// SetNetLayer включает режим VPN. Вызывать до первого Start.
+func (a *App) SetNetLayer(n NetLayer) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.net = n
 }
 
 func New(cfg config.Config) *App {
@@ -350,6 +376,12 @@ func (a *App) StopNow() { a.stop(false) }
 
 func (a *App) stop(drain bool) {
 	a.mu.Lock()
+	netLayer := a.net
+	if netLayer != nil {
+		// Слив держится на локальных слушателях прокси, а в режиме VPN их нет:
+		// адаптер снимается сразу, и приложения переходят на обычную сеть.
+		drain = false
+	}
 	tun, sysOn := a.tun, a.sysOn
 	a.running, a.sysOn = false, false
 	a.effectiveProfile = ""
@@ -377,6 +409,9 @@ func (a *App) stop(drain bool) {
 		} else {
 			a.Bus.Infof("Системный прокси выключен, трафик идёт как обычно")
 		}
+	}
+	if netLayer != nil {
+		netLayer.Detach()
 	}
 	if tun == nil {
 		// Туннеля нет, но слив ещё идёт — значит человек нажал «Отключить»

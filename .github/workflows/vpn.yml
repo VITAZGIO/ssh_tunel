@@ -1,0 +1,39 @@
+# Сборка ssh_tunnel_vpn.exe — версии для Windows с режимом VPN.
+#
+# Отдельный workflow, потому что модулю нужен Go 1.26 (сетевой стек gvisor),
+# а обычной настольной сборке хватает 1.22. Результат прикладывается к запуску
+# файлом; в релиз сам по себе ничего не публикуется.
+name: vpn
+
+on:
+  push:
+    branches: ["claude/**"]
+    paths:
+      - "vpn/**"
+      - "android/core/**"
+      - "src/**"
+      - ".github/workflows/vpn.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.x"
+
+      - name: Собрать
+        working-directory: vpn
+        run: ./build.sh
+
+      - name: Выложить
+        uses: actions/upload-artifact@v4
+        with:
+          name: ssh_tunnel_vpn
+          path: releases/windows/ssh_tunnel_vpn.exe
+          if-no-files-found: error
