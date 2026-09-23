@@ -173,6 +173,10 @@ type Tunnel struct {
 	lastAccept atomic.Int64
 	drainMu    sync.Mutex
 	drainTimer *time.Timer
+
+	// learned — адреса, выданные телефоном для имён из «всегда напрямую»
+	// (см. LearnDirect). Нужно только на Android.
+	learned learnedDirect
 }
 
 type stats struct {

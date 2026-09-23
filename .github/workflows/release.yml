@@ -195,4 +195,10 @@ jobs:
           name: ${{ inputs.tag || github.ref_name }}
           body: ${{ inputs.notes }}
           generate_release_notes: ${{ inputs.notes == '' }}
+          # Метка с суффиксом (v1.4.0-yt1) — пробная сборка: помечаем её
+          # предварительной. Такие не считаются «последним релизом», и кнопка
+          # «Проверить обновления» у остальных их не предложит.
+          prerelease: ${{ contains(inputs.tag || github.ref_name, '-') }}
+          # Метку ставим на тот коммит, из которого собирали, а не на main.
+          target_commitish: ${{ github.sha }}
           files: dist/*

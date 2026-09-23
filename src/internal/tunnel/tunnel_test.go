@@ -793,6 +793,75 @@ func TestDirectListSkipsTunnel(t *testing.T) {
 	}
 }
 
+// Имя из «всегда напрямую» на телефоне превращается в настоящий адрес ещё в
+// DNS, и до ядра доходит уже адрес. Раньше список его не узнавал, и такие
+// соединения уходили через сервер — правило по имени на Android не работало
+// вовсе. Теперь адрес, выданный под это имя, запоминается (LearnDirect).
+func TestLearnedDirectAddressSkipsTunnel(t *testing.T) {
+	tun, _, _, srv := startTunnel(t, 1)
+	target := echoServer(t)
+	// Иначе 127.0.0.1 ушёл бы напрямую и без нового правила — как локальный.
+	tun.SetLocalViaTunnel(true)
+
+	ch, unsub := tun.bus.Subscribe()
+	defer unsub()
+
+	host, _, _ := net.SplitHostPort(target.String())
+	tun.LearnDirect("api.example.invalid", []net.IP{net.ParseIP(host)})
+
+	before := srv.channels.Load()
+	app, ours := net.Pipe()
+	defer app.Close()
+	go tun.ServeConn(ours, target.String(), true)
+
+	assertHTTPBody(t, app, target.String(), "/hello", "привет от ")
+	if got := srv.channels.Load(); got != before {
+		t.Fatalf("сервер открыл %d каналов — выученный адрес ушёл в туннель", got-before)
+	}
+
+	// В журнале — имя и пометка «напрямую», а не «адрес известен заранее».
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case ev := <-ch:
+			if ev.Kind != events.KindConn {
+				continue
+			}
+			if !strings.HasPrefix(ev.Target, "api.example.invalid:") || !ev.Direct || ev.DNSLeak {
+				t.Fatalf("в журнал ушло %+v", ev)
+			}
+			return
+		case <-deadline:
+			t.Fatal("нет события о соединении")
+		}
+	}
+}
+
+// Адрес, которого телефон под имена из списка не выдавал, по-прежнему идёт
+// через сервер.
+func TestUnlearnedAddressStillGoesThroughTunnel(t *testing.T) {
+	tun, _, _, srv := startTunnel(t, 1)
+	tun.LearnDirect("api.example.invalid", []net.IP{net.ParseIP("203.0.113.7")})
+
+	before := srv.channels.Load()
+	conn, direct, _ := tun.dialForTun("203.0.113.8:443", false)
+	if conn != nil {
+		conn.Close()
+	}
+	if direct {
+		t.Fatal("посторонний адрес выпущен мимо туннеля")
+	}
+	if _, ok := tun.learnedName("203.0.113.8:443"); ok {
+		t.Fatal("посторонний адрес узнан как выученный")
+	}
+	if name, ok := tun.learnedName("203.0.113.7:443"); !ok || name != "api.example.invalid" {
+		t.Fatalf("выученный адрес не узнан: %q %v", name, ok)
+	}
+	if got := srv.channels.Load(); got != before+1 {
+		t.Fatalf("сервер открыл %d каналов вместо одного", got-before)
+	}
+}
+
 // ---------- поведение при мёртвой связи ----------
 
 // silentServer поднимает туннель, у которого сервер замолкает начиная с

@@ -295,7 +295,13 @@ func (t *Tunnel) StartStack(tunFD int, mtu int) error {
 			if cb == nil {
 				return nil, fmt.Errorf("нет резолвера")
 			}
-			return parseIPs(cb.ResolveLocal(name))
+			ips, err := parseIPs(cb.ResolveLocal(name))
+			if err == nil {
+				// Приложение придёт уже с адресом, а не с именем, —
+				// ядро должно узнать его и не повести через сервер.
+				tun.LearnDirect(name, ips)
+			}
+			return ips, err
 		},
 		// Block проверяется раньше Direct и раньше Pool.Get — см. dns.go.
 		Block: block,
