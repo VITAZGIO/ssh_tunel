@@ -195,6 +195,7 @@ func (s *Server) Serve() error {
 	mux.HandleFunc("/api/settings/import", s.guard(s.handleSettingsImport))
 	mux.HandleFunc("/api/update/check", s.guard(s.handleUpdateCheck))
 	mux.HandleFunc("/api/update/download", s.guard(s.handleUpdateDownload))
+	mux.HandleFunc("/api/mesh", s.guard(s.handleMesh))
 
 	srv := &http.Server{
 		Handler:           mux,
@@ -346,6 +347,11 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 	s.app.Stop()
 	writeJSON(w, map[string]bool{"ok": true})
+}
+
+// handleMesh — состояние сети устройств: кто в сети, какие у кого имена.
+func (s *Server) handleMesh(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, s.app.MeshStatus())
 }
 
 func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
@@ -602,6 +608,7 @@ func (s *Server) handleVpsSetupStart(w http.ResponseWriter, r *http.Request) {
 		KeyPath         string `json:"keyPath"`
 		InstallPanel    bool   `json:"installPanel"`
 		InstallUDPRelay bool   `json:"installUdpRelay"`
+		InstallMesh     bool   `json:"installMesh"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, map[string]string{"error": "не разобрал запрос: " + err.Error()})
@@ -633,6 +640,7 @@ func (s *Server) handleVpsSetupStart(w http.ResponseWriter, r *http.Request) {
 		KeyPath:         keyPath,
 		InstallPanel:    req.InstallPanel,
 		InstallUDPRelay: req.InstallUDPRelay,
+		InstallMesh:     req.InstallMesh,
 	}
 	go func() {
 		defer func() {

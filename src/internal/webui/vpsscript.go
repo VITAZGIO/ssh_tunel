@@ -19,7 +19,7 @@ import (
 	"text/template"
 )
 
-//go:embed vpsassets/*.tmpl vpsassets/udprelay_server.go.txt
+//go:embed vpsassets/*.tmpl vpsassets/udprelay_server.go.txt vpsassets/meshd_server.go.txt
 var vpsScripts embed.FS
 
 var (
@@ -34,6 +34,17 @@ var (
 // с оригиналом проверяет TestUDPRelayServerSourceMatchesCmd в vpssetup_test.go.
 func udpRelayServerSource() (string, error) {
 	data, err := vpsScripts.ReadFile("vpsassets/udprelay_server.go.txt")
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
+}
+
+// meshdServerSource — исходник сервиса сети устройств (sshtunnel/cmd/meshd),
+// копия по той же причине, что и у ретранслятора UDP; синхронность проверяет
+// TestMeshdServerSourceMatchesCmd.
+func meshdServerSource() (string, error) {
+	data, err := vpsScripts.ReadFile("vpsassets/meshd_server.go.txt")
 	if err != nil {
 		return "", err
 	}

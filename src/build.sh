@@ -60,7 +60,7 @@ GOOS=linux GOARCH=arm64 go build \
   -ldflags="-s -w $LDVERSION" \
   -o "$OUT/linux/ssh_tunnel_linux_arm64" ./cmd/ssh_tunnel_linux
 
-# Веб-панель и ретранслятор UDP работают только на самом сервере, поэтому
+# Веб-панель, ретранслятор UDP и сеть устройств работают только на самом сервере, поэтому
 # собираются лишь под Linux. Готовые файлы нужны в релизе не для красоты:
 # мастер настройки VPS скачивает их прямо на сервер по постоянной ссылке —
 # без этого он либо ставил бы туда компилятор Go, либо не работал бы вовсе.
@@ -75,6 +75,10 @@ for arch in amd64 arm64; do
   GOOS=linux GOARCH="$arch" go build \
     -ldflags="-s -w $LDVERSION" \
     -o "$OUT/linux/udprelay$suffix" ./cmd/udprelay
+  echo "Linux: сеть устройств meshd ($arch)..."
+  GOOS=linux GOARCH="$arch" go build \
+    -ldflags="-s -w" \
+    -o "$OUT/linux/meshd$suffix" ./cmd/meshd
 done
 
 # Архив для Windows. Браузеры почти не придираются к .zip, тогда как

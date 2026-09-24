@@ -218,6 +218,8 @@ jobs:
           cp releases/linux/ssh_tunnel_panel_arm64 dist/
           cp releases/linux/udprelay dist/
           cp releases/linux/udprelay_arm64 dist/
+          cp releases/linux/meshd dist/
+          cp releases/linux/meshd_arm64 dist/
           cp releases/ssh_tunnel.apk dist/
           ( cd dist && sha256sum * > SHA256SUMS.txt )
           ls -lh dist

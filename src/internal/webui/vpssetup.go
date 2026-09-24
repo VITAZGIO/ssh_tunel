@@ -44,6 +44,7 @@ type vpsSetupParams struct {
 	KeyPath         string
 	InstallPanel    bool
 	InstallUDPRelay bool
+	InstallMesh     bool
 }
 
 const vpsDialTimeout = 20 * time.Second
@@ -149,7 +150,109 @@ func runVpsSetup(bus *events.Bus, p vpsSetupParams) (err error) {
 		}
 	}
 
+	if p.InstallMesh {
+		bus.VpsSetupLine("meshd", "Ставлю сервис сети устройств (meshd)")
+		if err := installMeshd(keyClient, func(line string) { bus.VpsSetupLine("meshd", line) }); err != nil {
+			bus.VpsSetupLine("meshd", "Сеть устройств не установлена: "+err.Error())
+		} else {
+			bus.VpsSetupLine("meshd", "Готово — включи «Сеть устройств» в настройках сервера на каждом устройстве")
+		}
+	}
+
 	return nil
+}
+
+// fwExemption дописывается в конец установки ретранслятора UDP и meshd.
+// Брандмауэр пользователя туннеля (tunnel-user.sh, «закрыть доступ к самому
+// серверу») запрещает ему соединения с 127.0.0.1 — а обе службы слушают как
+// раз там. В свежем tunnel-user.sh исключение уже есть; на серверах,
+// настроенных раньше, его добавляем и в действующие правила, и в сам скрипт,
+// чтобы пережило перезагрузку.
+const fwExemption = `
+if iptables -L SSHTUNNEL -n >/dev/null 2>&1; then
+  iptables -C SSHTUNNEL -p tcp -d 127.0.0.1 --dport 47830:47831 -j RETURN 2>/dev/null || \
+    iptables -I SSHTUNNEL 1 -p tcp -d 127.0.0.1 --dport 47830:47831 -j RETURN
+fi
+if [ -f /usr/local/sbin/tunnel-fw.sh ] && ! grep -q 47831 /usr/local/sbin/tunnel-fw.sh; then
+  sed -i 's|^for N in 127.0.0.0/8|iptables -A SSHTUNNEL -p tcp -d 127.0.0.1 --dport 47830:47831 -j RETURN\nfor N in 127.0.0.0/8|' /usr/local/sbin/tunnel-fw.sh
+  echo "брандмауэр: службам ssh_tunnel на 127.0.0.1 открыт доступ через туннель"
+fi
+`
+
+// installMeshd ставит сервис сети устройств (см. sshtunnel/cmd/meshd) — так
+// же, как ретранслятор UDP: готовый файл со страницы релиза, а если его нет —
+// сборка прямо на сервере из вшитого исходника. Слушает только 127.0.0.1:
+// до него дотягиваются лишь через туннель.
+func installMeshd(client *ssh.Client, onLine func(string)) error {
+	script, err := meshdInstallScript()
+	if err != nil {
+		return err
+	}
+	return runRemoteScript(client, script, onLine)
+}
+
+func meshdInstallScript() (string, error) {
+	src, err := meshdServerSource()
+	if err != nil {
+		return "", fmt.Errorf("не нашёл исходник meshd: %w", err)
+	}
+	const marker = "EOF_MESHD_SOURCE_7c41d0"
+	script := fmt.Sprintf(`set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+
+BIN=""
+case "$(uname -m)" in
+  x86_64)        BIN=meshd ;;
+  aarch64|arm64) BIN=meshd_arm64 ;;
+esac
+GOT=0
+if [ -n "$BIN" ] && command -v curl >/dev/null; then
+  if curl -fsSL -o /usr/local/bin/meshd.new \
+      "https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$BIN"; then
+    mv /usr/local/bin/meshd.new /usr/local/bin/meshd
+    chmod +x /usr/local/bin/meshd
+    GOT=1
+    echo "meshd скачан"
+  fi
+fi
+
+if [ "$GOT" != 1 ]; then
+  rm -f /usr/local/bin/meshd.new
+  echo "готового файла нет — собираю на сервере"
+  command -v go >/dev/null || { echo "ставлю Go"; apt-get -y -qq install golang-go >/dev/null; }
+  mkdir -p /root/meshd
+  cat > /root/meshd/main.go <<'%s'
+%s
+%s
+  cd /root/meshd
+  go build -o /usr/local/bin/meshd main.go
+  echo "meshd собран"
+fi
+
+cat > /etc/systemd/system/meshd.service <<'EOF_UNIT'
+[Unit]
+Description=ssh_tunnel - сеть устройств (только 127.0.0.1)
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/meshd -state /var/lib/meshd/state.json
+Restart=always
+RestartSec=2
+DynamicUser=yes
+StateDirectory=meshd
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF_UNIT
+systemctl daemon-reload
+systemctl enable meshd.service
+systemctl restart meshd.service
+echo "meshd запущен"
+`+fwExemption, marker, src, marker)
+	return script, nil
 }
 
 // vpsDial — то же самое, что ssh.Dial, но с ограничением по времени на само
@@ -293,9 +396,17 @@ func (w *lineWriter) Flush() {
 // отдельно открывать порт в файрволе не нужно, достучаться до него можно
 // только через уже прошедший SSH-аутентификацию туннель.
 func installUDPRelay(client *ssh.Client, onLine func(string)) error {
+	script, err := udpRelayInstallScript()
+	if err != nil {
+		return err
+	}
+	return runRemoteScript(client, script, onLine)
+}
+
+func udpRelayInstallScript() (string, error) {
 	src, err := udpRelayServerSource()
 	if err != nil {
-		return fmt.Errorf("не нашёл исходник ретранслятора: %w", err)
+		return "", fmt.Errorf("не нашёл исходник ретранслятора: %w", err)
 	}
 
 	const marker = "EOF_UDPRELAY_SOURCE_39fa2c"
@@ -353,9 +464,8 @@ EOF_UNIT
 systemctl daemon-reload
 systemctl enable --now udprelay.service
 echo "udprelay запущен"
-`, marker, src, marker)
-
-	return runRemoteScript(client, script, onLine)
+`+fwExemption, marker, src, marker)
+	return script, nil
 }
 
 // installPanel ставит НАШУ веб-панель (sshtunnel/cmd/ssh_tunnel_panel):

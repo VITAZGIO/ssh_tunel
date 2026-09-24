@@ -363,6 +363,17 @@
            color:var(--err);border-radius:9px;padding:8px 11px;margin:0 0 11px;
            font-size:12.5px;white-space:pre-wrap;display:none}
   .err-box.on{display:block}
+  .peer{display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid var(--line);
+        border-radius:9px;background:var(--card);margin-bottom:6px;cursor:pointer}
+  .peer:hover{border-color:var(--accent)}
+  .peer .dot{width:8px;height:8px;border-radius:50%;background:var(--dim);flex:none}
+  .peer.on .dot{background:var(--ok)}
+  .peer .nm{flex:1;min-width:0}
+  .peer .nm .h{font-family:var(--mono);font-size:12px}
+  .peer .nm .n{font-size:11.5px;color:var(--dim)}
+  .peer .ip{font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+  .keybox{display:flex;gap:6px;align-items:center}
+  .keybox input{flex:1;font-family:var(--mono);font-size:11.5px}
   pre{font-family:var(--mono);font-size:11px;background:var(--card);
       border:1px solid var(--line);padding:8px 10px;border-radius:8px;
       overflow-x:auto;margin:6px 0 0;-webkit-user-select:text;user-select:text}
@@ -436,6 +447,9 @@
            со своими отступами, который раньше прилипал к плиткам вплотную. -->
       <button class="btn speed" id="speedtest" data-i18n="speedtest">Тест скорости</button>
       <button class="btn" id="toSelfCheck" data-i18n="selfcheck_open">Самопроверка</button>
+      <!-- Появляется, только когда у сервера включена сеть устройств. -->
+      <button class="btn" id="toMeshMain" hidden style="grid-column:1/-1">
+        <span data-i18n="mesh_devices">Устройства</span>: <span id="meshMainCount">—</span></button>
     </div>
   </div>
 
@@ -587,6 +601,13 @@
     <button class="row-link" id="toFilter" style="margin-top:14px">
       <span class="t"><span data-i18n="filter_title">Какие программы вести через туннель</span>
         <div class="v" id="filterSummary">Все</div>
+      </span>
+      <span class="arr">›</span>
+    </button>
+
+    <button class="row-link" id="toMesh" style="margin-top:8px">
+      <span class="t"><span data-i18n="mesh_title">Сеть устройств</span>
+        <div class="v" id="meshSummary">Выключена</div>
       </span>
       <span class="arr">›</span>
     </button>
@@ -940,6 +961,13 @@
       отдельный порт наружу не открывается, достучаться до него можно только через уже настроенный туннель.
       После установки включи «Пробрасывать UDP через сервер» в настройках сервера.</p>
 
+    <label class="chk" style="margin:4px 0 14px">
+      <input type="checkbox" id="vpsInstallMesh">
+      <span class="lbl" data-i18n="vps_install_mesh">Заодно поставить сеть устройств (как NetBird)</span></label>
+    <p class="note" style="margin-top:-8px" data-i18n="vps_install_mesh_note">Твои устройства увидят друг
+      друга по именам вида «ноутбук.mesh» — через этот сервер, без белых адресов и проброса портов. Слушает
+      только 127.0.0.1. После установки включи «Сеть устройств» в настройках сервера на каждом устройстве.</p>
+
     <div style="display:flex;gap:9px;align-items:center;margin-top:6px">
       <button class="btn primary" id="vpsSetupStart" data-i18n="vps_setup_start">Настроить сервер</button>
       <span class="hint" id="vpsSetupNote"></span>
@@ -950,6 +978,51 @@
   </div>
 
   <!-- САМОПРОВЕРКА -->
+  <div class="view" id="viewMesh">
+    <div class="head">
+      <button class="ico" id="backFromMesh" title="Назад" data-i18n-title="back">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <span class="t" data-i18n="mesh_title">Сеть устройств</span>
+    </div>
+    <p class="note" style="margin-top:0" data-i18n="mesh_intro">Твои устройства — компьютер, телефон,
+      домашний сервер — видят друг друга по именам вида «ноутбук.mesh», как в NetBird. Всё идёт через этот
+      сервер: белые адреса и проброс портов на роутерах не нужны. На сервере должна стоять служба сети
+      устройств — её ставит мастер настройки VPS.</p>
+
+    <label class="chk"><input type="checkbox" id="meshEnabled">
+      <span class="lbl" data-i18n="mesh_enable">Включить сеть устройств на этом сервере</span></label>
+
+    <div class="field" style="margin-top:10px"><label for="meshName" data-i18n="mesh_name">Имя этого устройства</label>
+      <input type="text" id="meshName" maxlength="64" placeholder="имя компьютера"></div>
+
+    <div class="field"><label for="meshKey" data-i18n="mesh_key">Ключ сети</label>
+      <div class="keybox">
+        <input type="text" id="meshKey" spellcheck="false" autocomplete="off">
+        <button class="btn" id="meshCopyKey" data-i18n="mesh_copy">Скопировать</button>
+      </div>
+    </div>
+    <div class="hint" style="margin:-4px 0 10px" data-i18n="mesh_key_hint">Устройства с одинаковым ключом — одна
+      сеть. Ключ переносится вместе с сервером через «Экспорт» (на телефон — QR-кодом). Никому постороннему
+      его не давай.</div>
+    <button class="btn" id="meshNewKey" data-i18n="mesh_new">Создать новую сеть</button>
+
+    <label class="chk" style="margin-top:10px"><input type="checkbox" id="meshIncoming">
+      <span class="lbl" data-i18n="mesh_incoming">Пускать другие устройства к моим службам</span></label>
+    <div class="hint" style="margin:-4px 0 10px" data-i18n="mesh_incoming_hint">Тогда с другого устройства
+      откроется то, что слушает на этом: например «сервер.mesh:8080» — это порт 8080 здесь (Docker, веб-панели,
+      SSH). Выключи на устройствах, к которым ходить не нужно, — например на телефоне.</div>
+
+    <div style="display:flex;gap:9px;align-items:center;margin:4px 0 14px">
+      <button class="btn primary" id="meshSave" data-i18n="save">Сохранить</button>
+      <span class="hint" id="meshNote"></span>
+    </div>
+
+    <div class="k" style="margin:4px 0 6px;color:var(--dim);font-size:12px" data-i18n="mesh_devices">Устройства</div>
+    <div class="hint" id="meshState" style="margin:0 0 8px"></div>
+    <div id="meshPeers"></div>
+  </div>
+
   <div class="view" id="viewSelfCheck">
     <div class="head">
       <button class="ico" id="backFromSelfCheck" title="Назад" data-i18n-title="back">
@@ -1117,6 +1190,26 @@ const I18N = {
     vps_install_panel:'Заодно поставить веб-панель для клиентов',
     vps_install_panel_note:'Отдельная веб-страница для администрирования сервера (системные службы, '+
       'сеть, диски) — новый открытый порт наружу. Показывает адрес и одноразовый пароль после установки.',
+    mesh_title:'Сеть устройств', mesh_devices:'Устройства', mesh_enable:'Включить сеть устройств на этом сервере',
+    mesh_name:'Имя этого устройства', mesh_key:'Ключ сети', mesh_copy:'Скопировать', mesh_new:'Создать новую сеть',
+    mesh_incoming:'Пускать другие устройства к моим службам',
+    mesh_intro:'Твои устройства — компьютер, телефон, домашний сервер — видят друг друга по именам вида '+
+      '«ноутбук.mesh», как в NetBird. Всё идёт через этот сервер: белые адреса и проброс портов на роутерах не '+
+      'нужны. На сервере должна стоять служба сети устройств — её ставит мастер настройки VPS.',
+    mesh_key_hint:'Устройства с одинаковым ключом — одна сеть. Ключ переносится вместе с сервером через «Экспорт» '+
+      '(на телефон — QR-кодом). Никому постороннему его не давай.',
+    mesh_incoming_hint:'Тогда с другого устройства откроется то, что слушает на этом: например «сервер.mesh:8080» — '+
+      'это порт 8080 здесь (Docker, веб-панели, SSH). Выключи на устройствах, к которым ходить не нужно, — '+
+      'например на телефоне.',
+    copied:'скопировано', mesh_on:'Включена', mesh_off:'Выключена', mesh_this:'(это устройство)', mesh_click_copy:'Нажми, чтобы скопировать имя',
+    mesh_new_confirm:'Создать новую сеть? Это устройство уйдёт из прежней, и остальным понадобится новый ключ.',
+    mesh_not_saved:'новый ключ — не забудь «Сохранить»',
+    mesh_state_online:'В сети', mesh_state_connecting:'Подключаюсь', mesh_state_error:'Нет связи',
+    mesh_state_stopped:'Туннель выключен', mesh_state_off:'Выключена',
+    vps_install_mesh:'Заодно поставить сеть устройств (как NetBird)',
+    vps_install_mesh_note:'Твои устройства увидят друг друга по именам вида «ноутбук.mesh» — через этот сервер, '+
+      'без белых адресов и проброса портов. Слушает только 127.0.0.1. После установки включи «Сеть устройств» '+
+      'в настройках сервера на каждом устройстве.',
     vps_install_udprelay:'Заодно поставить ретранслятор UDP (звонки, игры)',
     vps_install_udprelay_note:'Слушает только 127.0.0.1 — отдельный порт наружу не открывается, '+
       'достучаться до него можно только через уже настроенный туннель. После установки включи '+
@@ -1289,6 +1382,25 @@ const I18N = {
     vps_install_panel:'Also install the client web panel',
     vps_install_panel_note:'A separate web page for administering the server (system services, network, '+
       'disks) — one more open port. Shows the address and a one-time password once installed.',
+    mesh_title:'Device network', mesh_devices:'Devices', mesh_enable:'Turn on the device network on this server',
+    mesh_name:'This device name', mesh_key:'Network key', mesh_copy:'Copy', mesh_new:'Create a new network',
+    mesh_incoming:'Let other devices reach my services',
+    mesh_intro:'Your devices — computer, phone, home server — see each other by names like "laptop.mesh", like '+
+      'NetBird. Everything goes through this server: no public IPs or router port forwarding needed. The server '+
+      'needs the device network service — the VPS setup wizard installs it.',
+    mesh_key_hint:'Devices with the same key form one network. The key travels with the server via "Export" '+
+      '(to a phone — as a QR code). Do not give it to strangers.',
+    mesh_incoming_hint:'Then another device can open what listens here: e.g. "server.mesh:8080" is port 8080 on '+
+      'this device (Docker, web panels, SSH). Turn it off on devices nobody needs to reach, e.g. a phone.',
+    copied:'copied', mesh_on:'On', mesh_off:'Off', mesh_this:'(this device)', mesh_click_copy:'Click to copy the name',
+    mesh_new_confirm:'Create a new network? This device will leave the old one, and the others will need the new key.',
+    mesh_not_saved:'new key — remember to Save',
+    mesh_state_online:'Online', mesh_state_connecting:'Connecting', mesh_state_error:'No connection',
+    mesh_state_stopped:'Tunnel is off', mesh_state_off:'Off',
+    vps_install_mesh:'Also install the device network (like NetBird)',
+    vps_install_mesh_note:'Your devices will see each other by names like "laptop.mesh" — through this server, '+
+      'no public IPs or port forwarding needed. Listens only on 127.0.0.1. After installing, turn on '+
+      '"Device network" in the server settings on each device.',
     vps_install_udprelay:'Also install the UDP relay (calls, games)',
     vps_install_udprelay_note:"Listens only on 127.0.0.1 — no separate port opens up; it's reachable only "+
       'through the tunnel that\'s already set up. Once installed, turn on "Route UDP through the server" '+
@@ -1422,8 +1534,8 @@ $('language').addEventListener('change', () => {
   formDirty = true;
 });
 
-const FIELDS = ['host','user','keyPath','sshPort','socksPort','httpPort','poolSize'];
-const PROFILE_CHECKS = ['localViaTunnel', 'udpRelayEnabled'];
+const FIELDS = ['host','user','keyPath','sshPort','socksPort','httpPort','poolSize','meshName','meshKey'];
+const PROFILE_CHECKS = ['localViaTunnel', 'udpRelayEnabled', 'meshEnabled', 'meshIncoming'];
 const CHECKS = ['verbose'];
 
 /* Правила фильтра живут отдельно от полей формы: они правятся на своём
@@ -1781,7 +1893,7 @@ function docWithProfile(p){
 
 /* ---------- переключение экранов ---------- */
 const VIEWS = ['viewMain','viewSettings','viewFilter','viewWizard',
-               'viewVpsSetup','viewSelfCheck','viewLog'];
+               'viewVpsSetup','viewSelfCheck','viewLog','viewMesh'];
 let current = 'viewMain';
 
 function show(name){
@@ -1809,6 +1921,10 @@ $('backFromLog').onclick = () => show('viewMain');
 $('backFromFilter').onclick = () => show('viewSettings');
 $('toFilter').onclick = () => show('viewFilter');
 $('backFromSelfCheck').onclick = () => show('viewMain');
+let meshFrom = 'viewSettings';
+$('toMesh').onclick = () => { meshFrom = 'viewSettings'; show('viewMesh'); pollMesh(); };
+$('toMeshMain').onclick = () => { meshFrom = 'viewMain'; show('viewMesh'); pollMesh(); };
+$('backFromMesh').onclick = () => show(meshFrom);
 $('toSelfCheck').onclick = () => { show('viewSelfCheck'); runSelfCheck(); };
 // «Настроить сервер по SSH» — вариант «автоматически» внутри вкладки VPS
 // мастера настройки, поэтому назад возвращает туда же, а не в настройки.
@@ -2125,6 +2241,7 @@ $('vpsSetupStart').onclick = async () => {
     keyPath: $('keyPath').value || undefined,
     installPanel: $('vpsInstallPanel').checked,
     installUdpRelay: $('vpsInstallUdpRelay').checked,
+    installMesh: $('vpsInstallMesh').checked,
   });
   if(r.error){
     vpsSetupRunning = false;
@@ -2432,6 +2549,84 @@ $('scanNet').onclick = async () => {
   box.onmouseleave = hideScanLater;
   hideScanLater();
 };
+
+/* ---------- сеть устройств ---------- */
+function newMeshKey(){
+  const b = new Uint8Array(24);
+  crypto.getRandomValues(b);
+  return btoa(String.fromCharCode(...b)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+$('meshEnabled').onchange = () => {
+  if($('meshEnabled').checked){
+    if(!$('meshKey').value.trim()) $('meshKey').value = newMeshKey();
+    if(!$('meshIncoming').dataset.touched) $('meshIncoming').checked = true;
+  }
+  formDirty = true;
+  renderMeshSummary();
+};
+$('meshIncoming').onchange = () => { $('meshIncoming').dataset.touched = '1'; formDirty = true; };
+$('meshNewKey').onclick = async () => {
+  if($('meshKey').value.trim() && !await appConfirm(tr('mesh_new_confirm'))) return;
+  $('meshKey').value = newMeshKey();
+  $('meshEnabled').checked = true;
+  formDirty = true;
+  $('meshNote').textContent = tr('mesh_not_saved');
+  renderMeshSummary();
+};
+$('meshCopyKey').onclick = async () => {
+  const ok = await copyToClipboard($('meshKey').value.trim());
+  $('meshNote').textContent = ok ? tr('copied') : '';
+};
+$('meshSave').onclick = () => {
+  $('save').click();
+  $('meshNote').textContent = tr('saved');
+  setTimeout(() => { $('meshNote').textContent = ''; pollMesh(); }, 1500);
+};
+
+function renderMeshSummary(){
+  const on = $('meshEnabled').checked;
+  $('meshSummary').textContent = on ? tr('mesh_on') : tr('mesh_off');
+}
+
+let meshLast = null;
+async function pollMesh(){
+  // Плитка на главном — про сервер, к которому подключаемся, а не про тот,
+  // что сейчас открыт в настройках.
+  const p = (cfg.profiles || []).find(x => x.id === cfg.activeProfile) || {};
+  const enabled = !!p.meshEnabled;
+  $('toMeshMain').hidden = !enabled;
+  if(!enabled && current !== 'viewMesh') return;
+  let st;
+  try { st = await api('/api/mesh'); } catch(e) { return; }
+  meshLast = st;
+  renderMesh(st);
+}
+
+function renderMesh(st){
+  const peers = (st.peers || []);
+  const online = peers.filter(p => p.online).length;
+  $('meshMainCount').textContent = st.state === 'online' ? online + ' / ' + peers.length : tr('mesh_state_' + st.state) || st.state;
+  let state = tr('mesh_state_' + st.state) || st.state;
+  if(st.state === 'online' && st.self && st.self.host) state += ' — ' + st.self.host + '.mesh (' + st.self.ip + ')';
+  if(st.error) state += ': ' + st.error;
+  $('meshState').textContent = state;
+  const box = $('meshPeers');
+  box.innerHTML = '';
+  peers.forEach(p => {
+    const row = document.createElement('div');
+    row.className = 'peer' + (p.online ? ' on' : '');
+    row.title = tr('mesh_click_copy');
+    row.innerHTML = '<span class="dot"></span><span class="nm"><div class="h"></div><div class="n"></div></span><span class="ip"></span>';
+    row.querySelector('.h').textContent = p.host + '.mesh' + (p.self ? ' ' + tr('mesh_this') : '');
+    row.querySelector('.n').textContent = p.name;
+    row.querySelector('.ip').textContent = p.ip;
+    row.onclick = async () => {
+      if(await copyToClipboard(p.host + '.mesh')) $('meshNote').textContent = tr('copied') + ': ' + p.host + '.mesh';
+    };
+    box.appendChild(row);
+  });
+}
+setInterval(pollMesh, 3000);
 
 async function copyToClipboard(text){
   try {
@@ -2959,6 +3154,8 @@ function fillProfileForm(p){
   renderApps();
   renderCityPicker(p);
   renderIssuedByPanel(p);
+  delete $('meshIncoming').dataset.touched;
+  renderMeshSummary();
 }
 
 // renderIssuedByPanel — сервер настроен вручную почти всегда, поле panel в

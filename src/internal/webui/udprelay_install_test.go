@@ -10,6 +10,8 @@ package webui
 
 import (
 	"os"
+	"os/exec"
+	"strings"
 	"testing"
 )
 
@@ -25,5 +27,47 @@ func TestUDPRelayServerSourceMatchesCmd(t *testing.T) {
 	if embedded != string(original) {
 		t.Fatal("vpsassets/udprelay_server.go.txt разошёлся с cmd/udprelay/main.go — " +
 			"скопируй актуальный main.go поверх vpsassets/udprelay_server.go.txt")
+	}
+}
+
+// TestMeshdServerSourceMatchesCmd — то же для сервиса сети устройств.
+func TestMeshdServerSourceMatchesCmd(t *testing.T) {
+	embedded, err := meshdServerSource()
+	if err != nil {
+		t.Fatal(err)
+	}
+	original, err := os.ReadFile("../../cmd/meshd/main.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if embedded != string(original) {
+		t.Fatal("vpsassets/meshd_server.go.txt разошёлся с cmd/meshd/main.go — " +
+			"скопируй актуальный main.go поверх vpsassets/meshd_server.go.txt")
+	}
+}
+
+// Скрипты установки служб собираются из кусков (исходник, юнит systemd,
+// правка брандмауэра) — bash -n ловит сломанные кавычки и heredoc раньше,
+// чем их увидит настоящий сервер.
+func TestInstallScriptsParse(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("нет bash")
+	}
+	for name, build := range map[string]func() (string, error){
+		"udprelay": udpRelayInstallScript,
+		"meshd":    meshdInstallScript,
+	} {
+		script, err := build()
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if !strings.Contains(script, "47830:47831") {
+			t.Errorf("%s: нет исключения в брандмауэре", name)
+		}
+		cmd := exec.Command("bash", "-n")
+		cmd.Stdin = strings.NewReader(script)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Errorf("%s: bash -n: %v\n%s", name, err, out)
+		}
 	}
 }
