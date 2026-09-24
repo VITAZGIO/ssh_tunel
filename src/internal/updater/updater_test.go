@@ -155,3 +155,23 @@ func resetCache() {
 	cached, cachedAt = nil, time.Time{}
 	cacheMu.Unlock()
 }
+
+func TestAssetForVPN(t *testing.T) {
+	rel := Release{Assets: []Asset{
+		{Name: "ssh_tunnel.exe"}, {Name: "ssh_tunnel_vpn.exe"},
+		{Name: "ssh_tunnel_linux"}, {Name: "ssh_tunnel_vpn_linux"}, {Name: "ssh_tunnel_vpn_linux_arm64"},
+	}}
+	VPN = true
+	defer func() { VPN = false }()
+	cases := map[[2]string]string{
+		{"windows", "amd64"}: "ssh_tunnel_vpn.exe",
+		{"linux", "amd64"}:   "ssh_tunnel_vpn_linux",
+		{"linux", "arm64"}:   "ssh_tunnel_vpn_linux_arm64",
+	}
+	for k, want := range cases {
+		a, ok := AssetFor(rel, k[0], k[1])
+		if !ok || a.Name != want {
+			t.Errorf("AssetFor(%s/%s) = %q, %v; ожидалось %q", k[0], k[1], a.Name, ok, want)
+		}
+	}
+}

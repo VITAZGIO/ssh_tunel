@@ -135,6 +135,9 @@ func (h *Handler) logf(format string, a ...any) {
 	}
 }
 
+// Device — устройство, поверх которого поднимается стек (см. StartDevice).
+type Device = device.Device
+
 // Engine — собранный стек поверх дескриптора от VpnService.
 type Engine struct {
 	dev   device.Device

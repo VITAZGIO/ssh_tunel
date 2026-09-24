@@ -70,7 +70,10 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: vpn
-          path: releases/windows/ssh_tunnel_vpn.exe
+          path: |
+            releases/windows/ssh_tunnel_vpn.exe
+            releases/linux/ssh_tunnel_vpn_linux
+            releases/linux/ssh_tunnel_vpn_linux_arm64
           if-no-files-found: error
 
   android:
@@ -190,7 +193,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: vpn
-          path: releases/windows
+          path: releases
 
       - uses: actions/download-artifact@v4
         with:
@@ -207,6 +210,8 @@ jobs:
           cp releases/windows/ssh_tunnel_vpn.exe dist/
           cp releases/linux/ssh_tunnel_linux dist/
           cp releases/linux/ssh_tunnel_linux_arm64 dist/
+          cp releases/linux/ssh_tunnel_vpn_linux dist/
+          cp releases/linux/ssh_tunnel_vpn_linux_arm64 dist/
           # Панель и ретранслятор UDP — на них ссылается мастер настройки VPS:
           # он скачивает их на сервер по постоянному адресу этого релиза.
           cp releases/linux/ssh_tunnel_panel dist/

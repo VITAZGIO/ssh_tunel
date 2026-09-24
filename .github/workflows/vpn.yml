@@ -1,4 +1,4 @@
-# Сборка ssh_tunnel_vpn.exe — версии для Windows с режимом VPN.
+# Сборка версий с режимом VPN: ssh_tunnel_vpn.exe и ssh_tunnel_vpn_linux.
 #
 # Отдельный workflow, потому что модулю нужен Go 1.26 (сетевой стек gvisor),
 # а обычной настольной сборке хватает 1.22. Результат прикладывается к запуску
@@ -35,5 +35,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ssh_tunnel_vpn
-          path: releases/windows/ssh_tunnel_vpn.exe
+          path: |
+            releases/windows/ssh_tunnel_vpn.exe
+            releases/linux/ssh_tunnel_vpn_linux
+            releases/linux/ssh_tunnel_vpn_linux_arm64
           if-no-files-found: error

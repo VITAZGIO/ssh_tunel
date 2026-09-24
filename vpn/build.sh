@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Собирает ssh_tunnel_vpn.exe — версию для Windows с режимом VPN — и кладёт
-# рядом с остальными файлами в ../releases/windows. Запускать из папки vpn.
+# Собирает версии с режимом VPN: ssh_tunnel_vpn.exe для Windows и
+# ssh_tunnel_vpn_linux (amd64, arm64) — и кладёт рядом с остальными файлами в
+# ../releases. Запускать из папки vpn.
 #
 # Отдельно от src/build.sh, потому что этому модулю нужен Go 1.26 (сетевой
 # стек gvisor), а основному хватает 1.22.
@@ -21,7 +22,7 @@ echo "Версия сборки: $VERSION"
 # остановит, а не уедет в exe.
 WINTUN_VERSION="0.14.1"
 WINTUN_SHA256="07c256185d6ee3652e09fa55c0b673e2624b565e02c4b9091c79ca7d2f24ef51"
-DLL="winvpn/wintun/wintun.dll"
+DLL="vpnlayer/wintun/wintun.dll"
 
 if [ ! -f "$DLL" ] || [ "$(head -c 2 "$DLL")" != "MZ" ]; then
   echo "Скачиваю Wintun $WINTUN_VERSION..."
@@ -59,5 +60,16 @@ GOOS=windows GOARCH=amd64 go build \
   -ldflags="-s -w -H windowsgui $LDVERSION" \
   -o "$OUT/ssh_tunnel_vpn.exe" ./cmd/ssh_tunnel_vpn
 
-ls -lh "$OUT/ssh_tunnel_vpn.exe"
+LINUX_OUT="../releases/linux"
+mkdir -p "$LINUX_OUT"
+for arch in amd64 arm64; do
+  suffix=""
+  [ "$arch" = arm64 ] && suffix="_arm64"
+  echo "Linux: VPN ($arch)..."
+  GOOS=linux GOARCH="$arch" go build \
+    -ldflags="-s -w $LDVERSION" \
+    -o "$LINUX_OUT/ssh_tunnel_vpn_linux$suffix" ./cmd/ssh_tunnel_vpn_linux
+done
+
+ls -lh "$OUT/ssh_tunnel_vpn.exe" "$LINUX_OUT"/ssh_tunnel_vpn_linux*
 echo "Готово."

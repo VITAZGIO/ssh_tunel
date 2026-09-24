@@ -1,4 +1,4 @@
-package winvpn
+package vpnlayer
 
 import (
 	"fmt"

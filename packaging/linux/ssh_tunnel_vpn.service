@@ -1,0 +1,33 @@
+# Служба ssh_tunnel_vpn_linux для systemd — режим VPN: через туннель идёт весь
+# трафик системы.
+#
+# В отличие от ssh_tunnel.service, системная, а не пользовательская: создавать
+# сетевые устройства и менять маршруты может только root. Настройки берутся из
+# папки, указанной в XDG_CONFIG_HOME ниже, — поправь на свою домашнюю, чтобы
+# серверы были общими с обычной версией.
+#
+#   sudo cp ssh_tunnel_vpn.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now ssh_tunnel_vpn
+#
+# Журнал:  journalctl -u ssh_tunnel_vpn -f
+#
+# Одновременно с ssh_tunnel.service запускать не стоит: хватит одного.
+
+[Unit]
+Description=ssh_tunnel VPN — весь трафик через собственный сервер
+Documentation=https://github.com/VITAZGIO/ssh_tunel
+After=network-online.target systemd-resolved.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=XDG_CONFIG_HOME=/home/ИМЯ/.config
+ExecStart=/usr/local/bin/ssh_tunnel_vpn_linux -web
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

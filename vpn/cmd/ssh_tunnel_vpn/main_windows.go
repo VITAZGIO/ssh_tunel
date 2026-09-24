@@ -23,7 +23,7 @@ import (
 	"sshtunnel/internal/shutdown"
 	"sshtunnel/internal/updater"
 	"sshtunnel/internal/webui"
-	"sshtunnel/vpn/winvpn"
+	"sshtunnel/vpn/vpnlayer"
 )
 
 const windowTitle = "ssh_tunnel VPN"
@@ -44,11 +44,11 @@ func main() {
 		return
 	}
 
-	updater.WindowsAsset = "ssh_tunnel_vpn.exe"
+	updater.VPN = true
 
 	cfg := config.Load()
 	a := app.New(cfg)
-	a.SetNetLayer(winvpn.New(a.Bus))
+	a.SetNetLayer(vpnlayer.New(a.Bus))
 	// Системный прокси мог остаться от аварийно закрытого ssh_tunnel.exe —
 	// вместе с VPN он только мешал бы.
 	a.RecoverStaleProxy()
