@@ -6,12 +6,14 @@ package tunnel
 // делает браузер, и через ServeConn, как это делает стек режима VPN.
 
 import (
+	"bufio"
 	"fmt"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -39,22 +41,33 @@ func startTestMeshd(t *testing.T) string {
 	if err != nil {
 		t.Skipf("не удалось собрать meshd: %v", err)
 	}
-	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
-	cmd := exec.Command(bin, "-listen", addr, "-state", filepath.Join(t.TempDir(), "state.json"))
+	// Порт выбирает сам meshd (:0) и сообщает в журнале — см. тот же приём
+	// в internal/mesh.
+	cmd := exec.Command(bin, "-listen", "127.0.0.1:0", "-state", filepath.Join(t.TempDir(), "state.json"))
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { cmd.Process.Kill(); cmd.Wait() })
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		if c, err := net.Dial("tcp", addr); err == nil {
-			c.Close()
-			return addr
+	found := make(chan string, 1)
+	go func() {
+		sc := bufio.NewScanner(stderr)
+		for sc.Scan() {
+			if i := strings.Index(sc.Text(), "слушает "); i >= 0 {
+				found <- strings.TrimSpace(sc.Text()[i+len("слушает "):])
+			}
 		}
-		time.Sleep(20 * time.Millisecond)
+	}()
+	select {
+	case addr := <-found:
+		return addr
+	case <-time.After(10 * time.Second):
+		t.Fatal("meshd не поднялся")
+		return ""
 	}
-	t.Fatal("meshd не поднялся")
-	return ""
 }
 
 func startMeshTunnel(t *testing.T, srv *testSSHServer, keyPath string, m mesh.Config) (*Tunnel, string) {

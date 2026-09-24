@@ -3,11 +3,9 @@ package webui
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -232,18 +230,10 @@ func TestHandleStartReportsConnErrorKind(t *testing.T) {
 	}
 
 	// Порт, на котором заведомо никто не слушает — TCP сразу отвечает RST.
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, portStr, _ := net.SplitHostPort(ln.Addr().String())
-	ln.Close()
-
 	cfg := withHost("127.0.0.1")
 	p := cfg.Active()
 	p.KeyPath = keyPath
-	port, _ := strconv.Atoi(portStr)
-	p.SSHPort = port
+	p.SSHPort = closedPort(t)
 	cfg.SetProfile(p)
 
 	s, err := NewOn(app.New(cfg), "127.0.0.1:0")

@@ -41,28 +41,39 @@ func startMeshd(t *testing.T) string {
 	if err != nil {
 		t.Skipf("не удалось собрать meshd: %v", err)
 	}
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	return runMeshd(t, bin, filepath.Join(t.TempDir(), "state.json"))
+}
+
+// runMeshd запускает meshd на свободном порту, который тот выбирает сам (:0),
+// и узнаёт адрес из его журнала. «Взять свободный порт и закрыть» здесь не
+// годится: пока meshd стартует, порт успевает занять тест другого пакета.
+func runMeshd(t *testing.T, bin, state string) string {
+	t.Helper()
+	cmd := exec.Command(bin, "-listen", "127.0.0.1:0", "-state", state)
+	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		t.Fatal(err)
 	}
-	addr := ln.Addr().String()
-	ln.Close()
-
-	cmd := exec.Command(bin, "-listen", addr, "-state", filepath.Join(t.TempDir(), "state.json"))
 	if err := cmd.Start(); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { cmd.Process.Kill(); cmd.Wait() })
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		if c, err := net.Dial("tcp", addr); err == nil {
-			c.Close()
-			return addr
+	found := make(chan string, 1)
+	go func() {
+		sc := bufio.NewScanner(stderr)
+		for sc.Scan() {
+			if i := strings.Index(sc.Text(), "слушает "); i >= 0 {
+				found <- strings.TrimSpace(sc.Text()[i+len("слушает "):])
+			}
 		}
-		time.Sleep(20 * time.Millisecond)
+	}()
+	select {
+	case addr := <-found:
+		return addr
+	case <-time.After(10 * time.Second):
+		t.Fatal("meshd не поднялся")
+		return ""
 	}
-	t.Fatal("meshd не поднялся")
-	return ""
 }
 
 func directDial(network, addr string) (net.Conn, error) { return net.Dial(network, addr) }
