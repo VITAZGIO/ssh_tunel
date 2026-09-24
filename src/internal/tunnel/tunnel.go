@@ -29,6 +29,7 @@ import (
 
 	"sshtunnel/internal/events"
 	"sshtunnel/internal/hostkey"
+	"sshtunnel/internal/mesh"
 	"sshtunnel/internal/procinfo"
 	"sshtunnel/internal/routing"
 	"sshtunnel/internal/udprelay"
@@ -105,6 +106,10 @@ type Config struct {
 	// localhost). Пусто — значение по умолчанию, то же, что и у
 	// cmd/udprelay без флагов.
 	UDPRelayAddr string
+
+	// Mesh — сеть устройств на этом сервере (см. internal/mesh). nil —
+	// выключена.
+	Mesh *mesh.Config
 
 	// DrainTimeout — сколько после «Отключить» держать локальные слушатели
 	// живыми, водя трафик напрямую (см. Drain и docs/DRAIN_SPEC.md). Ноль
@@ -185,6 +190,9 @@ type Tunnel struct {
 	lastAccept atomic.Int64
 	drainMu    sync.Mutex
 	drainTimer *time.Timer
+
+	// mesh — клиент сети устройств, пока пул жив (см. startMesh).
+	mesh atomic.Pointer[mesh.Client]
 
 	// learned — адреса, выданные телефоном для имён из «всегда напрямую»
 	// (см. LearnDirect). Нужно только на Android.
@@ -387,6 +395,44 @@ func (t *Tunnel) startPool() error {
 	go t.publishStats()
 	t.wg.Add(1)
 	go t.pingLoop()
+	t.startMesh()
+	return nil
+}
+
+// startMesh поднимает клиента сети устройств — он живёт столько же, сколько
+// пул: без связи с сервером сети устройств нет.
+func (t *Tunnel) startMesh() {
+	t.mu.RLock()
+	cfg := t.cfg.Mesh
+	t.mu.RUnlock()
+	if cfg == nil || cfg.Key == "" {
+		t.mesh.Store(nil)
+		return
+	}
+	c := mesh.New(*cfg, t.Dial, func(level, text string) {
+		if level == "warn" {
+			t.bus.Warnf("%s", text)
+		} else {
+			t.bus.Infof("%s", text)
+		}
+	})
+	t.mesh.Store(c)
+	ctx := t.poolCtx
+	t.wg.Add(1)
+	go func() {
+		defer t.wg.Done()
+		c.Run(ctx)
+	}()
+}
+
+// Mesh — клиент сети устройств, если она включена и туннель работает.
+func (t *Tunnel) Mesh() *mesh.Client { return t.mesh.Load() }
+
+// meshTarget — цель ведёт в сеть устройств, и сеть включена.
+func (t *Tunnel) meshTarget(target string) *mesh.Client {
+	if m := t.mesh.Load(); m != nil && m.Match(target) {
+		return m
+	}
 	return nil
 }
 
@@ -571,6 +617,7 @@ func (t *Tunnel) Drain() {
 	if t.poolCancel != nil {
 		t.poolCancel()
 	}
+	t.mesh.Store(nil)
 	for _, l := range t.snapLinks() {
 		l.set(nil)
 	}
@@ -738,6 +785,7 @@ func (t *Tunnel) Stop() {
 	t.drainMu.Unlock()
 
 	t.cancel()
+	t.mesh.Store(nil)
 	for _, ln := range t.listeners {
 		ln.Close()
 	}

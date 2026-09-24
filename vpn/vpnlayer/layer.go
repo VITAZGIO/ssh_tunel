@@ -14,6 +14,7 @@ import (
 	"sshtunnel/android/core"
 	"sshtunnel/internal/config"
 	"sshtunnel/internal/events"
+	"sshtunnel/internal/mesh"
 	"sshtunnel/internal/routing"
 	"sshtunnel/internal/tunnel"
 	"sshtunnel/internal/udprelay"
@@ -155,6 +156,15 @@ func (l *Layer) startStack(dev core.Device) error {
 	dns := &core.DNS{
 		Pool:  pool,
 		Stats: stats,
+		// Имена сети устройств («ноутбук.mesh») — настоящими адресами
+		// устройств: они и так ведут в сеть устройств через туннель.
+		Static: func(name string) ([]net.IP, bool) {
+			var m *mesh.Client
+			if t := l.current.Load(); t != nil {
+				m = t.Mesh()
+			}
+			return mesh.StaticDNS(m, name)
+		},
 		// Мимо туннеля — те же имена, что и в режиме прокси: локальная
 		// сеть и список «всегда напрямую».
 		Direct: func(name string) bool {

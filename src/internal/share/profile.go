@@ -46,6 +46,11 @@ type Doc struct {
 	Panel      string `json:"panel,omitempty"`      // адрес веб-панели VPS
 	ClientID   string `json:"clientId,omitempty"`   // id устройства-клиента
 	DeviceName string `json:"deviceName,omitempty"` // человекочитаемое имя устройства
+
+	// MeshKey — ключ сети устройств на этом сервере (см. internal/mesh):
+	// импортировав файл, устройство попадает в ту же сеть. Необязательное,
+	// как и поля версии 2.
+	MeshKey string `json:"meshKey,omitempty"`
 }
 
 // Build собирает файл обмена из заполненного Doc. Format всегда

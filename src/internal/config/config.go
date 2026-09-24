@@ -4,11 +4,13 @@ package config
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 // Profile — один сервер: всё, что относится именно к нему, а не к программе
@@ -69,6 +71,16 @@ type Profile struct {
 	// настройки VPS), включать нечего — соединение до него просто не
 	// поднимется, и поведение останется прежним.
 	UDPRelayEnabled bool `json:"udpRelayEnabled"`
+
+	// Сеть устройств (см. internal/mesh, cmd/meshd): устройства с одним
+	// ключом сети на этом сервере видят друг друга по именам «имя.mesh».
+	// MeshName — имя этого устройства; пусто — имя компьютера.
+	// MeshIncoming — пускать ли к своим службам соединения от других
+	// устройств сети.
+	MeshEnabled  bool   `json:"meshEnabled,omitempty"`
+	MeshKey      string `json:"meshKey,omitempty"`
+	MeshName     string `json:"meshName,omitempty"`
+	MeshIncoming bool   `json:"meshIncoming,omitempty"`
 }
 
 // Config — вся программа целиком: список серверов и настройки, общие для
@@ -309,6 +321,26 @@ func migrateOldDir() {
 
 func Path() string { return filepath.Join(Dir(), "config.json") }
 
+// DeviceID — постоянный id этого устройства для сети устройств: по нему
+// сервер узнаёт устройство и выдаёт ему тот же адрес. Хранится отдельным
+// файлом, а не в config.json: настройки переносят между устройствами
+// (экспорт, перенос всех настроек), а id у каждого устройства должен быть свой.
+func DeviceID() string {
+	path := filepath.Join(Dir(), "device_id")
+	if b, err := os.ReadFile(path); err == nil {
+		if id := strings.TrimSpace(string(b)); len(id) >= 16 {
+			return id
+		}
+	}
+	var raw [16]byte
+	rand.Read(raw[:])
+	id := base64.RawURLEncoding.EncodeToString(raw[:])
+	if err := os.MkdirAll(Dir(), 0o700); err == nil {
+		os.WriteFile(path, []byte(id+"\n"), 0o600)
+	}
+	return id
+}
+
 // DetectKeyPath ищет ключ SSH в домашней папке ТЕКУЩЕГО пользователя.
 //
 // Путь не зашит и не угадывается по имени: домашняя папка берётся у системы,
@@ -468,6 +500,14 @@ func (p *Profile) normalize(n int) {
 	}
 	if p.KeyPath == "" {
 		p.KeyPath = DetectKeyPath()
+	}
+	p.MeshKey = strings.TrimSpace(p.MeshKey)
+	if p.MeshEnabled && p.MeshKey == "" {
+		// Включили сеть устройств, а ключа нет — это первое устройство
+		// новой сети. Остальные получат ключ экспортом сервера.
+		var raw [24]byte
+		rand.Read(raw[:])
+		p.MeshKey = base64.RawURLEncoding.EncodeToString(raw[:])
 	}
 	switch p.FilterMode {
 	case "only", "except":

@@ -19,6 +19,7 @@ import (
 
 	"sshtunnel/android/core"
 	"sshtunnel/internal/events"
+	"sshtunnel/internal/mesh"
 	"sshtunnel/internal/routing"
 	"sshtunnel/internal/share"
 	"sshtunnel/internal/speedtest"
@@ -165,6 +166,60 @@ func (t *Tunnel) Configure(
 		HTTPAddr:  "",
 	}
 	return nil
+}
+
+// ConfigureMesh задаёт сеть устройств (см. sshtunnel/internal/mesh).
+// Вызывается после Configure и до StartCore: Configure собирает настройки
+// заново и сеть сбрасывает. deviceID — постоянный id телефона, его хранит
+// приложение. Пустой key при enabled — ошибка: ключ сети приложение
+// создаёт само (NewMeshKey) или получает импортом сервера.
+func (t *Tunnel) ConfigureMesh(enabled bool, key, name, deviceID string, incoming bool) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if !enabled {
+		t.cfg.Mesh = nil
+		return nil
+	}
+	key, name, deviceID = strings.TrimSpace(key), strings.TrimSpace(name), strings.TrimSpace(deviceID)
+	if key == "" {
+		return fmt.Errorf("не задан ключ сети устройств")
+	}
+	if deviceID == "" {
+		return fmt.Errorf("не задан id устройства")
+	}
+	if name == "" {
+		name = "телефон"
+	}
+	t.cfg.Mesh = &mesh.Config{Key: key, DeviceID: deviceID, Name: name, AllowIncoming: incoming}
+	return nil
+}
+
+// NewMeshKey — ключ новой сети устройств.
+func NewMeshKey() string { return mesh.NewKey() }
+
+// NewDeviceID — постоянный id устройства для сети устройств.
+func NewDeviceID() string { return mesh.NewDeviceID() }
+
+// MeshStatusJSON — состояние сети устройств для экрана:
+// {"state":"online","self":{...},"peers":[...]} или {"state":"off"}.
+func (t *Tunnel) MeshStatusJSON() string {
+	t.mu.Lock()
+	tun, cfg := t.core, t.cfg
+	t.mu.Unlock()
+	st := mesh.Status{State: "off"}
+	if cfg.Mesh != nil {
+		st.State = "stopped"
+	}
+	if tun != nil {
+		if m := tun.Mesh(); m != nil {
+			st = m.Status()
+		}
+	}
+	b, err := json.Marshal(st)
+	if err != nil {
+		return `{"state":"off"}`
+	}
+	return string(b)
 }
 
 // protect помечает сокет через приложение. Ошибка пометки — не повод рвать
@@ -317,6 +372,10 @@ func (t *Tunnel) StartStack(tunFD int, mtu int) error {
 		},
 		// Block проверяется раньше Direct и раньше Pool.Get — см. dns.go.
 		Block: block,
+		// Имена сети устройств («ноутбук.mesh») — настоящими адресами.
+		Static: func(name string) ([]net.IP, bool) {
+			return mesh.StaticDNS(tun.Mesh(), name)
+		},
 		Stats: stackStats,
 	}
 

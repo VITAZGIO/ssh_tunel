@@ -37,6 +37,12 @@ type DNS struct {
 	// ушло бы в туннель вместо домашней сети.
 	Local LocalResolve
 
+	// Static отвечает за «свои» имена — устройства сети устройств
+	// («ноутбук.mesh»): ours=true значит «это имя моё», и тогда ответом будут
+	// ips (пусто — такого имени нет). Такие имена не получают подставной
+	// адрес: их адреса и так ведут в сеть устройств. nil — своих имён нет.
+	Static func(name string) (ips []net.IP, ours bool)
+
 	// Block — список рекламы и слежки. В отличие от Direct (имя просто идёт
 	// мимо туннеля), заблокированное имя не получает вообще никакого адреса:
 	// ни настоящего, ни подставного. nil или пустой список — блокировка
@@ -84,6 +90,15 @@ func (d *DNS) Answer(query []byte) ([]byte, error) {
 		return refuse(h, q, dnsmessage.RCodeNameError)
 	}
 
+	var static []net.IP
+	isStatic := false
+	if d.Static != nil {
+		static, isStatic = d.Static(name)
+		if isStatic && len(static) == 0 {
+			return refuse(h, q, dnsmessage.RCodeNameError)
+		}
+	}
+
 	reply := dnsmessage.NewBuilder(nil, dnsmessage.Header{
 		ID:                 h.ID,
 		Response:           true,
@@ -112,9 +127,13 @@ func (d *DNS) Answer(query []byte) ([]byte, error) {
 		return reply.Finish()
 	}
 
-	addrs, err := d.resolve(name)
-	if err != nil {
-		return refuse(h, q, dnsmessage.RCodeServerFailure)
+	addrs := static
+	if !isStatic {
+		var err error
+		addrs, err = d.resolve(name)
+		if err != nil {
+			return refuse(h, q, dnsmessage.RCodeServerFailure)
+		}
 	}
 	for _, ip := range addrs {
 		v4 := ip.To4()

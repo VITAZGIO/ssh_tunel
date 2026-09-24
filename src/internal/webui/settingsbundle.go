@@ -39,6 +39,7 @@ func (s *Server) handleSettingsExport(w http.ResponseWriter, r *http.Request) {
 			FilterMode: p.FilterMode, FilterApps: p.FilterApps, DirectHosts: p.DirectHosts,
 			LocalViaTunnel: p.LocalViaTunnel,
 			Panel:          p.Panel, ClientID: p.ClientID, DeviceName: p.DeviceName,
+			MeshKey: exportMeshKey(p),
 		}
 		// Нечитаемый ключ не повод оборвать всю выгрузку: остальные серверы
 		// перенести всё равно полезно, а про этот интерфейс скажет отдельно.
@@ -109,6 +110,8 @@ func (s *Server) handleSettingsImport(w http.ResponseWriter, r *http.Request) {
 		p.FilterMode, p.FilterApps = doc.FilterMode, doc.FilterApps
 		p.DirectHosts, p.LocalViaTunnel = doc.DirectHosts, doc.LocalViaTunnel
 		p.Panel, p.ClientID, p.DeviceName = doc.Panel, doc.ClientID, doc.DeviceName
+		importMeshKey(&p, doc.MeshKey)
+		importMeshKey(&p, doc.MeshKey)
 		if doc.KeyIncluded && strings.TrimSpace(doc.KeyContents) != "" {
 			path, err := saveImportedKey(p.ID, doc.KeyContents)
 			if err != nil {

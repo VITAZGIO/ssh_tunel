@@ -57,6 +57,7 @@ func (s *Server) handleAndroidKey(w http.ResponseWriter, r *http.Request) {
 		SocksPort: p.SocksPort, HTTPPort: p.HTTPPort, PoolSize: p.PoolSize,
 		FilterMode: p.FilterMode, FilterApps: p.FilterApps, DirectHosts: p.DirectHosts,
 		LocalViaTunnel: p.LocalViaTunnel, KeyIncluded: true, KeyContents: priv,
+		MeshKey: exportMeshKey(p),
 	}
 	payload, err := share.Build(doc)
 	if err != nil {

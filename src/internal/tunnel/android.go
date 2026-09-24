@@ -76,6 +76,10 @@ func (t *Tunnel) ServeConn(conn net.Conn, target string, byIP bool) {
 // forceDirect — напрямую в любом случае: адрес выучен под имя из «всегда
 // напрямую» или программе по правилам положено мимо сервера.
 func (t *Tunnel) dialForTun(target string, forceDirect bool) (net.Conn, bool, error) {
+	if m := t.meshTarget(target); m != nil {
+		c, err := m.DialPeer(target)
+		return c, false, err
+	}
 	// Слив (см. Drain): связи с сервером уже нет, но интерфейс VPN ещё
 	// поднят ради уже открытых сокетов приложений — ведём их напрямую.
 	if !t.draining.Load() && !forceDirect && !t.localDirect(target) && !t.listedDirect(target) {

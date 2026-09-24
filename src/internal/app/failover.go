@@ -15,11 +15,14 @@ import (
 	"context"
 	"errors"
 	"net"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"sshtunnel/internal/config"
 	"sshtunnel/internal/events"
+	"sshtunnel/internal/mesh"
 	"sshtunnel/internal/tunnel"
 )
 
@@ -156,6 +159,7 @@ func (a *App) tunnelConfig(cfg config.Config, p config.Profile) (_ tunnel.Config
 		Direct:          a.direct,
 		LocalViaTunnel:  p.LocalViaTunnel,
 		UDPRelayEnabled: p.UDPRelayEnabled,
+		Mesh:            meshConfig(p),
 	}
 	a.mu.Lock()
 	netLayer := a.net
@@ -164,6 +168,23 @@ func (a *App) tunnelConfig(cfg config.Config, p config.Profile) (_ tunnel.Config
 		netLayer.Prepare(&c)
 	}
 	return c, socksAddr, httpAddr
+}
+
+// meshConfig — настройки сети устройств для туннеля; nil, если она выключена.
+func meshConfig(p config.Profile) *mesh.Config {
+	if !p.MeshEnabled || p.MeshKey == "" {
+		return nil
+	}
+	name := strings.TrimSpace(p.MeshName)
+	if name == "" {
+		name, _ = os.Hostname()
+	}
+	return &mesh.Config{
+		Key:           p.MeshKey,
+		DeviceID:      config.DeviceID(),
+		Name:          name,
+		AllowIncoming: p.MeshIncoming,
+	}
 }
 
 func (a *App) enableSysProxy(cfg config.Config, p config.Profile, httpAddr, socksAddr string) {

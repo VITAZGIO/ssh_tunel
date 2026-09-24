@@ -48,6 +48,7 @@ func (s *Server) handleProfileExport(w http.ResponseWriter, r *http.Request) {
 		FilterMode: p.FilterMode, FilterApps: p.FilterApps, DirectHosts: p.DirectHosts,
 		LocalViaTunnel: p.LocalViaTunnel,
 		Panel:          p.Panel, ClientID: p.ClientID, DeviceName: p.DeviceName,
+		MeshKey: exportMeshKey(p),
 	}
 	// Нечитаемый ключ (его ещё не создали, путь указан неверно) больше не
 	// обрывает экспорт: настройки сервера сами по себе полезны, а про
@@ -113,6 +114,7 @@ func (s *Server) handleProfileImport(w http.ResponseWriter, r *http.Request) {
 	p.FilterMode, p.FilterApps = doc.FilterMode, doc.FilterApps
 	p.DirectHosts, p.LocalViaTunnel = doc.DirectHosts, doc.LocalViaTunnel
 	p.Panel, p.ClientID, p.DeviceName = doc.Panel, doc.ClientID, doc.DeviceName
+	importMeshKey(&p, doc.MeshKey)
 
 	keyImported := false
 	if doc.KeyIncluded && strings.TrimSpace(doc.KeyContents) != "" {
@@ -160,4 +162,22 @@ func saveImportedKey(profileID, contents string) (string, error) {
 		return "", err
 	}
 	return path, nil
+}
+
+// exportMeshKey — ключ сети устройств идёт в файл обмена, только если сеть
+// включена: иначе и нести нечего.
+func exportMeshKey(p config.Profile) string {
+	if !p.MeshEnabled {
+		return ""
+	}
+	return p.MeshKey
+}
+
+// importMeshKey: пришёл ключ сети — устройство сразу в ней, со входящими
+// соединениями, как у того, кто её завёл. Имя у каждого устройства своё.
+func importMeshKey(p *config.Profile, key string) {
+	if key == "" {
+		return
+	}
+	p.MeshEnabled, p.MeshKey, p.MeshIncoming = true, key, true
 }

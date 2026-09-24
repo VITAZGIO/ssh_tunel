@@ -17,6 +17,7 @@ import (
 
 	"sshtunnel/internal/config"
 	"sshtunnel/internal/events"
+	"sshtunnel/internal/mesh"
 	"sshtunnel/internal/routing"
 	"sshtunnel/internal/speedtest"
 	"sshtunnel/internal/sysproxy"
@@ -260,6 +261,8 @@ func connectionSettingsChanged(a, b config.Config) bool {
 		oldActive.User != newActive.User || oldActive.KeyPath != newActive.KeyPath ||
 		oldActive.SocksPort != newActive.SocksPort || oldActive.HTTPPort != newActive.HTTPPort ||
 		oldActive.PoolSize != newActive.PoolSize || oldActive.LocalViaTunnel != newActive.LocalViaTunnel ||
+		oldActive.MeshEnabled != newActive.MeshEnabled || oldActive.MeshKey != newActive.MeshKey ||
+		oldActive.MeshName != newActive.MeshName || oldActive.MeshIncoming != newActive.MeshIncoming ||
 		a.SysProxy != b.SysProxy || a.SetEnvVars != b.SetEnvVars
 }
 
@@ -532,6 +535,23 @@ func (a *App) SpeedTest() (speedtest.Result, error) {
 	a.Bus.Speed("", 0, true)
 	a.Bus.Infof("Тест скорости: приём %.1f Мбит/с, отдача %.1f Мбит/с", res.DownMbps, res.UpMbps)
 	return res, nil
+}
+
+// MeshStatus — состояние сети устройств для экрана. State "off" — сеть
+// выключена в настройках или туннель не работает.
+func (a *App) MeshStatus() mesh.Status {
+	a.mu.Lock()
+	tun, cfg := a.tun, a.cfg
+	a.mu.Unlock()
+	if tun != nil {
+		if m := tun.Mesh(); m != nil {
+			return m.Status()
+		}
+	}
+	if cfg.Active().MeshEnabled {
+		return mesh.Status{State: "stopped"}
+	}
+	return mesh.Status{State: "off"}
 }
 
 // ProxyURL — адрес HTTP-прокси для подсказок в интерфейсе.

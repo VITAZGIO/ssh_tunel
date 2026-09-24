@@ -377,3 +377,59 @@ func buildQuery(t *testing.T, name string, typ dnsmessage.Type) []byte {
 	}
 	return out
 }
+
+// Имена сети устройств отвечают настоящими адресами устройств, а
+// незнакомое имя в .mesh — «нет такого», а не подставной адрес.
+func TestDNSStaticMeshNames(t *testing.T) {
+	pool, _ := NewFakePool("198.18.128.0/17")
+	d := &DNS{
+		Pool: pool,
+		Static: func(name string) ([]net.IP, bool) {
+			if !strings.HasSuffix(name, ".mesh") {
+				return nil, false
+			}
+			if name == "laptop.mesh" {
+				return []net.IP{net.ParseIP("198.19.0.2")}, true
+			}
+			return nil, true
+		},
+	}
+	ask := func(name string) (dnsmessage.RCode, []net.IP) {
+		q := dnsmessage.NewBuilder(nil, dnsmessage.Header{ID: 7, RecursionDesired: true})
+		q.StartQuestions()
+		q.Question(dnsmessage.Question{Name: dnsmessage.MustNewName(name + "."), Type: dnsmessage.TypeA, Class: dnsmessage.ClassINET})
+		query, _ := q.Finish()
+		reply, err := d.Answer(query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var p dnsmessage.Parser
+		h, _ := p.Start(reply)
+		p.SkipAllQuestions()
+		var ips []net.IP
+		for {
+			if _, err := p.AnswerHeader(); err != nil {
+				break
+			}
+			a, err := p.AResource()
+			if err != nil {
+				break
+			}
+			ips = append(ips, net.IP(a.A[:]))
+		}
+		return h.RCode, ips
+	}
+	if code, ips := ask("laptop.mesh"); code != dnsmessage.RCodeSuccess || len(ips) != 1 || !ips[0].Equal(net.ParseIP("198.19.0.2")) {
+		t.Fatalf("laptop.mesh: %v %v", code, ips)
+	}
+	if code, _ := ask("nobody.mesh"); code != dnsmessage.RCodeNameError {
+		t.Fatalf("nobody.mesh: %v, ожидалось «нет такого имени»", code)
+	}
+	_, ips := ask("example.com")
+	if len(ips) != 1 {
+		t.Fatalf("example.com: %v", ips)
+	}
+	if name, ok := pool.Resolver()(ips[0].String()); !ok || name != "example.com" {
+		t.Fatalf("обычное имя должно получить подставной адрес, получено %v", ips)
+	}
+}
