@@ -364,6 +364,9 @@ func (t *Tunnel) loadSigner() error {
 // уметь поднять заново, не трогая локальные слушатели (см. Resume).
 func (t *Tunnel) startPool() error {
 	t.poolCtx, t.poolCancel = context.WithCancel(t.ctx)
+	// Горутинам пула контекст — параметром, а не чтением поля: после слива и
+	// Resume поле перезаписывается, пока горутины прежнего пула ещё живы.
+	ctx := t.poolCtx
 
 	// Первое соединение поднимаем синхронно: если сервер недоступен или ключ
 	// не подходит, пользователь должен узнать об этом сразу, а не из лога.
@@ -389,19 +392,19 @@ func (t *Tunnel) startPool() error {
 
 	for i := range links {
 		t.wg.Add(1)
-		go t.keepLinkAlive(links[i], i)
+		go t.keepLinkAlive(ctx, links[i], i)
 	}
 	t.wg.Add(1)
-	go t.publishStats()
+	go t.publishStats(ctx)
 	t.wg.Add(1)
-	go t.pingLoop()
-	t.startMesh()
+	go t.pingLoop(ctx)
+	t.startMesh(ctx)
 	return nil
 }
 
 // startMesh поднимает клиента сети устройств — он живёт столько же, сколько
 // пул: без связи с сервером сети устройств нет.
-func (t *Tunnel) startMesh() {
+func (t *Tunnel) startMesh(ctx context.Context) {
 	t.mu.RLock()
 	cfg := t.cfg.Mesh
 	t.mu.RUnlock()
@@ -417,7 +420,6 @@ func (t *Tunnel) startMesh() {
 		}
 	})
 	t.mesh.Store(c)
-	ctx := t.poolCtx
 	t.wg.Add(1)
 	go func() {
 		defer t.wg.Done()
@@ -455,7 +457,9 @@ func (t *Tunnel) startListeners() error {
 			return fmt.Errorf("не могу занять локальный адрес %s (%s): %w%s",
 				s.addr, s.name, err, whoHolds(s.addr))
 		}
+		t.mu.Lock()
 		t.listeners = append(t.listeners, ln)
+		t.mu.Unlock()
 		t.wg.Add(1)
 		go t.acceptLoop(ln, s.handler)
 	}
@@ -468,10 +472,9 @@ func (t *Tunnel) startListeners() error {
 // экране было бы почти всегда несвежим. Свой замер стоит копейки — служебный
 // запрос без нагрузки по уже открытому соединению, — зато показывает связь
 // такой, какая она сейчас.
-func (t *Tunnel) pingLoop() {
+func (t *Tunnel) pingLoop(ctx context.Context) {
 	defer t.wg.Done()
 
-	ctx := t.poolCtx
 	for {
 		select {
 		case <-ctx.Done():
@@ -786,10 +789,15 @@ func (t *Tunnel) Stop() {
 
 	t.cancel()
 	t.mesh.Store(nil)
-	for _, ln := range t.listeners {
+	// Stop может прийти одновременно с двух сторон — конец слива по таймеру
+	// и «выход» человека; список слушателей трогаем под замком.
+	t.mu.Lock()
+	lns := t.listeners
+	t.listeners = nil
+	t.mu.Unlock()
+	for _, ln := range lns {
 		ln.Close()
 	}
-	t.listeners = nil
 	for _, l := range t.snapLinks() {
 		l.set(nil)
 	}
@@ -955,12 +963,9 @@ func (t *Tunnel) directDialer(timeout time.Duration) *net.Dialer {
 // Без keepalive обрыв связи (заснул ноутбук, моргнул Wi-Fi, NAT выкинул сессию)
 // раньше не замечался вообще: программа продолжала принимать соединения и
 // молча их ломать, а выглядело это как "интернет пропал".
-func (t *Tunnel) keepLinkAlive(l *link, idx int) {
+func (t *Tunnel) keepLinkAlive(ctx context.Context, l *link, idx int) {
 	defer t.wg.Done()
 
-	// Контекст пула, а не всего туннеля: слив гасит пул и эти горутины
-	// должны выйти, хотя локальные слушатели продолжают работать.
-	ctx := t.poolCtx
 	backoff := time.Second
 	for {
 		if ctx.Err() != nil {
@@ -1169,9 +1174,8 @@ func (t *Tunnel) Stats() events.Stats {
 	}
 }
 
-func (t *Tunnel) publishStats() {
+func (t *Tunnel) publishStats(ctx context.Context) {
 	defer t.wg.Done()
-	ctx := t.poolCtx
 	tk := time.NewTicker(time.Second)
 	defer tk.Stop()
 	for {
