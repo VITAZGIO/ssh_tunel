@@ -117,6 +117,8 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var adBlockRow: View
     private lateinit var adBlockSummary: TextView
+    private lateinit var meshRow: View
+    private lateinit var meshSummary: TextView
     private lateinit var udpRelayEnabledCheck: CheckBox
     private lateinit var showServerPickerCheck: CheckBox
 
@@ -232,6 +234,9 @@ class MainActivity : AppCompatActivity() {
         adBlockRow = findViewById(R.id.adBlockRow)
         adBlockSummary = findViewById(R.id.adBlockSummary)
         adBlockRow.setOnClickListener { startActivity(Intent(this, AdBlockActivity::class.java)) }
+        meshRow = findViewById(R.id.meshRow)
+        meshSummary = findViewById(R.id.meshSummary)
+        meshRow.setOnClickListener { startActivity(Intent(this, MeshActivity::class.java)) }
         udpRelayEnabledCheck = findViewById(R.id.udpRelayEnabled)
         showServerPickerCheck = findViewById(R.id.showServerPicker)
 
@@ -330,6 +335,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         TunnelService.onUpdate = { runOnUiThread { refresh() } }
         renderAdBlockSummary()
+        renderMeshSummary()
         refresh()
     }
 
@@ -558,6 +564,7 @@ class MainActivity : AppCompatActivity() {
                 p.name, p.flag, p.host, p.sshPort.toLong(), p.user, p.poolSize.toLong(),
                 p.filterMode, p.filterApps.joinToString("\n"), p.directHosts,
                 p.localViaTunnel, keyContents.isNotBlank(), keyContents, p.panel, p.deviceName,
+                if (p.meshEnabled) p.meshKey else "",
             )
         } catch (e: Exception) {
             Toast.makeText(this, e.message ?: getString(R.string.import_bad_apps), Toast.LENGTH_SHORT).show()
@@ -742,6 +749,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** Сводка сети устройств — про активный сервер: сеть живёт на нём. */
+    private fun renderMeshSummary() {
+        val p = settings.active()
+        meshSummary.text = if (p.meshEnabled && p.meshKey.isNotBlank()) {
+            getString(R.string.mesh_on_for, p.name)
+        } else {
+            getString(R.string.mesh_off)
+        }
+    }
+
     private fun saveAppSettings() {
         settings.udpRelayEnabled = udpRelayEnabledCheck.isChecked
         val pickerChanged = settings.showServerPicker != showServerPickerCheck.isChecked
@@ -827,6 +844,7 @@ class MainActivity : AppCompatActivity() {
         val keyContents = parsed.getKeyContents()
         val panel = parsed.getPanel()
         val deviceName = parsed.getDeviceName()
+        val meshKey = parsed.getMeshKey()
 
         saveCurrentFormInto(editingProfileId)
         val p = settings.addProfile(name, flag)
@@ -840,6 +858,12 @@ class MainActivity : AppCompatActivity() {
         p.localViaTunnel = localViaTunnel
         p.panel = panel
         p.deviceName = deviceName
+        // Пришёл ключ сети устройств — телефон сразу в ней (входящие на
+        // телефоне остаются выключены, их включают на экране сети).
+        if (meshKey.isNotBlank()) {
+            p.meshEnabled = true
+            p.meshKey = meshKey
+        }
         settings.saveProfile(p)
 
         if (keyIncluded && keyContents.isNotBlank()) {

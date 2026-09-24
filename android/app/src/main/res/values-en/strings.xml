@@ -190,4 +190,27 @@
     <string name="author_site">vitazgio.ru</string>
     <string name="scan_replaces_note">The scanned server is added as a new tab and this one is removed.</string>
     <string name="server_switched_reconnecting">Server switched — connecting to it</string>
+    <!-- Device network (MeshActivity, docs/MESH.md) -->
+    <string name="mesh_title">Device network</string>
+    <string name="mesh_off">Off</string>
+    <string name="mesh_on_for">On — server "%1$s"</string>
+    <string name="mesh_for_server">For server "%1$s". Changes apply on the next connection.</string>
+    <string name="mesh_intro">Your phone, computer and home server see each other by names like "laptop.mesh" — like NetBird, but through your own server. The server needs the device network service (the VPS setup wizard on the computer installs it).</string>
+    <string name="mesh_enable">Turn on the device network</string>
+    <string name="mesh_name">Phone name in the network</string>
+    <string name="mesh_key">Network key</string>
+    <string name="mesh_new">New network</string>
+    <string name="mesh_key_hint">Devices with the same key form one network. The easiest way to get the key is to scan the server QR code from the computer: it comes along with the server.</string>
+    <string name="mesh_incoming">Let other devices reach services on the phone</string>
+    <string name="mesh_reconnect_note">Saved automatically, applied on the next connection.</string>
+    <string name="mesh_devices">Devices</string>
+    <string name="mesh_this">(this phone)</string>
+    <string name="mesh_new_confirm">Create a new network? The phone will leave the old one, and other devices will need the new key.</string>
+    <string name="mesh_key_copied">Network key copied</string>
+    <string name="mesh_name_copied">Copied: %1$s</string>
+    <string name="mesh_state_online">Online</string>
+    <string name="mesh_state_connecting">Connecting</string>
+    <string name="mesh_state_error">No connection to the network service</string>
+    <string name="mesh_state_stopped">Tunnel is off</string>
+    <string name="mesh_cancel">Cancel</string>
 </resources>

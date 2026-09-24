@@ -44,6 +44,10 @@ class TunnelService : VpnService(), Callbacks {
         fun speedTest(): String =
             current?.tunnel?.speedTest() ?: """{"error":"туннель выключен"}"""
 
+        /** Состояние сети устройств для MeshActivity (JSON, см. mobile.MeshStatusJSON). */
+        fun meshStatus(): String =
+            current?.tunnel?.meshStatusJSON() ?: """{"state":"stopped"}"""
+
         /**
          * Самопроверка не требует поднятого туннеля — соединение для неё
          * отдельное — но всё равно идёт через уже настроенный tunnel, чтобы
@@ -267,6 +271,14 @@ class TunnelService : VpnService(), Callbacks {
                     settings.adBlockListFile.absolutePath,
                     settings.adBlockAllowlist,
                     settings.udpRelayEnabled,
+                )
+                val prof = settings.active()
+                tunnel.configureMesh(
+                    prof.meshEnabled && prof.meshKey.isNotBlank(),
+                    prof.meshKey,
+                    prof.meshName.ifBlank { android.os.Build.MODEL ?: "телефон" },
+                    settings.deviceId,
+                    prof.meshIncoming,
                 )
                 tunnel.startCore()
 

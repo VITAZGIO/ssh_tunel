@@ -50,6 +50,11 @@
             android:exported="false"
             android:label="@string/ad_block_title" />
 
+        <activity
+            android:name=".MeshActivity"
+            android:exported="false"
+            android:label="@string/mesh_title" />
+
         <!-- Экран сканера QR из zxing-android-embedded: по умолчанию у него
              fullSensor, из-за чего при повороте телефона картинка с камеры
              уезжает в альбомную ориентацию — неудобно держать при сканировании

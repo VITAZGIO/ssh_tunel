@@ -704,6 +704,8 @@ type ParsedConfig struct {
 	// «Этот сервер выдан панелью».
 	Panel      string
 	DeviceName string
+	// MeshKey — ключ сети устройств на этом сервере; пусто — сети нет.
+	MeshKey string
 }
 
 // ParseConfig разбирает текст, вставленный из буфера обмена или считанный из
@@ -727,6 +729,7 @@ func ParseConfig(text string) (*ParsedConfig, error) {
 		KeyContents:    doc.KeyContents,
 		Panel:          doc.Panel,
 		DeviceName:     doc.DeviceName,
+		MeshKey:        doc.MeshKey,
 	}, nil
 }
 
@@ -737,7 +740,7 @@ func ParseConfig(text string) (*ParsedConfig, error) {
 // плоский набор скаляров, как и во всех остальных функциях этого пакета.
 func BuildConfig(name, flag, host string, sshPort int, user string, poolSize int,
 	filterMode, filterApps, directHosts string, localViaTunnel, keyIncluded bool,
-	keyContents, panel, deviceName string) (string, error) {
+	keyContents, panel, deviceName, meshKey string) (string, error) {
 	doc := share.Doc{
 		Name: name, Flag: flag, Host: host, SSHPort: sshPort, User: user,
 		SocksPort: 1080, HTTPPort: 1081, PoolSize: poolSize,
@@ -749,6 +752,7 @@ func BuildConfig(name, flag, host string, sshPort int, user string, poolSize int
 		KeyContents:    keyContents,
 		Panel:          panel,
 		DeviceName:     deviceName,
+		MeshKey:        meshKey,
 	}
 	data, err := share.Build(doc)
 	if err != nil {

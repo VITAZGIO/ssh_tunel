@@ -40,6 +40,13 @@ class Settings(context: Context) {
         // и экран настроек ничего дополнительного не показывает.
         var panel: String = "",
         var deviceName: String = "",
+        // Сеть устройств на этом сервере (см. MeshActivity, docs/MESH.md).
+        // Входящие на телефоне по умолчанию выключены: к нему самому
+        // ходить обычно незачем.
+        var meshEnabled: Boolean = false,
+        var meshKey: String = "",
+        var meshName: String = "",
+        var meshIncoming: Boolean = false,
     )
 
     private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
@@ -163,6 +170,8 @@ class Settings(context: Context) {
             p.filterApps.forEach { apps.put(it) }
             o.put("filterApps", apps)
             o.put("panel", p.panel); o.put("deviceName", p.deviceName)
+            o.put("meshEnabled", p.meshEnabled); o.put("meshKey", p.meshKey)
+            o.put("meshName", p.meshName); o.put("meshIncoming", p.meshIncoming)
             arr.put(o)
         }
         return arr.toString()
@@ -193,6 +202,10 @@ class Settings(context: Context) {
                         filterApps = apps,
                         panel = o.optString("panel", ""),
                         deviceName = o.optString("deviceName", ""),
+                        meshEnabled = o.optBoolean("meshEnabled", false),
+                        meshKey = o.optString("meshKey", ""),
+                        meshName = o.optString("meshName", ""),
+                        meshIncoming = o.optBoolean("meshIncoming", false),
                     )
                 )
             }
@@ -292,6 +305,19 @@ class Settings(context: Context) {
         set(v) = prefs.edit().putBoolean("showServerPicker", v).apply()
 
     val knownHostsFile: File get() = File(filesDir, "known_hosts")
+
+    /**
+     * Постоянный id телефона для сети устройств: по нему сервер узнаёт
+     * устройство и выдаёт ему тот же адрес. Свой у каждого устройства,
+     * поэтому в выгрузку настроек не попадает.
+     */
+    val deviceId: String
+        get() {
+            prefs.getString("meshDeviceId", null)?.takeIf { it.isNotBlank() }?.let { return it }
+            val id = mobile.Mobile.newDeviceID()
+            prefs.edit().putString("meshDeviceId", id).apply()
+            return id
+        }
 
     // ---------------------------------------------------------------------
     // Удобные свойства для активного профиля — чтобы TunnelService и старый

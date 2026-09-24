@@ -189,4 +189,27 @@
     <string name="author_site">vitazgio.ru</string>
     <string name="scan_replaces_note">Отсканированный сервер добавится новой вкладкой, а этот будет удалён.</string>
     <string name="server_switched_reconnecting">Сервер переключён — подключаюсь к нему</string>
+    <!-- Сеть устройств (MeshActivity, docs/MESH.md) -->
+    <string name="mesh_title">Сеть устройств</string>
+    <string name="mesh_off">Выключена</string>
+    <string name="mesh_on_for">Включена — сервер «%1$s»</string>
+    <string name="mesh_for_server">Для сервера «%1$s». Изменения — при следующем подключении.</string>
+    <string name="mesh_intro">Телефон, компьютер и домашний сервер видят друг друга по именам вида «ноутбук.mesh» — как в NetBird, но через твой сервер. На сервере должна стоять служба сети устройств (ставит мастер настройки VPS на компьютере).</string>
+    <string name="mesh_enable">Включить сеть устройств</string>
+    <string name="mesh_name">Имя телефона в сети</string>
+    <string name="mesh_key">Ключ сети</string>
+    <string name="mesh_new">Новая сеть</string>
+    <string name="mesh_key_hint">Устройства с одинаковым ключом — одна сеть. Проще всего получить ключ, отсканировав QR-код сервера с компьютера: он приедет вместе с сервером.</string>
+    <string name="mesh_incoming">Пускать другие устройства к службам телефона</string>
+    <string name="mesh_reconnect_note">Сохраняется само, применяется при следующем подключении.</string>
+    <string name="mesh_devices">Устройства</string>
+    <string name="mesh_this">(этот телефон)</string>
+    <string name="mesh_new_confirm">Создать новую сеть? Телефон уйдёт из прежней, и остальным устройствам понадобится новый ключ.</string>
+    <string name="mesh_key_copied">Ключ сети скопирован</string>
+    <string name="mesh_name_copied">Скопировано: %1$s</string>
+    <string name="mesh_state_online">В сети</string>
+    <string name="mesh_state_connecting">Подключаюсь</string>
+    <string name="mesh_state_error">Нет связи с сервером сети</string>
+    <string name="mesh_state_stopped">Туннель выключен</string>
+    <string name="mesh_cancel">Отмена</string>
 </resources>

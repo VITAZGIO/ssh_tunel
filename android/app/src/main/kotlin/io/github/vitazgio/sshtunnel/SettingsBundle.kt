@@ -38,6 +38,7 @@ object SettingsBundle {
                 p.name, p.flag, p.host, p.sshPort.toLong(), p.user, p.poolSize.toLong(),
                 p.filterMode, p.filterApps.joinToString("\n"), p.directHosts,
                 p.localViaTunnel, key.isNotBlank(), key, p.panel, p.deviceName,
+                if (p.meshEnabled) p.meshKey else "",
             )
             servers.put(JSONObject(doc))
             if (p.id == settings.activeProfileId) active = i
@@ -100,6 +101,7 @@ object SettingsBundle {
                 filterApps = doc.getFilterApps().split("\n")
                     .map { it.trim() }.filter { it.isNotBlank() }.toMutableSet(),
                 panel = doc.getPanel(), deviceName = doc.getDeviceName(),
+                meshEnabled = doc.getMeshKey().isNotBlank(), meshKey = doc.getMeshKey(),
             )
             val key = if (doc.getKeyIncluded()) doc.getKeyContents() else ""
             parsed.add(p to key)
