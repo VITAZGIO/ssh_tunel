@@ -16,6 +16,7 @@ import (
 	"errors"
 	"net"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"sshtunnel/internal/events"
 	"sshtunnel/internal/mesh"
 	"sshtunnel/internal/tunnel"
+	"sshtunnel/internal/updater"
 )
 
 // errNotConnected — подключение состоялось, но пока мы его фиксировали,
@@ -145,6 +147,12 @@ func (a *App) buildTunnel(cfg config.Config, p config.Profile) (tun *tunnel.Tunn
 func (a *App) tunnelConfig(cfg config.Config, p config.Profile) (_ tunnel.Config, socksAddr, httpAddr string) {
 	socksAddr = net.JoinHostPort("127.0.0.1", strconv.Itoa(p.SocksPort))
 	httpAddr = net.JoinHostPort("127.0.0.1", strconv.Itoa(p.HTTPPort))
+	a.mu.Lock()
+	mode := "proxy"
+	if a.net != nil {
+		mode = "vpn"
+	}
+	a.mu.Unlock()
 	c := tunnel.Config{
 		Host:            p.Host,
 		SSHPort:         p.SSHPort,
@@ -159,7 +167,7 @@ func (a *App) tunnelConfig(cfg config.Config, p config.Profile) (_ tunnel.Config
 		Direct:          a.direct,
 		LocalViaTunnel:  p.LocalViaTunnel,
 		UDPRelayEnabled: p.UDPRelayEnabled,
-		Mesh:            meshConfig(p),
+		Mesh:            meshConfig(p, mode),
 	}
 	a.mu.Lock()
 	netLayer := a.net
@@ -171,7 +179,7 @@ func (a *App) tunnelConfig(cfg config.Config, p config.Profile) (_ tunnel.Config
 }
 
 // meshConfig — настройки сети устройств для туннеля; nil, если она выключена.
-func meshConfig(p config.Profile) *mesh.Config {
+func meshConfig(p config.Profile, mode string) *mesh.Config {
 	if !p.MeshEnabled || p.MeshKey == "" {
 		return nil
 	}
@@ -179,11 +187,17 @@ func meshConfig(p config.Profile) *mesh.Config {
 	if name == "" {
 		name, _ = os.Hostname()
 	}
+	hostname, _ := os.Hostname()
 	return &mesh.Config{
 		Key:           p.MeshKey,
 		DeviceID:      config.DeviceID(),
 		Name:          name,
 		AllowIncoming: p.MeshIncoming,
+		Platform:      runtime.GOOS,
+		AppVersion:    updater.Version,
+		Mode:          mode,
+		Via:           p.Host,
+		Hostname:      hostname,
 	}
 }
 

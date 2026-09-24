@@ -17,13 +17,20 @@
 //
 // Протокол — по строке JSON в начале каждого соединения:
 //
-//	управление: → {"op":"hello","net":КЛЮЧ,"device":ID,"name":ИМЯ}
+//	управление: → {"op":"hello","net":КЛЮЧ,"device":ID,"name":ИМЯ,
+//	               "platform":..,"os":..,"app":..,"mode":..,"via":..}
 //	            ← {"op":"welcome","ip":..,"host":..,"peers":[..]}
-//	            дальше ← peers / incoming / pong, → ping
+//	            дальше ← peers / incoming / pong / ping, → ping / pong
+//	            (сервер шлёт ping с меткой времени и по pong меряет задержку)
 //	вызов:      → {"op":"dial","net":..,"device":..,"to":IP,"port":N}
 //	            ← {"op":"connected"} и дальше сырые байты — или {"op":"error"}
 //	ответ:      → {"op":"accept","net":..,"device":..,"call":ID,"ok":true}
 //	            и дальше сырые байты
+//
+// Для панели на сервере (ssh_tunnel_panel) есть отдельный вход — HTTP по
+// unix-сокету (флаг -admin): список устройств с характеристиками и качеством
+// связи, переименование, удаление. Сокет доступен только владельцу службы и
+// root: через SSH-туннель до него не дотянуться, в отличие от порта.
 //
 // Клиентская сторона — пакет sshtunnel/internal/mesh. Этот файл нарочно
 // самодостаточен (только стандартная библиотека): мастер настройки VPS может
@@ -40,19 +47,24 @@ import (
 	"flag"
 	"io"
 	"log"
+	"math"
 	"net"
+	"net/http"
 	"net/netip"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 )
 
 const (
-	protoVersion = 1
+	protoVersion = 2
+	// version — версия самого meshd, её видно в панели.
+	version = "2"
 
 	maxLine          = 4096
 	maxNetworks      = 1000
@@ -68,6 +80,10 @@ const (
 	// forgetAfter — устройство, которое не появлялось столько времени,
 	// забывается, и его адрес может достаться новому.
 	forgetAfter = 180 * 24 * time.Hour
+	// pingEvery — как часто сервер сам меряет задержку до устройства.
+	pingEvery = 15 * time.Second
+	// maxField — предел для строк, которые устройство рассказывает о себе.
+	maxField = 64
 )
 
 // meshRange — адреса устройств. Диапазон 198.18.0.0/15 зарезервирован под
@@ -93,6 +109,17 @@ type msg struct {
 	From     string `json:"from,omitempty"`
 	FromHost string `json:"fromHost,omitempty"`
 	Peers    []peer `json:"peers,omitempty"`
+
+	// Что устройство рассказывает о себе в hello (всё необязательное).
+	Platform string `json:"platform,omitempty"` // windows, linux, android
+	OS       string `json:"os,omitempty"`       // версия системы, если известна
+	App      string `json:"app,omitempty"`      // версия ssh_tunnel
+	Mode     string `json:"mode,omitempty"`     // proxy или vpn
+	Via      string `json:"via,omitempty"`      // через какой сервер пришло
+	Hostname string `json:"hostname,omitempty"` // имя компьютера
+
+	// T — метка времени (наносекунды) в ping/pong для замера задержки.
+	T int64 `json:"t,omitempty"`
 }
 
 type peer struct {
@@ -101,18 +128,95 @@ type peer struct {
 	IP       string `json:"ip"`
 	Online   bool   `json:"online"`
 	LastSeen int64  `json:"lastSeen,omitempty"`
+	Platform string `json:"platform,omitempty"`
+	Via      string `json:"via,omitempty"`
 }
 
 // ---------- состояние ----------
 
 type device struct {
-	ID       string    `json:"id"`
-	Name     string    `json:"name"`
-	Host     string    `json:"host"`
-	IP       string    `json:"ip"`
-	LastSeen time.Time `json:"lastSeen"`
+	ID string `json:"id"`
+	// Name — как устройство назвало себя само; Alias — как его переименовали
+	// в панели. Показывается Alias, если он есть: иначе переименование
+	// жило бы до первого переподключения устройства.
+	Name      string    `json:"name"`
+	Alias     string    `json:"alias,omitempty"`
+	Host      string    `json:"host"`
+	IP        string    `json:"ip"`
+	FirstSeen time.Time `json:"firstSeen,omitempty"`
+	LastSeen  time.Time `json:"lastSeen"`
+	Platform  string    `json:"platform,omitempty"`
+	OS        string    `json:"os,omitempty"`
+	App       string    `json:"app,omitempty"`
+	Mode      string    `json:"mode,omitempty"`
+	Via       string    `json:"via,omitempty"`
+	Hostname  string    `json:"hostname,omitempty"`
+	Sessions  int64     `json:"sessions,omitempty"`
+	BytesUp   int64     `json:"bytesUp,omitempty"`
+	BytesDown int64     `json:"bytesDown,omitempty"`
 
-	ctrl *ctrlConn
+	ctrl        *ctrlConn
+	connectedAt time.Time
+	up, down    atomic.Int64 // трафик за время жизни процесса, поверх Bytes*
+	activeCalls atomic.Int64
+	link        linkStats
+}
+
+// displayName — имя для людей: переименование из панели главнее.
+func (d *device) displayName() string {
+	if d.Alias != "" {
+		return d.Alias
+	}
+	return d.Name
+}
+
+// linkStats — качество связи с устройством по замерам ping/pong. Под s.mu.
+type linkStats struct {
+	sent, got int
+	last      time.Duration
+	avg       float64 // миллисекунды, скользящее среднее
+	jitter    float64 // миллисекунды, скользящее среднее отклонения
+}
+
+func (l *linkStats) add(rtt time.Duration) {
+	ms := float64(rtt) / float64(time.Millisecond)
+	if l.got == 0 {
+		l.avg = ms
+	} else {
+		l.jitter = 0.7*l.jitter + 0.3*math.Abs(ms-float64(l.last)/float64(time.Millisecond))
+		l.avg = 0.7*l.avg + 0.3*ms
+	}
+	l.last = rtt
+	l.got++
+}
+
+// loss — доля пропавших замеров, в процентах. Последний отправленный ping
+// мог ещё не вернуться — его не считаем.
+func (l *linkStats) loss() float64 {
+	if l.sent <= 1 {
+		return 0
+	}
+	lost := l.sent - 1 - l.got
+	if lost < 0 {
+		lost = 0
+	}
+	return 100 * float64(lost) / float64(l.sent-1)
+}
+
+// quality — оценка связи словом, для значка в панели.
+func (l *linkStats) quality() string {
+	switch {
+	case l.got == 0:
+		return "unknown"
+	case l.loss() > 20 || l.avg > 400:
+		return "poor"
+	case l.loss() > 5 || l.avg > 150:
+		return "fair"
+	case l.avg > 60:
+		return "good"
+	default:
+		return "excellent"
+	}
 }
 
 type network struct {
@@ -131,20 +235,22 @@ type answer struct {
 }
 
 type server struct {
-	mu     sync.Mutex
-	nets   map[string]*network // по хешу ключа
-	calls  map[string]*call
-	path   string
-	saveMu sync.Mutex
-	dirty  chan struct{}
+	mu      sync.Mutex
+	nets    map[string]*network // по хешу ключа
+	calls   map[string]*call
+	path    string
+	saveMu  sync.Mutex
+	dirty   chan struct{}
+	started time.Time
 }
 
 func newServer(path string) *server {
 	s := &server{
-		nets:  map[string]*network{},
-		calls: map[string]*call{},
-		path:  path,
-		dirty: make(chan struct{}, 1),
+		nets:    map[string]*network{},
+		calls:   map[string]*call{},
+		path:    path,
+		dirty:   make(chan struct{}, 1),
+		started: time.Now(),
 	}
 	s.load()
 	return s
@@ -202,7 +308,23 @@ func (s *server) save() {
 		return
 	}
 	s.mu.Lock()
+	// Живые счётчики трафика — поверх сохранённых: на диск идёт сумма.
+	type saved struct {
+		d        *device
+		up, down int64
+	}
+	var restore []saved
+	for _, n := range s.nets {
+		for _, d := range n.Devices {
+			restore = append(restore, saved{d, d.BytesUp, d.BytesDown})
+			d.BytesUp += d.up.Load()
+			d.BytesDown += d.down.Load()
+		}
+	}
 	data, err := json.MarshalIndent(s.nets, "", " ")
+	for _, r := range restore {
+		r.d.BytesUp, r.d.BytesDown = r.up, r.down
+	}
 	s.mu.Unlock()
 	if err != nil {
 		return
@@ -222,7 +344,8 @@ func (s *server) save() {
 func peersLocked(n *network) []peer {
 	out := make([]peer, 0, len(n.Devices))
 	for _, d := range n.Devices {
-		p := peer{Name: d.Name, Host: d.Host, IP: d.IP, Online: d.ctrl != nil}
+		p := peer{Name: d.displayName(), Host: d.Host, IP: d.IP, Online: d.ctrl != nil,
+			Platform: d.Platform, Via: d.Via}
 		if !d.LastSeen.IsZero() {
 			p.LastSeen = d.LastSeen.Unix()
 		}
@@ -465,14 +588,57 @@ func (s *server) control(conn net.Conn, m msg) {
 		// соединение уже не нужно.
 		d.ctrl.conn.Close()
 	}
+	now := time.Now()
 	d.Name = name
-	d.Host = uniqueHostLocked(n, m.Device, name)
-	d.LastSeen = time.Now()
+	d.Host = uniqueHostLocked(n, m.Device, d.displayName())
+	if d.FirstSeen.IsZero() {
+		d.FirstSeen = now
+	}
+	d.LastSeen = now
+	// Необязательные сведения: старый клиент их не шлёт — прежние не стираем.
+	for dst, src := range map[*string]string{
+		&d.Platform: m.Platform, &d.OS: m.OS, &d.App: m.App,
+		&d.Mode: m.Mode, &d.Via: m.Via, &d.Hostname: m.Hostname,
+	} {
+		if v := clip(src); v != "" {
+			*dst = v
+		}
+	}
+	d.Sessions++
+	d.connectedAt = now
+	d.link = linkStats{}
 	d.ctrl = c
 	c.send(msg{Op: "welcome", V: protoVersion, IP: d.IP, Host: d.Host, Peers: peersLocked(n)})
 	broadcastLocked(n)
 	s.mu.Unlock()
 	s.markDirty()
+
+	// Замер задержки: сервер сам шлёт ping с меткой времени, устройство
+	// возвращает её в pong. Старые клиенты незнакомое сообщение пропускают
+	// — у них задержка просто остаётся неизвестной.
+	stopPing := make(chan struct{})
+	defer close(stopPing)
+	go func() {
+		t := time.NewTicker(pingEvery)
+		defer t.Stop()
+		send := func() {
+			s.mu.Lock()
+			if d.ctrl == c {
+				d.link.sent++
+			}
+			s.mu.Unlock()
+			c.send(msg{Op: "ping", T: time.Now().UnixNano()})
+		}
+		send()
+		for {
+			select {
+			case <-stopPing:
+				return
+			case <-t.C:
+				send()
+			}
+		}
+	}()
 
 	r := bufio.NewReaderSize(conn, maxLine)
 	for {
@@ -485,8 +651,20 @@ func (s *server) control(conn net.Conn, m msg) {
 		if json.Unmarshal(line, &in) != nil {
 			continue
 		}
-		if in.Op == "ping" {
-			c.send(msg{Op: "pong"})
+		switch in.Op {
+		case "ping":
+			c.send(msg{Op: "pong", T: in.T})
+		case "pong":
+			if in.T > 0 {
+				rtt := time.Since(time.Unix(0, in.T))
+				if rtt >= 0 && rtt < time.Minute {
+					s.mu.Lock()
+					if d.ctrl == c {
+						d.link.add(rtt)
+					}
+					s.mu.Unlock()
+				}
+			}
 		}
 	}
 
@@ -498,6 +676,15 @@ func (s *server) control(conn net.Conn, m msg) {
 	}
 	s.mu.Unlock()
 	s.markDirty()
+}
+
+// clip обрезает строку, которую устройство прислало о себе, до разумной.
+func clip(v string) string {
+	v = strings.TrimSpace(v)
+	if r := []rune(v); len(r) > maxField {
+		v = string(r[:maxField])
+	}
+	return v
 }
 
 func (s *server) dial(conn net.Conn, m msg) {
@@ -583,7 +770,14 @@ func (s *server) dial(conn net.Conn, m msg) {
 		peerConn.Close()
 		return
 	}
-	splice(conn, peerConn)
+	// Трафик — обоим устройствам: вызывающему «отдано» то, что ушло к
+	// вызванному, и наоборот.
+	from.activeCalls.Add(1)
+	target.activeCalls.Add(1)
+	defer from.activeCalls.Add(-1)
+	defer target.activeCalls.Add(-1)
+	splice(conn, peerConn, &from.up, &target.down, &target.up, &from.down)
+	s.markDirty()
 }
 
 func (s *server) accept(conn net.Conn, m msg) {
@@ -609,10 +803,11 @@ func (s *server) accept(conn net.Conn, m msg) {
 }
 
 // splice перекладывает байты в обе стороны и ждёт, пока закончат обе.
-func splice(a, b net.Conn) {
+// Счётчики: aUp/bDown — то, что пришло от a и ушло к b; bUp/aDown — обратно.
+func splice(a, b net.Conn, aUp, bDown, bUp, aDown *atomic.Int64) {
 	done := make(chan struct{}, 2)
-	cp := func(dst, src net.Conn) {
-		io.Copy(dst, src)
+	cp := func(dst, src net.Conn, c1, c2 *atomic.Int64) {
+		io.Copy(dst, countingReader{src, c1, c2})
 		if cw, ok := dst.(interface{ CloseWrite() error }); ok {
 			cw.CloseWrite()
 		} else {
@@ -620,12 +815,214 @@ func splice(a, b net.Conn) {
 		}
 		done <- struct{}{}
 	}
-	go cp(a, b)
-	go cp(b, a)
+	go cp(b, a, aUp, bDown)
+	go cp(a, b, bUp, aDown)
 	<-done
 	<-done
 	a.Close()
 	b.Close()
+}
+
+type countingReader struct {
+	r      io.Reader
+	c1, c2 *atomic.Int64
+}
+
+func (c countingReader) Read(p []byte) (int, error) {
+	n, err := c.r.Read(p)
+	if n > 0 {
+		c.c1.Add(int64(n))
+		c.c2.Add(int64(n))
+	}
+	return n, err
+}
+
+// ---------- вход для панели (HTTP по unix-сокету) ----------
+
+// adminDevice — устройство глазами панели.
+type adminDevice struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Alias       string  `json:"alias,omitempty"`
+	Display     string  `json:"display"`
+	Host        string  `json:"host"`
+	IP          string  `json:"ip"`
+	Online      bool    `json:"online"`
+	Platform    string  `json:"platform,omitempty"`
+	OS          string  `json:"os,omitempty"`
+	App         string  `json:"app,omitempty"`
+	Mode        string  `json:"mode,omitempty"`
+	Via         string  `json:"via,omitempty"`
+	Hostname    string  `json:"hostname,omitempty"`
+	FirstSeen   int64   `json:"firstSeen,omitempty"`
+	LastSeen    int64   `json:"lastSeen,omitempty"`
+	ConnectedAt int64   `json:"connectedAt,omitempty"`
+	Sessions    int64   `json:"sessions"`
+	RTTMs       float64 `json:"rttMs,omitempty"`
+	RTTAvgMs    float64 `json:"rttAvgMs,omitempty"`
+	JitterMs    float64 `json:"jitterMs,omitempty"`
+	LossPct     float64 `json:"lossPct"`
+	Quality     string  `json:"quality"`
+	BytesUp     int64   `json:"bytesUp"`
+	BytesDown   int64   `json:"bytesDown"`
+	ActiveCalls int64   `json:"activeCalls"`
+}
+
+type adminNetwork struct {
+	ID      string        `json:"id"`
+	Devices []adminDevice `json:"devices"`
+}
+
+type adminState struct {
+	Version   string         `json:"version"`
+	StartedAt int64          `json:"startedAt"`
+	Networks  []adminNetwork `json:"networks"`
+}
+
+func unixOrZero(t time.Time) int64 {
+	if t.IsZero() {
+		return 0
+	}
+	return t.Unix()
+}
+
+func round1(v float64) float64 { return math.Round(v*10) / 10 }
+
+func (s *server) adminState() adminState {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	st := adminState{Version: version, StartedAt: s.started.Unix()}
+	for id, n := range s.nets {
+		an := adminNetwork{ID: id}
+		for _, d := range n.Devices {
+			ad := adminDevice{
+				ID: d.ID, Name: d.Name, Alias: d.Alias, Display: d.displayName(),
+				Host: d.Host, IP: d.IP, Online: d.ctrl != nil,
+				Platform: d.Platform, OS: d.OS, App: d.App, Mode: d.Mode, Via: d.Via,
+				Hostname: d.Hostname, FirstSeen: unixOrZero(d.FirstSeen), LastSeen: unixOrZero(d.LastSeen),
+				Sessions:  d.Sessions,
+				BytesUp:   d.BytesUp + d.up.Load(),
+				BytesDown: d.BytesDown + d.down.Load(),
+				Quality:   "unknown",
+			}
+			if d.ctrl != nil {
+				ad.ConnectedAt = unixOrZero(d.connectedAt)
+				ad.ActiveCalls = d.activeCalls.Load()
+				ad.Quality = d.link.quality()
+				ad.LossPct = round1(d.link.loss())
+				if d.link.got > 0 {
+					ad.RTTMs = round1(float64(d.link.last) / float64(time.Millisecond))
+					ad.RTTAvgMs = round1(d.link.avg)
+					ad.JitterMs = round1(d.link.jitter)
+				}
+			}
+			an.Devices = append(an.Devices, ad)
+		}
+		sort.Slice(an.Devices, func(i, j int) bool { return an.Devices[i].IP < an.Devices[j].IP })
+		st.Networks = append(st.Networks, an)
+	}
+	sort.Slice(st.Networks, func(i, j int) bool { return len(st.Networks[i].Devices) > len(st.Networks[j].Devices) })
+	return st
+}
+
+// rename задаёт устройству имя из панели. Пустое — вернуть его собственное.
+func (s *server) rename(netID, devID, alias string) error {
+	alias = clip(alias)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := s.nets[netID]
+	if n == nil || n.Devices[devID] == nil {
+		return errors.New("нет такого устройства")
+	}
+	d := n.Devices[devID]
+	d.Alias = alias
+	d.Host = uniqueHostLocked(n, devID, d.displayName())
+	broadcastLocked(n)
+	s.markDirty()
+	return nil
+}
+
+// forget убирает устройство из сети: его адрес освобождается. Если оно
+// сейчас на связи — соединение рвётся; вернуться оно сможет, но уже как новое.
+func (s *server) forget(netID, devID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := s.nets[netID]
+	if n == nil || n.Devices[devID] == nil {
+		return errors.New("нет такого устройства")
+	}
+	d := n.Devices[devID]
+	delete(n.Devices, devID)
+	if d.ctrl != nil {
+		d.ctrl.conn.Close()
+		d.ctrl = nil
+	}
+	broadcastLocked(n)
+	s.markDirty()
+	return nil
+}
+
+func (s *server) adminHandler() http.Handler {
+	mux := http.NewServeMux()
+	reply := func(w http.ResponseWriter, v any, err error) {
+		w.Header().Set("Content-Type", "application/json")
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+			return
+		}
+		json.NewEncoder(w).Encode(v)
+	}
+	type req struct {
+		Net    string `json:"net"`
+		Device string `json:"device"`
+		Alias  string `json:"alias"`
+	}
+	decode := func(r *http.Request) (req, error) {
+		var q req
+		if r.Method != http.MethodPost {
+			return q, errors.New("нужен POST")
+		}
+		err := json.NewDecoder(io.LimitReader(r.Body, 64<<10)).Decode(&q)
+		return q, err
+	}
+	mux.HandleFunc("/v1/state", func(w http.ResponseWriter, r *http.Request) {
+		reply(w, s.adminState(), nil)
+	})
+	mux.HandleFunc("/v1/rename", func(w http.ResponseWriter, r *http.Request) {
+		q, err := decode(r)
+		if err == nil {
+			err = s.rename(q.Net, q.Device, q.Alias)
+		}
+		reply(w, map[string]bool{"ok": true}, err)
+	})
+	mux.HandleFunc("/v1/forget", func(w http.ResponseWriter, r *http.Request) {
+		q, err := decode(r)
+		if err == nil {
+			err = s.forget(q.Net, q.Device)
+		}
+		reply(w, map[string]bool{"ok": true}, err)
+	})
+	return mux
+}
+
+// serveAdmin слушает unix-сокет для панели. Права 0600: достучаться может
+// только владелец службы и root — клиентам туннеля (другие пользователи
+// системы) он недоступен даже через проброс unix-сокетов в SSH.
+func (s *server) serveAdmin(path string) error {
+	os.MkdirAll(filepath.Dir(path), 0o700)
+	os.Remove(path)
+	ln, err := net.Listen("unix", path)
+	if err != nil {
+		return err
+	}
+	if err := os.Chmod(path, 0o600); err != nil {
+		ln.Close()
+		return err
+	}
+	log.Printf("вход для панели: %s", path)
+	go (&http.Server{Handler: s.adminHandler(), ReadHeaderTimeout: 10 * time.Second}).Serve(ln)
+	return nil
 }
 
 func randomID() string {
@@ -637,7 +1034,13 @@ func randomID() string {
 func main() {
 	listen := flag.String("listen", "127.0.0.1:47831", "адрес, на котором слушать (только localhost)")
 	state := flag.String("state", "/var/lib/meshd/state.json", "где хранить адреса устройств")
+	admin := flag.String("admin", "", "unix-сокет для панели на сервере (пусто — выключен)")
+	showVersion := flag.Bool("version", false, "напечатать версию и выйти")
 	flag.Parse()
+	if *showVersion {
+		os.Stdout.WriteString(version + "\n")
+		return
+	}
 
 	host, _, err := net.SplitHostPort(*listen)
 	if err != nil {
@@ -649,6 +1052,11 @@ func main() {
 
 	s := newServer(*state)
 	go s.saveLoop()
+	if *admin != "" {
+		if err := s.serveAdmin(*admin); err != nil {
+			log.Printf("вход для панели не открылся (%v) — сеть работает, но панель её не увидит", err)
+		}
+	}
 
 	ln, err := net.Listen("tcp", *listen)
 	if err != nil {

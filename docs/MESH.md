@@ -72,10 +72,11 @@ Description=ssh_tunnel - сеть устройств (только 127.0.0.1)
 After=network.target
 
 [Service]
-ExecStart=/usr/local/bin/meshd -state /var/lib/meshd/state.json
+ExecStart=/usr/local/bin/meshd -state /var/lib/meshd/state.json -admin /run/meshd/admin.sock
 Restart=always
 DynamicUser=yes
 StateDirectory=meshd
+RuntimeDirectory=meshd
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes

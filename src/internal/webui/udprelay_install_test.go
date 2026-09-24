@@ -13,6 +13,8 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"sshtunnel/internal/meshsvc"
 )
 
 func TestUDPRelayServerSourceMatchesCmd(t *testing.T) {
@@ -30,22 +32,6 @@ func TestUDPRelayServerSourceMatchesCmd(t *testing.T) {
 	}
 }
 
-// TestMeshdServerSourceMatchesCmd — то же для сервиса сети устройств.
-func TestMeshdServerSourceMatchesCmd(t *testing.T) {
-	embedded, err := meshdServerSource()
-	if err != nil {
-		t.Fatal(err)
-	}
-	original, err := os.ReadFile("../../cmd/meshd/main.go")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if embedded != string(original) {
-		t.Fatal("vpsassets/meshd_server.go.txt разошёлся с cmd/meshd/main.go — " +
-			"скопируй актуальный main.go поверх vpsassets/meshd_server.go.txt")
-	}
-}
-
 // Скрипты установки служб собираются из кусков (исходник, юнит systemd,
 // правка брандмауэра) — bash -n ловит сломанные кавычки и heredoc раньше,
 // чем их увидит настоящий сервер.
@@ -55,7 +41,7 @@ func TestInstallScriptsParse(t *testing.T) {
 	}
 	for name, build := range map[string]func() (string, error){
 		"udprelay": udpRelayInstallScript,
-		"meshd":    meshdInstallScript,
+		"meshd":    func() (string, error) { return meshsvc.InstallScript(), nil },
 	} {
 		script, err := build()
 		if err != nil {

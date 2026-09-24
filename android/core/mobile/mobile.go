@@ -24,6 +24,7 @@ import (
 	"sshtunnel/internal/share"
 	"sshtunnel/internal/speedtest"
 	"sshtunnel/internal/tunnel"
+	"sshtunnel/internal/updater"
 )
 
 // Callbacks — то, что Go просит сделать у приложения.
@@ -190,7 +191,10 @@ func (t *Tunnel) ConfigureMesh(enabled bool, key, name, deviceID string, incomin
 	if name == "" {
 		name = "телефон"
 	}
-	t.cfg.Mesh = &mesh.Config{Key: key, DeviceID: deviceID, Name: name, AllowIncoming: incoming}
+	t.cfg.Mesh = &mesh.Config{
+		Key: key, DeviceID: deviceID, Name: name, AllowIncoming: incoming,
+		Platform: "android", Mode: "vpn", Via: t.cfg.Host, AppVersion: updater.Version,
+	}
 	return nil
 }
 

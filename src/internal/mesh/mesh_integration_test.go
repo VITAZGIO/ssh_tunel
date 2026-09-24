@@ -44,12 +44,31 @@ func startMeshd(t *testing.T) string {
 	return runMeshd(t, bin, filepath.Join(t.TempDir(), "state.json"))
 }
 
+// startMeshdAdmin — meshd со входом для панели; возвращает адрес и путь к
+// сокету.
+func startMeshdAdmin(t *testing.T) (string, string) {
+	t.Helper()
+	bin, err := buildMeshdOnce()
+	if err != nil {
+		t.Skipf("не удалось собрать meshd: %v", err)
+	}
+	// Путь к сокету короткий: у unix-сокетов предел около 100 символов, а
+	// t.TempDir() бывает длинным.
+	dir, err := os.MkdirTemp("", "md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	sock := filepath.Join(dir, "a.sock")
+	return runMeshd(t, bin, filepath.Join(dir, "state.json"), "-admin", sock), sock
+}
+
 // runMeshd запускает meshd на свободном порту, который тот выбирает сам (:0),
 // и узнаёт адрес из его журнала. «Взять свободный порт и закрыть» здесь не
 // годится: пока meshd стартует, порт успевает занять тест другого пакета.
-func runMeshd(t *testing.T, bin, state string) string {
+func runMeshd(t *testing.T, bin, state string, extra ...string) string {
 	t.Helper()
-	cmd := exec.Command(bin, "-listen", "127.0.0.1:0", "-state", state)
+	cmd := exec.Command(bin, append([]string{"-listen", "127.0.0.1:0", "-state", state}, extra...)...)
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		t.Fatal(err)

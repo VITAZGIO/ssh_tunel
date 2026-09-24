@@ -50,6 +50,15 @@ type Config struct {
 	AllowIncoming bool
 	// Addr — адрес meshd на сервере. Пусто — DefaultAddr.
 	Addr string
+
+	// То, что устройство рассказывает о себе: видно в панели на сервере.
+	// Всё необязательное.
+	Platform   string // windows, linux, android
+	OS         string // версия системы, если известна
+	AppVersion string // версия ssh_tunnel
+	Mode       string // proxy или vpn
+	Via        string // через какой сервер подключено устройство
+	Hostname   string // имя компьютера
 }
 
 // NewKey придумывает ключ новой сети.
@@ -69,6 +78,8 @@ type Peer struct {
 	Name     string     `json:"name"`
 	Host     string     `json:"host"`
 	IP       netip.Addr `json:"ip"`
+	Platform string     `json:"platform,omitempty"`
+	Via      string     `json:"via,omitempty"`
 	Online   bool       `json:"online"`
 	LastSeen int64      `json:"lastSeen,omitempty"`
 	Self     bool       `json:"self,omitempty"`
@@ -134,17 +145,27 @@ type wire struct {
 	From     string     `json:"from,omitempty"`
 	FromHost string     `json:"fromHost,omitempty"`
 	Peers    []wirePeer `json:"peers,omitempty"`
+
+	Platform string `json:"platform,omitempty"`
+	OS       string `json:"os,omitempty"`
+	App      string `json:"app,omitempty"`
+	Mode     string `json:"mode,omitempty"`
+	Via      string `json:"via,omitempty"`
+	Hostname string `json:"hostname,omitempty"`
+	T        int64  `json:"t,omitempty"`
 }
 
 type wirePeer struct {
 	Name     string `json:"name"`
 	Host     string `json:"host"`
 	IP       string `json:"ip"`
+	Platform string `json:"platform,omitempty"`
+	Via      string `json:"via,omitempty"`
 	Online   bool   `json:"online"`
 	LastSeen int64  `json:"lastSeen,omitempty"`
 }
 
-const protoVersion = 1
+const protoVersion = 2
 
 func send(conn net.Conn, m wire) error {
 	m.V = protoVersion
@@ -207,7 +228,12 @@ func (c *Client) session(ctx context.Context) error {
 	stop := context.AfterFunc(ctx, func() { conn.Close() })
 	defer stop()
 
-	if err := send(conn, wire{Op: "hello", Net: c.cfg.Key, Device: c.cfg.DeviceID, Name: c.cfg.Name}); err != nil {
+	hello := wire{
+		Op: "hello", Net: c.cfg.Key, Device: c.cfg.DeviceID, Name: c.cfg.Name,
+		Platform: c.cfg.Platform, OS: c.cfg.OS, App: c.cfg.AppVersion,
+		Mode: c.cfg.Mode, Via: c.cfg.Via, Hostname: c.cfg.Hostname,
+	}
+	if err := send(conn, hello); err != nil {
 		return err
 	}
 	r := bufio.NewReader(conn)
@@ -268,6 +294,14 @@ func (c *Client) session(ctx context.Context) error {
 			c.setPeers(m.Peers)
 		case "incoming":
 			go c.incoming(m)
+		case "ping":
+			// Сервер меряет задержку: вернуть его метку времени как есть.
+			wmu.Lock()
+			err := send(conn, wire{Op: "pong", T: m.T})
+			wmu.Unlock()
+			if err != nil {
+				return errors.New("связь с сервером сети потеряна")
+			}
 		}
 	}
 }
@@ -289,10 +323,15 @@ func (c *Client) setPeers(list []wirePeer) {
 		if err != nil {
 			continue
 		}
+		self := ip == c.status.Self.IP
 		peers = append(peers, Peer{
 			Name: p.Name, Host: p.Host, IP: ip, Online: p.Online, LastSeen: p.LastSeen,
-			Self: ip == c.status.Self.IP,
+			Platform: p.Platform, Via: p.Via, Self: self,
 		})
+		if self {
+			// Устройство могли переименовать в панели — имя берём из списка.
+			c.status.Self.Name, c.status.Self.Host = p.Name, p.Host
+		}
 	}
 	c.status.Peers = peers
 }
