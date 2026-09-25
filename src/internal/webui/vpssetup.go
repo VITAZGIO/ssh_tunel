@@ -34,6 +34,7 @@ import (
 	"sshtunnel/internal/hostkey"
 	"sshtunnel/internal/meshsvc"
 	"sshtunnel/internal/tunnel"
+	"sshtunnel/internal/updater"
 )
 
 // vpsSetupParams — то, что вводится в мастере настройки VPS.
@@ -168,7 +169,7 @@ func runVpsSetup(bus *events.Bus, p vpsSetupParams) (err error) {
 // если его нет — сборка прямо на сервере из вшитого исходника. Слушает только
 // 127.0.0.1: до него дотягиваются лишь через туннель.
 func installMeshd(client *ssh.Client, onLine func(string)) error {
-	return runRemoteScript(client, meshsvc.InstallScript(), onLine)
+	return runRemoteScript(client, meshsvc.InstallScript(updater.Version), onLine)
 }
 
 // vpsDial — то же самое, что ssh.Dial, но с ограничением по времени на само

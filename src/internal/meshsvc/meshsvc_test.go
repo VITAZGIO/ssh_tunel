@@ -24,7 +24,7 @@ func TestInstallScriptParses(t *testing.T) {
 	if _, err := exec.LookPath("bash"); err != nil {
 		t.Skip("нет bash")
 	}
-	script := InstallScript()
+	script := InstallScript("v1.5.0-mesh1")
 	for _, want := range []string{"47830:47831", AdminSocket, "RuntimeDirectory=meshd", UplinkUnitName} {
 		if !strings.Contains(script, want) {
 			t.Errorf("в скрипте нет %q", want)
@@ -64,5 +64,20 @@ func TestKnownHostsLine(t *testing.T) {
 	}
 	if got := KnownHostsLine("203.0.113.7", 2222, "ssh-ed25519 AAAA"); got != "[203.0.113.7]:2222 ssh-ed25519 AAAA" {
 		t.Errorf("другой порт: %q", got)
+	}
+}
+
+func TestInstallScriptКачаетТуЖеВерсию(t *testing.T) {
+	for version, want := range map[string]string{
+		"v1.5.0":            "releases/download/v1.5.0/$BIN",
+		"v1.5.0-mesh1":      "releases/download/v1.5.0-mesh1/$BIN",
+		"dev":               "releases/latest/download/$BIN",
+		"":                  "releases/latest/download/$BIN",
+		"v1.5.0; rm -rf /":  "releases/latest/download/$BIN",
+		"v1.5.0\"$(reboot)": "releases/latest/download/$BIN",
+	} {
+		if s := InstallScript(version); !strings.Contains(s, want) {
+			t.Errorf("версия %q: в скрипте нет %q", version, want)
+		}
 	}
 }

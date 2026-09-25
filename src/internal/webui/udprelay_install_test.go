@@ -41,7 +41,7 @@ func TestInstallScriptsParse(t *testing.T) {
 	}
 	for name, build := range map[string]func() (string, error){
 		"udprelay": udpRelayInstallScript,
-		"meshd":    func() (string, error) { return meshsvc.InstallScript(), nil },
+		"meshd":    func() (string, error) { return meshsvc.InstallScript("v1.5.0"), nil },
 	} {
 		script, err := build()
 		if err != nil {

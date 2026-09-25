@@ -9,8 +9,10 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"sshtunnel/internal/meshsvc"
 )
@@ -52,8 +54,24 @@ func parseUnitState(out string) UnitState {
 	return st
 }
 
+// scriptCommand — чем выполнить скрипт установки. Панель работает службой
+// systemd с ProtectSystem (/usr только на чтение), а скрипт кладёт meshd в
+// /usr/local/bin и может ставить пакеты. Поэтому под systemd он запускается
+// отдельной временной службой (systemd-run) — без ограничений панели, но
+// с выводом прямо сюда. Панель, запущенная руками, выполняет его сама.
+func scriptCommand() *exec.Cmd {
+	if os.Getenv("INVOCATION_ID") != "" {
+		if path, err := exec.LookPath("systemd-run"); err == nil {
+			unit := "ssh_tunnel_mesh_install_" + strconv.FormatInt(time.Now().UnixNano(), 36)
+			return exec.Command(path, "--quiet", "--wait", "--pipe", "--collect",
+				"--unit="+unit, "--setenv=HOME=/root", "--", "/bin/bash", "-s")
+		}
+	}
+	return exec.Command("bash", "-s")
+}
+
 func (systemMesh) RunScript(script string, onLine func(string)) error {
-	cmd := exec.Command("bash", "-s")
+	cmd := scriptCommand()
 	cmd.Stdin = strings.NewReader(script)
 	pr, pw := io.Pipe()
 	cmd.Stdout, cmd.Stderr = pw, pw

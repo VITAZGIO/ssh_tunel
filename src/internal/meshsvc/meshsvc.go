@@ -8,6 +8,7 @@ package meshsvc
 import (
 	_ "embed"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -70,10 +71,26 @@ if [ -f /usr/local/sbin/tunnel-fw.sh ] && ! grep -q 47831 /usr/local/sbin/tunnel
 fi
 `
 
-// InstallScript — установка или обновление meshd: готовый файл со страницы
-// релиза, а если его нет — сборка на сервере из Source. Побочный проброс к
-// главному (если был) останавливается: на одном сервере — что-то одно.
-func InstallScript() string {
+// releaseTag — метка релиза, из которого качать meshd той же версии, что и
+// программа, которая его ставит. Иначе панель новой версии могла бы
+// поставить старый meshd из «последнего релиза» — без нужных ей
+// возможностей. Сборка без версии (dev) и всё непохожее на метку — ""
+// («последний релиз»).
+var releaseTag = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$`)
+
+// downloadURL — откуда качать meshd для этой версии ($BIN подставит скрипт).
+func downloadURL(version string) string {
+	if releaseTag.MatchString(version) {
+		return "https://github.com/VITAZGIO/ssh_tunel/releases/download/" + version + "/$BIN"
+	}
+	return "https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$BIN"
+}
+
+// InstallScript — установка или обновление meshd версии version (версия
+// программы, которая ставит): готовый файл со страницы этого релиза, а если
+// его нет — сборка на сервере из Source. Побочный проброс к главному (если
+// был) останавливается: на одном сервере — что-то одно.
+func InstallScript(version string) string {
 	const marker = "EOF_MESHD_SOURCE_7c41d0"
 	return fmt.Sprintf(`set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
@@ -85,19 +102,33 @@ case "$(uname -m)" in
 esac
 GOT=0
 if [ -n "$BIN" ] && command -v curl >/dev/null; then
-  if curl -fsSL -o /usr/local/bin/meshd.new \
-      "https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$BIN"; then
-    mv /usr/local/bin/meshd.new /usr/local/bin/meshd
-    chmod +x /usr/local/bin/meshd
-    GOT=1
-    echo "meshd скачан"
+  if curl -fsSL -o /usr/local/bin/meshd.new "%s"; then
+    chmod +x /usr/local/bin/meshd.new
+    # Старый meshd (до входа для панели) не знает -version: такой не годится.
+    if /usr/local/bin/meshd.new -version >/dev/null 2>&1; then
+      mv /usr/local/bin/meshd.new /usr/local/bin/meshd
+      GOT=1
+      echo "meshd скачан: версия $(/usr/local/bin/meshd -version)"
+    else
+      echo "скачанный meshd слишком старый"
+    fi
   fi
 fi
 
 if [ "$GOT" != 1 ]; then
   rm -f /usr/local/bin/meshd.new
   echo "готового файла нет — собираю на сервере"
-  command -v go >/dev/null || { echo "ставлю Go"; apt-get -y -qq install golang-go >/dev/null; }
+  if ! command -v go >/dev/null; then
+    # Go из пакетов весит сотни мегабайт: на маленьком диске он заполнил бы
+    # его целиком, и сервер перестал бы работать вовсе.
+    FREE_MB=$(df -Pm /usr | awk 'NR==2 {print $4}')
+    if [ "${FREE_MB:-0}" -lt 800 ]; then
+      echo "Для сборки нужен Go, а на диске свободно только ${FREE_MB} МБ (нужно от 800)." >&2
+      echo "Освободи место или поставь версию программы, для которой есть готовый meshd." >&2
+      exit 1
+    fi
+    echo "ставлю Go"; apt-get -y -qq install golang-go >/dev/null
+  fi
   mkdir -p /root/meshd
   cat > /root/meshd/main.go <<'%s'
 %s
@@ -115,7 +146,7 @@ systemctl daemon-reload
 systemctl enable meshd.service
 systemctl restart meshd.service
 echo "meshd запущен"
-`, marker, Source, marker, UplinkUnitName, strings.TrimRight(Unit(), "\n")) + FirewallExemption
+`, downloadURL(version), marker, Source, marker, UplinkUnitName, strings.TrimRight(Unit(), "\n")) + FirewallExemption
 }
 
 // UplinkUnit — служба побочного сервера: держит SSH-соединение с главным и

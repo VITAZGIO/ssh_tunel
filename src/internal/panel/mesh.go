@@ -235,7 +235,7 @@ func (m *MeshManager) Reinstall() error {
 
 func (m *MeshManager) installMain(onLine func(string)) error {
 	onLine("Ставлю meshd — службу сети устройств")
-	if err := m.sys.RunScript(meshsvc.InstallScript(), onLine); err != nil {
+	if err := m.sys.RunScript(meshsvc.InstallScript(m.version), onLine); err != nil {
 		return err
 	}
 	onLine("Готовлю вход для побочных серверов (пользователь " + meshsvc.LinkUser + ")")
