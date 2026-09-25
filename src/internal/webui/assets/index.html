@@ -22,13 +22,18 @@
            --text:#141821; --dim:#616b7f; }
   }
   *{box-sizing:border-box;-webkit-user-select:none;user-select:none}
-  input{-webkit-user-select:text;user-select:text}
+  input,textarea{-webkit-user-select:text;user-select:text}
   html,body{height:100%}
   body{margin:0;background:var(--bg);color:var(--text);overflow:hidden;
        font:14px/1.45 "Segoe UI",-apple-system,Roboto,sans-serif}
 
   /* ---------- каркас ---------- */
   .app{height:100vh;display:flex;flex-direction:column}
+  /* В браузере на широком экране (Linux-версия с -web) — колонкой по
+     центру, как окно программы, а не на всю ширину. */
+  @media (min-width:640px){
+    .app{max-width:560px;margin:0 auto;border-left:1px solid var(--line);border-right:1px solid var(--line)}
+  }
   .bar{display:flex;align-items:flex-start;gap:8px;padding:12px 14px 6px;flex:none}
   .bar .sp{flex:1}
 
@@ -1191,6 +1196,26 @@
      поверх приложения (с адресом вроде "Сообщение с 127.0.0.1:64366" в
      заголовке) — не в стиле программы и может вылезать за её границы.
      Этот диалог — просто скрытый оверлей внутри того же окна. -->
+<!-- Вставка вручную: браузер даёт странице читать буфер обмена только по
+     https:// или с localhost. Панель Linux-версии по адресу машины в сети
+     (http://192.168.x.x:47821) этого права не имеет — тогда текст
+     вставляется сюда. -->
+<div class="overlay" id="pasteOverlay" hidden>
+  <div class="dialog" style="max-width:420px">
+    <div class="db" style="padding:16px 16px 0">
+      <p style="margin:0 0 8px;font-size:13.5px;font-weight:650" data-i18n="paste_manual_title">Вставь сюда (Ctrl+V)</p>
+      <p style="margin:0 0 10px;font-size:12px;color:var(--dim)" data-i18n="paste_manual_hint">Браузер не даёт странице
+        прочитать буфер обмена по адресу http:// — вставь скопированный текст сам.</p>
+      <textarea id="pasteArea" rows="6" style="width:100%;resize:vertical;background:var(--card2);color:var(--text);
+        border:1px solid var(--line);border-radius:8px;padding:8px;font:12px/1.4 Consolas,monospace"></textarea>
+      <div class="two" style="margin:12px 0 16px">
+        <button class="btn" id="pasteCancelBtn" data-i18n="cancel">Отмена</button>
+        <button class="btn primary" id="pasteOkBtn">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="confirmOverlay" hidden>
   <div class="dialog" style="max-width:340px">
     <div class="db" style="padding:16px 16px 0">
@@ -1234,6 +1259,31 @@ function closeConfirm(result){
 }
 $('confirmOkBtn').onclick = () => closeConfirm(true);
 $('confirmCancelBtn').onclick = () => closeConfirm(false);
+
+/* readClipboard — текст из буфера обмена; если браузер не даёт его прочитать
+   (страница не по https:// и не с localhost), — окно, куда текст
+   вставляется вручную. null — человек передумал. */
+let pasteResolve = null;
+async function readClipboard(){
+  try {
+    if(navigator.clipboard && navigator.clipboard.readText){
+      const text = await navigator.clipboard.readText();
+      if(text) return text;
+    }
+  } catch(e) {}
+  $('pasteArea').value = '';
+  $('pasteOverlay').hidden = false;
+  setTimeout(() => $('pasteArea').focus(), 0);
+  return new Promise(resolve => { pasteResolve = resolve; });
+}
+function closePaste(ok){
+  $('pasteOverlay').hidden = true;
+  const r = pasteResolve;
+  pasteResolve = null;
+  if(r) r(ok ? $('pasteArea').value.trim() || null : null);
+}
+$('pasteOkBtn').onclick = () => closePaste(true);
+$('pasteCancelBtn').onclick = () => closePaste(false);
 
 /* ---------- язык интерфейса ---------- */
 /* Переключает подписи, кнопки и заголовки. Журнал соединений и сообщения,
@@ -1472,6 +1522,8 @@ const I18N = {
     paste_title:'Вставить настройки сервера из буфера обмена',
     paste_apps:'Вставить список из буфера',
     paste_failed:'не удалось прочитать буфер обмена',
+    paste_manual_title:'Вставь сюда (Ctrl+V)',
+    paste_manual_hint:'Браузер не даёт странице прочитать буфер обмена по адресу http:// — вставь скопированный текст сам.',
     paste_not_config:'в буфере не похоже на настройки ssh_tunnel',
   },
   en: {
@@ -1701,6 +1753,8 @@ const I18N = {
     paste_title:'Paste server settings from clipboard',
     paste_apps:'Paste list from clipboard',
     paste_failed:'couldn\'t read the clipboard',
+    paste_manual_title:'Paste here (Ctrl+V)',
+    paste_manual_hint:'The browser does not let this page read the clipboard over http:// — paste the copied text yourself.',
     paste_not_config:'this doesn\'t look like ssh_tunnel settings',
   },
 };
@@ -1883,13 +1937,8 @@ $('importAppsFile').addEventListener('change', async () => {
 });
 
 $('pasteAppsBtn').onclick = async () => {
-  let text;
-  try {
-    text = await navigator.clipboard.readText();
-  } catch(e) {
-    $('filterNote').textContent = tr('paste_failed');
-    return;
-  }
+  const text = await readClipboard();
+  if(!text) return;
   let doc;
   try {
     doc = JSON.parse(text);
@@ -3273,13 +3322,8 @@ async function importProfileDoc(doc){
 }
 
 $('pasteBtn').onclick = async () => {
-  let text;
-  try {
-    text = await navigator.clipboard.readText();
-  } catch(e) {
-    showError(tr('paste_failed'), 'setError');
-    return;
-  }
+  const text = await readClipboard();
+  if(!text) return;
   let doc;
   try {
     doc = JSON.parse(text);
@@ -3538,13 +3582,8 @@ $('bundleExportBtn').onclick = async () => {
    своим давало бы список, в котором не разобраться, поэтому спрашиваем
    подтверждение — отменить это нечем. */
 $('bundleImportBtn').onclick = async () => {
-  let text;
-  try {
-    text = await navigator.clipboard.readText();
-  } catch(e) {
-    showError(tr('paste_failed'), 'setError');
-    return;
-  }
+  const text = await readClipboard();
+  if(!text) return;
   if(!(await appConfirm(tr('bundle_replace_confirm')))) return;
   const r = await api('/api/settings/import', text, true);
   if(r.error){ showError(r.error, 'setError'); return; }
