@@ -82,7 +82,7 @@ fi
 # перебила бы нашу.
 DIRECTIVES='PasswordAuthentication|PermitRootLogin|KbdInteractiveAuthentication'
 DIRECTIVES="$DIRECTIVES|ChallengeResponseAuthentication|PubkeyAuthentication"
-DIRECTIVES="$DIRECTIVES|PermitEmptyPasswords|AllowTcpForwarding|Port|X11Forwarding"
+DIRECTIVES="$DIRECTIVES|PermitEmptyPasswords|AllowTcpForwarding|Port|X11Forwarding|MaxStartups"
 # Свой файл на этот момент ещё пуст (или из него только что вырезан прошлый
 # блок), поэтому проходим по всем файлам без исключений — иначе в режиме без
 # Include старый "Port 22" из основного файла остался бы выше нашего и выиграл.
@@ -103,6 +103,12 @@ LoginGraceTime 30
 X11Forwarding no
 ClientAliveInterval 60
 ClientAliveCountMax 3
+
+# Сколько соединений может одновременно ждать входа. По умолчанию 10 — а
+# ssh_tunnel держит 4 соединения на устройство, и уже три устройства,
+# подключающиеся разом, упираются в этот предел. 120 — это 30 устройств;
+# число меняется в панели сервера (Настройки → Ёмкость сервера).
+MaxStartups 120:30:240
 
 # Проброс TCP нужен для SSH-туннеля (ssh -D, ssh -L и ssh_tunnel).
 # Многие "гайды по безопасности" его выключают — тогда туннель не работает.

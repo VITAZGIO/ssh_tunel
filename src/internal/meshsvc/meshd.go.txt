@@ -26,6 +26,14 @@
 //	            ← {"op":"connected"} и дальше сырые байты — или {"op":"error"}
 //	ответ:      → {"op":"accept","net":..,"device":..,"call":ID,"ok":true}
 //	            и дальше сырые байты
+//	сервер:     → {"op":"server","device":ID,"name":..,"host":..,"addrs":[..]}
+//	            ← {"op":"welcome"}, дальше ping / pong, как у устройств
+//
+// Несколько серверов. На «побочном» сервере meshd не запущен: его
+// 127.0.0.1:47831 — это SSH-проброс (ssh -L) к meshd «главного», поэтому
+// устройства, подключённые к любому из серверов, оказываются в одной сети.
+// Сам побочный сервер (его панель) держит здесь управляющее соединение
+// "server" — чтобы главный видел его на схеме и знал качество связи с ним.
 //
 // Для панели на сервере (ssh_tunnel_panel) есть отдельный вход — HTTP по
 // unix-сокету (флаг -admin): список устройств с характеристиками и качеством
@@ -70,6 +78,7 @@ const (
 	maxNetworks      = 1000
 	maxDevicesPerNet = 1024
 	maxPendingCalls  = 256
+	maxRelays        = 64
 
 	// callTimeout — сколько ждать, пока вызванное устройство откроет встречное
 	// соединение.
@@ -117,6 +126,10 @@ type msg struct {
 	Mode     string `json:"mode,omitempty"`     // proxy или vpn
 	Via      string `json:"via,omitempty"`      // через какой сервер пришло
 	Hostname string `json:"hostname,omitempty"` // имя компьютера
+
+	// Addrs — адреса побочного сервера (op "server"): по ним панель узнаёт,
+	// какие устройства пришли через него.
+	Addrs []string `json:"addrs,omitempty"`
 
 	// T — метка времени (наносекунды) в ping/pong для замера задержки.
 	T int64 `json:"t,omitempty"`
@@ -234,10 +247,21 @@ type answer struct {
 	err  string
 }
 
+// relay — побочный сервер, подключённый к этому. В памяти: после
+// перезапуска он переподключится сам.
+type relay struct {
+	ID, Name, Host, App string
+	Addrs               []string
+	connectedAt         time.Time
+	ctrl                *ctrlConn
+	link                linkStats
+}
+
 type server struct {
 	mu      sync.Mutex
 	nets    map[string]*network // по хешу ключа
 	calls   map[string]*call
+	relays  map[string]*relay
 	path    string
 	saveMu  sync.Mutex
 	dirty   chan struct{}
@@ -248,6 +272,7 @@ func newServer(path string) *server {
 	s := &server{
 		nets:    map[string]*network{},
 		calls:   map[string]*call{},
+		relays:  map[string]*relay{},
 		path:    path,
 		dirty:   make(chan struct{}, 1),
 		started: time.Now(),
@@ -525,6 +550,10 @@ func (s *server) handle(conn net.Conn) {
 		conn.Close()
 		return
 	}
+	if m.Op == "server" {
+		s.relayLink(conn, m)
+		return
+	}
 	if m.Net == "" || m.Device == "" || len(m.Device) > 128 {
 		writeMsg(conn, msg{Op: "error", Error: "нет ключа сети или id устройства"})
 		conn.Close()
@@ -613,20 +642,39 @@ func (s *server) control(conn net.Conn, m msg) {
 	s.mu.Unlock()
 	s.markDirty()
 
-	// Замер задержки: сервер сам шлёт ping с меткой времени, устройство
-	// возвращает её в pong. Старые клиенты незнакомое сообщение пропускают
-	// — у них задержка просто остаётся неизвестной.
+	s.keepAlive(conn, c, func(f func(*linkStats)) {
+		s.mu.Lock()
+		if d.ctrl == c {
+			f(&d.link)
+		}
+		s.mu.Unlock()
+	})
+
+	s.mu.Lock()
+	if d.ctrl == c {
+		d.ctrl = nil
+		d.LastSeen = time.Now()
+		broadcastLocked(n)
+	}
+	s.mu.Unlock()
+	s.markDirty()
+}
+
+// keepAlive обслуживает управляющее соединение, пока оно живо: отвечает на
+// ping и сам меряет задержку. link даёт доступ к замерам под блокировкой —
+// или не вызывает f вовсе, если соединение уже сменилось новым.
+//
+// Замер: сервер шлёт ping с меткой времени, другая сторона возвращает её в
+// pong. Старые клиенты незнакомое сообщение пропускают — у них задержка
+// просто остаётся неизвестной.
+func (s *server) keepAlive(conn net.Conn, c *ctrlConn, link func(func(*linkStats))) {
 	stopPing := make(chan struct{})
 	defer close(stopPing)
 	go func() {
 		t := time.NewTicker(pingEvery)
 		defer t.Stop()
 		send := func() {
-			s.mu.Lock()
-			if d.ctrl == c {
-				d.link.sent++
-			}
-			s.mu.Unlock()
+			link(func(l *linkStats) { l.sent++ })
 			c.send(msg{Op: "ping", T: time.Now().UnixNano()})
 		}
 		send()
@@ -645,7 +693,7 @@ func (s *server) control(conn net.Conn, m msg) {
 		conn.SetReadDeadline(time.Now().Add(ctrlIdle))
 		line, err := r.ReadSlice('\n')
 		if err != nil {
-			break
+			return
 		}
 		var in msg
 		if json.Unmarshal(line, &in) != nil {
@@ -658,24 +706,57 @@ func (s *server) control(conn net.Conn, m msg) {
 			if in.T > 0 {
 				rtt := time.Since(time.Unix(0, in.T))
 				if rtt >= 0 && rtt < time.Minute {
-					s.mu.Lock()
-					if d.ctrl == c {
-						d.link.add(rtt)
-					}
-					s.mu.Unlock()
+					link(func(l *linkStats) { l.add(rtt) })
 				}
 			}
 		}
 	}
+}
+
+// relayLink — управляющее соединение побочного сервера.
+func (s *server) relayLink(conn net.Conn, m msg) {
+	defer conn.Close()
+	id := clip(m.Device)
+	if id == "" {
+		writeMsg(conn, msg{Op: "error", Error: "нет id сервера"})
+		return
+	}
+	c := newCtrlConn(conn)
+	defer c.close()
+	r := &relay{ID: id, Name: clip(m.Name), Host: clip(m.Host), App: clip(m.App), connectedAt: time.Now(), ctrl: c}
+	for _, a := range m.Addrs {
+		if v := clip(a); v != "" && len(r.Addrs) < 8 {
+			r.Addrs = append(r.Addrs, v)
+		}
+	}
 
 	s.mu.Lock()
-	if d.ctrl == c {
-		d.ctrl = nil
-		d.LastSeen = time.Now()
-		broadcastLocked(n)
+	if old := s.relays[id]; old != nil {
+		old.ctrl.conn.Close()
+	} else if len(s.relays) >= maxRelays {
+		s.mu.Unlock()
+		writeMsg(conn, msg{Op: "error", Error: "подключено слишком много серверов"})
+		return
+	}
+	s.relays[id] = r
+	s.mu.Unlock()
+	log.Printf("подключился сервер %q (%s)", r.Name, r.Host)
+	c.send(msg{Op: "welcome", V: protoVersion})
+
+	s.keepAlive(conn, c, func(f func(*linkStats)) {
+		s.mu.Lock()
+		if s.relays[id] == r {
+			f(&r.link)
+		}
+		s.mu.Unlock()
+	})
+
+	s.mu.Lock()
+	if s.relays[id] == r {
+		delete(s.relays, id)
 	}
 	s.mu.Unlock()
-	s.markDirty()
+	log.Printf("сервер %q отключился", r.Name)
 }
 
 // clip обрезает строку, которую устройство прислало о себе, до разумной.
@@ -873,10 +954,26 @@ type adminNetwork struct {
 	Devices []adminDevice `json:"devices"`
 }
 
+// adminServer — подключённый побочный сервер глазами панели.
+type adminServer struct {
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Host        string   `json:"host"`
+	Addrs       []string `json:"addrs,omitempty"`
+	App         string   `json:"app,omitempty"`
+	ConnectedAt int64    `json:"connectedAt"`
+	RTTMs       float64  `json:"rttMs,omitempty"`
+	RTTAvgMs    float64  `json:"rttAvgMs,omitempty"`
+	JitterMs    float64  `json:"jitterMs,omitempty"`
+	LossPct     float64  `json:"lossPct"`
+	Quality     string   `json:"quality"`
+}
+
 type adminState struct {
 	Version   string         `json:"version"`
 	StartedAt int64          `json:"startedAt"`
 	Networks  []adminNetwork `json:"networks"`
+	Servers   []adminServer  `json:"servers"`
 }
 
 func unixOrZero(t time.Time) int64 {
@@ -922,6 +1019,22 @@ func (s *server) adminState() adminState {
 		st.Networks = append(st.Networks, an)
 	}
 	sort.Slice(st.Networks, func(i, j int) bool { return len(st.Networks[i].Devices) > len(st.Networks[j].Devices) })
+	st.Servers = []adminServer{}
+	for _, r := range s.relays {
+		as := adminServer{
+			ID: r.ID, Name: r.Name, Host: r.Host, Addrs: r.Addrs, App: r.App,
+			ConnectedAt: unixOrZero(r.connectedAt),
+			Quality:     r.link.quality(),
+			LossPct:     round1(r.link.loss()),
+		}
+		if r.link.got > 0 {
+			as.RTTMs = round1(float64(r.link.last) / float64(time.Millisecond))
+			as.RTTAvgMs = round1(r.link.avg)
+			as.JitterMs = round1(r.link.jitter)
+		}
+		st.Servers = append(st.Servers, as)
+	}
+	sort.Slice(st.Servers, func(i, j int) bool { return st.Servers[i].Name < st.Servers[j].Name })
 	return st
 }
 

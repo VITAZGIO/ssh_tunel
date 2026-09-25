@@ -44,6 +44,11 @@ type Server struct {
 	// панель отвечает нулями, а «за всё время» — вечными счётчиками
 	// клиентов, которые есть всегда.
 	history *TrafficHistory
+
+	// settings — настройки панели (ёмкость сервера); mesh — сеть устройств.
+	// Оба могут быть nil (тесты): тогда их ручки отвечают, что недоступны.
+	settings *SettingsStore
+	mesh     *MeshManager
 }
 
 // WithHistory подключает историю трафика по дням (traffic_history.go).
@@ -90,6 +95,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/traffic", s.requireAuth(s.handleTraffic))
 	mux.HandleFunc("/api/autostart", s.requireAuth(s.handleAutostart))
 	mux.HandleFunc("/api/update", s.requireAuth(s.handleUpdate))
+	s.meshRoutes(mux)
 	return mux
 }
 

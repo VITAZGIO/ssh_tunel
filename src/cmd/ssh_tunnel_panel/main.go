@@ -37,7 +37,9 @@ import (
 
 	"golang.org/x/crypto/acme/autocert"
 
+	"sshtunnel/internal/meshsvc"
 	"sshtunnel/internal/panel"
+	"sshtunnel/internal/updater"
 )
 
 // defaultListen — только петлевой адрес: по умолчанию перед панелью должен
@@ -73,6 +75,17 @@ func main() {
 
 	if err := panel.EnsureSSHDRestrictions(); err != nil {
 		fatal("не могу подготовить ограничения sshd для клиентов панели: %v", err)
+	}
+	settings, err := panel.OpenSettings(filepath.Join(*dataDir, "settings.json"))
+	if err != nil {
+		fatal("не могу открыть настройки панели: %v", err)
+	}
+	// Ёмкость сервера (MaxStartups sshd) — при каждом запуске: скрипт
+	// настройки сервера или обновление системы могли её переписать. Не
+	// фатально: без неё панель работает, просто устройств одновременно
+	// поместится меньше.
+	if err := panel.ApplyCapacity(panel.EffectiveMaxDevices(settings.Get().MaxDevices)); err != nil {
+		log.Printf("ёмкость сервера не выставлена: %v", err)
 	}
 	clientStore, err := panel.OpenClientStore(filepath.Join(*dataDir, "clients.json"))
 	if err != nil {
@@ -111,9 +124,15 @@ func main() {
 			"придётся донастраивать вручную, пока один из флагов не будет задан")
 	}
 
+	mesh := panel.NewMeshManager(settings, panel.NewSystemMesh(), meshsvc.NewAdmin(meshsvc.AdminSocket),
+		*dataDir, updater.Version).WithSSH(effectiveSSHHost, *sshPort)
+	mesh.Start()
+
 	srv := panel.NewServer(store, clients).
 		WithClientDefaults(effectiveSSHHost, *sshPort, effectivePublicURL).
-		WithHistory(history)
+		WithHistory(history).
+		WithSettings(settings).
+		WithMesh(mesh)
 	handler := srv.Handler()
 
 	if *domain != "" {

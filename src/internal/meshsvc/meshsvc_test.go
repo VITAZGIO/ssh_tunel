@@ -39,19 +39,30 @@ func TestInstallScriptParses(t *testing.T) {
 
 func TestLinkAuthorizedKeyТолькоПроброс(t *testing.T) {
 	line := LinkAuthorizedKey("ssh-ed25519 AAAAC3Nza root@nl  \n", `Нидерланды "x" nl-1`)
-	if !strings.HasPrefix(line, `restrict,port-forwarding,permitopen="127.0.0.1:47831" ssh-ed25519 AAAAC3Nza `) {
+	const opts = `restrict,port-forwarding,permitopen="127.0.0.1:47831",command="/usr/sbin/nologin" `
+	if !strings.HasPrefix(line, opts+"ssh-ed25519 AAAAC3Nza ") {
 		t.Fatalf("строка: %q", line)
 	}
-	if strings.ContainsAny(strings.TrimPrefix(line, `restrict,port-forwarding,permitopen="127.0.0.1:47831" `), "\"\n") {
+	if strings.ContainsAny(strings.TrimPrefix(line, opts), "\"\n") {
 		t.Fatalf("в строке кавычки или перевод строки: %q", line)
 	}
 }
 
 func TestUplinkUnit(t *testing.T) {
-	u := UplinkUnit("de.example.com", 2222, "/etc/ssh_tunnel_panel/uplink", "/etc/ssh_tunnel_panel/uplink_known_hosts")
-	for _, want := range []string{"-p 2222", "-L 127.0.0.1:47831:127.0.0.1:47831", "meshlink@de.example.com", "ExitOnForwardFailure=yes"} {
+	u := UplinkUnit("de.example.com", 2222, "/etc/ssh_tunnel_panel/uplink", "/etc/ssh_tunnel_panel/uplink_known_hosts", true)
+	for _, want := range []string{"-p 2222", "-L 127.0.0.1:47831:127.0.0.1:47831", "meshlink@de.example.com",
+		"ExitOnForwardFailure=yes", "StrictHostKeyChecking=yes"} {
 		if !strings.Contains(u, want) {
 			t.Errorf("в юните нет %q:\n%s", want, u)
 		}
+	}
+}
+
+func TestKnownHostsLine(t *testing.T) {
+	if got := KnownHostsLine("de.example.com", 22, "ssh-ed25519 AAAA root@de"); got != "de.example.com ssh-ed25519 AAAA" {
+		t.Errorf("порт 22: %q", got)
+	}
+	if got := KnownHostsLine("203.0.113.7", 2222, "ssh-ed25519 AAAA"); got != "[203.0.113.7]:2222 ssh-ed25519 AAAA" {
+		t.Errorf("другой порт: %q", got)
 	}
 }

@@ -123,7 +123,15 @@ echo "meshd запущен"
 // подключены к побочному серверу, так попадают в сеть главного — сами они
 // ничего об этом не знают. Работает на обычном клиенте OpenSSH: он и так
 // есть на любом сервере, а переподключается systemd.
-func UplinkUnit(mainHost string, mainPort int, keyPath, knownHosts string) string {
+//
+// strict — ключи главного сервера уже записаны в knownHosts (они приходят в
+// коде подключения): чужой сервер под его адресом не примется. Без них
+// ключ запоминается при первом подключении.
+func UplinkUnit(mainHost string, mainPort int, keyPath, knownHosts string, strict bool) string {
+	check := "accept-new"
+	if strict {
+		check = "yes"
+	}
 	return `[Unit]
 Description=ssh_tunnel - сеть устройств: проброс к главному серверу ` + mainHost + `
 After=network-online.target
@@ -132,7 +140,7 @@ Wants=network-online.target
 [Service]
 ExecStart=/usr/bin/ssh -N -T \
   -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 \
-  -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=` + knownHosts + ` \
+  -o BatchMode=yes -o StrictHostKeyChecking=` + check + ` -o UserKnownHostsFile=` + knownHosts + ` \
   -i ` + keyPath + ` -p ` + strconv.Itoa(mainPort) + ` \
   -L 127.0.0.1:` + strconv.Itoa(Port) + `:127.0.0.1:` + strconv.Itoa(Port) + ` \
   ` + LinkUser + `@` + mainHost + `
@@ -144,16 +152,51 @@ WantedBy=multi-user.target
 `
 }
 
+// LinkKeyOptions — ограничения ключа побочного сервера в authorized_keys:
+// только проброс и только до meshd, ни оболочки, ни чего-то ещё. Команда
+// принудительная на случай, если кто-то всё же попросит сессию.
+var LinkKeyOptions = `restrict,port-forwarding,permitopen="127.0.0.1:` + strconv.Itoa(Port) + `",command="/usr/sbin/nologin"`
+
 // LinkAuthorizedKey — строка authorized_keys пользователя meshlink на главном
-// сервере: только проброс и только до meshd, ни оболочки, ни чего-то ещё.
+// сервере для ключа побочного сервера name.
 func LinkAuthorizedKey(pubKey, name string) string {
 	pubKey = strings.TrimSpace(pubKey)
 	fields := strings.Fields(pubKey)
 	if len(fields) >= 2 {
 		pubKey = fields[0] + " " + fields[1]
 	}
-	return `restrict,port-forwarding,permitopen="127.0.0.1:` + strconv.Itoa(Port) + `" ` +
-		pubKey + " " + sanitizeComment(name)
+	return LinkKeyOptions + " " + pubKey + " " + sanitizeComment(name)
+}
+
+// LinkSSHDBlock — ограничения для пользователя meshlink в sshd_config:
+// вторая линия защиты после опций в authorized_keys (их можно забыть при
+// ручной правке файла, а этот блок — нет). Проброс только «к себе» (-L) и
+// только до meshd; обратный проброс, сессии, агент — закрыты.
+func LinkSSHDBlock() string {
+	return "Match User " + LinkUser + "\n" +
+		"    AllowTcpForwarding local\n" +
+		"    PermitOpen 127.0.0.1:" + strconv.Itoa(Port) + "\n" +
+		"    PermitListen none\n" +
+		"    AllowStreamLocalForwarding no\n" +
+		"    AllowAgentForwarding no\n" +
+		"    X11Forwarding no\n" +
+		"    PermitTunnel no\n" +
+		"    PermitTTY no\n" +
+		"    ForceCommand /usr/sbin/nologin\n"
+}
+
+// KnownHostsLine — строка known_hosts для ключа hostKey ("тип ключ")
+// сервера host:port в том виде, в каком её ищет ssh.
+func KnownHostsLine(host string, port int, hostKey string) string {
+	name := host
+	if port != 22 {
+		name = "[" + host + "]:" + strconv.Itoa(port)
+	}
+	f := strings.Fields(hostKey)
+	if len(f) >= 2 {
+		hostKey = f[0] + " " + f[1]
+	}
+	return name + " " + hostKey
 }
 
 // sanitizeComment — имя сервера в комментарии ключа: без пробелов и кавычек,
