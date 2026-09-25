@@ -169,6 +169,196 @@
   .row-inline{display:flex;gap:8px;flex-wrap:wrap}
   .chk{display:flex;align-items:flex-start;gap:9px;font-size:13px;cursor:pointer}
   .chk input{margin-top:2px;accent-color:var(--accent-muted)}
+
+  /* ---------- движение: мягко и без суеты ---------- */
+  body{background:
+         radial-gradient(900px 480px at 85% -8%, rgba(76,141,255,.10), transparent 62%),
+         radial-gradient(700px 420px at -5% 105%, rgba(47,191,113,.06), transparent 60%),
+         var(--bg);
+       background-attachment:fixed}
+  @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  @keyframes pop{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}
+  main > section:not([hidden]) > *{animation:rise .38s cubic-bezier(.2,.7,.2,1) both}
+  main > section:not([hidden]) > *:nth-child(2){animation-delay:.03s}
+  main > section:not([hidden]) > *:nth-child(3){animation-delay:.06s}
+  main > section:not([hidden]) > *:nth-child(4){animation-delay:.09s}
+  main > section:not([hidden]) > *:nth-child(5){animation-delay:.12s}
+  main > section:not([hidden]) > *:nth-child(n+6){animation-delay:.15s}
+  .card{transition:border-color .2s, box-shadow .2s}
+  .card:hover{border-color:color-mix(in srgb, var(--accent) 22%, var(--line))}
+  button.btn{transition:filter .15s, transform .08s, box-shadow .2s}
+  button.btn:active:not(:disabled){transform:scale(.97)}
+  button.btn:not(.ghost):not(.danger):hover{box-shadow:0 4px 18px -6px rgba(76,141,255,.55)}
+  .side button{position:relative;transition:color .15s, background .15s, border-color .15s}
+  .side button::before{content:"";position:absolute;left:0;top:22%;bottom:22%;width:3px;
+       border-radius:3px;background:var(--accent);transform:scaleY(0);transition:transform .22s}
+  .side button.on::before{transform:scaleY(1)}
+  @media (max-width:860px){ .side button::before{display:none} }
+  .dialog{animation:pop .18s ease both}
+  .overlay:not([hidden]){animation:fade .15s ease both}
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{animation:none!important;transition:none!important}
+  }
+
+  /* ---------- подсказки «?» ---------- */
+  .hint{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;
+        margin-left:6px;border-radius:50%;border:1px solid var(--line);background:var(--card2);
+        color:var(--dim);font:700 10.5px/1 "Segoe UI",sans-serif;cursor:help;padding:0;
+        vertical-align:middle;transition:color .15s, border-color .15s, transform .15s, background .15s}
+  .hint:hover,.hint:focus-visible,.hint.open{color:#fff;background:var(--accent-muted);
+        border-color:var(--accent);transform:scale(1.12);outline:none}
+  #hintPop{position:fixed;z-index:60;max-width:min(330px,calc(100vw - 24px));padding:11px 13px;
+        border-radius:11px;background:color-mix(in srgb, var(--card) 92%, #000);
+        border:1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+        box-shadow:0 14px 40px -10px rgba(0,0,0,.55);font-size:12.5px;line-height:1.5;
+        color:var(--text);pointer-events:none;opacity:0;transform:translateY(4px) scale(.97);
+        transform-origin:top center;transition:opacity .16s, transform .16s}
+  #hintPop.show{opacity:1;transform:none}
+  #hintPop.above{transform-origin:bottom center}
+  #hintPop p{margin:0}
+  #hintPop p + p{margin-top:6px}
+  #hintPop b{color:var(--accent)}
+
+  /* ---------- всплывающие уведомления ---------- */
+  #toasts{position:fixed;right:16px;bottom:16px;z-index:70;display:flex;flex-direction:column;
+          gap:8px;align-items:flex-end;pointer-events:none}
+  .toast{pointer-events:auto;max-width:360px;padding:10px 14px;border-radius:10px;font-size:13px;
+         background:var(--card);border:1px solid var(--line);box-shadow:0 10px 30px -10px rgba(0,0,0,.5);
+         display:flex;gap:9px;align-items:flex-start;animation:toastIn .28s cubic-bezier(.2,.8,.2,1) both}
+  .toast.out{animation:toastOut .25s ease both}
+  .toast::before{content:"";flex:none;width:8px;height:8px;border-radius:50%;margin-top:5px;background:var(--ok)}
+  .toast.err::before{background:var(--err)}
+  @keyframes toastIn{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}
+  @keyframes toastOut{to{opacity:0;transform:translateX(20px)}}
+
+  /* ---------- сеть устройств ---------- */
+  .role-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  .role{position:relative;background:var(--card2);border:1px solid var(--line);border-radius:12px;
+        padding:16px;cursor:pointer;text-align:left;color:var(--text);font:inherit;
+        transition:transform .18s, border-color .18s, box-shadow .18s}
+  .role:hover{transform:translateY(-2px);border-color:var(--accent-muted);
+        box-shadow:0 10px 26px -14px rgba(76,141,255,.6)}
+  .role.on{border-color:var(--accent);box-shadow:0 0 0 3px rgba(76,141,255,.16)}
+  .role .ico{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;
+        justify-content:center;background:linear-gradient(160deg,var(--accent-muted),var(--accent-muted-dark));
+        margin-bottom:10px}
+  .role .ico svg{width:22px;height:22px;fill:none;stroke:#fff;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .role .t{font-weight:650;font-size:14.5px;display:flex;align-items:center}
+  .role .d{color:var(--dim);font-size:12.5px;margin-top:4px;line-height:1.45}
+  .role.off .ico{background:var(--line)}
+
+  .spin{display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:-2px;
+        border:2px solid color-mix(in srgb, var(--accent) 30%, transparent);border-top-color:var(--accent);
+        animation:spin .8s linear infinite;margin-right:7px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .console{background:#0a0c11;color:#b9c3d6;font:12px/1.5 var(--mono);border:1px solid var(--line);
+        border-radius:9px;padding:10px 12px;max-height:230px;overflow:auto;white-space:pre-wrap;
+        word-break:break-word}
+  .console .l{animation:fade .25s ease both}
+
+  .sum .box{position:relative;overflow:hidden}
+  .sum .box .s{font-size:11.5px;color:var(--dim);margin-top:2px}
+  .sum .box::after{content:"";position:absolute;inset:auto -20% -60% auto;width:90px;height:90px;
+        border-radius:50%;background:radial-gradient(circle, rgba(76,141,255,.14), transparent 70%)}
+
+  .map-wrap{position:relative;background:
+        radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 65%),
+        var(--card2);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .map-wrap svg{display:block;width:100%;height:460px}
+  @media (max-width:560px){ .map-wrap svg{height:330px} }
+  .map-grid{stroke:color-mix(in srgb, var(--line) 70%, transparent);stroke-width:1}
+  .edge{fill:none;stroke-width:1.6;stroke-linecap:round}
+  .edge.on{stroke-dasharray:5 7;animation:flow 1.1s linear infinite}
+  .edge.srv{stroke-width:2.6}
+  .edge.srv.on{stroke-dasharray:9 8;animation-duration:.9s}
+  .edge.off{stroke:var(--dim);opacity:.28;stroke-dasharray:2 6}
+  @keyframes flow{to{stroke-dashoffset:-24}}
+  .q-excellent,.q-good{stroke:var(--ok)} .q-fair{stroke:var(--warn)} .q-poor{stroke:var(--err)}
+  .q-unknown{stroke:var(--accent)}
+  .node{cursor:pointer}
+  .node .halo{transform-box:fill-box;transform-origin:center;animation:halo 2.4s ease-out infinite;pointer-events:none}
+  @keyframes halo{0%{opacity:.5;transform:scale(.7)}100%{opacity:0;transform:scale(1.9)}}
+  .node .disc{stroke-width:1.5;transition:transform .15s;transform-box:fill-box;transform-origin:center}
+  .node:hover .disc{transform:scale(1.12)}
+  .node text{font:600 10.5px "Segoe UI",sans-serif;fill:var(--text);text-anchor:middle;paint-order:stroke;
+        stroke:var(--card2);stroke-width:3px;stroke-linejoin:round}
+  .node text.sub{font-weight:500;font-size:9.5px;fill:var(--dim)}
+  .node .glyph{fill:none;stroke:#fff;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+  .node.offline{opacity:.5}
+  .node-enter{animation:pop .4s cubic-bezier(.2,.8,.2,1) both;transform-box:fill-box;transform-origin:center}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--dim);margin-top:10px}
+  .legend i{display:inline-block;width:18px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .toolbar input[type=text]{flex:1;min-width:160px}
+  .chips{display:flex;gap:6px}
+  .chips button{padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:var(--card2);
+        color:var(--dim);font:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+  .chips button.on{background:var(--accent-muted);border-color:var(--accent-muted);color:#fff}
+
+  .mdevs{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px}
+  .mdev{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:13px;
+        transition:border-color .2s, transform .2s, box-shadow .2s;animation:rise .3s ease both}
+  .mdev:hover{transform:translateY(-1px);box-shadow:0 8px 22px -14px rgba(0,0,0,.6)}
+  .mdev.flash{animation:flash 1.2s ease}
+  @keyframes flash{0%,100%{box-shadow:none}30%{box-shadow:0 0 0 3px rgba(76,141,255,.45)}}
+  .mdev .top{display:flex;align-items:center;gap:10px}
+  .mdev .pic{width:34px;height:34px;border-radius:10px;flex:none;display:flex;align-items:center;
+        justify-content:center;background:linear-gradient(160deg,var(--accent-muted),var(--accent-muted-dark))}
+  .mdev.offline .pic{background:var(--line)}
+  .mdev .pic svg{width:19px;height:19px;fill:none;stroke:#fff;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .mdev .nm{flex:1;min-width:0}
+  .mdev .nm .n{font-weight:650;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mdev .nm .h{font:11.5px var(--mono);color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mdev .nm input{width:100%;padding:4px 7px;font-size:13px}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--dim);flex:none}
+  .dot.on{background:var(--ok);box-shadow:0 0 0 0 rgba(47,191,113,.6);animation:beat 2s infinite}
+  @keyframes beat{0%{box-shadow:0 0 0 0 rgba(47,191,113,.55)}70%{box-shadow:0 0 0 7px rgba(47,191,113,0)}100%{box-shadow:0 0 0 0 rgba(47,191,113,0)}}
+  .mdev .facts{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-top:11px;font-size:12px}
+  .mdev .facts .k{color:var(--dim);font-size:10.5px;text-transform:uppercase;letter-spacing:.5px}
+  .mdev .facts .v{font-family:var(--mono);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mdev .acts{display:flex;gap:6px;margin-top:11px}
+  .mdev .acts button{flex:1}
+  .qual{display:inline-flex;align-items:flex-end;gap:2px;height:13px;vertical-align:-1px;margin-right:6px}
+  .qual span{width:3px;border-radius:1px;background:var(--line);transition:background .3s}
+  .qual span:nth-child(1){height:4px} .qual span:nth-child(2){height:7px}
+  .qual span:nth-child(3){height:10px} .qual span:nth-child(4){height:13px}
+  .qual.q4 span{background:var(--ok)} .qual.q3 span:nth-child(-n+3){background:var(--ok)}
+  .qual.q2 span:nth-child(-n+2){background:var(--warn)} .qual.q1 span:nth-child(1){background:var(--err)}
+  .icon-btn{background:none;border:none;color:var(--dim);cursor:pointer;padding:3px;border-radius:6px;
+        display:inline-flex;transition:color .15s, background .15s}
+  .icon-btn:hover{color:var(--text);background:var(--line)}
+  .icon-btn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+  .srv-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+  .srv-row:last-child{border-bottom:none}
+  .srv-row .nm{flex:1;min-width:0}
+  .srv-row .nm .n{font-weight:600}
+  .srv-row .nm .h{font:11.5px var(--mono);color:var(--dim)}
+  .srv-row .m{font:12px var(--mono);color:var(--dim);white-space:nowrap}
+  .code-box{font:11.5px/1.45 var(--mono);word-break:break-all;background:var(--card2);border:1px dashed var(--accent-muted);
+        border-radius:9px;padding:10px;max-height:120px;overflow:auto}
+  .steps{margin:10px 0 0;padding-left:20px;color:var(--dim);font-size:12.5px;line-height:1.6}
+
+  .link-viz{display:flex;align-items:center;gap:14px;padding:18px 6px}
+  .link-viz .end{text-align:center;flex:none;width:110px}
+  .link-viz .end .ico{width:52px;height:52px;margin:0 auto 7px;border-radius:14px;display:flex;align-items:center;
+        justify-content:center;background:linear-gradient(160deg,var(--accent-muted),var(--accent-muted-dark))}
+  .link-viz .end .ico svg{width:26px;height:26px;fill:none;stroke:#fff;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .link-viz .end .n{font-weight:600;font-size:13px}
+  .link-viz .end .h{font:11px var(--mono);color:var(--dim);overflow:hidden;text-overflow:ellipsis}
+  .link-viz .wire{flex:1;height:4px;border-radius:4px;position:relative;overflow:hidden;background:var(--line)}
+  .link-viz .wire.on{background:color-mix(in srgb, var(--ok) 30%, transparent)}
+  .link-viz .wire.on::after{content:"";position:absolute;top:0;bottom:0;width:30%;border-radius:4px;
+        background:linear-gradient(90deg,transparent,var(--ok),transparent);animation:packet 1.4s linear infinite}
+  .link-viz .wire.err{background:repeating-linear-gradient(90deg,var(--err) 0 8px,transparent 8px 14px);opacity:.6}
+  @keyframes packet{from{left:-30%}to{left:100%}}
+
+  input[type=number]{width:100%;background:var(--card2);border:1px solid var(--line);border-radius:8px;
+        padding:9px 10px;color:var(--text);font:inherit}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  .cap-row{display:grid;grid-template-columns:minmax(0,1fr) 110px;gap:14px;align-items:center}
 </style>
 </head>
 <body>
@@ -280,7 +470,7 @@
       </div>
 
       <div class="card">
-        <h1 data-i18n="traffic_title">Трафик</h1>
+        <h1><span data-i18n="traffic_title">Трафик</span><button class="hint" data-hint="hint_traffic">?</button></h1>
         <p class="note" data-i18n="traffic_note">Считается по правилам nftables на самом сервере,
           отдельно по каждому клиенту. «За всё время» — с момента, когда клиент был заведён.</p>
         <div class="periods" id="periods">
@@ -383,6 +573,177 @@
       </div>
     </section>
 
+    <!-- ======== СЕТЬ УСТРОЙСТВ ======== -->
+    <section id="tabMesh" hidden>
+      <h1 class="page-title"><span data-i18n="nav_mesh">Сеть устройств</span><button class="hint" data-hint="hint_mesh_what">?</button></h1>
+      <p class="page-sub" data-i18n="mesh_sub">Твои устройства в одной сети через твои же серверы — как NetBird:
+        каждое получает постоянный адрес и имя вида «ноутбук.mesh».</p>
+
+      <!-- роль сервера -->
+      <div class="card" id="meshRoleCard" hidden>
+        <h1 data-i18n="mesh_role_title">Роль этого сервера</h1>
+        <p class="note" data-i18n="mesh_role_note">Серверов может быть несколько: один главный, остальные подключаются к нему.
+          Устройства, подключённые к любому из них, окажутся в одной сети.</p>
+        <div class="role-grid">
+          <button class="role" id="roleMainBtn" type="button">
+            <div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><circle cx="4.5" cy="5" r="2"/><circle cx="19.5" cy="5" r="2"/><circle cx="4.5" cy="19" r="2"/><circle cx="19.5" cy="19" r="2"/><path d="M6 6.4 9.7 9.8M18 6.4l-3.7 3.4M6 17.6l3.7-3.4M18 17.6l-3.7-3.4"/></svg></div>
+            <div class="t"><span data-i18n="role_main">Главный сервер</span><span class="hint" tabindex="0" data-hint="hint_role_main">?</span></div>
+            <div class="d" data-i18n="role_main_d">Здесь работает служба сети. К нему подключаются устройства и другие серверы, здесь видна вся сеть.</div>
+          </button>
+          <button class="role" id="roleSecBtn" type="button">
+            <div class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01M12 10v4"/></svg></div>
+            <div class="t"><span data-i18n="role_secondary">Побочный сервер</span><span class="hint" tabindex="0" data-hint="hint_role_secondary">?</span></div>
+            <div class="d" data-i18n="role_secondary_d">Подключается к главному. Устройства этого сервера попадают в общую сеть, выход в интернет остаётся здесь.</div>
+          </button>
+        </div>
+
+        <div id="meshMainForm" hidden style="margin-top:16px">
+          <div class="field">
+            <label for="meshName"><span data-i18n="mesh_name_label">Как назвать этот сервер</span><button class="hint" data-hint="hint_mesh_name">?</button></label>
+            <input type="text" id="meshName" data-i18n-ph="mesh_name_ph" placeholder="Москва, Германия…">
+          </div>
+          <button class="btn" id="meshMakeMainBtn" data-i18n="mesh_make_main">Сделать главным и установить</button>
+        </div>
+
+        <div id="meshJoinForm" hidden style="margin-top:16px">
+          <div class="field">
+            <label for="meshJoinCode"><span data-i18n="mesh_code_label">Код подключения с главного сервера</span><button class="hint" data-hint="hint_mesh_code">?</button></label>
+            <textarea id="meshJoinCode" rows="3" style="font-family:var(--mono);font-size:11.5px" placeholder="sshtunnel-link1:…"></textarea>
+          </div>
+          <div class="field">
+            <label for="meshSelfHost"><span data-i18n="mesh_self_host">Адрес этого сервера для устройств</span><button class="hint" data-hint="hint_mesh_self_host">?</button></label>
+            <input type="text" id="meshSelfHost" placeholder="de.example.com">
+          </div>
+          <button class="btn" id="meshJoinBtn" data-i18n="mesh_join">Подключить к главному</button>
+        </div>
+        <div id="meshRoleMsg" style="margin-top:12px"></div>
+      </div>
+
+      <!-- установка -->
+      <div class="card" id="meshJobCard" hidden>
+        <h1 id="meshJobTitle"></h1>
+        <div class="console" id="meshJobLog"></div>
+      </div>
+
+      <!-- главный сервер -->
+      <div id="meshMainView" hidden>
+        <div class="msg err" id="meshAdminErr" hidden></div>
+        <div class="sum" id="meshTiles">
+          <div class="box"><div class="k"><span data-i18n="tile_devices">Устройства</span><button class="hint" data-hint="hint_tile_devices">?</button></div>
+            <div class="v" id="tileDevices">—</div><div class="s" id="tileDevicesSub"></div></div>
+          <div class="box"><div class="k"><span data-i18n="tile_servers">Серверы</span><button class="hint" data-hint="hint_tile_servers">?</button></div>
+            <div class="v" id="tileServers">—</div><div class="s" id="tileServersSub"></div></div>
+          <div class="box"><div class="k"><span data-i18n="tile_latency">Задержка</span><button class="hint" data-hint="hint_tile_latency">?</button></div>
+            <div class="v" id="tileLatency">—</div><div class="s" id="tileLatencySub"></div></div>
+          <div class="box"><div class="k"><span data-i18n="tile_traffic">Трафик в сети</span><button class="hint" data-hint="hint_tile_traffic">?</button></div>
+            <div class="v" id="tileTraffic">—</div><div class="s" id="tileTrafficSub"></div></div>
+        </div>
+
+        <div class="card">
+          <h1><span data-i18n="mesh_map_title">Схема сети</span><button class="hint" data-hint="hint_map">?</button></h1>
+          <div class="toolbar" id="meshNetBar" hidden>
+            <label class="note" style="margin:0" for="meshNetSel" data-i18n="mesh_network">Сеть</label>
+            <select id="meshNetSel"></select>
+          </div>
+          <div class="map-wrap"><svg id="meshMap" role="img" aria-label="mesh map"></svg></div>
+          <div class="legend">
+            <span><i style="background:var(--ok)"></i><span data-i18n="legend_good">связь хорошая</span></span>
+            <span><i style="background:var(--warn)"></i><span data-i18n="legend_fair">средняя</span></span>
+            <span><i style="background:var(--err)"></i><span data-i18n="legend_poor">плохая</span></span>
+            <span><i style="background:var(--dim);opacity:.5"></i><span data-i18n="legend_off">не в сети</span></span>
+          </div>
+        </div>
+
+        <div class="card">
+          <h1><span data-i18n="mesh_devices_title">Устройства в сети</span><button class="hint" data-hint="hint_devices_list">?</button></h1>
+          <div class="toolbar">
+            <input type="text" id="meshSearch" data-i18n-ph="mesh_search_ph" placeholder="Поиск по имени, адресу, системе…">
+            <div class="chips" id="meshFilter">
+              <button data-f="all" class="on" data-i18n="f_all">Все</button>
+              <button data-f="on" data-i18n="f_on">В сети</button>
+              <button data-f="off" data-i18n="f_off">Не в сети</button>
+            </div>
+          </div>
+          <div class="mdevs" id="meshDevices"></div>
+          <div class="empty" id="meshDevicesEmpty" hidden></div>
+        </div>
+
+        <div class="card">
+          <h1><span data-i18n="mesh_servers_title">Серверы сети</span><button class="hint" data-hint="hint_servers">?</button></h1>
+          <div id="meshServers"></div>
+          <div id="meshLinkMsg"></div>
+          <button class="btn" id="meshAddLinkBtn" style="margin-top:12px" data-i18n="mesh_add_server">+ Подключить сервер</button>
+          <div id="meshLinkForm" hidden style="margin-top:14px">
+            <div class="field">
+              <label for="linkName" data-i18n="link_name_label">Имя побочного сервера</label>
+              <input type="text" id="linkName" data-i18n-ph="link_name_ph" placeholder="Германия">
+            </div>
+            <div class="cap-row" style="grid-template-columns:minmax(0,1fr) 110px">
+              <div class="field"><label for="linkHost"><span data-i18n="link_host_label">Адрес этого (главного) сервера</span><button class="hint" data-hint="hint_link_host">?</button></label>
+                <input type="text" id="linkHost"></div>
+              <div class="field"><label for="linkPort" data-i18n="port_label">Порт</label>
+                <input type="number" id="linkPort" min="1" max="65535" value="22"></div>
+            </div>
+            <div class="row-inline">
+              <button class="btn" id="linkCreateBtn" data-i18n="link_create">Получить код</button>
+              <button class="btn ghost" id="linkCancelBtn" data-i18n="cancel">Отмена</button>
+            </div>
+          </div>
+          <div id="meshCodeBox" hidden style="margin-top:14px">
+            <div class="msg ok" data-i18n="link_code_ready">Код готов. Он содержит ключ доступа — передай его только на свой сервер.
+              Один код — для одного сервера: для следующего получи новый.</div>
+            <div class="code-box" id="meshCode"></div>
+            <div class="row-inline" style="margin-top:10px">
+              <button class="btn" id="meshCodeCopy" data-i18n="copy_config">Скопировать</button>
+              <button class="btn ghost" id="meshCodeClose" data-i18n="close">Закрыть</button>
+            </div>
+            <ol class="steps">
+              <li data-i18n="link_step1">Открой панель побочного сервера → «Сеть устройств».</li>
+              <li data-i18n="link_step2">Выбери «Побочный сервер» и вставь код.</li>
+              <li data-i18n="link_step3">Нажми «Подключить к главному» — через несколько секунд сервер появится здесь на схеме.</li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="card">
+          <h1><span data-i18n="mesh_service_title">Служба сети</span><button class="hint" data-hint="hint_service">?</button></h1>
+          <div class="kv"><span class="k" data-i18n="status_label">Статус</span><span class="v" id="meshSvcState">—</span></div>
+          <div class="kv"><span class="k" data-i18n="mesh_version">Версия meshd</span><span class="v" id="meshSvcVersion">—</span></div>
+          <div class="kv"><span class="k" data-i18n="mesh_since">Работает с</span><span class="v" id="meshSvcSince">—</span></div>
+          <div class="row-inline" style="margin-top:12px">
+            <button class="btn ghost" id="meshReinstallBtn" data-i18n="mesh_reinstall">Обновить meshd</button>
+            <button class="btn danger" id="meshOffBtn" data-i18n="mesh_off">Выключить сеть на сервере</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- побочный сервер -->
+      <div id="meshSecView" hidden>
+        <div class="card">
+          <h1><span data-i18n="sec_title">Связь с главным сервером</span><button class="hint" data-hint="hint_sec">?</button></h1>
+          <div class="link-viz">
+            <div class="end"><div class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/></svg></div>
+              <div class="n" id="secSelfName">—</div><div class="h" id="secSelfHost"></div></div>
+            <div class="wire" id="secWire"></div>
+            <div class="end"><div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><circle cx="4.5" cy="5" r="2"/><circle cx="19.5" cy="5" r="2"/><circle cx="4.5" cy="19" r="2"/><circle cx="19.5" cy="19" r="2"/><path d="M6 6.4 9.7 9.8M18 6.4l-3.7 3.4M6 17.6l3.7-3.4M18 17.6l-3.7-3.4"/></svg></div>
+              <div class="n" data-i18n="role_main">Главный сервер</div><div class="h" id="secMainHost"></div></div>
+          </div>
+          <div class="kv"><span class="k" data-i18n="status_label">Статус</span><span class="v" id="secState">—</span></div>
+          <div class="kv"><span class="k" data-i18n="sec_since">На связи с</span><span class="v" id="secSince">—</span></div>
+          <div class="kv"><span class="k" data-i18n="sec_last_ping">Последняя проверка</span><span class="v" id="secPing">—</span></div>
+          <div class="kv"><span class="k"><span data-i18n="sec_uplink">Служба проброса</span><button class="hint" data-hint="hint_uplink">?</button></span><span class="v" id="secUplink">—</span></div>
+          <div class="msg err" id="secErr" hidden style="margin-top:12px"></div>
+          <h2 style="margin-top:16px" data-i18n="sec_log">Журнал проброса</h2>
+          <div class="console" id="secLog"></div>
+          <p class="note" style="margin:12px 0 0" data-i18n="sec_note">Устройства всей сети, качество связи и переименование — в панели главного сервера.</p>
+          <div class="row-inline" style="margin-top:12px">
+            <button class="btn ghost" id="secRejoinBtn" data-i18n="sec_rejoin">Подключить по новому коду</button>
+            <button class="btn danger" id="secOffBtn" data-i18n="mesh_off">Выключить сеть на сервере</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- ======== НАСТРОЙКИ ======== -->
     <section id="tabSettings" hidden>
       <h1 class="page-title" data-i18n="nav_settings">Настройки</h1>
@@ -406,7 +767,23 @@
       </div>
 
       <div class="card">
-        <h1 data-i18n="autostart_title">Автозапуск</h1>
+        <h1><span data-i18n="cap_title">Ёмкость сервера</span><button class="hint" data-hint="hint_capacity">?</button></h1>
+        <p class="note" data-i18n="cap_note">Сколько устройств могут подключаться к серверу одновременно. Меняет настройку
+          защиты sshd от наплыва соединений — уже подключённые устройства это не затронет.</p>
+        <div id="capMsg"></div>
+        <div class="cap-row">
+          <input type="range" id="capRange" min="1" max="250" value="30">
+          <input type="number" id="capNum" min="1" max="250" value="30">
+        </div>
+        <div class="kv" style="margin-top:8px"><span class="k"><span data-i18n="cap_wanted">Будет выставлено</span><button class="hint" data-hint="hint_maxstartups">?</button></span>
+          <span class="v" id="capWanted">—</span></div>
+        <div class="kv"><span class="k" data-i18n="cap_effective">Действует сейчас (sshd -T)</span>
+          <span class="v" id="capEffective">—</span></div>
+        <button class="btn" id="capSaveBtn" style="margin-top:12px" data-i18n="cap_save">Применить</button>
+      </div>
+
+      <div class="card">
+        <h1><span data-i18n="autostart_title">Автозапуск</span><button class="hint" data-hint="hint_autostart">?</button></h1>
         <p class="note" id="autostartNote" hidden data-i18n="autostart_note">Включено — панель поднимется сама после
           перезагрузки сервера. Снятая галочка не выключает панель прямо сейчас, а только не даёт
           ей стартовать в следующий раз.</p>
@@ -458,6 +835,10 @@
         <path d="M6 19h7"/><rect x="17.5" y="9.5" width="4" height="10" rx="1.2"/></svg>
       <span data-i18n="nav_devices">Устройства</span>
     </button>
+    <button data-tab="Mesh">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.6"/><circle cx="5" cy="5.5" r="2"/><circle cx="19" cy="5.5" r="2"/><circle cx="5" cy="18.5" r="2"/><circle cx="19" cy="18.5" r="2"/><path d="M6.5 7 10 10M17.5 7 14 10M6.5 17 10 14M17.5 17 14 14"/></svg>
+      <span data-i18n="nav_mesh">Сеть устройств</span>
+    </button>
     <button data-tab="Settings">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/>
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -484,6 +865,11 @@
   </div>
 </div>
 
+<!-- Подсказка к «?» — одна на страницу: так она не обрезается краем карточки
+     или таблицы, в которой стоит знак вопроса. -->
+<div id="hintPop" role="tooltip"></div>
+<div id="toasts" aria-live="polite"></div>
+
 <script>
 const $ = id => document.getElementById(id);
 const api = (path, body) => fetch(path, {
@@ -495,8 +881,9 @@ const api = (path, body) => fetch(path, {
 
 /* ---------- своё окно подтверждения ---------- */
 let confirmResolve = null;
-function appConfirm(message){
+function appConfirm(message, okLabel){
   $('confirmText').textContent = message;
+  $('confirmOkBtn').textContent = okLabel || t('confirm_yes');
   $('confirmOverlay').hidden = false;
   return new Promise(resolve => { confirmResolve = resolve; });
 }
@@ -592,6 +979,119 @@ const I18N = {
     err_password_mismatch:'Пароли не совпадают',
     err_autostart_unsupported:'Автозапуском отсюда управлять нечем',
     password_changed:'Пароль изменён',
+    nav_mesh:'Сеть устройств',
+    mesh_sub:'Твои устройства в одной сети через твои же серверы — как NetBird: каждое получает '+
+      'постоянный адрес и имя вида «ноутбук.mesh».',
+    mesh_role_title:'Роль этого сервера',
+    mesh_role_note:'Серверов может быть несколько: один главный, остальные подключаются к нему. '+
+      'Устройства, подключённые к любому из них, окажутся в одной сети.',
+    role_main:'Главный сервер', role_secondary:'Побочный сервер',
+    role_main_d:'Здесь работает служба сети. К нему подключаются устройства и другие серверы, '+
+      'здесь видна вся сеть.',
+    role_secondary_d:'Подключается к главному. Устройства этого сервера попадают в общую сеть, '+
+      'выход в интернет остаётся здесь.',
+    mesh_name_label:'Как назвать этот сервер', mesh_name_ph:'Москва, Германия…',
+    mesh_make_main:'Сделать главным и установить',
+    mesh_code_label:'Код подключения с главного сервера',
+    mesh_self_host:'Адрес этого сервера для устройств', mesh_join:'Подключить к главному',
+    job_install:'Устанавливаю службу сети', job_done:'Установка закончена', job_failed:'Установка не удалась',
+    tile_devices:'Устройства', tile_servers:'Серверы', tile_latency:'Задержка', tile_traffic:'Трафик в сети',
+    tile_online:'в сети', tile_of:'из', tile_avg:'в среднем по сети', tile_no_data:'нет замеров',
+    tile_traffic_sub:'между устройствами',
+    mesh_map_title:'Схема сети', mesh_network:'Сеть',
+    legend_good:'связь хорошая', legend_fair:'средняя', legend_poor:'плохая', legend_off:'не в сети',
+    mesh_devices_title:'Устройства в сети', mesh_search_ph:'Поиск по имени, адресу, системе…',
+    f_all:'Все', f_on:'В сети', f_off:'Не в сети',
+    mesh_no_devices:'В сети пока нет устройств. Включи «Сеть устройств» в настройках сервера в программе '+
+      'на компьютере или телефоне — они появятся здесь сами.',
+    mesh_no_match:'Ничего не нашлось',
+    mesh_servers_title:'Серверы сети', mesh_add_server:'+ Подключить сервер',
+    link_name_label:'Имя побочного сервера', link_name_ph:'Германия',
+    link_host_label:'Адрес этого (главного) сервера', link_create:'Получить код',
+    link_code_ready:'Код готов. Он содержит ключ доступа — передай его только на свой сервер. Один код — для одного сервера: '+
+      'для следующего получи новый.',
+    link_step1:'Открой панель побочного сервера → «Сеть устройств».',
+    link_step2:'Выбери «Побочный сервер» и вставь код.',
+    link_step3:'Нажми «Подключить к главному» — через несколько секунд сервер появится здесь на схеме.',
+    link_remove:'Отключить', confirm_link_remove:'Отключить сервер «{n}»? Его ключ перестанет работать, '+
+      'устройства этого сервера пропадут из сети, пока его не подключат снова.',
+    srv_main:'главный', srv_waiting:'ждёт подключения', srv_self_joined:'подключился сам',
+    mesh_service_title:'Служба сети', mesh_version:'Версия meshd', mesh_since:'Работает с',
+    mesh_reinstall:'Обновить meshd', mesh_off:'Выключить сеть на сервере',
+    confirm_mesh_off:'Выключить сеть устройств на этом сервере? Устройства перестанут видеть друг друга '+
+      'через него. Их адреса и имена сохранятся — включишь снова, всё вернётся.',
+    confirm_off_yes:'Выключить',
+    svc_active:'работает', svc_stopped:'остановлена', svc_missing:'не установлена',
+    sec_title:'Связь с главным сервером', sec_since:'На связи с', sec_last_ping:'Последняя проверка',
+    sec_uplink:'Служба проброса', sec_log:'Журнал проброса',
+    sec_note:'Устройства всей сети, качество связи и переименование — в панели главного сервера.',
+    sec_rejoin:'Подключить по новому коду', sec_connected:'на связи', sec_connecting:'подключаюсь…',
+    sec_no_log:'журнал пуст',
+    mesh_wizard_banner:'Служба сети уже стоит на этом сервере (её поставил мастер настройки). '+
+      'Выбери «Главный сервер», чтобы управлять ею отсюда и подключать другие серверы.',
+    mesh_admin_err:'Служба сети не отвечает панели: {e}. Нажми «Обновить meshd» — панель поставит свежую версию.',
+    dev_ip:'Адрес', dev_platform:'Система', dev_mode:'Режим', dev_via:'Через сервер',
+    dev_latency:'Задержка', dev_loss:'Потери', dev_traffic:'Трафик', dev_since:'На связи',
+    dev_last:'Был на связи', dev_app:'Программа', dev_sessions:'Подключений',
+    dev_rename:'Переименовать', dev_reset_name:'Вернуть имя «{n}»', dev_forget:'Убрать',
+    confirm_forget:'Убрать «{n}» из сети? Адрес освободится. Если устройство снова подключится — '+
+      'появится как новое.',
+    confirm_forget_yes:'Убрать',
+    mode_proxy:'прокси', mode_vpn:'VPN',
+    q_excellent:'отличная', q_good:'хорошая', q_fair:'средняя', q_poor:'плохая', q_unknown:'нет замеров',
+    ago_now:'только что', ago_min:'{n} мин', ago_hour:'{n} ч', ago_day:'{n} дн',
+    renamed:'Имя изменено', forgotten:'Устройство убрано из сети', saved:'Сохранено',
+    cap_title:'Ёмкость сервера',
+    cap_note:'Сколько устройств могут подключаться к серверу одновременно. Меняет настройку защиты sshd '+
+      'от наплыва соединений — уже подключённые устройства это не затронет.',
+    cap_wanted:'Будет выставлено', cap_effective:'Действует сейчас (sshd -T)', cap_save:'Применить',
+    cap_saved:'Готово: сервер держит до {n} устройств одновременно',
+    hint_mesh_what:'<p><b>Сеть устройств</b> — твои компьютеры и телефоны видят друг друга, где бы они ни были, '+
+      'как в одной домашней сети.</p><p>Каждое устройство получает постоянный адрес 198.19.x.x и имя '+
+      '«имя.mesh». Весь трафик идёт через твой сервер по SSH — белые адреса и проброс портов на роутере не нужны.</p>',
+    hint_role_main:'<p>На главном работает <b>meshd</b> — служба, которая раздаёт адреса и соединяет устройства.</p>'+
+      '<p>Главный нужен один на всю сеть. Выбирай самый надёжный сервер: если он недоступен, устройства '+
+      'не видят друг друга (интернет при этом работает).</p>',
+    hint_role_secondary:'<p>Побочный сервер держит SSH-соединение с главным и пробрасывает к нему '+
+      'подключения своих устройств.</p><p>Так можно выходить в интернет через Германию, а друзья — через '+
+      'Нидерланды, и при этом все устройства остаются в одной сети.</p>',
+    hint_mesh_name:'Имя видно на схеме сети и в списке серверов. Удобно называть по стране или городу.',
+    hint_mesh_code:'<p>Код выдаёт панель главного сервера: «Серверы сети» → «Подключить сервер».</p>'+
+      '<p>Внутри — адрес главного, его SSH-ключи (защита от подмены) и ключ доступа для этого сервера.</p>',
+    hint_mesh_self_host:'Адрес, который вписан в профиль у устройств (домен или IP). По нему главный '+
+      'понимает, какие устройства пришли через этот сервер. Можно оставить пустым.',
+    hint_tile_devices:'Сколько устройств сейчас на связи и сколько всего сервер помнит. Устройство, '+
+      'не появлявшееся полгода, забывается само.',
+    hint_tile_servers:'Главный и подключённые к нему побочные серверы.',
+    hint_tile_latency:'<p>Время туда-обратно от главного сервера до устройства (<b>RTT</b>), '+
+      'измеряется каждые 15 секунд.</p><p>До 60 мс — отлично, до 150 — хорошо, больше 400 — плохо.</p>',
+    hint_tile_traffic:'Сколько данных устройства передали друг другу через сеть (не весь интернет-трафик, '+
+      'а только соединения между устройствами).',
+    hint_map:'<p>В центре — главный сервер, вокруг — побочные, у каждого сервера — его устройства.</p>'+
+      '<p>Бегущие линии — живая связь, цвет — её качество. Наведи на узел, чтобы увидеть подробности, '+
+      'нажми — перейдёшь к карточке устройства.</p>',
+    hint_devices_list:'<p>Имя можно поменять прямо здесь (карандаш) — новое имя «.mesh» сразу увидят '+
+      'все устройства сети.</p><p><b>Джиттер</b> — насколько скачет задержка; <b>потери</b> — доля '+
+      'проверок, на которые устройство не ответило.</p>',
+    hint_servers:'<p>Побочные серверы подключаются к главному по SSH под отдельным пользователем '+
+      '<b>meshlink</b>, которому разрешено только одно — проброс до службы сети.</p><p>Ни оболочки, '+
+      'ни доступа к другим портам у него нет.</p>',
+    hint_link_host:'Адрес, по которому побочный сервер достучится до этого по SSH. Обычно это тот же '+
+      'адрес, что вписан у устройств.',
+    hint_service:'<b>meshd</b> слушает только 127.0.0.1 — снаружи его не видно, до него добираются лишь '+
+      'через SSH-туннель. «Обновить» скачает свежую версию со страницы релиза.',
+    hint_sec:'Этот сервер пробрасывает свой вход сети к главному. Бегущая точка — связь есть. '+
+      'Красный пунктир — связи нет; причина в журнале ниже.',
+    hint_uplink:'Служба systemd <b>meshd-uplink</b>: держит SSH-соединение с главным и сама '+
+      'переподключается, если связь оборвалась.',
+    hint_capacity:'<p>Программа держит с сервером 4 SSH-соединения на устройство — так один тяжёлый '+
+      'поток не тормозит остальные.</p><p>У sshd по умолчанию стоит защита: больше 10 одновременных '+
+      'входов — часть отбрасывается. Поэтому уже 3 устройства, подключающиеся разом, мешали друг другу.</p>',
+    hint_maxstartups:'<p>Настройка sshd <b>MaxStartups</b> «начало:процент:предел»: после «начала» '+
+      'ожидающих входа соединений sshd начинает отбрасывать новые с этой вероятностью, после «предела» — все.</p>'+
+      '<p>Касается только тех, кто ещё не вошёл: уже подключённым она не мешает.</p>',
+    hint_traffic:'Трафик считается правилами nftables на самом сервере — отдельно для каждого клиента.',
+    hint_autostart:'То же, что «systemctl enable ssh_tunnel_panel» в консоли — просто кнопкой.',
   },
   en: {
     nav_home:'Home', nav_devices:'Devices', nav_settings:'Settings',
@@ -673,15 +1173,128 @@ const I18N = {
     err_password_mismatch:'Passwords do not match',
     err_autostart_unsupported:'There is nothing to switch here',
     password_changed:'Password changed',
+    nav_mesh:'Device network',
+    mesh_sub:'Your devices in one network through your own servers — like NetBird: each gets a '+
+      'permanent address and a name like "laptop.mesh".',
+    mesh_role_title:'Role of this server',
+    mesh_role_note:'You can have several servers: one main, the rest connect to it. Devices connected '+
+      'to any of them end up in the same network.',
+    role_main:'Main server', role_secondary:'Secondary server',
+    role_main_d:'Runs the network service. Devices and other servers connect here; the whole network is visible here.',
+    role_secondary_d:'Connects to the main one. Devices of this server join the shared network, '+
+      'internet exit stays here.',
+    mesh_name_label:'Name of this server', mesh_name_ph:'Frankfurt, Amsterdam…',
+    mesh_make_main:'Make main and install',
+    mesh_code_label:'Connection code from the main server',
+    mesh_self_host:'Address of this server for devices', mesh_join:'Connect to main',
+    job_install:'Installing the network service', job_done:'Installation finished', job_failed:'Installation failed',
+    tile_devices:'Devices', tile_servers:'Servers', tile_latency:'Latency', tile_traffic:'Network traffic',
+    tile_online:'online', tile_of:'of', tile_avg:'network average', tile_no_data:'no samples',
+    tile_traffic_sub:'between devices',
+    mesh_map_title:'Network map', mesh_network:'Network',
+    legend_good:'good link', legend_fair:'fair', legend_poor:'poor', legend_off:'offline',
+    mesh_devices_title:'Devices in the network', mesh_search_ph:'Search by name, address, system…',
+    f_all:'All', f_on:'Online', f_off:'Offline',
+    mesh_no_devices:'No devices yet. Turn on "Device network" in the server settings of the app on a '+
+      'computer or phone — they will show up here by themselves.',
+    mesh_no_match:'Nothing found',
+    mesh_servers_title:'Servers of the network', mesh_add_server:'+ Connect a server',
+    link_name_label:'Name of the secondary server', link_name_ph:'Frankfurt',
+    link_host_label:'Address of this (main) server', link_create:'Get code',
+    link_code_ready:'The code is ready. It contains an access key — give it only to your own server. One code — one server: '+
+      'get a new one for the next.',
+    link_step1:'Open the panel of the secondary server → "Device network".',
+    link_step2:'Choose "Secondary server" and paste the code.',
+    link_step3:'Press "Connect to main" — in a few seconds the server shows up here on the map.',
+    link_remove:'Disconnect', confirm_link_remove:'Disconnect server "{n}"? Its key stops working, its '+
+      'devices leave the network until it is connected again.',
+    srv_main:'main', srv_waiting:'waiting to connect', srv_self_joined:'joined by itself',
+    mesh_service_title:'Network service', mesh_version:'meshd version', mesh_since:'Running since',
+    mesh_reinstall:'Update meshd', mesh_off:'Turn off the network on this server',
+    confirm_mesh_off:'Turn off the device network on this server? Devices will stop seeing each other '+
+      'through it. Their addresses and names are kept — turn it back on and everything returns.',
+    confirm_off_yes:'Turn off',
+    svc_active:'running', svc_stopped:'stopped', svc_missing:'not installed',
+    sec_title:'Link to the main server', sec_since:'Connected since', sec_last_ping:'Last check',
+    sec_uplink:'Forwarding service', sec_log:'Forwarding log',
+    sec_note:'Devices of the whole network, link quality and renaming — in the main server panel.',
+    sec_rejoin:'Connect with a new code', sec_connected:'connected', sec_connecting:'connecting…',
+    sec_no_log:'log is empty',
+    mesh_wizard_banner:'The network service is already installed on this server (by the setup wizard). '+
+      'Choose "Main server" to manage it from here and connect other servers.',
+    mesh_admin_err:'The network service does not answer the panel: {e}. Press "Update meshd" — the panel installs a fresh version.',
+    dev_ip:'Address', dev_platform:'System', dev_mode:'Mode', dev_via:'Via server',
+    dev_latency:'Latency', dev_loss:'Loss', dev_traffic:'Traffic', dev_since:'Online for',
+    dev_last:'Last seen', dev_app:'App', dev_sessions:'Connections',
+    dev_rename:'Rename', dev_reset_name:'Restore name "{n}"', dev_forget:'Remove',
+    confirm_forget:'Remove "{n}" from the network? Its address is freed. If the device connects again, '+
+      'it shows up as a new one.',
+    confirm_forget_yes:'Remove',
+    mode_proxy:'proxy', mode_vpn:'VPN',
+    q_excellent:'excellent', q_good:'good', q_fair:'fair', q_poor:'poor', q_unknown:'no samples',
+    ago_now:'just now', ago_min:'{n} min', ago_hour:'{n} h', ago_day:'{n} d',
+    renamed:'Name changed', forgotten:'Device removed from the network', saved:'Saved',
+    cap_title:'Server capacity',
+    cap_note:'How many devices may connect to the server at the same time. Changes the sshd protection '+
+      'against connection floods — devices already connected are not affected.',
+    cap_wanted:'Will be set', cap_effective:'In effect now (sshd -T)', cap_save:'Apply',
+    cap_saved:'Done: the server handles up to {n} devices at once',
+    hint_mesh_what:'<p>The <b>device network</b> lets your computers and phones see each other wherever '+
+      'they are, like one home network.</p><p>Each device gets a permanent 198.19.x.x address and a '+
+      '"name.mesh" name. All traffic goes through your server over SSH — no public IPs or router port forwarding needed.</p>',
+    hint_role_main:'<p>The main server runs <b>meshd</b> — the service that hands out addresses and connects devices.</p>'+
+      '<p>One main server per network. Pick the most reliable one: if it is down, devices do not see each '+
+      'other (internet still works).</p>',
+    hint_role_secondary:'<p>A secondary server keeps an SSH connection to the main one and forwards its '+
+      'devices\' connections there.</p><p>This way you can exit to the internet via Germany, friends via '+
+      'the Netherlands, and all devices stay in one network.</p>',
+    hint_mesh_name:'The name shows on the network map and in the server list. Country or city works well.',
+    hint_mesh_code:'<p>The main server panel gives it out: "Servers of the network" → "Connect a server".</p>'+
+      '<p>Inside: the main server address, its SSH keys (protection against spoofing) and an access key for this server.</p>',
+    hint_mesh_self_host:'The address written in the devices\' profile (domain or IP). The main server uses '+
+      'it to tell which devices came through this server. May be left empty.',
+    hint_tile_devices:'How many devices are online now and how many the server remembers. A device not '+
+      'seen for half a year is forgotten automatically.',
+    hint_tile_servers:'The main server and the secondary servers connected to it.',
+    hint_tile_latency:'<p>Round-trip time from the main server to the device (<b>RTT</b>), measured every 15 seconds.</p>'+
+      '<p>Up to 60 ms is excellent, up to 150 good, over 400 poor.</p>',
+    hint_tile_traffic:'How much data devices sent each other through the network (not all internet '+
+      'traffic, only connections between devices).',
+    hint_map:'<p>The main server is in the center, secondary ones around it, each server with its devices.</p>'+
+      '<p>Moving lines are live links, the color is their quality. Hover a node for details, click to jump to the device card.</p>',
+    hint_devices_list:'<p>Rename right here (pencil) — every device in the network sees the new ".mesh" '+
+      'name at once.</p><p><b>Jitter</b> is how much the latency jumps; <b>loss</b> is the share of checks the device did not answer.</p>',
+    hint_servers:'<p>Secondary servers connect to the main one over SSH as a separate user '+
+      '<b>meshlink</b>, which may do only one thing — forward to the network service.</p><p>No shell, no access to other ports.</p>',
+    hint_link_host:'The address the secondary server uses to reach this one over SSH. Usually the same '+
+      'as in the devices\' profile.',
+    hint_service:'<b>meshd</b> listens on 127.0.0.1 only — invisible from outside, reachable only through '+
+      'the SSH tunnel. "Update" downloads the fresh version from the release page.',
+    hint_sec:'This server forwards its network entry to the main one. A moving dot means the link is up. '+
+      'A red dashed line — no link; the reason is in the log below.',
+    hint_uplink:'The systemd service <b>meshd-uplink</b>: keeps the SSH connection to the main server and '+
+      'reconnects by itself if it drops.',
+    hint_capacity:'<p>The app keeps 4 SSH connections per device — so one heavy stream does not slow the others.</p>'+
+      '<p>By default sshd drops part of the logins once more than 10 are pending. That is why even 3 devices '+
+      'connecting at once got in each other\'s way.</p>',
+    hint_maxstartups:'<p>sshd setting <b>MaxStartups</b> "start:rate:full": after "start" pending logins sshd '+
+      'drops new ones with this probability, after "full" — all of them.</p><p>It only affects connections '+
+      'that have not logged in yet; connected ones are not touched.</p>',
+    hint_traffic:'Traffic is counted by nftables rules on the server itself, separately for each client.',
+    hint_autostart:'Same as "systemctl enable ssh_tunnel_panel" in a console — just a button.',
   },
 };
 function t(key){ return (I18N[LANG] && I18N[LANG][key]) || key; }
 function applyI18N(){
   document.documentElement.lang = LANG;
   document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
   $('lang').value = LANG;
   // Списки собираются кодом, поэтому их надо перерисовать целиком.
-  if (!$('viewMain').hidden){ renderAll(); }
+  if (!$('viewMain').hidden){
+    renderAll();
+    if (MESH){ MAP_SIG = ''; DEV_CARDS.forEach(c => c.remove()); DEV_CARDS.clear(); renderMesh(); }
+  }
 }
 $('lang').addEventListener('change', e => {
   LANG = e.target.value;
@@ -712,11 +1325,13 @@ let TAB = localStorage.getItem('panelTab') || 'Home';
 function showTab(name){
   TAB = name;
   localStorage.setItem('panelTab', name);
-  ['Home','Devices','Settings'].forEach(v => { $('tab'+v).hidden = (v !== name); });
+  ['Home','Devices','Mesh','Settings'].forEach(v => { $('tab'+v).hidden = (v !== name); });
   document.querySelectorAll('.side button').forEach(b => {
     b.classList.toggle('on', b.dataset.tab === name);
   });
-  if (name === 'Settings') loadAutostart();
+  hidePop();
+  if (name === 'Settings'){ loadAutostart(); loadCapacity(); }
+  if (name === 'Mesh'){ MAP_SIG = ''; loadMesh(); } else { clearTimeout(MESH_TIMER); }
 }
 document.querySelectorAll('.side button').forEach(b => {
   b.addEventListener('click', () => showTab(b.dataset.tab));
@@ -1207,6 +1822,871 @@ $('accountChangeBtn').addEventListener('click', () => doChangePassword(
 $('logoutBtn').addEventListener('click', async () => {
   await api('/api/logout', {});
   loadSession();
+});
+
+
+/* ---------- подсказки «?» ---------- */
+/* Одно всплывающее окно на страницу. На компьютере — по наведению и фокусу,
+   на телефоне — по нажатию (второе нажатие или нажатие мимо закрывает). */
+const hintPop = $('hintPop');
+let hintOwner = null, hintPinned = false;
+function fillPop(content){
+  hintPop.innerHTML = '';
+  if (content instanceof Node){ hintPop.appendChild(content); return; }
+  // Строки подсказок — свои, из I18N, в них бывает <b> и <p>. Ввод людей
+  // (имена устройств) сюда не попадает: он идёт узлами через textContent.
+  if (content.includes('<')){ hintPop.innerHTML = content; return; }
+  const p = document.createElement('p');
+  p.textContent = content;
+  hintPop.appendChild(p);
+}
+function placePop(r){
+  const pw = hintPop.offsetWidth, ph = hintPop.offsetHeight;
+  let left = Math.max(12, Math.min(r.left + r.width/2 - pw/2, innerWidth - pw - 12));
+  let top = r.bottom + 9, above = false;
+  if (top + ph > innerHeight - 8 && r.top - ph - 9 > 8){ top = r.top - ph - 9; above = true; }
+  hintPop.style.left = left + 'px';
+  hintPop.style.top = top + 'px';
+  hintPop.classList.toggle('above', above);
+}
+function showPop(owner, content, pinned){
+  if (hintOwner && hintOwner !== owner) hintOwner.classList.remove('open');
+  hintOwner = owner;
+  hintPinned = !!pinned;
+  fillPop(content);
+  if (owner.classList.contains('hint')) owner.classList.add('open');
+  placePop(owner.getBoundingClientRect());
+  hintPop.classList.add('show');
+}
+function hidePop(){
+  hintPop.classList.remove('show');
+  if (hintOwner) hintOwner.classList.remove('open');
+  hintOwner = null;
+  hintPinned = false;
+}
+document.addEventListener('mouseover', e => {
+  const h = e.target.closest('.hint');
+  if (h && !hintPinned && h !== hintOwner) showPop(h, t(h.dataset.hint));
+});
+document.addEventListener('mouseout', e => {
+  const h = e.target.closest('.hint');
+  if (h && h === hintOwner && !hintPinned && !h.contains(e.relatedTarget)) hidePop();
+});
+document.addEventListener('focusin', e => {
+  const h = e.target.closest('.hint');
+  if (h) showPop(h, t(h.dataset.hint));
+});
+document.addEventListener('focusout', e => {
+  if (e.target.closest('.hint') && !hintPinned) hidePop();
+});
+// Перехват на всплытии не годится: «?» стоит и внутри кнопок выбора роли, и
+// внутри подписей к полям — нажатие на знак не должно выбирать роль или
+// ставить курсор в поле.
+document.addEventListener('click', e => {
+  const h = e.target.closest('.hint');
+  if (h){
+    e.preventDefault();
+    e.stopPropagation();
+    if (hintOwner === h && hintPinned) hidePop(); else showPop(h, t(h.dataset.hint), true);
+    return;
+  }
+  if (hintPinned) hidePop();
+}, true);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') hidePop(); });
+addEventListener('scroll', () => { if (hintOwner) hidePop(); }, true);
+addEventListener('resize', () => { if (hintOwner) hidePop(); });
+
+/* ---------- уведомления ---------- */
+function toast(text, kind){
+  const el = document.createElement('div');
+  el.className = 'toast' + (kind === 'err' ? ' err' : '');
+  el.textContent = text;
+  $('toasts').appendChild(el);
+  setTimeout(() => {
+    el.classList.add('out');
+    setTimeout(() => el.remove(), 260);
+  }, kind === 'err' ? 6500 : 3200);
+}
+
+/* ---------- мелочи для сети устройств ---------- */
+function fmtAgo(unix){
+  if (!unix) return '—';
+  const s = Math.max(0, Date.now()/1000 - unix);
+  if (s < 60) return t('ago_now');
+  if (s < 3600) return t('ago_min').replace('{n}', Math.floor(s/60));
+  if (s < 86400) return t('ago_hour').replace('{n}', Math.floor(s/3600));
+  return t('ago_day').replace('{n}', Math.floor(s/86400));
+}
+function fmtClock(unix){
+  if (!unix) return '—';
+  const d = new Date(unix*1000);
+  return d.toLocaleString(LANG === 'ru' ? 'ru-RU' : 'en-US',
+    {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+}
+function fmtMs(v){ return v ? (v < 10 ? v.toFixed(1) : Math.round(v)) + ' ' + (LANG === 'ru' ? 'мс' : 'ms') : '—'; }
+const QLEVEL = {excellent:4, good:3, fair:2, poor:1, unknown:0};
+function qualBars(q){
+  const s = document.createElement('span');
+  s.className = 'qual q' + (QLEVEL[q] || 0);
+  for (let i = 0; i < 4; i++) s.appendChild(document.createElement('span'));
+  return s;
+}
+function el(tag, cls, text){
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+// animateNum плавно докручивает число в плитке до нового значения.
+function animateNum(node, value, fmt){
+  const from = Number(node.dataset.v || 0);
+  node.dataset.v = value;
+  if (from === value || matchMedia('(prefers-reduced-motion: reduce)').matches){
+    node.textContent = fmt(value);
+    return;
+  }
+  const start = performance.now(), dur = 600;
+  const step = now => {
+    const k = Math.min(1, (now - start) / dur), e = 1 - Math.pow(1 - k, 3);
+    node.textContent = fmt(from + (value - from) * e);
+    if (k < 1 && node.dataset.v == value) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+const NS = 'http://www.w3.org/2000/svg';
+// Значки — одни и те же на схеме и в карточках: координаты вокруг нуля.
+const GLYPH = {
+  windows:'M-5 -5h4.3v4.3h-4.3zM.7 -5h4.3v4.3h-4.3zM-5 .7h4.3v4.3h-4.3zM.7 .7h4.3v4.3h-4.3z',
+  linux:'M-6 -4.5h12v9h-12zM-3.5 -1.6l2 1.6-2 1.6M.6 1.6h3',
+  android:'M-3.5 -6.2h7a1.2 1.2 0 0 1 1.2 1.2v10a1.2 1.2 0 0 1-1.2 1.2h-7a1.2 1.2 0 0 1-1.2-1.2v-10a1.2 1.2 0 0 1 1.2-1.2zM-1.2 3.6h2.4',
+  other:'M-6 -4.2h12v7.4h-12zM-7.6 5.2h15.2',
+  server:'M-6 -5.6h12v4.6h-12zM-6 1h12v4.6h-12zM-3.4 -3.3h.01M-3.4 3.3h.01',
+  main:'M-2.4 0a2.4 2.4 0 1 0 4.8 0a2.4 2.4 0 1 0-4.8 0M-6.2 -6.2l3.9 3.9M6.2 -6.2l-3.9 3.9M-6.2 6.2l3.9-3.9M6.2 6.2l-3.9-3.9',
+};
+const PLATFORM_NAME = {windows:'Windows', linux:'Linux', android:'Android', darwin:'macOS'};
+function glyphOf(platform){ return GLYPH[platform] || GLYPH.other; }
+function glyphSVG(path){
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '-8 -8 16 16');
+  const p = document.createElementNS(NS, 'path');
+  p.setAttribute('d', path);
+  svg.appendChild(p);
+  return svg;
+}
+
+/* ---------- сеть устройств: данные ---------- */
+let MESH = null, MESH_TIMER = null, MESH_FILTER = 'all', MESH_NET = null;
+let MESH_PICK = null;      // выбранная в карточке роль (до нажатия кнопки)
+let MESH_EDIT = null;      // id устройства, которое сейчас переименовывают
+let MESH_CODE = '';
+
+async function loadMesh(){
+  clearTimeout(MESH_TIMER);
+  const {ok, data} = await api('/api/mesh/state');
+  if (ok){
+    MESH = data;
+    renderMesh();
+  }
+  scheduleMesh();
+}
+function scheduleMesh(){
+  clearTimeout(MESH_TIMER);
+  if (TAB !== 'Mesh' || $('viewMain').hidden) return;
+  const fast = MESH && MESH.job && MESH.job.running;
+  MESH_TIMER = setTimeout(() => {
+    if (document.hidden){ scheduleMesh(); return; }
+    loadMesh();
+  }, fast ? 1500 : 5000);
+}
+
+function meshDevices(){
+  const nets = (MESH && MESH.networks) || [];
+  if (!nets.length) return [];
+  if (!nets.some(n => n.id === MESH_NET)) MESH_NET = nets[0].id;
+  return nets.find(n => n.id === MESH_NET).devices || [];
+}
+function serverName(id){
+  const s = ((MESH && MESH.servers) || []).find(x => x.id === id);
+  return s ? s.name : '—';
+}
+function svcText(u){
+  if (!u || !u.installed) return t('svc_missing');
+  return u.active ? t('svc_active') : t('svc_stopped') + (u.detail ? ' (' + u.detail + ')' : '');
+}
+
+function renderMesh(){
+  const m = MESH;
+  if (!m) return;
+  const role = m.effectiveRole;
+
+  // Выбор роли: пока она не закреплена в панели или когда побочный
+  // переподключают по новому коду.
+  const showRole = m.role === '' || MESH_PICK === 'rejoin';
+  $('meshRoleCard').hidden = !showRole;
+  if (showRole){
+    const pick = MESH_PICK === 'rejoin' ? 'secondary' : MESH_PICK;
+    $('roleMainBtn').classList.toggle('on', pick === 'main');
+    $('roleSecBtn').classList.toggle('on', pick === 'secondary');
+    $('meshMainForm').hidden = pick !== 'main';
+    $('meshJoinForm').hidden = pick !== 'secondary';
+    if (m.role === '' && role === 'main' && !$('meshRoleMsg').dataset.shown){
+      $('meshRoleMsg').dataset.shown = '1';
+      showMsg($('meshRoleMsg'), t('mesh_wizard_banner'), 'ok');
+    }
+  }
+
+  renderJob(m.job);
+  $('meshMainView').hidden = role !== 'main';
+  $('meshSecView').hidden = role !== 'secondary';
+  if (role === 'main') renderMeshMain();
+  if (role === 'secondary') renderMeshSecondary();
+}
+
+function renderJob(job){
+  const recent = job && (job.running || job.error ||
+    (job.finished && Date.now() - new Date(job.finished) < 60000));
+  $('meshJobCard').hidden = !recent;
+  if (!recent) return;
+  const title = $('meshJobTitle');
+  title.innerHTML = '';
+  if (job.running){
+    title.appendChild(el('span', 'spin'));
+    title.appendChild(document.createTextNode(t('job_install')));
+  } else {
+    title.textContent = job.error ? t('job_failed') + ': ' + job.error : t('job_done');
+  }
+  const log = $('meshJobLog');
+  const lines = job.lines || [];
+  if (Number(log.dataset.n || 0) !== lines.length || log.dataset.started !== job.started){
+    const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 20;
+    const from = log.dataset.started === job.started ? Number(log.dataset.n || 0) : 0;
+    if (from === 0) log.innerHTML = '';
+    lines.slice(from).forEach(l => log.appendChild(el('div', 'l', l)));
+    log.dataset.n = lines.length;
+    log.dataset.started = job.started;
+    if (atBottom || from === 0) log.scrollTop = log.scrollHeight;
+  }
+}
+
+function renderMeshMain(){
+  const m = MESH;
+  const err = $('meshAdminErr');
+  err.hidden = !m.adminError || (m.job && m.job.running);
+  err.textContent = t('mesh_admin_err').replace('{e}', m.adminError || '');
+
+  // Выбор сети — если ключей несколько (например, свой и семьи).
+  const nets = m.networks || [];
+  $('meshNetBar').hidden = nets.length < 2;
+  const sel = $('meshNetSel');
+  const want = nets.map(n => n.id + ':' + n.devices.length).join(',');
+  if (sel.dataset.sig !== want){
+    sel.dataset.sig = want;
+    sel.innerHTML = '';
+    nets.forEach((n, i) => {
+      const o = el('option', '', (LANG === 'ru' ? 'Сеть ' : 'Network ') + (i + 1) + ' · ' + n.devices.length);
+      o.value = n.id;
+      sel.appendChild(o);
+    });
+  }
+  const devices = meshDevices();
+  sel.value = MESH_NET || '';
+
+  // Плитки.
+  const online = devices.filter(d => d.online);
+  animateNum($('tileDevices'), online.length, v => Math.round(v));
+  $('tileDevicesSub').textContent = t('tile_online') + ' · ' + t('tile_of') + ' ' + devices.length;
+  const servers = m.servers || [];
+  animateNum($('tileServers'), servers.filter(s => s.online).length, v => Math.round(v));
+  $('tileServersSub').textContent = t('tile_online') + ' · ' + t('tile_of') + ' ' + servers.length;
+  const rtts = online.map(d => d.rttAvgMs).filter(Boolean);
+  const avg = rtts.length ? rtts.reduce((a, b) => a + b, 0) / rtts.length : 0;
+  if (avg) animateNum($('tileLatency'), avg, fmtMs); else $('tileLatency').textContent = '—';
+  $('tileLatencySub').textContent = avg ? t('tile_avg') : t('tile_no_data');
+  const traffic = devices.reduce((a, d) => a + (d.bytesUp || 0), 0);
+  animateNum($('tileTraffic'), traffic, fmtBytes);
+  $('tileTrafficSub').textContent = t('tile_traffic_sub');
+
+  renderMap(servers, devices);
+  renderMeshDevices(devices);
+  renderMeshServers(servers);
+
+  $('meshSvcState').innerHTML = '';
+  const b = el('span', 'badge ' + (m.meshd.active ? 'ok' : 'warn'), svcText(m.meshd));
+  $('meshSvcState').appendChild(b);
+  $('meshSvcVersion').textContent = m.version || '—';
+  $('meshSvcSince').textContent = m.startedAt ? fmtClock(m.startedAt) : '—';
+  $('meshReinstallBtn').disabled = !!(m.job && m.job.running);
+}
+
+/* ---------- схема сети ---------- */
+function svgEl(tag, attrs, parent){
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+let MAP_SIG = '', MAP_REFS = {};
+
+function qClass(online, q){ return online ? 'on q-' + (q || 'unknown') : 'off'; }
+
+function renderMap(servers, devices){
+  const svg = $('meshMap');
+  const W = Math.round(svg.clientWidth) || 720, H = Math.round(svg.clientHeight) || 420;
+  // Раскладка меняется только от состава сети; качество связи и «в сети»
+  // обновляются на месте — иначе схема мигала бы при каждом опросе.
+  const sig = [W, H, LANG, servers.map(s => s.id + '/' + s.name).join(','),
+    devices.map(d => d.id + '/' + d.server + '/' + d.display + '/' + d.platform).join(',')].join('|');
+  if (sig !== MAP_SIG){
+    const first = !MAP_SIG;
+    MAP_SIG = sig;
+    buildMap(svg, W, H, servers, devices, first);
+  }
+  servers.forEach(s => {
+    const r = MAP_REFS['s:' + s.id];
+    if (!r) return;
+    const q = s.main ? 'excellent' : (s.link && s.link.quality);
+    if (r.edge) r.edge.setAttribute('class', 'edge srv ' + qClass(s.online, q));
+    r.node.classList.toggle('offline', !s.online);
+    r.halo.style.display = s.online ? '' : 'none';
+    r.data = s;
+  });
+  devices.forEach(d => {
+    const r = MAP_REFS['d:' + d.id];
+    if (!r) return;
+    r.edge.setAttribute('class', 'edge ' + qClass(d.online, d.quality));
+    r.node.classList.toggle('offline', !d.online);
+    r.halo.style.display = d.online ? '' : 'none';
+    r.disc.setAttribute('stroke', qColor(d.online, d.quality));
+    r.data = d;
+  });
+}
+
+function qColor(online, q){
+  if (!online) return 'var(--dim)';
+  return {excellent:'var(--ok)', good:'var(--ok)', fair:'var(--warn)', poor:'var(--err)'}[q] || 'var(--accent)';
+}
+
+function buildMap(svg, W, H, servers, devices, animate){
+  svg.innerHTML = '';
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+  MAP_REFS = {};
+  const cx = W / 2, cy = H / 2, S = Math.min(W, H);
+  const defs = svgEl('defs', {}, svg);
+  const grad = svgEl('linearGradient', {id:'gNode', x1:0, y1:0, x2:0, y2:1}, defs);
+  svgEl('stop', {offset:'0', 'stop-color':'var(--accent-muted)'}, grad);
+  svgEl('stop', {offset:'1', 'stop-color':'var(--accent-muted-dark)'}, grad);
+  for (let i = 1; i <= 3; i++) svgEl('circle', {cx, cy, r: S * 0.155 * i, fill:'none', class:'map-grid'}, svg);
+  const gEdges = svgEl('g', {}, svg), gNodes = svgEl('g', {}, svg);
+
+  const main = servers.find(s => s.main);
+  const secs = servers.filter(s => !s.main);
+  const narrow = W < 520;
+  const pos = {};
+  if (main) pos[main.id] = {x: cx, y: cy, a: 0};
+  // Серверы — по эллипсу во всю ширину схемы: она шире, чем выше.
+  const rx = W * (narrow ? 0.34 : 0.35), ry = H * 0.33;
+  secs.forEach((s, i) => {
+    const a = i * 2 * Math.PI / secs.length;
+    pos[s.id] = {x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a), a};
+  });
+
+  const byServer = {};
+  devices.forEach(d => {
+    const sid = pos[d.server] ? d.server : (main ? main.id : null);
+    (byServer[sid] = byServer[sid] || []).push(d);
+  });
+  const dpos = {};
+  Object.keys(byServer).forEach(sid => {
+    const list = byServer[sid], p = pos[sid];
+    if (!p) return;
+    if (main && sid === main.id){
+      // Устройства главного — по кругу вокруг него, в промежутках между
+      // лучами к побочным серверам.
+      const kx = secs.length ? rx * 0.48 : W * 0.3, ky = secs.length ? ry * 0.55 : H * 0.34;
+      const start = secs.length ? Math.PI / secs.length : -Math.PI / 2;
+      list.forEach((d, j) => {
+        const a = start + j * 2 * Math.PI / list.length;
+        dpos[d.id] = {x: p.x + kx * Math.cos(a), y: p.y + ky * Math.sin(a), sid, len: Math.hypot(kx, ky) / 1.5};
+      });
+    } else {
+      // Устройства побочного — веером наружу от центра.
+      const n = list.length, spread = Math.min(Math.PI * 1.1, n * 0.5);
+      const rr = Math.min(W, H) * 0.2;
+      list.forEach((d, j) => {
+        const a = p.a + (n === 1 ? 0 : -spread / 2 + j * spread / (n - 1));
+        dpos[d.id] = {x: p.x + rr * Math.cos(a), y: p.y + rr * Math.sin(a), sid, len: rr};
+      });
+    }
+  });
+  relaxLayout(Object.values(pos), dpos, pos, W, H, narrow);
+
+  const curve = (a, b, bend) => {
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    return 'M' + a.x.toFixed(1) + ' ' + a.y.toFixed(1) + 'Q' + (mx - dy * bend).toFixed(1) + ' ' +
+      (my + dx * bend).toFixed(1) + ' ' + b.x.toFixed(1) + ' ' + b.y.toFixed(1);
+  };
+  const many = devices.length > (narrow ? 12 : 28);
+  let k = 0;
+  const node = (key, p, r, path, label, sub, data, isServer) => {
+    // Положение — атрибутом внешней группы, анимация появления — у внутренней:
+    // CSS-свойство transform у SVG перекрывает атрибут, и анимация на той же
+    // группе увезла бы узел в угол схемы.
+    const outer = svgEl('g', {class: 'node', transform: 'translate(' +
+      p.x.toFixed(1) + ' ' + p.y.toFixed(1) + ')'}, gNodes);
+    const g = svgEl('g', animate ? {class: 'node-enter'} : {}, outer);
+    if (animate) g.style.animationDelay = (k++ * 0.025) + 's';
+    const halo = svgEl('circle', {r, fill: isServer ? 'var(--accent)' : 'var(--ok)', class: 'halo'}, g);
+    const disc = svgEl('circle', {r, fill: 'url(#gNode)', stroke: 'var(--accent)', class: 'disc'}, g);
+    svgEl('path', {d: path, class: 'glyph', transform: 'scale(' + (r / 10.5).toFixed(2) + ')'}, g);
+    if (!many || isServer){
+      const tx = svgEl('text', {y: r + 13}, g);
+      tx.textContent = label.length > 18 ? label.slice(0, 17) + '…' : label;
+      if (sub && !narrow){
+        const st = svgEl('text', {y: r + 24, class: 'sub'}, g);
+        st.textContent = sub;
+      }
+    }
+    const ref = {node: outer, halo, disc, data};
+    MAP_REFS[key] = ref;
+    outer.addEventListener('mouseenter', () => showPop(disc, isServer ? serverPop(ref.data) : devicePop(ref.data)));
+    outer.addEventListener('mouseleave', () => { if (!hintPinned) hidePop(); });
+    outer.addEventListener('click', e => {
+      e.stopPropagation();
+      if (isServer){ showPop(disc, serverPop(ref.data), true); return; }
+      hidePop();
+      focusDevice(ref.data.id);
+    });
+    return ref;
+  };
+
+  secs.forEach(s => {
+    const e = svgEl('path', {d: curve(pos[main ? main.id : s.id] || pos[s.id], pos[s.id], 0.08), class: 'edge srv'}, gEdges);
+    const r = node('s:' + s.id, pos[s.id], 17, GLYPH.server, s.name, s.host || '', s, true);
+    r.edge = e;
+  });
+  if (main){
+    node('s:' + main.id, pos[main.id], 23, GLYPH.main, main.name, t('srv_main'), main, true);
+  }
+  devices.forEach(d => {
+    const p = dpos[d.id];
+    if (!p) return;
+    const sid = pos[d.server] ? d.server : main.id;
+    const e = svgEl('path', {d: curve(p, pos[sid], 0.12), class: 'edge'}, gEdges);
+    const r = node('d:' + d.id, p, narrow ? 10.5 : 12.5, glyphOf(d.platform), d.display, d.host + '.mesh', d, false);
+    r.edge = e;
+  });
+  if (!servers.length){
+    const tx = svgEl('text', {x: cx, y: cy, 'text-anchor': 'middle', fill: 'var(--dim)'}, svg);
+    tx.textContent = '—';
+  }
+}
+
+// relaxLayout расталкивает узлы, чтобы кружки и подписи не наезжали друг на
+// друга: серверы стоят на месте, устройства отодвигаются и при этом держатся
+// на своём расстоянии от сервера, как на пружинке. Подпись шире кружка,
+// поэтому по горизонтали узлам нужно больше места, чем по вертикали.
+function relaxLayout(fixed, free, pos, W, H, narrow){
+  const nodes = fixed.map(p => ({p, fixed: true})).concat(Object.values(free).map(p => ({p, fixed: false})));
+  const sx = narrow ? 1.5 : 1.8, need = narrow ? 36 : 46;
+  const minX = 36, maxX = W - 36, minY = 22, maxY = H - (narrow ? 26 : 40);
+  for (let it = 0; it < 180; it++){
+    for (let i = 0; i < nodes.length; i++){
+      for (let j = i + 1; j < nodes.length; j++){
+        const a = nodes[i], b = nodes[j];
+        if (a.fixed && b.fixed) continue;
+        let dx = (b.p.x - a.p.x) / sx, dy = b.p.y - a.p.y;
+        let d = Math.hypot(dx, dy);
+        if (d >= need) continue;
+        if (d < 0.01){ dx = Math.cos(i + j); dy = Math.sin(i + j); d = 1; }
+        const push = (need - d) * 0.5, ux = dx / d * sx, uy = dy / d;
+        const ka = a.fixed ? 0 : (b.fixed ? 2 : 1), kb = b.fixed ? 0 : (a.fixed ? 2 : 1);
+        a.p.x -= ux * push * ka; a.p.y -= uy * push * ka;
+        b.p.x += ux * push * kb; b.p.y += uy * push * kb;
+      }
+    }
+    Object.values(free).forEach(p => {
+      const s = pos[p.sid];
+      const dx = p.x - s.x, dy = p.y - s.y, d = Math.hypot(dx, dy) || 1;
+      const k = (d - p.len) / d * 0.08;
+      p.x -= dx * k; p.y -= dy * k;
+      p.x = Math.max(minX, Math.min(maxX, p.x));
+      p.y = Math.max(minY, Math.min(maxY, p.y));
+    });
+  }
+}
+
+function popBox(title, rows){
+  const box = el('div');
+  box.appendChild(el('p', '', '')).appendChild(el('b', '', title));
+  rows.forEach(([k, v]) => {
+    if (v === undefined || v === null || v === '') return;
+    const p = el('p');
+    p.appendChild(el('span', '', k + ': '));
+    p.appendChild(el('span', '', String(v)));
+    box.appendChild(p);
+  });
+  return box;
+}
+function devicePop(d){
+  return popBox(d.display, [
+    ['.mesh', d.host + '.mesh'],
+    [t('dev_ip'), d.ip],
+    [t('dev_platform'), [PLATFORM_NAME[d.platform] || d.platform, d.os].filter(Boolean).join(' ')],
+    [t('dev_mode'), d.mode ? t('mode_' + d.mode) : ''],
+    [t('dev_latency'), d.online && d.rttMs ? fmtMs(d.rttMs) + ' · ' + t('q_' + d.quality) : ''],
+    [t('dev_via'), serverName(d.server)],
+    [d.online ? t('dev_since') : t('dev_last'), d.online ? fmtAgo(d.connectedAt) : fmtClock(d.lastSeen)],
+  ]);
+}
+function serverPop(s){
+  const l = s.link;
+  return popBox(s.name, [
+    ['host', s.host],
+    [t('status_label'), s.online ? t('sec_connected') : t('srv_waiting')],
+    [t('dev_latency'), l && l.rttMs ? fmtMs(l.rttMs) + ' · ' + t('q_' + l.quality) : ''],
+    [t('dev_since'), l ? fmtAgo(l.connectedAt) : ''],
+  ]);
+}
+function focusDevice(id){
+  MESH_FILTER = 'all';
+  $('meshSearch').value = '';
+  document.querySelectorAll('#meshFilter button').forEach(b => b.classList.toggle('on', b.dataset.f === 'all'));
+  renderMeshDevices(meshDevices());
+  const card = document.querySelector('.mdev[data-id="' + CSS.escape(id) + '"]');
+  if (!card) return;
+  card.scrollIntoView({behavior: 'smooth', block: 'center'});
+  card.classList.remove('flash');
+  void card.offsetWidth;
+  card.classList.add('flash');
+}
+
+/* ---------- карточки устройств ---------- */
+const DEV_CARDS = new Map();
+
+function renderMeshDevices(devices){
+  const q = $('meshSearch').value.trim().toLowerCase();
+  const list = devices.filter(d => {
+    if (MESH_FILTER === 'on' && !d.online) return false;
+    if (MESH_FILTER === 'off' && d.online) return false;
+    if (!q) return true;
+    return [d.display, d.name, d.host, d.ip, d.platform, d.os, d.hostname, d.via, serverName(d.server)]
+      .some(v => v && String(v).toLowerCase().includes(q));
+  }).sort((a, b) => (b.online - a.online) || a.display.localeCompare(b.display));
+
+  const box = $('meshDevices');
+  const empty = $('meshDevicesEmpty');
+  empty.hidden = list.length > 0;
+  empty.textContent = devices.length ? t('mesh_no_match') : t('mesh_no_devices');
+
+  const keep = new Set(list.map(d => d.id));
+  for (const [id, card] of DEV_CARDS){
+    if (!keep.has(id)){ card.remove(); DEV_CARDS.delete(id); }
+  }
+  list.forEach((d, i) => {
+    let card = DEV_CARDS.get(d.id);
+    if (!card){
+      card = el('div', 'mdev');
+      card.dataset.id = d.id;
+      DEV_CARDS.set(d.id, card);
+    }
+    if (MESH_EDIT !== d.id) fillDeviceCard(card, d);
+    // Переставляем только если порядок изменился: вставка заново
+    // перезапускает анимацию появления.
+    if (box.children[i] !== card) box.insertBefore(card, box.children[i] || null);
+  });
+}
+
+function fillDeviceCard(card, d){
+  card.classList.toggle('offline', !d.online);
+  card.innerHTML = '';
+  const top = el('div', 'top');
+  const pic = el('div', 'pic');
+  pic.appendChild(glyphSVG(glyphOf(d.platform)));
+  top.appendChild(pic);
+  const nm = el('div', 'nm');
+  nm.appendChild(el('div', 'n', d.display));
+  nm.appendChild(el('div', 'h', d.host + '.mesh'));
+  top.appendChild(nm);
+  const pencil = el('button', 'icon-btn');
+  pencil.title = t('dev_rename');
+  pencil.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></svg>';
+  pencil.addEventListener('click', () => startRename(card, d));
+  top.appendChild(pencil);
+  top.appendChild(el('span', 'dot' + (d.online ? ' on' : '')));
+  card.appendChild(top);
+
+  const facts = el('div', 'facts');
+  const fact = (k, v, node) => {
+    const f = el('div');
+    f.appendChild(el('div', 'k', k));
+    const vv = el('div', 'v');
+    if (node) vv.appendChild(node);
+    vv.appendChild(document.createTextNode(v));
+    f.appendChild(vv);
+    facts.appendChild(f);
+  };
+  fact(t('dev_ip'), d.ip);
+  fact(t('dev_platform'), [PLATFORM_NAME[d.platform] || d.platform || '—', d.os].filter(Boolean).join(' '));
+  if (d.online){
+    fact(t('dev_latency'), fmtMs(d.rttMs) + (d.jitterMs ? ' ±' + d.jitterMs : ''), qualBars(d.quality));
+    fact(t('dev_loss'), (d.lossPct || 0) + '%');
+  }
+  fact(t('dev_mode'), d.mode ? t('mode_' + d.mode) : '—');
+  fact(t('dev_via'), serverName(d.server));
+  fact(t('dev_traffic'), '↑' + fmtBytes(d.bytesUp) + ' ↓' + fmtBytes(d.bytesDown));
+  fact(d.online ? t('dev_since') : t('dev_last'), d.online ? fmtAgo(d.connectedAt) : fmtClock(d.lastSeen));
+  if (d.app) fact(t('dev_app'), d.app);
+  fact(t('dev_sessions'), String(d.sessions || 0));
+  card.appendChild(facts);
+
+  const acts = el('div', 'acts');
+  if (d.alias){
+    const reset = el('button', 'btn ghost small', t('dev_reset_name').replace('{n}', d.name));
+    reset.addEventListener('click', () => renameDevice(d, ''));
+    acts.appendChild(reset);
+  }
+  const forget = el('button', 'btn ghost small', t('dev_forget'));
+  forget.addEventListener('click', async () => {
+    const yes = await appConfirm(t('confirm_forget').replace('{n}', d.display), t('confirm_forget_yes'));
+    if (!yes) return;
+    const {ok, data} = await api('/api/mesh/forget', {net: MESH_NET, device: d.id});
+    if (!ok){ toast(data.error || t('err_internal'), 'err'); return; }
+    toast(t('forgotten'));
+    loadMesh();
+  });
+  acts.appendChild(forget);
+  card.appendChild(acts);
+}
+
+function startRename(card, d){
+  MESH_EDIT = d.id;
+  const nm = card.querySelector('.nm');
+  nm.innerHTML = '';
+  const input = el('input');
+  input.type = 'text';
+  input.maxLength = 64;
+  input.value = d.alias || d.display;
+  nm.appendChild(input);
+  nm.appendChild(el('div', 'h', d.host + '.mesh'));
+  input.focus();
+  input.select();
+  let done = false;
+  const finish = save => {
+    if (done) return;
+    done = true;
+    MESH_EDIT = null;
+    const v = input.value.trim();
+    if (save && v && v !== d.display) renameDevice(d, v);
+    else fillDeviceCard(card, d);
+  };
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') finish(true);
+    if (e.key === 'Escape') finish(false);
+  });
+  input.addEventListener('blur', () => finish(true));
+}
+
+async function renameDevice(d, alias){
+  const {ok, data} = await api('/api/mesh/rename', {net: MESH_NET, device: d.id, alias});
+  if (!ok){ toast(data.error || t('err_internal'), 'err'); loadMesh(); return; }
+  toast(t('renamed'));
+  loadMesh();
+}
+
+/* ---------- серверы сети ---------- */
+function renderMeshServers(servers){
+  const box = $('meshServers');
+  box.innerHTML = '';
+  servers.forEach(s => {
+    const row = el('div', 'srv-row');
+    row.appendChild(el('span', 'dot' + (s.online ? ' on' : '')));
+    const nm = el('div', 'nm');
+    const n = el('div', 'n', s.name);
+    if (s.main) n.appendChild(el('span', 'badge dim', t('srv_main'))).style.marginLeft = '8px';
+    else if (!s.known) n.appendChild(el('span', 'badge warn', t('srv_self_joined'))).style.marginLeft = '8px';
+    nm.appendChild(n);
+    nm.appendChild(el('div', 'h', s.host || (s.online ? '' : t('srv_waiting'))));
+    row.appendChild(nm);
+    if (s.link){
+      const mm = el('span', 'm');
+      mm.appendChild(qualBars(s.link.quality));
+      mm.appendChild(document.createTextNode(fmtMs(s.link.rttMs)));
+      row.appendChild(mm);
+    }
+    if (!s.main && s.known){
+      const del = el('button', 'btn ghost small', t('link_remove'));
+      del.addEventListener('click', async () => {
+        const yes = await appConfirm(t('confirm_link_remove').replace('{n}', s.name), t('link_remove'));
+        if (!yes) return;
+        const {ok, data} = await api('/api/mesh/links/delete', {id: s.id});
+        if (!ok){ toast(data.error || t('err_internal'), 'err'); return; }
+        loadMesh();
+      });
+      row.appendChild(del);
+    }
+    box.appendChild(row);
+  });
+}
+
+/* ---------- побочный сервер ---------- */
+function renderMeshSecondary(){
+  const m = MESH, l = m.link || {};
+  $('secSelfName').textContent = m.name || '—';
+  $('secSelfHost').textContent = m.selfHost || m.sshHost || '';
+  $('secMainHost').textContent = (m.mainHost || '') + (m.mainPort && m.mainPort !== 22 ? ':' + m.mainPort : '');
+  $('secWire').className = 'wire ' + (l.connected ? 'on' : (l.error ? 'err' : ''));
+  const st = $('secState');
+  st.innerHTML = '';
+  st.appendChild(el('span', 'badge ' + (l.connected ? 'ok' : 'warn'), l.connected ? t('sec_connected') : t('sec_connecting')));
+  $('secSince').textContent = l.connected && l.since ? fmtClock(Date.parse(l.since) / 1000) : '—';
+  $('secPing').textContent = l.lastPing && !String(l.lastPing).startsWith('0001') ? fmtAgo(Date.parse(l.lastPing) / 1000) : '—';
+  $('secUplink').textContent = svcText(m.uplink);
+  $('secErr').hidden = !l.error;
+  $('secErr').textContent = l.error || '';
+  const log = $('secLog');
+  log.textContent = (m.log && m.log.length) ? m.log.join('\n') : t('sec_no_log');
+}
+
+/* ---------- действия ---------- */
+$('roleMainBtn').addEventListener('click', () => {
+  MESH_PICK = 'main';
+  if (!$('meshName').value) $('meshName').value = (MESH && MESH.name) || '';
+  renderMesh();
+  $('meshName').focus();
+});
+$('roleSecBtn').addEventListener('click', () => {
+  MESH_PICK = MESH_PICK === 'rejoin' ? 'rejoin' : 'secondary';
+  if (!$('meshSelfHost').value) $('meshSelfHost').value = (MESH && (MESH.selfHost || MESH.sshHost)) || '';
+  renderMesh();
+  $('meshJoinCode').focus();
+});
+$('meshMakeMainBtn').addEventListener('click', async () => {
+  const btn = $('meshMakeMainBtn');
+  btn.disabled = true;
+  const {ok, data} = await api('/api/mesh/role', {role: 'main', name: $('meshName').value.trim()});
+  btn.disabled = false;
+  if (!ok){ showMsg($('meshRoleMsg'), data.error || t('err_internal'), 'err'); return; }
+  MESH_PICK = null;
+  showMsg($('meshRoleMsg'), '', '');
+  loadMesh();
+});
+$('meshJoinBtn').addEventListener('click', async () => {
+  const btn = $('meshJoinBtn');
+  btn.disabled = true;
+  const {ok, data} = await api('/api/mesh/join', {code: $('meshJoinCode').value, host: $('meshSelfHost').value.trim()});
+  btn.disabled = false;
+  if (!ok){ showMsg($('meshRoleMsg'), data.error || t('err_internal'), 'err'); return; }
+  MESH_PICK = null;
+  $('meshJoinCode').value = '';
+  showMsg($('meshRoleMsg'), '', '');
+  toast(t('saved'));
+  loadMesh();
+});
+$('meshNetSel').addEventListener('change', e => { MESH_NET = e.target.value; MAP_SIG = ''; renderMesh(); });
+$('meshSearch').addEventListener('input', () => renderMeshDevices(meshDevices()));
+document.querySelectorAll('#meshFilter button').forEach(b => b.addEventListener('click', () => {
+  MESH_FILTER = b.dataset.f;
+  document.querySelectorAll('#meshFilter button').forEach(x => x.classList.toggle('on', x === b));
+  renderMeshDevices(meshDevices());
+}));
+$('meshAddLinkBtn').addEventListener('click', () => {
+  $('meshLinkForm').hidden = false;
+  $('meshAddLinkBtn').hidden = true;
+  $('meshCodeBox').hidden = true;
+  if (!$('linkHost').value) $('linkHost').value = (MESH && MESH.sshHost) || '';
+  $('linkPort').value = (MESH && MESH.sshPort) || 22;
+  $('linkName').focus();
+});
+$('linkCancelBtn').addEventListener('click', () => {
+  $('meshLinkForm').hidden = true;
+  $('meshAddLinkBtn').hidden = false;
+  showMsg($('meshLinkMsg'), '', '');
+});
+$('linkCreateBtn').addEventListener('click', async () => {
+  const btn = $('linkCreateBtn');
+  btn.disabled = true;
+  const {ok, data} = await api('/api/mesh/links/create', {
+    name: $('linkName').value.trim(), host: $('linkHost').value.trim(), port: Number($('linkPort').value) || 0});
+  btn.disabled = false;
+  if (!ok){ showMsg($('meshLinkMsg'), data.error || t('err_internal'), 'err'); return; }
+  showMsg($('meshLinkMsg'), '', '');
+  MESH_CODE = data.code;
+  $('meshCode').textContent = data.code;
+  $('meshLinkForm').hidden = true;
+  $('meshCodeBox').hidden = false;
+  $('linkName').value = '';
+  loadMesh();
+});
+$('meshCodeCopy').addEventListener('click', async () => {
+  toast(await copyText(MESH_CODE) ? t('copied') : t('copy_failed'), 'ok');
+});
+$('meshCodeClose').addEventListener('click', () => {
+  $('meshCodeBox').hidden = true;
+  $('meshAddLinkBtn').hidden = false;
+  MESH_CODE = '';
+  $('meshCode').textContent = '';
+});
+$('meshReinstallBtn').addEventListener('click', async () => {
+  const {ok, data} = await api('/api/mesh/reinstall', {});
+  if (!ok){ toast(data.error || t('err_internal'), 'err'); return; }
+  loadMesh();
+});
+async function meshOff(){
+  const yes = await appConfirm(t('confirm_mesh_off'), t('confirm_off_yes'));
+  if (!yes) return;
+  const {ok, data} = await api('/api/mesh/role', {role: 'off'});
+  if (!ok){ toast(data.error || t('err_internal'), 'err'); }
+  MESH_PICK = null;
+  $('meshRoleMsg').dataset.shown = '';
+  loadMesh();
+}
+$('meshOffBtn').addEventListener('click', meshOff);
+$('secOffBtn').addEventListener('click', meshOff);
+$('secRejoinBtn').addEventListener('click', () => {
+  MESH_PICK = 'rejoin';
+  renderMesh();
+  $('meshRoleCard').scrollIntoView({behavior: 'smooth'});
+  $('meshJoinCode').focus();
+});
+let MAP_RESIZE = null;
+addEventListener('resize', () => {
+  clearTimeout(MAP_RESIZE);
+  MAP_RESIZE = setTimeout(() => { if (TAB === 'Mesh' && MESH) renderMesh(); }, 150);
+});
+
+/* ---------- настройки: ёмкость сервера ---------- */
+// Та же формула, что MaxStartupsFor в capacity.go: 4 соединения на
+// устройство, полный отказ — вдвое выше, не ниже умолчаний sshd.
+function maxStartupsFor(n){
+  const begin = Math.max(10, n * 4), full = Math.max(100, begin * 2);
+  return begin + ':30:' + full;
+}
+function capPreview(){
+  const n = Math.max(1, Math.min(Number($('capNum').max) || 250, Number($('capNum').value) || 1));
+  $('capWanted').textContent = 'MaxStartups ' + maxStartupsFor(n);
+  return n;
+}
+async function loadCapacity(){
+  const {ok, data} = await api('/api/settings/capacity');
+  if (!ok) return;
+  ['capRange', 'capNum'].forEach(id => { $(id).min = data.min; $(id).max = data.max; $(id).value = data.maxDevices; });
+  $('capEffective').textContent = data.effective ? 'MaxStartups ' + data.effective : '—';
+  capPreview();
+}
+$('capRange').addEventListener('input', e => { $('capNum').value = e.target.value; capPreview(); });
+$('capNum').addEventListener('input', e => { $('capRange').value = e.target.value; capPreview(); });
+$('capSaveBtn').addEventListener('click', async () => {
+  const n = capPreview();
+  const btn = $('capSaveBtn');
+  btn.disabled = true;
+  showMsg($('capMsg'), '', '');
+  const {ok, data} = await api('/api/settings/capacity', {maxDevices: n});
+  btn.disabled = false;
+  if (!ok){ showMsg($('capMsg'), data.error || t('err_internal'), 'err'); return; }
+  $('capEffective').textContent = data.effective ? 'MaxStartups ' + data.effective : '—';
+  toast(t('cap_saved').replace('{n}', data.maxDevices));
 });
 
 applyI18N();
