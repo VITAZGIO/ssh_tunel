@@ -27,6 +27,79 @@ chmod +x ssh_tunnel_linux
 
 ---
 
+## Домашний сервер одной вставкой
+
+Для Linux-машины дома — без белого IP, без экрана, управление из браузера.
+Адрес VPS в командах не нужен: сервер добавляется потом в веб-панели.
+
+Сначала выбери версию — первой строкой блока:
+
+- `ssh_tunnel_linux` — **прокси**. Машина видна в сети устройств: её порты
+  (веб-панели, SSH, qBittorrent…) открываются с других устройств. Свой
+  интернет машины при этом идёт как раньше — напрямую.
+- `ssh_tunnel_vpn_linux` — **VPN**, как на Windows и Android. Вдобавок сама
+  машина ходит к другим устройствам по именам `.mesh` (ssh, ping, rsync
+  куда угодно), а **весь её интернет** идёт через VPS. Домашняя сеть
+  (192.168.x.x) и Docker остаются как были. Учти: торренты, игры и другие
+  VPN на этой машине (WireGuard, NetBird) ходят по UDP — через SSH он не
+  проходит, без ретранслятора UDP на сервере такие программы перестанут
+  работать.
+
+Вставь в терминал целиком (спросит пароль для `sudo`):
+
+```bash
+B=ssh_tunnel_linux        # или: B=ssh_tunnel_vpn_linux
+F=$B; [ "$(uname -m)" = aarch64 ] && F=${B}_arm64
+sudo curl -fL -o /usr/local/bin/$B https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
+sudo chmod +x /usr/local/bin/$B
+
+printf '%s\n' '[Unit]' 'Description=ssh_tunnel' 'After=network-online.target' 'Wants=network-online.target' '' \
+  '[Service]' 'Environment=HOME=/root' "ExecStart=/usr/local/bin/$B -web -web-lan" 'Restart=always' 'RestartSec=5' '' \
+  '[Install]' 'WantedBy=multi-user.target' | sudo tee /etc/systemd/system/ssh_tunnel.service >/dev/null
+sudo systemctl daemon-reload
+sudo systemctl enable ssh_tunnel
+sudo systemctl restart ssh_tunnel
+
+if sudo ufw status 2>/dev/null | grep -q "Status: active"; then
+  sudo ufw allow from 192.168.0.0/16 to any port 47821 proto tcp
+fi
+
+sleep 3
+systemctl is-active ssh_tunnel
+echo "Панель: http://$(hostname -I | awk '{print $1}'):47821"
+```
+
+В конце — `active` и адрес панели. Открой его с любого устройства в домашней
+сети и добавь сервер:
+
+1. В программе на компьютере: настройки своего сервера → **«Экспорт»**
+   (с ключом) — получится файл.
+2. В панели домашнего сервера: **«Импорт»** → этот файл → **«Подключить»**.
+   Вместе с сервером приезжают SSH-ключ и ключ сети устройств: машина сразу
+   появляется в сети как `имя-машины.mesh`, и её службы (порты на
+   `127.0.0.1` или на всех адресах) открываются с других устройств.
+3. Файл экспорта удали — он равносилен паролю от сервера.
+
+Служба стартует сама после перезагрузки. Панель открыта только для
+домашней сети (`-web-lan`), из интернета к ней не попасть.
+
+Сменить версию (прокси ↔ VPN) — снова вставить блок с другой первой строкой:
+настройки и сервер сохранятся, служба перезапишется.
+
+<details>
+<summary>Удалить всё</summary>
+
+```bash
+sudo systemctl disable --now ssh_tunnel
+sudo rm -f /etc/systemd/system/ssh_tunnel.service /usr/local/bin/ssh_tunnel_linux /usr/local/bin/ssh_tunnel_vpn_linux
+sudo systemctl daemon-reload
+sudo rm -rf /root/.config/ssh_tunnel
+sudo ufw status 2>/dev/null | grep -q 47821 && sudo ufw delete allow from 192.168.0.0/16 to any port 47821 proto tcp
+```
+</details>
+
+---
+
 ## Команды под свою систему
 
 Сама программа везде одна и та же — отличается только то, чем ставится `curl`,
