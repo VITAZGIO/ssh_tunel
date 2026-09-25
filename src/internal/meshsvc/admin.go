@@ -52,6 +52,8 @@ type Server struct {
 	ID          string   `json:"id"`
 	Name        string   `json:"name"`
 	Host        string   `json:"host"`
+	IP          string   `json:"ip,omitempty"` // адрес в сети устройств
+	MeshHost    string   `json:"meshHost,omitempty"`
 	Addrs       []string `json:"addrs,omitempty"`
 	App         string   `json:"app,omitempty"`
 	ConnectedAt int64    `json:"connectedAt"`
@@ -62,12 +64,22 @@ type Server struct {
 	Quality     string   `json:"quality"`
 }
 
+// Self — этот сервер как узел сети устройств.
+type Self struct {
+	Name    string `json:"name"`
+	Host    string `json:"host"`
+	IP      string `json:"ip"`
+	Enabled bool   `json:"enabled"`
+	Ports   string `json:"ports,omitempty"`
+}
+
 // State — ответ meshd на /v1/state.
 type State struct {
 	Version   string    `json:"version"`
 	StartedAt int64     `json:"startedAt"`
 	Networks  []Network `json:"networks"`
 	Servers   []Server  `json:"servers"`
+	Self      Self      `json:"self"`
 }
 
 // Admin — клиент входа meshd для панели (HTTP по unix-сокету).
@@ -150,4 +162,15 @@ func (a *Admin) Rename(ctx context.Context, netID, device, alias string) error {
 // Forget убирает устройство из сети.
 func (a *Admin) Forget(ctx context.Context, netID, device string) error {
 	return a.do(ctx, http.MethodPost, "/v1/forget", deviceReq{Net: netID, Device: device}, nil)
+}
+
+// SetSelf — как этот сервер выглядит в сети устройств: имя, пускать ли к нему
+// устройства и на какие порты ("" — на все).
+func (a *Admin) SetSelf(ctx context.Context, name string, enabled bool, ports string) error {
+	return a.do(ctx, http.MethodPost, "/v1/self", map[string]any{"name": name, "enabled": enabled, "ports": ports}, nil)
+}
+
+// ForgetServer забывает адрес отключённого побочного сервера.
+func (a *Admin) ForgetServer(ctx context.Context, id string) error {
+	return a.do(ctx, http.MethodPost, "/v1/forget-server", deviceReq{Device: id}, nil)
 }

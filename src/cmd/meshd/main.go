@@ -83,9 +83,13 @@ const (
 	// callTimeout — сколько ждать, пока вызванное устройство откроет встречное
 	// соединение.
 	callTimeout = 10 * time.Second
-	// ctrlIdle — управляющее соединение без единого ping дольше этого
-	// считается мёртвым (клиент шлёт ping раз в 25 секунд).
-	ctrlIdle = 90 * time.Second
+	// ctrlIdle — управляющее соединение, по которому дольше этого не пришло ни
+	// строчки, считается мёртвым. Сервер шлёт ping раз в 15 секунд, ответ на
+	// него — тоже строчка: 45 секунд — это три пропущенных ответа. Меньше
+	// нельзя: на мобильном интернете пауза в полминуты — обычное дело.
+	// Без этого устройство, ушедшее на другой сервер, долго висело бы «в
+	// сети»: sshd на сервере сам не замечает, что клиент пропал.
+	ctrlIdle = 45 * time.Second
 	// forgetAfter — устройство, которое не появлялось столько времени,
 	// забывается, и его адрес может достаться новому.
 	forgetAfter = 180 * 24 * time.Hour
@@ -258,24 +262,31 @@ type relay struct {
 }
 
 type server struct {
-	mu      sync.Mutex
-	nets    map[string]*network // по хешу ключа
-	calls   map[string]*call
-	relays  map[string]*relay
-	path    string
-	saveMu  sync.Mutex
-	dirty   chan struct{}
-	started time.Time
+	mu     sync.Mutex
+	nets   map[string]*network // по хешу ключа
+	calls  map[string]*call
+	relays map[string]*relay
+	// self — сам этот сервер как узел сети; relayRecs — адреса побочных
+	// серверов (постоянные, как у устройств). Хранятся в servers.json.
+	self      selfConfig
+	relayRecs map[string]*relayRecord
+	path      string
+	saveMu    sync.Mutex
+	dirty     chan struct{}
+	started   time.Time
 }
 
 func newServer(path string) *server {
 	s := &server{
-		nets:    map[string]*network{},
-		calls:   map[string]*call{},
-		relays:  map[string]*relay{},
-		path:    path,
-		dirty:   make(chan struct{}, 1),
-		started: time.Now(),
+		nets:   map[string]*network{},
+		calls:  map[string]*call{},
+		relays: map[string]*relay{},
+		self:   selfConfig{Enabled: true},
+		path:   path,
+
+		relayRecs: map[string]*relayRecord{},
+		dirty:     make(chan struct{}, 1),
+		started:   time.Now(),
 	}
 	s.load()
 	return s
@@ -290,6 +301,7 @@ func (s *server) load() {
 	if s.path == "" {
 		return
 	}
+	s.loadServers()
 	data, err := os.ReadFile(s.path)
 	if err != nil {
 		return
@@ -350,6 +362,7 @@ func (s *server) save() {
 	for _, r := range restore {
 		r.d.BytesUp, r.d.BytesDown = r.up, r.down
 	}
+	srv, _ := json.MarshalIndent(serversFile{Self: s.self, Relays: s.relayRecs}, "", " ")
 	s.mu.Unlock()
 	if err != nil {
 		return
@@ -357,6 +370,12 @@ func (s *server) save() {
 	s.saveMu.Lock()
 	defer s.saveMu.Unlock()
 	os.MkdirAll(filepath.Dir(s.path), 0o700)
+	if srv != nil {
+		tmp := s.serversPath() + ".tmp"
+		if os.WriteFile(tmp, srv, 0o600) == nil {
+			os.Rename(tmp, s.serversPath())
+		}
+	}
 	tmp := s.path + ".tmp"
 	if err := os.WriteFile(tmp, data, 0o600); err != nil {
 		log.Printf("не удалось сохранить состояние: %v", err)
@@ -366,8 +385,8 @@ func (s *server) save() {
 }
 
 // peersLocked — список устройств сети для рассылки. Под s.mu.
-func peersLocked(n *network) []peer {
-	out := make([]peer, 0, len(n.Devices))
+func (s *server) peersLocked(n *network) []peer {
+	out := make([]peer, 0, len(n.Devices)+len(s.relayRecs)+1)
 	for _, d := range n.Devices {
 		p := peer{Name: d.displayName(), Host: d.Host, IP: d.IP, Online: d.ctrl != nil,
 			Platform: d.Platform, Via: d.Via}
@@ -376,14 +395,15 @@ func peersLocked(n *network) []peer {
 		}
 		out = append(out, p)
 	}
+	out = append(out, s.serverPeersLocked(n)...)
 	sort.Slice(out, func(i, j int) bool { return out[i].Host < out[j].Host })
 	return out
 }
 
 // broadcastLocked рассылает всем подключённым устройствам сети свежий
 // список. Под s.mu.
-func broadcastLocked(n *network) {
-	peers := peersLocked(n)
+func (s *server) broadcastLocked(n *network) {
+	peers := s.peersLocked(n)
 	for _, d := range n.Devices {
 		if d.ctrl != nil {
 			d.ctrl.send(msg{Op: "peers", Peers: peers})
@@ -400,7 +420,7 @@ func allocIPLocked(n *network) (string, bool) {
 	a := meshRange.Addr().Next() // .0.0 — адрес сети, пропускаем
 	for meshRange.Contains(a) {
 		b := a.As4()
-		if b[3] != 0 && b[3] != 255 && !used[a.String()] {
+		if b[3] != 0 && b[3] != 255 && !used[a.String()] && !serverBlock.Contains(a) {
 			return a.String(), true
 		}
 		a = a.Next()
@@ -443,12 +463,16 @@ var translit = map[rune]string{
 }
 
 // uniqueHostLocked — hostLabel(name), а при совпадении с чужим — с номером.
-func uniqueHostLocked(n *network, self, name string) string {
+func (s *server) uniqueHostLocked(n *network, self, name string) string {
 	base := hostLabel(name)
 	if base == "" {
 		base = "device"
 	}
+	servers := s.serverLabelsLocked()
 	taken := func(h string) bool {
+		if servers[h] {
+			return true
+		}
 		for id, d := range n.Devices {
 			if id != self && d.Host == h {
 				return true
@@ -619,7 +643,7 @@ func (s *server) control(conn net.Conn, m msg) {
 	}
 	now := time.Now()
 	d.Name = name
-	d.Host = uniqueHostLocked(n, m.Device, d.displayName())
+	d.Host = s.uniqueHostLocked(n, m.Device, d.displayName())
 	if d.FirstSeen.IsZero() {
 		d.FirstSeen = now
 	}
@@ -637,8 +661,8 @@ func (s *server) control(conn net.Conn, m msg) {
 	d.connectedAt = now
 	d.link = linkStats{}
 	d.ctrl = c
-	c.send(msg{Op: "welcome", V: protoVersion, IP: d.IP, Host: d.Host, Peers: peersLocked(n)})
-	broadcastLocked(n)
+	c.send(msg{Op: "welcome", V: protoVersion, IP: d.IP, Host: d.Host, Peers: s.peersLocked(n)})
+	s.broadcastLocked(n)
 	s.mu.Unlock()
 	s.markDirty()
 
@@ -654,7 +678,7 @@ func (s *server) control(conn net.Conn, m msg) {
 	if d.ctrl == c {
 		d.ctrl = nil
 		d.LastSeen = time.Now()
-		broadcastLocked(n)
+		s.broadcastLocked(n)
 	}
 	s.mu.Unlock()
 	s.markDirty()
@@ -738,10 +762,31 @@ func (s *server) relayLink(conn net.Conn, m msg) {
 		writeMsg(conn, msg{Op: "error", Error: "подключено слишком много серверов"})
 		return
 	}
+	rec := s.relayRecs[id]
+	if rec == nil {
+		ip := s.allocRelayIPLocked()
+		if ip == "" {
+			s.mu.Unlock()
+			writeMsg(conn, msg{Op: "error", Error: "кончились адреса для серверов"})
+			return
+		}
+		rec = &relayRecord{IP: ip}
+		s.relayRecs[id] = rec
+	}
+	rec.Name = r.Name
+	if rec.Name == "" {
+		rec.Name = r.Host
+	}
+	rec.LastSeen = time.Now()
 	s.relays[id] = r
+	s.broadcastAllLocked()
 	s.mu.Unlock()
-	log.Printf("подключился сервер %q (%s)", r.Name, r.Host)
-	c.send(msg{Op: "welcome", V: protoVersion})
+	s.markDirty()
+	log.Printf("подключился сервер %q (%s), адрес в сети %s", r.Name, r.Host, rec.IP)
+	s.mu.Lock()
+	welcome := msg{Op: "welcome", V: protoVersion, IP: rec.IP, Host: hostLabel(rec.Name)}
+	s.mu.Unlock()
+	c.send(welcome)
 
 	s.keepAlive(conn, c, func(f func(*linkStats)) {
 		s.mu.Lock()
@@ -754,8 +799,13 @@ func (s *server) relayLink(conn net.Conn, m msg) {
 	s.mu.Lock()
 	if s.relays[id] == r {
 		delete(s.relays, id)
+		if rec := s.relayRecs[id]; rec != nil {
+			rec.LastSeen = time.Now()
+		}
+		s.broadcastAllLocked()
 	}
 	s.mu.Unlock()
+	s.markDirty()
 	log.Printf("сервер %q отключился", r.Name)
 }
 
@@ -787,6 +837,10 @@ func (s *server) dial(conn net.Conn, m msg) {
 		return
 	}
 	from := n.Devices[m.Device]
+	if ip, ok := s.serverTargetLocked(n, m.To); ok {
+		s.dialServer(conn, from, ip, m.Port, fail) // отпускает s.mu
+		return
+	}
 	var target *device
 	for _, d := range n.Devices {
 		if d.IP == m.To || d.Host == m.To {
@@ -959,6 +1013,8 @@ type adminServer struct {
 	ID          string   `json:"id"`
 	Name        string   `json:"name"`
 	Host        string   `json:"host"`
+	IP          string   `json:"ip,omitempty"` // адрес в сети устройств
+	MeshHost    string   `json:"meshHost,omitempty"`
 	Addrs       []string `json:"addrs,omitempty"`
 	App         string   `json:"app,omitempty"`
 	ConnectedAt int64    `json:"connectedAt"`
@@ -969,11 +1025,21 @@ type adminServer struct {
 	Quality     string   `json:"quality"`
 }
 
+// adminSelf — этот сервер как узел сети.
+type adminSelf struct {
+	Name    string `json:"name"`
+	Host    string `json:"host"`
+	IP      string `json:"ip"`
+	Enabled bool   `json:"enabled"`
+	Ports   string `json:"ports,omitempty"`
+}
+
 type adminState struct {
 	Version   string         `json:"version"`
 	StartedAt int64          `json:"startedAt"`
 	Networks  []adminNetwork `json:"networks"`
 	Servers   []adminServer  `json:"servers"`
+	Self      adminSelf      `json:"self"`
 }
 
 func unixOrZero(t time.Time) int64 {
@@ -1032,9 +1098,14 @@ func (s *server) adminState() adminState {
 			as.RTTAvgMs = round1(r.link.avg)
 			as.JitterMs = round1(r.link.jitter)
 		}
+		if rec := s.relayRecs[r.ID]; rec != nil {
+			as.IP, as.MeshHost = rec.IP, hostLabel(rec.Name)
+		}
 		st.Servers = append(st.Servers, as)
 	}
 	sort.Slice(st.Servers, func(i, j int) bool { return st.Servers[i].Name < st.Servers[j].Name })
+	st.Self = adminSelf{Name: s.selfNameLocked(), Host: hostLabel(s.selfNameLocked()), IP: selfIP,
+		Enabled: s.self.Enabled, Ports: s.self.Ports}
 	return st
 }
 
@@ -1049,8 +1120,8 @@ func (s *server) rename(netID, devID, alias string) error {
 	}
 	d := n.Devices[devID]
 	d.Alias = alias
-	d.Host = uniqueHostLocked(n, devID, d.displayName())
-	broadcastLocked(n)
+	d.Host = s.uniqueHostLocked(n, devID, d.displayName())
+	s.broadcastLocked(n)
 	s.markDirty()
 	return nil
 }
@@ -1070,7 +1141,7 @@ func (s *server) forget(netID, devID string) error {
 		d.ctrl.conn.Close()
 		d.ctrl = nil
 	}
-	broadcastLocked(n)
+	s.broadcastLocked(n)
 	s.markDirty()
 	return nil
 }
@@ -1090,6 +1161,10 @@ func (s *server) adminHandler() http.Handler {
 		Net    string `json:"net"`
 		Device string `json:"device"`
 		Alias  string `json:"alias"`
+		// Для /v1/self.
+		Name    string `json:"name"`
+		Enabled *bool  `json:"enabled"`
+		Ports   string `json:"ports"`
 	}
 	decode := func(r *http.Request) (req, error) {
 		var q req
@@ -1106,6 +1181,20 @@ func (s *server) adminHandler() http.Handler {
 		q, err := decode(r)
 		if err == nil {
 			err = s.rename(q.Net, q.Device, q.Alias)
+		}
+		reply(w, map[string]bool{"ok": true}, err)
+	})
+	mux.HandleFunc("/v1/self", func(w http.ResponseWriter, r *http.Request) {
+		q, err := decode(r)
+		if err == nil {
+			err = s.setSelf(q.Name, q.Enabled, q.Ports)
+		}
+		reply(w, map[string]bool{"ok": true}, err)
+	})
+	mux.HandleFunc("/v1/forget-server", func(w http.ResponseWriter, r *http.Request) {
+		q, err := decode(r)
+		if err == nil {
+			s.forgetRelay(q.Device)
 		}
 		reply(w, map[string]bool{"ok": true}, err)
 	})
@@ -1136,6 +1225,345 @@ func (s *server) serveAdmin(path string) error {
 	log.Printf("вход для панели: %s", path)
 	go (&http.Server{Handler: s.adminHandler(), ReadHeaderTimeout: 10 * time.Second}).Serve(ln)
 	return nil
+}
+
+// ---------- сами серверы как узлы сети ----------
+//
+// У главного сервера в каждой сети есть свой адрес (selfIP) и имя — как у
+// устройства. Соединение на него meshd ведёт на 127.0.0.1:ПОРТ самого
+// сервера: так с телефона открывается, например, панель или контейнер на
+// VPS, хотя наружу его порт закрыт. У побочных серверов адреса ниже selfIP;
+// соединение на такой адрес meshd передаёт побочному по его управляющему
+// соединению, и тот подключается к своему 127.0.0.1:ПОРТ.
+
+const (
+	selfIP = "198.19.255.254"
+	// relayNet — «сеть» в ответе побочного сервера на вызов: ключа сети у
+	// него нет, вызов узнаётся по id.
+	relayNet = "@relay"
+)
+
+// serverBlock — адреса серверов, устройствам не выдаются.
+var serverBlock = netip.MustParsePrefix("198.19.255.0/24")
+
+// selfConfig — этот сервер как узел сети; настраивается из панели.
+type selfConfig struct {
+	Name    string `json:"name,omitempty"`
+	Enabled bool   `json:"enabled"`
+	// Ports — какие порты сервера открыты устройствам сети: "22,80,8000-8100";
+	// пусто — все.
+	Ports string `json:"ports,omitempty"`
+}
+
+type relayRecord struct {
+	Name     string    `json:"name"`
+	IP       string    `json:"ip"`
+	LastSeen time.Time `json:"lastSeen"`
+}
+
+type serversFile struct {
+	Self   selfConfig              `json:"self"`
+	Relays map[string]*relayRecord `json:"relays"`
+}
+
+func (s *server) serversPath() string {
+	return filepath.Join(filepath.Dir(s.path), "servers.json")
+}
+
+func (s *server) loadServers() {
+	data, err := os.ReadFile(s.serversPath())
+	if err != nil {
+		return
+	}
+	var f serversFile
+	if json.Unmarshal(data, &f) != nil {
+		return
+	}
+	s.self = f.Self
+	for id, r := range f.Relays {
+		if r != nil && serverBlock.Contains(netip.MustParseAddr(safeAddr(r.IP))) {
+			s.relayRecs[id] = r
+		}
+	}
+}
+
+// safeAddr — адрес из файла, испорченный — нулевой (не попадёт в блок).
+func safeAddr(ip string) string {
+	if _, err := netip.ParseAddr(ip); err != nil {
+		return "0.0.0.0"
+	}
+	return ip
+}
+
+func (s *server) selfNameLocked() string {
+	if s.self.Name != "" {
+		return s.self.Name
+	}
+	if h, err := os.Hostname(); err == nil && h != "" {
+		return h
+	}
+	return "server"
+}
+
+// serverLabelsLocked — имена серверов: устройствам они не достаются.
+func (s *server) serverLabelsLocked() map[string]bool {
+	m := map[string]bool{}
+	if s.self.Enabled {
+		m[hostLabel(s.selfNameLocked())] = true
+	}
+	for _, r := range s.relayRecs {
+		m[hostLabel(r.Name)] = true
+	}
+	return m
+}
+
+// serverPeersLocked — серверы в списке устройств сети n. Имя совпало с
+// давно заведённым устройством — серверу достаётся суффикс.
+func (s *server) serverPeersLocked(n *network) []peer {
+	used := map[string]bool{}
+	for _, d := range n.Devices {
+		used[d.Host] = true
+	}
+	var out []peer
+	add := func(name, ip string, online bool, lastSeen time.Time) {
+		base := hostLabel(name)
+		if base == "" {
+			base = "server"
+		}
+		h := base
+		for i := 2; used[h]; i++ {
+			h = base + "-" + itoa(i)
+		}
+		used[h] = true
+		p := peer{Name: name, Host: h, IP: ip, Online: online, Platform: "server"}
+		if !lastSeen.IsZero() {
+			p.LastSeen = lastSeen.Unix()
+		}
+		out = append(out, p)
+	}
+	if s.self.Enabled {
+		add(s.selfNameLocked(), selfIP, true, time.Time{})
+	}
+	ids := make([]string, 0, len(s.relayRecs))
+	for id := range s.relayRecs {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return s.relayRecs[ids[i]].IP > s.relayRecs[ids[j]].IP })
+	for _, id := range ids {
+		r := s.relayRecs[id]
+		_, online := s.relays[id]
+		add(r.Name, r.IP, online, r.LastSeen)
+	}
+	return out
+}
+
+// serverTargetLocked — адрес сервера, если to — сервер этой сети.
+func (s *server) serverTargetLocked(n *network, to string) (string, bool) {
+	for _, p := range s.serverPeersLocked(n) {
+		if p.IP == to || p.Host == to {
+			return p.IP, true
+		}
+	}
+	return "", false
+}
+
+func (s *server) allocRelayIPLocked() string {
+	used := map[string]bool{selfIP: true}
+	for _, r := range s.relayRecs {
+		used[r.IP] = true
+	}
+	a := netip.MustParseAddr(selfIP).Prev()
+	for serverBlock.Contains(a) && a.As4()[3] != 0 {
+		if !used[a.String()] {
+			return a.String()
+		}
+		a = a.Prev()
+	}
+	return ""
+}
+
+func (s *server) broadcastAllLocked() {
+	for _, n := range s.nets {
+		s.broadcastLocked(n)
+	}
+}
+
+// portAllowed — открыт ли порт по списку вида "22,80,8000-8100" (пусто — все).
+func portAllowed(spec string, port int) bool {
+	spec = strings.TrimSpace(spec)
+	if spec == "" {
+		return true
+	}
+	for _, part := range strings.Split(spec, ",") {
+		part = strings.TrimSpace(part)
+		lo, hi, isRange := strings.Cut(part, "-")
+		a, err1 := atoiStrict(strings.TrimSpace(lo))
+		b := a
+		var err2 error
+		if isRange {
+			b, err2 = atoiStrict(strings.TrimSpace(hi))
+		}
+		if err1 == nil && err2 == nil && port >= a && port <= b {
+			return true
+		}
+	}
+	return false
+}
+
+func atoiStrict(v string) (int, error) {
+	if v == "" || len(v) > 5 {
+		return 0, errors.New("не число")
+	}
+	n := 0
+	for _, c := range v {
+		if c < '0' || c > '9' {
+			return 0, errors.New("не число")
+		}
+		n = n*10 + int(c-'0')
+	}
+	return n, nil
+}
+
+// validPorts — список портов из панели: пустой или разбирается целиком.
+func validPorts(spec string) error {
+	spec = strings.TrimSpace(spec)
+	if spec == "" {
+		return nil
+	}
+	for _, part := range strings.Split(spec, ",") {
+		lo, hi, isRange := strings.Cut(strings.TrimSpace(part), "-")
+		a, err := atoiStrict(strings.TrimSpace(lo))
+		if err != nil || a < 1 || a > 65535 {
+			return errors.New("неверный список портов: " + part)
+		}
+		if isRange {
+			b, err := atoiStrict(strings.TrimSpace(hi))
+			if err != nil || b < a || b > 65535 {
+				return errors.New("неверный список портов: " + part)
+			}
+		}
+	}
+	return nil
+}
+
+func (s *server) setSelf(name string, enabled *bool, ports string) error {
+	if err := validPorts(ports); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.self.Name = clip(name)
+	if enabled != nil {
+		s.self.Enabled = *enabled
+	}
+	s.self.Ports = strings.TrimSpace(ports)
+	s.broadcastAllLocked()
+	s.mu.Unlock()
+	s.markDirty()
+	return nil
+}
+
+func (s *server) forgetRelay(id string) {
+	s.mu.Lock()
+	if _, online := s.relays[id]; !online {
+		delete(s.relayRecs, id)
+		s.broadcastAllLocked()
+	}
+	s.mu.Unlock()
+	s.markDirty()
+}
+
+// dialServer — соединение устройства с самим сервером. Вызывается под s.mu
+// и отпускает его.
+func (s *server) dialServer(conn net.Conn, from *device, ip string, port int, fail func(string)) {
+	if ip == selfIP {
+		allowed := portAllowed(s.self.Ports, port)
+		s.mu.Unlock()
+		if !allowed || port == 47831 {
+			fail("сервер не пускает устройства сети на порт " + itoa(port) + " — это настраивается в его панели")
+			return
+		}
+		local, err := net.DialTimeout("tcp", net.JoinHostPort("127.0.0.1", itoa(port)), 5*time.Second)
+		if err != nil {
+			fail("на сервере на порту " + itoa(port) + " ничего не слушает")
+			return
+		}
+		s.serveCall(conn, local, from)
+		return
+	}
+	var r *relay
+	for id, rec := range s.relayRecs {
+		if rec.IP == ip {
+			r = s.relays[id]
+			break
+		}
+	}
+	if r == nil {
+		s.mu.Unlock()
+		fail("сервер " + ip + " сейчас не в сети")
+		return
+	}
+	if len(s.calls) >= maxPendingCalls {
+		s.mu.Unlock()
+		fail("сервер занят, попробуй ещё раз")
+		return
+	}
+	callID := randomID()
+	cl := &call{net: netID(relayNet), target: r.ID, answer: make(chan answer, 1)}
+	s.calls[callID] = cl
+	r.ctrl.send(msg{Op: "incoming", Call: callID, From: from.IP, FromHost: from.Host, Port: port})
+	s.mu.Unlock()
+
+	peerConn, errText := s.waitCall(callID, cl)
+	if peerConn == nil {
+		fail(errText)
+		return
+	}
+	s.serveCall(conn, peerConn, from)
+}
+
+// waitCall ждёт ответа на вызов; nil — отказ или тишина, с объяснением.
+func (s *server) waitCall(callID string, cl *call) (net.Conn, string) {
+	var got answer
+	timedOut := false
+	select {
+	case got = <-cl.answer:
+	case <-time.After(callTimeout):
+		timedOut = true
+	}
+	s.mu.Lock()
+	delete(s.calls, callID)
+	s.mu.Unlock()
+	if timedOut {
+		select {
+		case late := <-cl.answer:
+			if late.conn != nil {
+				late.conn.Close()
+			}
+		default:
+		}
+		return nil, "не ответил"
+	}
+	if got.conn == nil {
+		if got.err == "" {
+			got.err = "в соединении отказано"
+		}
+		return nil, got.err
+	}
+	return got.conn, ""
+}
+
+// serveCall сообщает вызывающему, что соединение есть, и перекачивает данные.
+func (s *server) serveCall(conn, peerConn net.Conn, from *device) {
+	if err := writeMsg(conn, msg{Op: "connected"}); err != nil {
+		conn.Close()
+		peerConn.Close()
+		return
+	}
+	from.activeCalls.Add(1)
+	defer from.activeCalls.Add(-1)
+	var sink1, sink2 atomic.Int64
+	splice(conn, peerConn, &from.up, &sink1, &sink2, &from.down)
+	s.markDirty()
 }
 
 func randomID() string {

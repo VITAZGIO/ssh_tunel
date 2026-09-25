@@ -211,6 +211,7 @@
     <string name="mesh_state_online">Online</string>
     <string name="mesh_state_connecting">Connecting</string>
     <string name="mesh_state_error">No connection to the network service</string>
+    <string name="mesh_state_pending">Turns on with the next connection — reconnect the tunnel</string>
     <string name="mesh_state_stopped">Tunnel is off</string>
     <string name="mesh_cancel">Cancel</string>
 </resources>

@@ -377,6 +377,10 @@ func (fakeDownAdmin) Rename(context.Context, string, string, string) error {
 	return meshsvc.ErrNotRunning
 }
 func (fakeDownAdmin) Forget(context.Context, string, string) error { return meshsvc.ErrNotRunning }
+func (fakeDownAdmin) SetSelf(context.Context, string, bool, string) error {
+	return meshsvc.ErrNotRunning
+}
+func (fakeDownAdmin) ForgetServer(context.Context, string) error { return meshsvc.ErrNotRunning }
 
 func TestКодПодключенияПроверяется(t *testing.T) {
 	for _, code := range []string{"", "что-то", invitePrefix + "!!!", invitePrefix + "e30"} {

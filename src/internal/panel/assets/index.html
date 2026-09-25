@@ -625,6 +625,20 @@
         <div class="console" id="meshJobLog"></div>
       </div>
 
+      <!-- сам сервер как узел сети (и у главного, и у побочного) -->
+      <div class="card" id="meshSelfCard" hidden>
+        <h1><span data-i18n="self_title">Сервер в сети устройств</span><button class="hint" data-hint="hint_self">?</button></h1>
+        <div class="kv"><span class="k" data-i18n="self_addr">Адрес в сети</span><span class="v" id="selfAddr">—</span></div>
+        <label class="chk" style="margin-top:12px"><input type="checkbox" id="selfEnabled">
+          <span data-i18n="self_enable">Пускать устройства сети к самому серверу</span></label>
+        <div class="field" style="margin-top:10px">
+          <label for="selfPorts"><span data-i18n="self_ports">Порты</span><button class="hint" data-hint="hint_self_ports">?</button></label>
+          <input type="text" id="selfPorts" data-i18n-ph="self_ports_ph" placeholder="пусто — все порты; например 22, 80, 8000-8100">
+        </div>
+        <p class="note" id="selfExample" style="margin:0 0 10px"></p>
+        <button class="btn" id="selfSaveBtn" data-i18n="cap_save">Применить</button>
+      </div>
+
       <!-- главный сервер -->
       <div id="meshMainView" hidden>
         <div class="msg err" id="meshAdminErr" hidden></div>
@@ -980,6 +994,16 @@ const I18N = {
     err_autostart_unsupported:'Автозапуском отсюда управлять нечем',
     password_changed:'Пароль изменён',
     nav_mesh:'Сеть устройств',
+    self_title:'Сервер в сети устройств', self_addr:'Адрес в сети',
+    self_enable:'Пускать устройства сети к самому серверу', self_ports:'Порты',
+    self_ports_ph:'пусто — все порты; например 22, 80, 8000-8100',
+    self_example:'С любого устройства сети: {h}:ПОРТ ведёт на 127.0.0.1:ПОРТ этого сервера.',
+    hint_self:'<p>У сервера, как у устройства, свой адрес и имя <b>.mesh</b>. Соединение на них ведёт на '+
+      '<b>127.0.0.1</b> самого сервера — так с телефона открываются службы, которые наружу закрыты: '+
+      'эта панель, Docker-контейнеры, базы.</p><p>Если сервером пользуются и другие люди со своими сетями, '+
+      'они тоже увидят его в своей сети — ограничь порты или выключи.</p>',
+    hint_self_ports:'Какие порты сервера открыты устройствам сети: через запятую, диапазоны через дефис. '+
+      'Пусто — все. Служба самой сети (47831) закрыта всегда.',
     mesh_sub:'Твои устройства в одной сети через твои же серверы — как NetBird: каждое получает '+
       'постоянный адрес и имя вида «ноутбук.mesh».',
     mesh_role_title:'Роль этого сервера',
@@ -1174,6 +1198,16 @@ const I18N = {
     err_autostart_unsupported:'There is nothing to switch here',
     password_changed:'Password changed',
     nav_mesh:'Device network',
+    self_title:'Server in the device network', self_addr:'Network address',
+    self_enable:'Let network devices reach this server itself', self_ports:'Ports',
+    self_ports_ph:'empty — all ports; e.g. 22, 80, 8000-8100',
+    self_example:'From any device in the network: {h}:PORT leads to 127.0.0.1:PORT of this server.',
+    hint_self:'<p>Like a device, the server has its own address and <b>.mesh</b> name. Connections to them lead '+
+      'to the server\'s own <b>127.0.0.1</b> — so a phone can open services that are closed to the outside: '+
+      'this panel, Docker containers, databases.</p><p>If other people use this server with their own networks, '+
+      'they see it too — restrict ports or turn it off.</p>',
+    hint_self_ports:'Which server ports are open to network devices: comma separated, ranges with a dash. '+
+      'Empty — all. The network service itself (47831) is always closed.',
     mesh_sub:'Your devices in one network through your own servers — like NetBird: each gets a '+
       'permanent address and a name like "laptop.mesh".',
     mesh_role_title:'Role of this server',
@@ -2037,6 +2071,7 @@ function renderMesh(){
   }
 
   renderJob(m.job);
+  renderSelfCard(m, role);
   $('meshMainView').hidden = role !== 'main';
   $('meshSecView').hidden = role !== 'secondary';
   if (role === 'main') renderMeshMain();
@@ -2263,11 +2298,11 @@ function buildMap(svg, W, H, servers, devices, animate){
 
   secs.forEach(s => {
     const e = svgEl('path', {d: curve(pos[main ? main.id : s.id] || pos[s.id], pos[s.id], 0.08), class: 'edge srv'}, gEdges);
-    const r = node('s:' + s.id, pos[s.id], 17, GLYPH.server, s.name, s.host || '', s, true);
+    const r = node('s:' + s.id, pos[s.id], 17, GLYPH.server, s.name, s.meshHost ? s.meshHost + '.mesh' : (s.host || ''), s, true);
     r.edge = e;
   });
   if (main){
-    node('s:' + main.id, pos[main.id], 23, GLYPH.main, main.name, t('srv_main'), main, true);
+    node('s:' + main.id, pos[main.id], 23, GLYPH.main, main.name, main.meshHost ? main.meshHost + '.mesh' : t('srv_main'), main, true);
   }
   devices.forEach(d => {
     const p = dpos[d.id];
@@ -2298,9 +2333,12 @@ function relaxLayout(fixed, free, pos, W, H, narrow){
         if (a.fixed && b.fixed) continue;
         let dx = (b.p.x - a.p.x) / sx, dy = b.p.y - a.p.y;
         let d = Math.hypot(dx, dy);
-        if (d >= need) continue;
+        // У сервера и кружок крупнее, и подпись длиннее — рядом с ним нужно
+        // больше места.
+        const req = (a.fixed || b.fixed) ? need * 1.6 : need;
+        if (d >= req) continue;
         if (d < 0.01){ dx = Math.cos(i + j); dy = Math.sin(i + j); d = 1; }
-        const push = (need - d) * 0.5, ux = dx / d * sx, uy = dy / d;
+        const push = (req - d) * 0.5, ux = dx / d * sx, uy = dy / d;
         const ka = a.fixed ? 0 : (b.fixed ? 2 : 1), kb = b.fixed ? 0 : (a.fixed ? 2 : 1);
         a.p.x -= ux * push * ka; a.p.y -= uy * push * ka;
         b.p.x += ux * push * kb; b.p.y += uy * push * kb;
@@ -2344,6 +2382,7 @@ function serverPop(s){
   const l = s.link;
   return popBox(s.name, [
     ['host', s.host],
+    ['.mesh', s.meshHost ? s.meshHost + '.mesh · ' + s.meshIp : ''],
     [t('status_label'), s.online ? t('sec_connected') : t('srv_waiting')],
     [t('dev_latency'), l && l.rttMs ? fmtMs(l.rttMs) + ' · ' + t('q_' + l.quality) : ''],
     [t('dev_since'), l ? fmtAgo(l.connectedAt) : ''],
@@ -2507,7 +2546,8 @@ function renderMeshServers(servers){
     if (s.main) n.appendChild(el('span', 'badge dim', t('srv_main'))).style.marginLeft = '8px';
     else if (!s.known) n.appendChild(el('span', 'badge warn', t('srv_self_joined'))).style.marginLeft = '8px';
     nm.appendChild(n);
-    nm.appendChild(el('div', 'h', s.host || (s.online ? '' : t('srv_waiting'))));
+    nm.appendChild(el('div', 'h', [s.host || (s.online ? '' : t('srv_waiting')), s.meshHost ? s.meshHost + '.mesh' : '']
+      .filter(Boolean).join(' · ')));
     row.appendChild(nm);
     if (s.link){
       const mm = el('span', 'm');
@@ -2529,6 +2569,38 @@ function renderMeshServers(servers){
     box.appendChild(row);
   });
 }
+
+/* ---------- сам сервер как узел сети ---------- */
+let SELF_DIRTY = false;
+function renderSelfCard(m, role){
+  const card = $('meshSelfCard');
+  card.hidden = role !== 'main' && role !== 'secondary';
+  if (card.hidden) return;
+  let host = '', ip = '';
+  if (role === 'main' && m.self){ host = m.self.host; ip = m.self.ip; }
+  if (role === 'secondary' && m.link){ host = m.link.meshHost || ''; ip = m.link.meshIp || ''; }
+  $('selfAddr').textContent = host ? host + '.mesh · ' + ip : '—';
+  $('selfExample').textContent = host ? t('self_example').replace('{h}', host + '.mesh') : '';
+  if (!SELF_DIRTY){
+    $('selfEnabled').checked = !!m.serverAccess;
+    $('selfPorts').value = m.serverPorts || '';
+  }
+  $('selfPorts').disabled = !$('selfEnabled').checked;
+}
+['selfEnabled', 'selfPorts'].forEach(id => $(id).addEventListener('input', () => {
+  SELF_DIRTY = true;
+  $('selfPorts').disabled = !$('selfEnabled').checked;
+}));
+$('selfSaveBtn').addEventListener('click', async () => {
+  const btn = $('selfSaveBtn');
+  btn.disabled = true;
+  const {ok, data} = await api('/api/mesh/serveraccess', {enabled: $('selfEnabled').checked, ports: $('selfPorts').value});
+  btn.disabled = false;
+  if (!ok){ toast(data.error || t('err_internal'), 'err'); return; }
+  SELF_DIRTY = false;
+  toast(t('saved'));
+  loadMesh();
+});
 
 /* ---------- побочный сервер ---------- */
 function renderMeshSecondary(){

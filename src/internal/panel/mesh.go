@@ -30,6 +30,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -83,6 +84,8 @@ type meshAdmin interface {
 	State(ctx context.Context) (meshsvc.State, error)
 	Rename(ctx context.Context, netID, device, alias string) error
 	Forget(ctx context.Context, netID, device string) error
+	SetSelf(ctx context.Context, name string, enabled bool, ports string) error
+	ForgetServer(ctx context.Context, id string) error
 }
 
 const meshdUnit = "meshd.service"
@@ -441,7 +444,54 @@ func (m *MeshManager) DeleteLink(id string) error {
 		return err
 	}
 	// Рвутся все побочные — остальные переподключатся сами за секунды.
+	// Адрес отключённого сервера в сети больше не нужен.
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	m.admin.ForgetServer(ctx, id)
 	return m.sys.KillLinkSessions()
+}
+
+// SetServerAccess — пускать ли устройства сети к самому этому серверу и на
+// какие порты. На главном применяется в meshd сразу, на побочном — к
+// следующему же соединению.
+func (m *MeshManager) SetServerAccess(ctx context.Context, enabled bool, ports string) error {
+	ports = strings.Join(strings.Fields(ports), " ")
+	if err := meshsvc.ValidPorts(ports); err != nil {
+		return err
+	}
+	var s MeshSettings
+	if err := m.settings.Update(func(st *Settings) error {
+		st.Mesh.ServerAccessOff = !enabled
+		st.Mesh.ServerPorts = ports
+		s = st.Mesh
+		return nil
+	}); err != nil {
+		return err
+	}
+	if s.Role == MeshRoleMain || m.sys.UnitState(meshdUnit).Active {
+		return m.admin.SetSelf(ctx, m.selfName(s), enabled, ports)
+	}
+	return nil
+}
+
+// selfName — имя этого сервера в сети устройств.
+func (m *MeshManager) selfName(s MeshSettings) string {
+	if s.Name != "" {
+		return s.Name
+	}
+	return "Главный сервер"
+}
+
+// allowLocal — пускать ли устройство сети на порт побочного сервера.
+func (m *MeshManager) allowLocal(port int) (bool, string) {
+	s := m.settings.Get().Mesh
+	if s.ServerAccessOff {
+		return false, "сервер не пускает устройства сети — это включается в его панели"
+	}
+	if !meshsvc.PortAllowed(s.ServerPorts, port) {
+		return false, "сервер не пускает устройства сети на порт " + strconv.Itoa(port) + " — это настраивается в его панели"
+	}
+	return true, ""
 }
 
 // ---------- побочный сервер ----------
@@ -525,7 +575,7 @@ func (m *MeshManager) startLink(s MeshSettings) {
 	}
 	link := &meshsvc.ServerLink{Addr: m.linkAddr, Info: meshsvc.ServerInfo{
 		ID: s.LinkID, Name: s.Name, Host: host, App: m.version, Addrs: m.sys.LocalAddrs(),
-	}}
+	}, Allow: m.allowLocal}
 	ctx, cancel := context.WithCancel(context.Background())
 	m.link, m.linkCancel = link, cancel
 	go link.Run(ctx)
@@ -564,6 +614,9 @@ type MeshServer struct {
 	Known  bool            `json:"known"` // добавлен в панели (а не подключился сам)
 	Added  time.Time       `json:"added,omitempty"`
 	Link   *meshsvc.Server `json:"link,omitempty"`
+	// MeshIP/MeshHost — адрес и имя сервера в сети устройств.
+	MeshIP   string `json:"meshIp,omitempty"`
+	MeshHost string `json:"meshHost,omitempty"`
 }
 
 // MeshState — всё, что показывает вкладка «Сеть устройств».
@@ -576,6 +629,11 @@ type MeshState struct {
 	Job           *meshJob  `json:"job,omitempty"`
 	SSHHost       string    `json:"sshHost,omitempty"`
 	SSHPort       int       `json:"sshPort,omitempty"`
+
+	// Сам сервер в сети устройств: пускать ли к нему и его адрес там.
+	ServerAccess bool          `json:"serverAccess"`
+	ServerPorts  string        `json:"serverPorts,omitempty"`
+	Self         *meshsvc.Self `json:"self,omitempty"`
 
 	// Главный.
 	Version   string        `json:"version,omitempty"`
@@ -607,6 +665,7 @@ func (m *MeshManager) State(ctx context.Context) MeshState {
 		Servers:  []MeshServer{},
 		Networks: []MeshNetwork{},
 	}
+	st.ServerAccess, st.ServerPorts = !s.ServerAccessOff, s.ServerPorts
 	st.EffectiveRole = s.Role
 	// meshd поставлен мастером настройки VPS, а в панели роль не выбрана —
 	// по сути это уже главный сервер.
@@ -640,6 +699,20 @@ func (m *MeshManager) fillMain(ctx context.Context, st *MeshState, s MeshSetting
 	ms, err := m.admin.State(ctx)
 	if err != nil {
 		st.AdminErr = err.Error()
+	} else if ms.Self.Name != name || ms.Self.Enabled == s.ServerAccessOff || ms.Self.Ports != s.ServerPorts {
+		// meshd переустановили или настройки поменяли, пока он не работал —
+		// приводим к тому, что выбрано в панели.
+		if m.admin.SetSelf(ctx, name, !s.ServerAccessOff, s.ServerPorts) == nil {
+			ms.Self = meshsvc.Self{Name: name, Host: ms.Self.Host, IP: ms.Self.IP, Enabled: !s.ServerAccessOff, Ports: s.ServerPorts}
+			if ms2, err := m.admin.State(ctx); err == nil {
+				ms = ms2
+			}
+		}
+	}
+	if err == nil {
+		self := ms.Self
+		st.Self = &self
+		st.Servers[0].MeshIP, st.Servers[0].MeshHost = self.IP, self.Host
 	}
 	st.Version, st.StartedAt = ms.Version, ms.StartedAt
 
@@ -652,6 +725,7 @@ func (m *MeshManager) fillMain(ctx context.Context, st *MeshState, s MeshSetting
 		if r, ok := connected[l.ID]; ok {
 			r := r
 			srv.Online, srv.Link, srv.Host = true, &r, r.Host
+			srv.MeshIP, srv.MeshHost = r.IP, r.MeshHost
 			delete(connected, l.ID)
 		}
 		st.Servers = append(st.Servers, srv)

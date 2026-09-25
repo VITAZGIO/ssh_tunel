@@ -143,7 +143,9 @@ class MeshActivity : AppCompatActivity() {
             "online" -> getString(R.string.mesh_state_online)
             "connecting" -> getString(R.string.mesh_state_connecting)
             "error" -> getString(R.string.mesh_state_error)
-            "off" -> getString(R.string.mesh_off)
+            // Галочку включили, а туннель поднят ещё без сети устройств —
+            // заработает после переподключения.
+            "off" -> getString(if (enabledCheck.isChecked) R.string.mesh_state_pending else R.string.mesh_off)
             else -> getString(R.string.mesh_state_stopped)
         }
         if (state == "online" && self != null) {

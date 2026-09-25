@@ -210,6 +210,7 @@
     <string name="mesh_state_online">В сети</string>
     <string name="mesh_state_connecting">Подключаюсь</string>
     <string name="mesh_state_error">Нет связи с сервером сети</string>
+    <string name="mesh_state_pending">Включится при следующем подключении — переподключи туннель</string>
     <string name="mesh_state_stopped">Туннель выключен</string>
     <string name="mesh_cancel">Отмена</string>
 </resources>

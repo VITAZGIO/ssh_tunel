@@ -28,6 +28,7 @@ func (s *Server) meshRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/mesh/links/create", s.requireAuth(s.withMesh(s.handleMeshLinkCreate)))
 	mux.HandleFunc("/api/mesh/links/delete", s.requireAuth(s.withMesh(s.handleMeshLinkDelete)))
 	mux.HandleFunc("/api/mesh/join", s.requireAuth(s.withMesh(s.handleMeshJoin)))
+	mux.HandleFunc("/api/mesh/serveraccess", s.requireAuth(s.withMesh(s.handleMeshServerAccess)))
 }
 
 func (s *Server) withMesh(next http.HandlerFunc) http.HandlerFunc {
@@ -186,4 +187,17 @@ func (s *Server) handleMeshJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	replyErr(w, s.mesh.Join(req.Code, req.Host), map[string]bool{"ok": true})
+}
+
+// handleMeshServerAccess — пускать ли устройства сети к самому серверу и на
+// какие порты.
+func (s *Server) handleMeshServerAccess(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Enabled bool   `json:"enabled"`
+		Ports   string `json:"ports"`
+	}
+	if !decodePost(w, r, &req) {
+		return
+	}
+	replyErr(w, s.mesh.SetServerAccess(r.Context(), req.Enabled, req.Ports), map[string]bool{"ok": true})
 }

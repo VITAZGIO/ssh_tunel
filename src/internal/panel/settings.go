@@ -49,6 +49,13 @@ type MeshSettings struct {
 
 	// Links — побочные серверы, которым главный разрешил подключаться.
 	Links []MeshLink `json:"links,omitempty"`
+
+	// ServerAccessOff — не пускать устройства сети к самому этому серверу
+	// (по умолчанию пускать: у сервера свой адрес и имя .mesh, соединение на
+	// них ведёт на его 127.0.0.1:ПОРТ). ServerPorts — какие порты открыты
+	// ("22,80,8000-8100"; пусто — все).
+	ServerAccessOff bool   `json:"serverAccessOff,omitempty"`
+	ServerPorts     string `json:"serverPorts,omitempty"`
 }
 
 // MeshLink — побочный сервер, подключённый к главному.
