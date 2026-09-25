@@ -215,12 +215,16 @@ func configureFamily(luid winipcfg.LUID, family winipcfg.AddressFamily, prefix n
 	if err := luid.SetIPAddressesForFamily(family, []netip.Prefix{prefix}); err != nil {
 		return fmt.Errorf("%s, адрес %s: %w", name, prefix, err)
 	}
-	var rd []*winipcfg.RouteData
+	// Маршруты — только добавляем. SetRoutesForFamily из winipcfg сначала
+	// удаляет все маршруты адаптера, а среди них служебные (подсеть,
+	// широковещательный, мультикаст), которые Windows как раз создаёт после
+	// назначения адреса. Если Windows успевала их поменять, удаление
+	// возвращало «Element not found», и до наших маршрутов дело не доходило.
+	// Адаптер только что создан — удалять на нём нечего.
 	for _, r := range routes {
-		rd = append(rd, &winipcfg.RouteData{Destination: r, NextHop: next, Metric: 0})
-	}
-	if err := luid.SetRoutesForFamily(family, rd); err != nil {
-		return fmt.Errorf("%s, маршруты: %w", name, err)
+		if err := addRoute(luid, r, next); err != nil {
+			return fmt.Errorf("%s, маршрут %s: %w", name, r, err)
+		}
 	}
 	ipif, err := luid.IPInterface(family)
 	if err != nil {
@@ -235,6 +239,23 @@ func configureFamily(luid winipcfg.LUID, family winipcfg.AddressFamily, prefix n
 		return fmt.Errorf("%s, метрика адаптера: %w", name, err)
 	}
 	return nil
+}
+
+// addRoute добавляет маршрут через адаптер. Уже есть — хорошо. «Не найден» —
+// интерфейс адаптера ещё поднимается: пробуем ещё несколько раз.
+func addRoute(luid winipcfg.LUID, dst netip.Prefix, next netip.Addr) error {
+	var err error
+	for try := 0; try < 15; try++ {
+		err = luid.AddRoute(dst, next, 0)
+		if err == nil || errors.Is(err, windows.ERROR_OBJECT_ALREADY_EXISTS) {
+			return nil
+		}
+		if !errors.Is(err, windows.ERROR_NOT_FOUND) {
+			return err
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	return err
 }
 
 // close убирает то, что не исчезает вместе с адаптером. Сам адаптер к этому
