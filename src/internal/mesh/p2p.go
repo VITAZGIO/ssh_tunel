@@ -698,7 +698,7 @@ func (p *p2p) adopt(peerIP string, conn quic.Connection) {
 	p.report()
 }
 
-func (p *p2p) drop(peerIP string, conn quic.Connection) {
+func (p *p2p) drop(peerIP string, conn quic.Connection, why error) {
 	p.mu.Lock()
 	peer := p.peers[peerIP]
 	gone := peer != nil && peer.conn == conn
@@ -709,7 +709,7 @@ func (p *p2p) drop(peerIP string, conn quic.Connection) {
 	p.mu.Unlock()
 	conn.CloseWithError(0, "")
 	if gone {
-		p.c.log("info", "Сеть устройств: прямое соединение с "+peerIP+" пропало — дальше через сервер")
+		p.c.log("info", fmt.Sprintf("Сеть устройств: прямое соединение с %s пропало (%v) — дальше через сервер", peerIP, why))
 		p.report()
 	}
 }
@@ -720,7 +720,7 @@ func (p *p2p) serve(peerIP string, conn quic.Connection) {
 	for {
 		str, err := conn.AcceptStream(p.ctx)
 		if err != nil {
-			p.drop(peerIP, conn)
+			p.drop(peerIP, conn, err)
 			return
 		}
 		go p.handleStream(peerIP, conn, str)
@@ -744,22 +744,23 @@ func (p *p2p) handleStream(peerIP string, conn quic.Connection, str quic.Stream)
 	}
 	str.SetReadDeadline(time.Time{})
 	port := int(binary.BigEndian.Uint16(hdr[1:3]))
+	reply := func(code byte) {
+		str.Write([]byte{code})
+		finishStream(str)
+	}
 	if port == 0 { // замер задержки
-		str.Write([]byte{streamOK})
-		str.Close()
+		reply(streamOK)
 		return
 	}
 	if !p.c.cfg.AllowIncoming {
-		str.Write([]byte{streamRefused})
-		str.Close()
+		reply(streamRefused)
 		return
 	}
 	ctx, cancel := context.WithTimeout(p.ctx, 5*time.Second)
 	local, err := p.c.LocalDial(ctx, port)
 	cancel()
 	if err != nil {
-		str.Write([]byte{streamNoListen})
-		str.Close()
+		reply(streamNoListen)
 		return
 	}
 	str.Write([]byte{streamOK})
@@ -782,7 +783,7 @@ func (p *p2p) dialDirect(peerIP string, port int) (net.Conn, error) {
 	}
 	str, err := p.openStream(conn, port)
 	if err != nil {
-		p.drop(peerIP, conn)
+		p.drop(peerIP, conn, fmt.Errorf("новый поток: %w", err))
 		return nil, nil
 	}
 	var status [1]byte
@@ -790,15 +791,16 @@ func (p *p2p) dialDirect(peerIP string, port int) (net.Conn, error) {
 	if _, err := io.ReadFull(str, status[:]); err != nil {
 		str.CancelRead(0)
 		str.Close()
+		p.drop(peerIP, conn, fmt.Errorf("устройство не ответило: %w", err))
 		return nil, nil
 	}
 	str.SetReadDeadline(time.Time{})
 	switch status[0] {
 	case streamRefused:
-		str.Close()
+		finishStream(str)
 		return nil, errors.New("устройство не принимает входящие соединения")
 	case streamNoListen:
-		str.Close()
+		finishStream(str)
 		return nil, fmt.Errorf("на устройстве ничего не слушает порт %d", port)
 	}
 	return streamConn{str, conn}, nil
@@ -838,10 +840,10 @@ func (p *p2p) measure(peerIP string) bool {
 		var b [1]byte
 		str.SetReadDeadline(time.Now().Add(5 * time.Second))
 		_, err = io.ReadFull(str, b[:])
-		str.Close()
+		finishStream(str)
 	}
 	if err != nil {
-		p.drop(peerIP, conn)
+		p.drop(peerIP, conn, fmt.Errorf("замер задержки: %w", err))
 		return false
 	}
 	rtt := time.Since(start)
@@ -897,6 +899,19 @@ func (p *p2p) direct(peerIP string) (bool, time.Duration) {
 		return true, peer.rtt
 	}
 	return false, 0
+}
+
+// finishStream закрывает поток до конца: своё направление — закрытием,
+// встречное — дочитав до конца (FIN) от собеседника. Недочитанный поток QUIC
+// считает живым, а живых потоков у соединения не больше 100: раньше замеры
+// задержки раз в 15 секунд за ~25 минут выбирали лимит, и прямое соединение
+// обрывалось.
+func finishStream(str quic.Stream) {
+	str.Close()
+	str.SetReadDeadline(time.Now().Add(5 * time.Second))
+	if _, err := io.Copy(io.Discard, io.LimitReader(str, 1<<16)); err != nil {
+		str.CancelRead(0)
+	}
 }
 
 // streamConn — поток QUIC как net.Conn.

@@ -2,6 +2,7 @@ package vpnlayer
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net/netip"
 	"sync"
@@ -175,27 +176,17 @@ func (s *sys) configure() error {
 		{windows.AF_INET6, adapterPrefix6, routes6, netip.IPv6Unspecified()},
 	}
 	for _, f := range families {
-		if err := luid.SetIPAddressesForFamily(f.family, []netip.Prefix{f.prefix}); err != nil {
-			return fmt.Errorf("адрес %s: %w", f.prefix, err)
+		err := configureFamily(luid, f.family, f.prefix, f.routes, f.next)
+		// «Element not found» на IPv6 — на компьютере выключен IPv6 (галочка
+		// в свойствах адаптера или DisabledComponents в реестре): у адаптера
+		// просто нет IPv6-интерфейса. Работаем по IPv4, как WireGuard.
+		if f.family == windows.AF_INET6 && errors.Is(err, windows.ERROR_NOT_FOUND) {
+			s.bus.Warnf("IPv6 на этом компьютере выключен — VPN работает только по IPv4. " +
+				"Если IPv6 выключен лишь у адаптера VPN, а у сетевой карты включён, IPv6-соединения пойдут мимо туннеля.")
+			continue
 		}
-		var rd []*winipcfg.RouteData
-		for _, r := range f.routes {
-			rd = append(rd, &winipcfg.RouteData{Destination: r, NextHop: f.next, Metric: 0})
-		}
-		if err := luid.SetRoutesForFamily(f.family, rd); err != nil {
-			return fmt.Errorf("маршруты: %w", err)
-		}
-		ipif, err := luid.IPInterface(f.family)
 		if err != nil {
 			return err
-		}
-		ipif.UseAutomaticMetric = false
-		ipif.Metric = 0
-		ipif.NLMTU = adapterMTU
-		ipif.DadTransmits = 0
-		ipif.RouterDiscoveryBehavior = winipcfg.RouterDiscoveryDisabled
-		if err := ipif.Set(); err != nil {
-			return fmt.Errorf("метрика адаптера: %w", err)
 		}
 	}
 	if err := luid.SetDNS(windows.AF_INET, []netip.Addr{dnsAddr}, nil); err != nil {
@@ -210,6 +201,38 @@ func (s *sys) configure() error {
 		s.bus.Warnf("Не удалось запретить DNS мимо VPN (%v): возможна утечка DNS-запросов провайдеру", err)
 	} else {
 		s.guard = guard
+	}
+	return nil
+}
+
+// configureFamily — адрес, маршруты и метрика адаптера для одного семейства
+// адресов (IPv4 или IPv6).
+func configureFamily(luid winipcfg.LUID, family winipcfg.AddressFamily, prefix netip.Prefix, routes []netip.Prefix, next netip.Addr) error {
+	name := "IPv4"
+	if family == windows.AF_INET6 {
+		name = "IPv6"
+	}
+	if err := luid.SetIPAddressesForFamily(family, []netip.Prefix{prefix}); err != nil {
+		return fmt.Errorf("%s, адрес %s: %w", name, prefix, err)
+	}
+	var rd []*winipcfg.RouteData
+	for _, r := range routes {
+		rd = append(rd, &winipcfg.RouteData{Destination: r, NextHop: next, Metric: 0})
+	}
+	if err := luid.SetRoutesForFamily(family, rd); err != nil {
+		return fmt.Errorf("%s, маршруты: %w", name, err)
+	}
+	ipif, err := luid.IPInterface(family)
+	if err != nil {
+		return fmt.Errorf("%s, интерфейс адаптера: %w", name, err)
+	}
+	ipif.UseAutomaticMetric = false
+	ipif.Metric = 0
+	ipif.NLMTU = adapterMTU
+	ipif.DadTransmits = 0
+	ipif.RouterDiscoveryBehavior = winipcfg.RouterDiscoveryDisabled
+	if err := ipif.Set(); err != nil {
+		return fmt.Errorf("%s, метрика адаптера: %w", name, err)
 	}
 	return nil
 }

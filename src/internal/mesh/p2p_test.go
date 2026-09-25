@@ -257,3 +257,31 @@ func TestЛокальныйАдресЧерезМаршрут(t *testing.T) {
 		t.Fatalf("адрес в сторону 127.0.0.1: %v %v", ip, ok)
 	}
 }
+
+// Замеры задержки не копят незакрытые потоки: у QUIC лимит одновременных
+// потоков (100), и раньше примерно через 100 замеров (≈25 минут) прямое
+// соединение «пропадало».
+func TestПрямоеСоединениеДолгаяЖизнь(t *testing.T) {
+	addr, _, _ := startMeshdSTUN(t)
+	key := NewKey()
+	a, _ := startClientLog(t, addr, Config{Key: key, Name: "a", Via: "127.0.0.1", AllowIncoming: true})
+	b, _ := startClientLog(t, addr, Config{Key: key, Name: "b", Via: "127.0.0.1", AllowIncoming: true})
+	bIP := b.Status().Self.IP.String()
+	waitLong(t, 15*time.Second, func() bool { return peerStatus(a, bIP).Direct }, "прямое соединение не установилось")
+	p := a.direct()
+	for i := 0; i < 250; i++ {
+		if !p.measure(bIP) {
+			t.Fatalf("замер %d не прошёл — соединение сброшено", i+1)
+		}
+	}
+	// И обычные соединения, в том числе отказы, тоже не копятся.
+	for i := 0; i < 150; i++ {
+		c, err := p.dialDirect(bIP, 1) // порт 1 никто не слушает
+		if c != nil || err == nil {
+			t.Fatalf("соединение %d: ожидался отказ, получено %v %v", i+1, c, err)
+		}
+	}
+	if !peerStatus(a, bIP).Direct {
+		t.Fatal("прямое соединение пропало")
+	}
+}
