@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"os"
+	"os/user"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -332,6 +333,15 @@ func baseDir() string {
 	base, err := os.UserConfigDir()
 	if err != nil {
 		home, _ := os.UserHomeDir()
+		if home == "" {
+			// Служба systemd без User= запускается без $HOME: тогда путь вышел
+			// бы относительным («.config» от корня диска), программа не нашла
+			// бы своих настроек и падала по кругу. Домашняя папка — из списка
+			// пользователей системы.
+			if u, err := user.Current(); err == nil {
+				home = u.HomeDir
+			}
+		}
 		base = filepath.Join(home, ".config")
 	}
 	return base

@@ -156,3 +156,15 @@ func TestТонкаяНастройкаВГраницах(t *testing.T) {
 		t.Fatalf("ноль и допустимые значения должны сохраниться: %+v", p)
 	}
 }
+
+// Служба systemd без User= запускается без $HOME и $XDG_CONFIG_HOME:
+// папка настроек всё равно должна быть настоящей домашней, а не «.config»
+// от текущей папки.
+func TestDirБезHOME(t *testing.T) {
+	t.Setenv("HOME", "")
+	t.Setenv("XDG_CONFIG_HOME", "")
+	d := Dir()
+	if !filepath.IsAbs(d) || d == filepath.Join("/", ".config", "ssh_tunnel") {
+		t.Fatalf("папка настроек без HOME: %q", d)
+	}
+}

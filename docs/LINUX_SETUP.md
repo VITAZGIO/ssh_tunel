@@ -87,6 +87,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+# У системной службы нет $HOME — без этой строки старые версии не находили
+# настроек в /root/.config и перезапускались по кругу.
+Environment=HOME=/root
 ExecStart=/usr/local/bin/ssh_tunnel_linux -web -web-lan
 Restart=always
 RestartSec=5
