@@ -50,8 +50,10 @@ chmod +x ssh_tunnel_linux
 ```bash
 B=ssh_tunnel_linux        # или: B=ssh_tunnel_vpn_linux
 F=$B; [ "$(uname -m)" = aarch64 ] && F=${B}_arm64
-sudo curl -fL -o /usr/local/bin/$B https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
-sudo chmod +x /usr/local/bin/$B
+# через /tmp: работающую программу поверх не записать («Text file busy»),
+# а install ставит новый файл на её место — так блок годится и для обновления
+curl -fL -o /tmp/$B https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
+sudo install -m 755 /tmp/$B /usr/local/bin/$B && rm -f /tmp/$B
 
 printf '%s\n' '[Unit]' 'Description=ssh_tunnel' 'After=network-online.target' 'Wants=network-online.target' '' \
   '[Service]' 'Environment=HOME=/root' "ExecStart=/usr/local/bin/$B -web -web-lan" 'Restart=always' 'RestartSec=5' '' \
