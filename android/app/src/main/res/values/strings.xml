@@ -211,6 +211,11 @@
     <string name="mesh_state_connecting">Подключаюсь</string>
     <string name="mesh_state_error">Нет связи с сервером сети</string>
     <string name="mesh_state_pending">Включится при следующем подключении — переподключи туннель</string>
+    <string name="mesh_nat">Проверка прямых соединений</string>
+    <string name="nat_easy">простой NAT</string>
+    <string name="nat_hard">жёсткий NAT</string>
+    <string name="nat_open">открытый</string>
+    <string name="nat_udp_blocked">UDP до сервера не проходит</string>
     <string name="mesh_state_stopped">Туннель выключен</string>
     <string name="mesh_cancel">Отмена</string>
 </resources>

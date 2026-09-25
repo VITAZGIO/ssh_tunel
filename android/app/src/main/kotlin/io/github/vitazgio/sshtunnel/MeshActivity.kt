@@ -152,6 +152,7 @@ class MeshActivity : AppCompatActivity() {
             text += " — " + self.optString("host") + ".mesh (" + self.optString("ip") + ")"
         }
         o.optString("error").takeIf { it.isNotBlank() }?.let { text += ": $it" }
+        o.optJSONObject("nat")?.let { text += "\n" + getString(R.string.mesh_nat) + ": " + natText(it) }
         stateView.text = text
 
         peersBox.removeAllViews()
@@ -160,6 +161,20 @@ class MeshActivity : AppCompatActivity() {
             val peer = peers.getJSONObject(i)
             peersBox.addView(peerRow(peer))
         }
+    }
+
+    /** Итог проверки NAT одной строкой (см. internal/mesh/natprobe.go). */
+    private fun natText(n: JSONObject): String {
+        if (!n.optBoolean("udp")) return getString(R.string.nat_udp_blocked)
+        var s = when (n.optString("mapping")) {
+            "independent" -> getString(R.string.nat_easy)
+            "dependent" -> getString(R.string.nat_hard)
+            else -> "?"
+        }
+        if (n.optString("filtering") == "open") s += ", " + getString(R.string.nat_open)
+        if (n.optBoolean("ipv6")) s += ", IPv6"
+        n.optString("publicIp").takeIf { it.isNotBlank() }?.let { s += " · $it" }
+        return s
     }
 
     private fun peerRow(peer: JSONObject): View {

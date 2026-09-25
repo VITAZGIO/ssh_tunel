@@ -16,22 +16,23 @@ import (
 )
 
 type adminDev struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Alias       string  `json:"alias"`
-	Display     string  `json:"display"`
-	Host        string  `json:"host"`
-	Online      bool    `json:"online"`
-	Platform    string  `json:"platform"`
-	App         string  `json:"app"`
-	Mode        string  `json:"mode"`
-	Via         string  `json:"via"`
-	RTTMs       float64 `json:"rttMs"`
-	Quality     string  `json:"quality"`
-	BytesUp     int64   `json:"bytesUp"`
-	BytesDown   int64   `json:"bytesDown"`
-	Sessions    int64   `json:"sessions"`
-	ConnectedAt int64   `json:"connectedAt"`
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Alias       string   `json:"alias"`
+	Display     string   `json:"display"`
+	Host        string   `json:"host"`
+	Online      bool     `json:"online"`
+	Platform    string   `json:"platform"`
+	App         string   `json:"app"`
+	Mode        string   `json:"mode"`
+	Via         string   `json:"via"`
+	RTTMs       float64  `json:"rttMs"`
+	Quality     string   `json:"quality"`
+	BytesUp     int64    `json:"bytesUp"`
+	BytesDown   int64    `json:"bytesDown"`
+	Sessions    int64    `json:"sessions"`
+	ConnectedAt int64    `json:"connectedAt"`
+	NAT         *NATInfo `json:"nat"`
 }
 
 type adminStateResp struct {

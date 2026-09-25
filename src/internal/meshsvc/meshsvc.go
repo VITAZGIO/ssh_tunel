@@ -146,6 +146,11 @@ systemctl daemon-reload
 systemctl enable meshd.service
 systemctl restart meshd.service
 echo "meshd запущен"
+# Проверка NAT (сможет ли устройство соединяться с другими напрямую) —
+# UDP 3478-3479. Открываем, только если брандмауэр ufw включён.
+if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+  ufw allow 3478:3479/udp comment 'ssh_tunnel meshd: проверка NAT' >/dev/null && echo "брандмауэр: открыт UDP 3478-3479 для проверки NAT"
+fi
 `, downloadURL(version), marker, Source, marker, UplinkUnitName, strings.TrimRight(Unit(), "\n")) + FirewallExemption
 }
 

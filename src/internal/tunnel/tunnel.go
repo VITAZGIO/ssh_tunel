@@ -437,7 +437,19 @@ func (t *Tunnel) startMesh(ctx context.Context) {
 		t.mesh.Store(nil)
 		return
 	}
-	c := mesh.New(*cfg, t.Dial, func(level, text string) {
+	mc := *cfg
+	// Проверка NAT идёт мимо туннеля — теми же сокетами, что и соединения
+	// «напрямую» (на Android и в режиме VPN они помечены).
+	if mc.ProbeListen == nil {
+		lc := net.ListenConfig{Control: t.cfg.ProtectSocket}
+		mc.ProbeListen = func(network string) (net.PacketConn, error) {
+			return lc.ListenPacket(context.Background(), network, ":0")
+		}
+	}
+	if mc.ProbeResolver == nil {
+		mc.ProbeResolver = t.cfg.Resolver
+	}
+	c := mesh.New(mc, t.Dial, func(level, text string) {
 		if level == "warn" {
 			t.bus.Warnf("%s", text)
 		} else {

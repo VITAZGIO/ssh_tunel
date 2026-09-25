@@ -49,6 +49,7 @@ import (
 	"bufio"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -135,6 +136,11 @@ type msg struct {
 	// какие устройства пришли через него.
 	Addrs []string `json:"addrs,omitempty"`
 
+	// Stun — порты проверки NAT на этом сервере (в welcome устройству).
+	Stun []int `json:"stun,omitempty"`
+	// NAT — результат проверки NAT, который устройство прислало о себе.
+	NAT *natInfo `json:"nat,omitempty"`
+
 	// T — метка времени (наносекунды) в ping/pong для замера задержки.
 	T int64 `json:"t,omitempty"`
 }
@@ -169,8 +175,10 @@ type device struct {
 	Via       string    `json:"via,omitempty"`
 	Hostname  string    `json:"hostname,omitempty"`
 	Sessions  int64     `json:"sessions,omitempty"`
-	BytesUp   int64     `json:"bytesUp,omitempty"`
-	BytesDown int64     `json:"bytesDown,omitempty"`
+	// NAT — последняя проверка NAT с этого устройства (см. проверку NAT).
+	NAT       *natInfo `json:"nat,omitempty"`
+	BytesUp   int64    `json:"bytesUp,omitempty"`
+	BytesDown int64    `json:"bytesDown,omitempty"`
 
 	ctrl        *ctrlConn
 	connectedAt time.Time
@@ -270,6 +278,8 @@ type server struct {
 	// серверов (постоянные, как у устройств). Хранятся в servers.json.
 	self      selfConfig
 	relayRecs map[string]*relayRecord
+	// stunPorts — порты проверки NAT (UDP), если она включена.
+	stunPorts []int
 	path      string
 	saveMu    sync.Mutex
 	dirty     chan struct{}
@@ -661,7 +671,7 @@ func (s *server) control(conn net.Conn, m msg) {
 	d.connectedAt = now
 	d.link = linkStats{}
 	d.ctrl = c
-	c.send(msg{Op: "welcome", V: protoVersion, IP: d.IP, Host: d.Host, Peers: s.peersLocked(n)})
+	c.send(msg{Op: "welcome", V: protoVersion, IP: d.IP, Host: d.Host, Peers: s.peersLocked(n), Stun: s.stunPorts})
 	s.broadcastLocked(n)
 	s.mu.Unlock()
 	s.markDirty()
@@ -672,6 +682,16 @@ func (s *server) control(conn net.Conn, m msg) {
 			f(&d.link)
 		}
 		s.mu.Unlock()
+	}, func(in msg) {
+		if in.Op == "nat" && in.NAT != nil {
+			info := in.NAT.clean()
+			s.mu.Lock()
+			if d.ctrl == c {
+				d.NAT = &info
+			}
+			s.mu.Unlock()
+			s.markDirty()
+		}
 	})
 
 	s.mu.Lock()
@@ -691,7 +711,7 @@ func (s *server) control(conn net.Conn, m msg) {
 // Замер: сервер шлёт ping с меткой времени, другая сторона возвращает её в
 // pong. Старые клиенты незнакомое сообщение пропускают — у них задержка
 // просто остаётся неизвестной.
-func (s *server) keepAlive(conn net.Conn, c *ctrlConn, link func(func(*linkStats))) {
+func (s *server) keepAlive(conn net.Conn, c *ctrlConn, link func(func(*linkStats)), other func(msg)) {
 	stopPing := make(chan struct{})
 	defer close(stopPing)
 	go func() {
@@ -732,6 +752,10 @@ func (s *server) keepAlive(conn net.Conn, c *ctrlConn, link func(func(*linkStats
 				if rtt >= 0 && rtt < time.Minute {
 					link(func(l *linkStats) { l.add(rtt) })
 				}
+			}
+		default:
+			if other != nil {
+				other(in)
 			}
 		}
 	}
@@ -794,7 +818,7 @@ func (s *server) relayLink(conn net.Conn, m msg) {
 			f(&r.link)
 		}
 		s.mu.Unlock()
-	})
+	}, nil)
 
 	s.mu.Lock()
 	if s.relays[id] == r {
@@ -976,31 +1000,32 @@ func (c countingReader) Read(p []byte) (int, error) {
 
 // adminDevice — устройство глазами панели.
 type adminDevice struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Alias       string  `json:"alias,omitempty"`
-	Display     string  `json:"display"`
-	Host        string  `json:"host"`
-	IP          string  `json:"ip"`
-	Online      bool    `json:"online"`
-	Platform    string  `json:"platform,omitempty"`
-	OS          string  `json:"os,omitempty"`
-	App         string  `json:"app,omitempty"`
-	Mode        string  `json:"mode,omitempty"`
-	Via         string  `json:"via,omitempty"`
-	Hostname    string  `json:"hostname,omitempty"`
-	FirstSeen   int64   `json:"firstSeen,omitempty"`
-	LastSeen    int64   `json:"lastSeen,omitempty"`
-	ConnectedAt int64   `json:"connectedAt,omitempty"`
-	Sessions    int64   `json:"sessions"`
-	RTTMs       float64 `json:"rttMs,omitempty"`
-	RTTAvgMs    float64 `json:"rttAvgMs,omitempty"`
-	JitterMs    float64 `json:"jitterMs,omitempty"`
-	LossPct     float64 `json:"lossPct"`
-	Quality     string  `json:"quality"`
-	BytesUp     int64   `json:"bytesUp"`
-	BytesDown   int64   `json:"bytesDown"`
-	ActiveCalls int64   `json:"activeCalls"`
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Alias       string   `json:"alias,omitempty"`
+	Display     string   `json:"display"`
+	Host        string   `json:"host"`
+	IP          string   `json:"ip"`
+	Online      bool     `json:"online"`
+	Platform    string   `json:"platform,omitempty"`
+	OS          string   `json:"os,omitempty"`
+	App         string   `json:"app,omitempty"`
+	Mode        string   `json:"mode,omitempty"`
+	Via         string   `json:"via,omitempty"`
+	Hostname    string   `json:"hostname,omitempty"`
+	FirstSeen   int64    `json:"firstSeen,omitempty"`
+	LastSeen    int64    `json:"lastSeen,omitempty"`
+	ConnectedAt int64    `json:"connectedAt,omitempty"`
+	Sessions    int64    `json:"sessions"`
+	RTTMs       float64  `json:"rttMs,omitempty"`
+	RTTAvgMs    float64  `json:"rttAvgMs,omitempty"`
+	JitterMs    float64  `json:"jitterMs,omitempty"`
+	LossPct     float64  `json:"lossPct"`
+	Quality     string   `json:"quality"`
+	BytesUp     int64    `json:"bytesUp"`
+	BytesDown   int64    `json:"bytesDown"`
+	ActiveCalls int64    `json:"activeCalls"`
+	NAT         *natInfo `json:"nat,omitempty"`
 }
 
 type adminNetwork struct {
@@ -1064,6 +1089,7 @@ func (s *server) adminState() adminState {
 				Platform: d.Platform, OS: d.OS, App: d.App, Mode: d.Mode, Via: d.Via,
 				Hostname: d.Hostname, FirstSeen: unixOrZero(d.FirstSeen), LastSeen: unixOrZero(d.LastSeen),
 				Sessions:  d.Sessions,
+				NAT:       d.NAT,
 				BytesUp:   d.BytesUp + d.up.Load(),
 				BytesDown: d.BytesDown + d.down.Load(),
 				Quality:   "unknown",
@@ -1566,6 +1592,186 @@ func (s *server) serveCall(conn, peerConn net.Conn, from *device) {
 	s.markDirty()
 }
 
+// ---------- проверка NAT (STUN) ----------
+//
+// Чтобы понять, смогут ли два устройства когда-нибудь соединиться напрямую,
+// каждое проверяет свой NAT: шлёт сюда запрос на один порт, потом на второй,
+// и сравнивает, с какого внешнего адреса пришло. Формат — стандартный STUN
+// (RFC 5389/5780): тот же, что у видеозвонков, ничем не выделяется.
+//
+// Сервер только отвечает «ты пришёл с такого адреса» — с того же порта или,
+// по просьбе, с другого (проверка фильтрации). Ответ не намного больше
+// запроса, а частота ограничена по адресу: для усиления атак он бесполезен.
+
+const (
+	stunMagic       = 0x2112A442
+	stunBindReq     = 0x0001
+	stunBindResp    = 0x0101
+	stunAttrMapped  = 0x0020 // XOR-MAPPED-ADDRESS
+	stunAttrChange  = 0x0003 // CHANGE-REQUEST
+	stunChangePort  = 0x02
+	stunMinRequest  = 28 // заголовок + CHANGE-REQUEST: без него не отвечаем
+	stunPerIPPerSec = 30
+)
+
+func (s *server) serveSTUN(spec string) error {
+	var conns []net.PacketConn
+	var ports []int
+	for _, p := range strings.Split(spec, ",") {
+		port, err := atoiStrict(strings.TrimSpace(p))
+		if err != nil || port < 0 || port > 65535 {
+			return errors.New("неверный порт проверки NAT: " + p)
+		}
+		// 0 — любой свободный (для тестов).
+		pc, err := net.ListenPacket("udp", ":"+itoa(port))
+		if err != nil {
+			for _, c := range conns {
+				c.Close()
+			}
+			return err
+		}
+		conns = append(conns, pc)
+		ports = append(ports, pc.LocalAddr().(*net.UDPAddr).Port)
+	}
+	s.mu.Lock()
+	s.stunPorts = ports
+	s.mu.Unlock()
+	lim := &stunLimiter{seen: map[string]int{}}
+	for i, pc := range conns {
+		other := conns[(i+1)%len(conns)]
+		go stunLoop(pc, other, lim)
+	}
+	names := make([]string, len(ports))
+	for i, p := range ports {
+		names[i] = itoa(p)
+	}
+	log.Printf("проверка NAT: UDP %s", strings.Join(names, ","))
+	return nil
+}
+
+type stunLimiter struct {
+	mu     sync.Mutex
+	second int64
+	seen   map[string]int
+}
+
+func (l *stunLimiter) allow(ip string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := time.Now().Unix()
+	if now != l.second {
+		l.second = now
+		clear(l.seen)
+	}
+	l.seen[ip]++
+	return l.seen[ip] <= stunPerIPPerSec
+}
+
+func stunLoop(pc, other net.PacketConn, lim *stunLimiter) {
+	buf := make([]byte, 1500)
+	for {
+		n, from, err := pc.ReadFrom(buf)
+		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				return
+			}
+			continue
+		}
+		ua, ok := from.(*net.UDPAddr)
+		if !ok || !lim.allow(ua.IP.String()) {
+			continue
+		}
+		resp, changePort, ok := stunAnswer(buf[:n], ua)
+		if !ok {
+			continue
+		}
+		out := pc
+		if changePort {
+			out = other
+		}
+		out.WriteTo(resp, from)
+	}
+}
+
+// stunAnswer разбирает запрос и собирает ответ с адресом отправителя.
+func stunAnswer(req []byte, from *net.UDPAddr) ([]byte, bool, bool) {
+	if len(req) < stunMinRequest || len(req) > 512 {
+		return nil, false, false
+	}
+	if binary.BigEndian.Uint16(req[0:2]) != stunBindReq || binary.BigEndian.Uint32(req[4:8]) != stunMagic {
+		return nil, false, false
+	}
+	if int(binary.BigEndian.Uint16(req[2:4]))+20 != len(req) {
+		return nil, false, false
+	}
+	changePort := false
+	for a := req[20:]; len(a) >= 4; {
+		typ, l := binary.BigEndian.Uint16(a[0:2]), int(binary.BigEndian.Uint16(a[2:4]))
+		padded := (l + 3) &^ 3
+		if 4+padded > len(a) {
+			return nil, false, false
+		}
+		if typ == stunAttrChange && l == 4 {
+			changePort = a[7]&stunChangePort != 0
+		}
+		a = a[4+padded:]
+	}
+	ip := from.IP.To4()
+	family := byte(1)
+	if ip == nil {
+		ip, family = from.IP.To16(), 2
+	}
+	attr := make([]byte, 4+4+len(ip))
+	binary.BigEndian.PutUint16(attr[0:2], stunAttrMapped)
+	binary.BigEndian.PutUint16(attr[2:4], uint16(4+len(ip)))
+	attr[5] = family
+	binary.BigEndian.PutUint16(attr[6:8], uint16(from.Port)^uint16(stunMagic>>16))
+	key := append([]byte{}, req[4:20]...) // cookie + id транзакции
+	for i := range ip {
+		attr[8+i] = ip[i] ^ key[i]
+	}
+	resp := make([]byte, 20, 20+len(attr))
+	binary.BigEndian.PutUint16(resp[0:2], stunBindResp)
+	binary.BigEndian.PutUint16(resp[2:4], uint16(len(attr)))
+	copy(resp[4:20], req[4:20])
+	return append(resp, attr...), changePort, true
+}
+
+// natInfo — результат проверки NAT, который присылает устройство.
+type natInfo struct {
+	Tested        int64  `json:"tested"`
+	UDP           bool   `json:"udp"`
+	Mapping       string `json:"mapping,omitempty"`   // independent / dependent
+	Filtering     string `json:"filtering,omitempty"` // open / restricted
+	PublicIP      string `json:"publicIp,omitempty"`
+	PortPreserved bool   `json:"portPreserved,omitempty"`
+	PortDelta     int    `json:"portDelta,omitempty"`
+	IPv6          bool   `json:"ipv6,omitempty"`
+	Network       string `json:"network,omitempty"` // wifi / mobile / ethernet — если устройство знает
+}
+
+func (n natInfo) clean() natInfo {
+	pick := func(v string, ok ...string) string {
+		for _, o := range ok {
+			if v == o {
+				return v
+			}
+		}
+		return ""
+	}
+	n.Mapping = pick(n.Mapping, "independent", "dependent")
+	n.Filtering = pick(n.Filtering, "open", "restricted")
+	n.Network = clip(n.Network)
+	if _, err := netip.ParseAddr(n.PublicIP); err != nil {
+		n.PublicIP = ""
+	}
+	if n.PortDelta < -1000 || n.PortDelta > 1000 {
+		n.PortDelta = 0
+	}
+	n.Tested = time.Now().Unix()
+	return n
+}
+
 func randomID() string {
 	var b [12]byte
 	rand.Read(b[:])
@@ -1576,6 +1782,7 @@ func main() {
 	listen := flag.String("listen", "127.0.0.1:47831", "адрес, на котором слушать (только localhost)")
 	state := flag.String("state", "/var/lib/meshd/state.json", "где хранить адреса устройств")
 	admin := flag.String("admin", "", "unix-сокет для панели на сервере (пусто — выключен)")
+	stun := flag.String("stun", "3478,3479", "UDP-порты проверки NAT для устройств (пусто — выключена)")
 	showVersion := flag.Bool("version", false, "напечатать версию и выйти")
 	flag.Parse()
 	if *showVersion {
@@ -1593,6 +1800,11 @@ func main() {
 
 	s := newServer(*state)
 	go s.saveLoop()
+	if *stun != "" {
+		if err := s.serveSTUN(*stun); err != nil {
+			log.Printf("проверка NAT не запустилась (%v) — сеть работает без неё", err)
+		}
+	}
 	if *admin != "" {
 		if err := s.serveAdmin(*admin); err != nil {
 			log.Printf("вход для панели не открылся (%v) — сеть работает, но панель её не увидит", err)

@@ -212,6 +212,11 @@
     <string name="mesh_state_connecting">Connecting</string>
     <string name="mesh_state_error">No connection to the network service</string>
     <string name="mesh_state_pending">Turns on with the next connection — reconnect the tunnel</string>
+    <string name="mesh_nat">Direct connection check</string>
+    <string name="nat_easy">easy NAT</string>
+    <string name="nat_hard">hard NAT</string>
+    <string name="nat_open">open</string>
+    <string name="nat_udp_blocked">UDP to the server is blocked</string>
     <string name="mesh_state_stopped">Tunnel is off</string>
     <string name="mesh_cancel">Cancel</string>
 </resources>

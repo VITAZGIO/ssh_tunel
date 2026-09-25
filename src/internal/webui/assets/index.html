@@ -1333,6 +1333,7 @@ const I18N = {
       'знают. Трафик мимо сервера не уходит даже пока связь переподключается: соединения ждут восстановления, а '+
       'не утекают напрямую. DNS тоже не утекает — имена разрешаются на сервере. Мимо туннеля — только то, что ты '+
       'сам разрешил: «Всегда напрямую», локальная сеть и программы из правил.',
+    mesh_nat:'Проверка прямых соединений', nat_easy:'простой NAT', nat_hard:'жёсткий NAT', nat_open:'открытый', nat_udp_blocked:'UDP до сервера не проходит',
     mesh_title:'Сеть устройств', mesh_devices:'Устройства', mesh_enable:'Включить сеть устройств на этом сервере',
     mesh_name:'Имя этого устройства', mesh_key:'Ключ сети', mesh_copy:'Скопировать', mesh_new:'Создать новую сеть',
     mesh_incoming:'Пускать другие устройства к моим службам',
@@ -1559,6 +1560,7 @@ const I18N = {
       'know nothing about proxies. Traffic does not leave past the server even while the link reconnects: '+
       'connections wait for it instead of leaking directly. DNS does not leak either — names are resolved on the '+
       'server. Only what you allowed goes around the tunnel: "Always direct", the local network and program rules.',
+    mesh_nat:'Direct connection check', nat_easy:'easy NAT', nat_hard:'hard NAT', nat_open:'open', nat_udp_blocked:'UDP to the server is blocked',
     mesh_title:'Device network', mesh_devices:'Devices', mesh_enable:'Turn on the device network on this server',
     mesh_name:'This device name', mesh_key:'Network key', mesh_copy:'Copy', mesh_new:'Create a new network',
     mesh_incoming:'Let other devices reach my services',
@@ -2788,6 +2790,15 @@ async function pollMesh(){
   renderMesh(st);
 }
 
+// natText — итог проверки NAT одной строкой (см. internal/mesh/natprobe.go).
+function natText(n){
+  if(!n.udp) return tr('nat_udp_blocked');
+  let s = n.mapping === 'independent' ? tr('nat_easy') : n.mapping === 'dependent' ? tr('nat_hard') : '?';
+  if(n.filtering === 'open') s += ', ' + tr('nat_open');
+  if(n.ipv6) s += ', IPv6';
+  return s + (n.publicIp ? ' · ' + n.publicIp : '');
+}
+
 function renderMesh(st){
   const peers = (st.peers || []);
   const online = peers.filter(p => p.online).length;
@@ -2795,7 +2806,9 @@ function renderMesh(st){
   let state = tr('mesh_state_' + st.state) || st.state;
   if(st.state === 'online' && st.self && st.self.host) state += ' — ' + st.self.host + '.mesh (' + st.self.ip + ')';
   if(st.error) state += ': ' + st.error;
+  if(st.nat) state += '\n' + tr('mesh_nat') + ': ' + natText(st.nat);
   $('meshState').textContent = state;
+  $('meshState').style.whiteSpace = 'pre-line';
   const box = $('meshPeers');
   box.innerHTML = '';
   peers.forEach(p => {

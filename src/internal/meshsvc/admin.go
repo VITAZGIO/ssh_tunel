@@ -39,6 +39,19 @@ type Device struct {
 	BytesUp     int64   `json:"bytesUp"`
 	BytesDown   int64   `json:"bytesDown"`
 	ActiveCalls int64   `json:"activeCalls"`
+	NAT         *NAT    `json:"nat,omitempty"`
+}
+
+// NAT — что устройство узнало о своём NAT (см. mesh.NATInfo).
+type NAT struct {
+	Tested        int64  `json:"tested"`
+	UDP           bool   `json:"udp"`
+	Mapping       string `json:"mapping,omitempty"`
+	Filtering     string `json:"filtering,omitempty"`
+	PublicIP      string `json:"publicIp,omitempty"`
+	PortPreserved bool   `json:"portPreserved,omitempty"`
+	PortDelta     int    `json:"portDelta,omitempty"`
+	IPv6          bool   `json:"ipv6,omitempty"`
 }
 
 // Network — одна сеть (все устройства с одинаковым ключом).

@@ -111,6 +111,11 @@
   .badge.ok{background:rgba(47,191,113,.15);color:var(--ok)}
   .badge.warn{background:rgba(232,179,57,.16);color:var(--warn)}
   .badge.dim{background:rgba(130,139,158,.16);color:var(--dim)}
+  .badge.err{background:rgba(229,72,77,.14);color:var(--err)}
+  .fc-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}
+  .fc-row:last-child{border-bottom:none}
+  .fc-row .p{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .fc-row .why{color:var(--dim);font-size:11.5px;white-space:normal}
 
   .empty{text-align:center;color:var(--dim);padding:26px 10px;font-size:13px}
 
@@ -683,6 +688,13 @@
         </div>
 
         <div class="card">
+          <h1><span data-i18n="fc_title">Прямые соединения: прогноз</span><button class="hint" data-hint="hint_fc">?</button></h1>
+          <p class="note" data-i18n="fc_note">Проверка NAT идёт сама при каждом подключении устройства. По её итогам —
+            смогут ли устройства когда-нибудь соединяться напрямую, минуя сервер.</p>
+          <div id="meshForecast"></div>
+        </div>
+
+        <div class="card">
           <h1><span data-i18n="mesh_servers_title">Серверы сети</span><button class="hint" data-hint="hint_servers">?</button></h1>
           <div id="meshServers"></div>
           <div id="meshLinkMsg"></div>
@@ -994,6 +1006,24 @@ const I18N = {
     err_autostart_unsupported:'Автозапуском отсюда управлять нечем',
     password_changed:'Пароль изменён',
     nav_mesh:'Сеть устройств',
+    dev_nat:'Сеть (NAT)', nat_easy:'простой NAT', nat_hard:'жёсткий NAT', nat_open:'открытый',
+    nat_udp_blocked:'UDP не проходит', nat_unknown:'не проверено',
+    fc_title:'Прямые соединения: прогноз', fc_pairs:'Пары устройств',
+    fc_note:'Проверка NAT идёт сама при каждом подключении устройства. По её итогам — смогут ли устройства '+
+      'когда-нибудь соединяться напрямую, минуя сервер.',
+    fc_yes:'да', fc_likely:'скорее всего', fc_maybe:'возможно', fc_unlikely:'маловероятно', fc_no:'нет',
+    fc_empty:'Прогноз появится, когда хотя бы два устройства пройдут проверку — она идёт сама при подключении '+
+      '(нужна свежая версия программы и meshd).',
+    fcw_udp:'у одного из устройств UDP до сервера не проходит', fcw_ipv6:'у обоих настоящий IPv6 — NAT нет',
+    fcw_both_easy:'у обоих простой NAT: адрес, узнанный через сервер, подойдёт и собеседнику',
+    fcw_one_hard:'у одного жёсткий NAT — нужен перебор портов, шансы средние',
+    fcw_one_hard_seq:'у одного жёсткий NAT, но порты идут по порядку — можно угадать',
+    fcw_both_hard:'у обоих жёсткий NAT — пробить почти не выйдет, выручит ретранслятор поближе',
+    hint_fc:'<p><b>NAT</b> — роутер или оператор, который прячет устройство за общим адресом. Чтобы соединиться '+
+      'напрямую, оба устройства одновременно «пробивают» свои NAT навстречу друг другу.</p><p><b>Простой</b> NAT '+
+      'даёт устройству один внешний адрес для всех — пробивается хорошо. <b>Жёсткий</b> (у мобильных операторов '+
+      'часто) — новый порт под каждого собеседника, пробивается плохо.</p><p>Это только измерение: трафик '+
+      'по-прежнему идёт через сервер.</p>',
     self_title:'Сервер в сети устройств', self_addr:'Адрес в сети',
     self_enable:'Пускать устройства сети к самому серверу', self_ports:'Порты',
     self_ports_ph:'пусто — все порты; например 22, 80, 8000-8100',
@@ -1198,6 +1228,23 @@ const I18N = {
     err_autostart_unsupported:'There is nothing to switch here',
     password_changed:'Password changed',
     nav_mesh:'Device network',
+    dev_nat:'Network (NAT)', nat_easy:'easy NAT', nat_hard:'hard NAT', nat_open:'open',
+    nat_udp_blocked:'UDP blocked', nat_unknown:'not checked',
+    fc_title:'Direct connections: forecast', fc_pairs:'Device pairs',
+    fc_note:'A NAT check runs by itself every time a device connects. From it — whether devices could ever '+
+      'connect directly, bypassing the server.',
+    fc_yes:'yes', fc_likely:'likely', fc_maybe:'maybe', fc_unlikely:'unlikely', fc_no:'no',
+    fc_empty:'The forecast appears once at least two devices are checked — it runs by itself on connect '+
+      '(needs a fresh app and meshd).',
+    fcw_udp:'UDP to the server does not pass for one of the devices', fcw_ipv6:'both have real IPv6 — no NAT',
+    fcw_both_easy:'both have easy NAT: the address learned via the server works for the peer too',
+    fcw_one_hard:'one has hard NAT — needs port guessing, medium chances',
+    fcw_one_hard_seq:'one has hard NAT, but its ports go in order — guessable',
+    fcw_both_hard:'both have hard NAT — punching will hardly work, a closer relay helps',
+    hint_fc:'<p><b>NAT</b> is a router or carrier that hides a device behind a shared address. To connect '+
+      'directly, both devices "punch" their NATs toward each other at the same time.</p><p><b>Easy</b> NAT gives '+
+      'the device one external address for everyone — punches well. <b>Hard</b> (common at mobile carriers) — a '+
+      'new port per peer, punches badly.</p><p>This is only a measurement: traffic still goes via the server.</p>',
     self_title:'Server in the device network', self_addr:'Network address',
     self_enable:'Let network devices reach this server itself', self_ports:'Ports',
     self_ports_ph:'empty — all ports; e.g. 22, 80, 8000-8100',
@@ -2144,6 +2191,7 @@ function renderMeshMain(){
 
   renderMap(servers, devices);
   renderMeshDevices(devices);
+  renderForecast(devices);
   renderMeshServers(servers);
 
   $('meshSvcState').innerHTML = '';
@@ -2473,6 +2521,7 @@ function fillDeviceCard(card, d){
     fact(t('dev_loss'), (d.lossPct || 0) + '%');
   }
   fact(t('dev_mode'), d.mode ? t('mode_' + d.mode) : '—');
+  if (d.nat) fact(t('dev_nat'), natLabel(d.nat));
   fact(t('dev_via'), serverName(d.server));
   fact(t('dev_traffic'), '↑' + fmtBytes(d.bytesUp) + ' ↓' + fmtBytes(d.bytesDown));
   fact(d.online ? t('dev_since') : t('dev_last'), d.online ? fmtAgo(d.connectedAt) : fmtClock(d.lastSeen));
@@ -2532,6 +2581,67 @@ async function renameDevice(d, alias){
   if (!ok){ toast(data.error || t('err_internal'), 'err'); loadMesh(); return; }
   toast(t('renamed'));
   loadMesh();
+}
+
+/* ---------- проверка NAT и прогноз прямых соединений ---------- */
+function natLabel(n){
+  if (!n) return t('nat_unknown');
+  if (!n.udp) return t('nat_udp_blocked');
+  let s = n.mapping === 'independent' ? t('nat_easy') : n.mapping === 'dependent' ? t('nat_hard') : t('nat_unknown');
+  if (n.filtering === 'open') s += ', ' + t('nat_open');
+  if (n.ipv6) s += ', IPv6';
+  return s;
+}
+// natForecast — сможет ли пара устройств соединиться напрямую.
+function natForecast(a, b){
+  if (!a.udp || !b.udp) return {lvl: 'no', cls: 'err', why: t('fcw_udp')};
+  if (a.ipv6 && b.ipv6) return {lvl: 'yes', cls: 'ok', why: t('fcw_ipv6')};
+  const ea = a.mapping === 'independent', eb = b.mapping === 'independent';
+  if (ea && eb) return {lvl: 'likely', cls: 'ok', why: t('fcw_both_easy')};
+  if (ea || eb){
+    const hard = ea ? b : a;
+    return {lvl: 'maybe', cls: 'warn', why: hard.portDelta ? t('fcw_one_hard_seq') : t('fcw_one_hard')};
+  }
+  return {lvl: 'unlikely', cls: 'err', why: t('fcw_both_hard')};
+}
+function renderForecast(devices){
+  const box = $('meshForecast');
+  box.innerHTML = '';
+  const tested = devices.filter(d => d.nat);
+  // Сначала — сами устройства: какой у кого NAT и внешний адрес.
+  tested.forEach(d => {
+    const row = el('div', 'fc-row');
+    const p = el('span', 'p');
+    p.appendChild(el('b', '', d.display));
+    p.appendChild(el('div', 'why', natLabel(d.nat) + (d.nat.publicIp ? ' · ' + d.nat.publicIp : '')));
+    row.appendChild(p);
+    box.appendChild(row);
+  });
+  const pairs = [];
+  for (let i = 0; i < tested.length; i++){
+    for (let j = i + 1; j < tested.length; j++){
+      pairs.push([tested[i], tested[j], natForecast(tested[i].nat, tested[j].nat)]);
+    }
+  }
+  const order = {yes: 0, likely: 1, maybe: 2, unlikely: 3, no: 4};
+  pairs.sort((x, y) => order[x[2].lvl] - order[y[2].lvl]);
+  if (pairs.length){
+    box.appendChild(el('h2', '', t('fc_pairs'))).style.marginTop = '14px';
+  }
+  pairs.slice(0, 40).forEach(([a, b, f]) => {
+    const row = el('div', 'fc-row');
+    const p = el('span', 'p');
+    p.appendChild(el('span', '', a.display + '  ↔  ' + b.display));
+    p.appendChild(el('div', 'why', f.why));
+    row.appendChild(p);
+    row.appendChild(el('span', 'badge ' + f.cls, t('fc_' + f.lvl)));
+    box.appendChild(row);
+  });
+  if (tested.length < 2){
+    const e = el('div', 'empty', t('fc_empty'));
+    e.style.padding = '14px 6px';
+    box.appendChild(e);
+  }
 }
 
 /* ---------- серверы сети ---------- */

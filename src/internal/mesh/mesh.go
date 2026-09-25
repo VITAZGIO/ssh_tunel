@@ -59,6 +59,14 @@ type Config struct {
 	Mode       string // proxy или vpn
 	Via        string // через какой сервер подключено устройство
 	Hostname   string // имя компьютера
+
+	// Проверка NAT (см. natprobe.go) идёт на сервер Via мимо туннеля.
+	// ProbeListen открывает такой UDP-сокет (на Android и в режиме VPN — с
+	// пометкой «мимо VPN»); nil — обычный. ProbeResolver ищет адрес сервера
+	// мимо туннеля; nil — системный. NoNATProbe — не проверять (тесты).
+	ProbeListen   func(network string) (net.PacketConn, error)
+	ProbeResolver *net.Resolver
+	NoNATProbe    bool
 }
 
 // NewKey придумывает ключ новой сети.
@@ -92,6 +100,8 @@ type Status struct {
 	Error string `json:"error,omitempty"`
 	Self  Peer   `json:"self"`
 	Peers []Peer `json:"peers"`
+	// NAT — результат проверки NAT этого устройства, если она прошла.
+	NAT *NATInfo `json:"nat,omitempty"`
 }
 
 // Dialer открывает соединение через туннель (tunnel.Tunnel.Dial).
@@ -153,6 +163,9 @@ type wire struct {
 	Via      string `json:"via,omitempty"`
 	Hostname string `json:"hostname,omitempty"`
 	T        int64  `json:"t,omitempty"`
+
+	Stun []int    `json:"stun,omitempty"`
+	NAT  *NATInfo `json:"nat,omitempty"`
 }
 
 type wirePeer struct {
@@ -261,6 +274,25 @@ func (c *Client) session(ctx context.Context) error {
 	// Пинг держит соединение живым через NAT и даёт серверу знать, что мы
 	// на месте.
 	var wmu sync.Mutex
+
+	// Проверка NAT — один раз на подключение: сеть сменилась — подключение
+	// пересобирается, и проверка идёт заново.
+	if len(welcome.Stun) > 0 && c.cfg.Via != "" && !c.cfg.NoNATProbe {
+		go func() {
+			info := ProbeNAT(ctx, ProbeEnv{Server: c.cfg.Via, Ports: welcome.Stun,
+				Listen: c.cfg.ProbeListen, Resolver: c.cfg.ProbeResolver})
+			if ctx.Err() != nil {
+				return
+			}
+			c.mu.Lock()
+			c.status.NAT = &info
+			c.mu.Unlock()
+			c.log("info", "Сеть устройств, проверка прямых соединений: "+natSummary(info))
+			wmu.Lock()
+			send(conn, wire{Op: "nat", NAT: &info})
+			wmu.Unlock()
+		}()
+	}
 	go func() {
 		t := time.NewTicker(25 * time.Second)
 		defer t.Stop()
