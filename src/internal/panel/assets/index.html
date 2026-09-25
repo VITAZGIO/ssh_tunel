@@ -282,13 +282,14 @@
   .edge.p2p{stroke:var(--accent);stroke-width:2.6;stroke-dasharray:1 6;animation:flow .7s linear infinite;
     filter:drop-shadow(0 0 3px color-mix(in srgb, var(--accent) 70%, transparent))}
   /* Задержка посередине линии; сама линия в этом месте прервана. */
-  .edge-label{font-size:10px;font-weight:600;fill:var(--text);opacity:.8;text-anchor:middle;
+  .edge-label{font-size:10px;font-weight:700;fill:var(--text);text-anchor:middle;
     dominant-baseline:central;pointer-events:none;font-variant-numeric:tabular-nums}
-  .edge-label.p2p{fill:var(--accent);opacity:1}
   @keyframes flow{to{stroke-dashoffset:-24}}
   .q-excellent,.q-good{stroke:var(--ok)} .q-fair{stroke:var(--warn)} .q-poor{stroke:var(--err)}
   .q-unknown{stroke:var(--accent)}
-  .node{cursor:pointer}
+  .node{cursor:grab;touch-action:none}
+  .node.dragging{cursor:grabbing}
+  .node.dragging .disc{transform:scale(1.15)}
   .node .halo{transform-box:fill-box;transform-origin:center;animation:halo 2.4s ease-out infinite;pointer-events:none}
   @keyframes halo{0%{opacity:.5;transform:scale(.7)}100%{opacity:0;transform:scale(1.9)}}
   .node .disc{stroke-width:1.5;transition:transform .15s;transform-box:fill-box;transform-origin:center}
@@ -1130,7 +1131,9 @@ const I18N = {
       'а только соединения между устройствами).',
     hint_map:'<p>В центре — главный сервер, вокруг — побочные, у каждого сервера — его устройства.</p>'+
       '<p>Бегущие линии — живая связь, цвет — её качество. Наведи на узел, чтобы увидеть подробности, '+
-      'нажми — перейдёшь к карточке устройства.</p>',
+      'нажми — перейдёшь к карточке устройства.</p><p>Цифры на линиях — задержка, синие дуги — прямые '+
+      'соединения между устройствами мимо сервера. Узлы можно таскать мышью или пальцем: схема живая, '+
+      'остальные подвинутся следом.</p>',
     hint_devices_list:'<p>Имя можно поменять прямо здесь (карандаш) — новое имя «.mesh» сразу увидят '+
       'все устройства сети.</p><p><b>Джиттер</b> — насколько скачет задержка; <b>потери</b> — доля '+
       'проверок, на которые устройство не ответило.</p>',
@@ -1349,7 +1352,9 @@ const I18N = {
     hint_tile_traffic:'How much data devices sent each other through the network (not all internet '+
       'traffic, only connections between devices).',
     hint_map:'<p>The main server is in the center, secondary ones around it, each server with its devices.</p>'+
-      '<p>Moving lines are live links, the color is their quality. Hover a node for details, click to jump to the device card.</p>',
+      '<p>Moving lines are live links, the color is their quality. Hover a node for details, click to jump to the device card.</p>'+
+      '<p>Numbers on lines are latency, blue arcs are direct device-to-device links bypassing the server. '+
+      'Drag nodes with a mouse or finger — the map is alive and the rest follow.</p>',
     hint_devices_list:'<p>Rename right here (pencil) — every device in the network sees the new ".mesh" '+
       'name at once.</p><p><b>Jitter</b> is how much the latency jumps; <b>loss</b> is the share of checks the device did not answer.</p>',
     hint_servers:'<p>Secondary servers connect to the main one over SSH as a separate user '+
@@ -2216,7 +2221,10 @@ function svgEl(tag, attrs, parent){
   if (parent) parent.appendChild(e);
   return e;
 }
-let MAP_SIG = '', MAP_REFS = {}, MAP_DIRECT = null, MAP_OBST = [];
+let MAP_SIG = '', MAP_REFS = {}, MAP_SIM = null;
+// Где стояли узлы (в долях ширины и высоты схемы): перестройка — новое
+// устройство, смена языка, другой размер окна — не раскидывает их заново.
+const MAP_POS = {};
 
 // edgeMs — задержка для подписи на схеме: «12мс», «135мс».
 function edgeMs(v){
@@ -2224,26 +2232,55 @@ function edgeMs(v){
   return (v < 1 ? '<1' : String(Math.round(v))) + (LANG === 'ru' ? 'мс' : 'ms');
 }
 
-// mapEdge — линия схемы от a к b: квадратичная кривая Безье с изгибом bend.
-// Она из двух половинок, чтобы посередине оставить окно под подпись.
-function mapEdge(gEdge, gLabel, a, b, bend, cls, labelCls){
-  const g = svgEl('g', {class: cls}, gEdge);
-  const e = {g, a, b, bend, last: null,
+/* Схема живая, как граф в Obsidian: узлы — шарики, которые расталкиваются,
+   линии — пружины, которые держат их на расстоянии, где помещаются цифры
+   задержки. Каждый кадр считаются силы, узлы чуть сдвигаются, и за пару
+   секунд всё успокаивается (alpha — «температура», она остывает до нуля).
+   Узел можно схватить и потащить — остальные подвинутся следом. */
+
+// mapEdge — линия схемы между узлами a и b. Она из двух половинок, чтобы
+// посередине оставить окно под цифры задержки.
+function mapEdge(sim, a, b, kind, labelOn){
+  const cls = kind === 'srv' ? 'edge srv' : kind === 'p2p' ? 'edge p2p' : 'edge';
+  const g = svgEl('g', {class: cls}, kind === 'p2p' ? sim.gDirect : sim.gEdges);
+  const e = {a, b, kind, g, labelOn, text: '', w: 0,
+    bend: kind === 'p2p' ? 0.16 : 0.06,
+    rest: kind === 'srv' ? (sim.narrow ? 150 : 230) : kind === 'p2p' ? (sim.narrow ? 110 : 150) : (sim.narrow ? 90 : 125),
+    k: kind === 'p2p' ? 0.04 : 0.2,
     p1: svgEl('path', {}, g), p2: svgEl('path', {}, g),
-    tx: svgEl('text', {class: 'edge-label' + (labelCls ? ' ' + labelCls : '')}, gLabel)};
-  setEdgeLabel(e, '');
+    tx: svgEl('text', {class: 'edge-label'}, sim.gLabels)};
+  sim.edges.push(e);
   return e;
 }
 
-// setEdgeLabel пишет подпись в середину линии и прерывает линию ровно на
-// ширину подписи с небольшим зазором: цифры стоят «на пути» линии, но её не
-// касаются. Пустая подпись — линия целиком.
-function setEdgeLabel(e, text){
-  if (!e.tx.parentNode) text = ''; // подписи выключены (слишком много устройств)
-  if (e.last === text) return;
-  e.last = text;
-  const {a, b, bend} = e;
-  const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+function removeEdge(sim, e){
+  e.g.remove();
+  e.tx.remove();
+  sim.edges = sim.edges.filter(x => x !== e);
+}
+
+// setEdgeText — цифры на линии; цвет — как у самой линии.
+function setEdgeText(e, text, color){
+  if (!e.labelOn) text = '';
+  e.tx.style.fill = color || '';
+  if (text === e.text) return;
+  e.text = text;
+  e.tx.textContent = text;
+  e.w = 0;
+  if (text){
+    try { e.w = e.tx.getComputedTextLength(); } catch (err) {}
+    if (!e.w) e.w = text.length * 5.8;
+  }
+  if (MAP_SIM && !MAP_SIM.raf) simDraw(MAP_SIM);
+}
+
+// layoutEdge рисует линию квадратичной кривой Безье и прерывает её ровно на
+// ширину цифр с небольшим зазором: цифры стоят «на пути» линии, но её не
+// касаются. Если середина занята кружком или названием узла — цифры
+// сдвигаются вдоль линии; места нет совсем — линия целиком.
+function layoutEdge(e, obst){
+  const a = e.a, b = e.b, bend = e.bend;
+  const dx = b.x - a.x, dy = b.y - a.y;
   const c = {x: (a.x + b.x) / 2 - dy * bend, y: (a.y + b.y) / 2 + dx * bend};
   const at = t => ({x: (1-t)*(1-t)*a.x + 2*t*(1-t)*c.x + t*t*b.x, y: (1-t)*(1-t)*a.y + 2*t*(1-t)*c.y + t*t*b.y});
   const tan = t => ({x: 2*(1-t)*(c.x - a.x) + 2*t*(b.x - c.x), y: 2*(1-t)*(c.y - a.y) + 2*t*(b.y - c.y)});
@@ -2253,53 +2290,251 @@ function setEdgeLabel(e, text){
     const p = at(t0), q = at(t1), v = tan(t0), k = (t1 - t0) / 2;
     return 'M' + f(p.x) + ' ' + f(p.y) + 'Q' + f(p.x + v.x * k) + ' ' + f(p.y + v.y * k) + ' ' + f(q.x) + ' ' + f(q.y);
   };
-  e.tx.textContent = text;
-  if (!text){
+  const whole = () => {
+    e.tx.setAttribute('visibility', 'hidden');
     e.p1.setAttribute('d', seg(0, 1));
     e.p2.setAttribute('d', '');
-    return;
-  }
-  let w = 0;
-  try { w = e.tx.getComputedTextLength(); } catch (err) {}
-  if (!w) w = text.length * 5.8;
-  const hw = w / 2 + 3, hh = 5 + 3;
-  // Место — посередине; если там кружок или название узла, ближайшее
-  // свободное вдоль линии.
-  // Площадь, на которую подпись в точке t наехала бы на узлы.
+  };
+  if (!e.text) return whole();
+  const hw = e.w / 2 + 3, hh = 5 + 3;
+  // Площадь, на которую цифры в точке t наехали бы на узлы.
   const overlap = t => {
     const m = at(t);
     let sum = 0;
-    MAP_OBST.forEach(r => {
+    for (const r of obst){
       const ox = Math.min(m.x + hw, r.x2) - Math.max(m.x - hw, r.x1);
       const oy = Math.min(m.y + hh, r.y2) - Math.max(m.y - hh, r.y1);
       if (ox > 0 && oy > 0) sum += ox * oy;
-    });
+    }
     return sum;
   };
-  let tm = 0.5, best = Infinity;
-  for (const t of [0.5, 0.44, 0.56, 0.38, 0.62, 0.32, 0.68, 0.26, 0.74, 0.2, 0.8]){
-    const o = overlap(t);
-    if (o < best - 1e-6){ best = o; tm = t; }
-    if (o === 0) break;
+  let tm = -1;
+  for (const t of [0.5, 0.44, 0.56, 0.38, 0.62, 0.32, 0.68, 0.26, 0.74]){
+    if (overlap(t) === 0){ tm = t; break; }
   }
-  if (best > 0){
-    // Линия слишком короткая: цифры везде наехали бы на узел. Тогда линия
-    // целиком, а задержка — во всплывающей подсказке и карточке.
-    e.tx.textContent = '';
-    e.p1.setAttribute('d', seg(0, 1));
-    e.p2.setAttribute('d', '');
-    return;
-  }
+  if (tm < 0) return whole();
   const m = at(tm), v = tan(tm), speed = Math.hypot(v.x, v.y) || 1;
+  // Следующие цифры на эти уже не лягут.
+  obst.push({x1: m.x - hw, x2: m.x + hw, y1: m.y - hh, y2: m.y + hh});
+  e.tx.removeAttribute('visibility');
   e.tx.setAttribute('x', f(m.x));
   e.tx.setAttribute('y', f(m.y));
-  // Прямая через центр прямоугольника подписи выходит из него на расстоянии
+  // Прямая через центр прямоугольника цифр выходит из него на расстоянии
   // min(½ширины/|cos|, ½высоты/|sin|) — столько линии и убираем.
   const cos = Math.abs(v.x) / speed, sin = Math.abs(v.y) / speed;
   const half = Math.min(cos > 1e-3 ? hw / cos : Infinity, sin > 1e-3 ? hh / sin : Infinity);
   const dt = half / speed;
   e.p1.setAttribute('d', tm - dt > 0.02 ? seg(0, tm - dt) : '');
   e.p2.setAttribute('d', tm + dt < 0.98 ? seg(tm + dt, 1) : '');
+}
+
+// simObstacles — кружки и названия узлов: сюда цифрам задержки нельзя.
+function simObstacles(sim){
+  const out = [];
+  sim.nodes.forEach(n => {
+    out.push({x1: n.x - n.r - 2, x2: n.x + n.r + 2, y1: n.y - n.r - 2, y2: n.y + n.r + 2});
+    if (n.tw) out.push({x1: n.x - n.tw / 2 - 2, x2: n.x + n.tw / 2 + 2, y1: n.y + n.r + 2, y2: n.y + n.r + n.th});
+  });
+  return out;
+}
+
+// Пересекаются ли отрезки ab и cd.
+function segCross(a, b, c, d){
+  const o = (p, q, r) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+  const d1 = o(a, b, c), d2 = o(a, b, d), d3 = o(c, d, a), d4 = o(c, d, b);
+  return d1 * d2 < 0 && d3 * d4 < 0;
+}
+
+// simTick — один шаг: силы → скорости → положения.
+function simTick(sim){
+  const N = sim.nodes, E = sim.edges, al = sim.alpha;
+  const sx = 1.6; // названия шире кружков: по горизонтали узлам нужно больше места
+  // 1. Узлы отталкиваются друг от друга; вплотную — жёстко расталкиваются.
+  for (let i = 0; i < N.length; i++){
+    for (let j = i + 1; j < N.length; j++){
+      const a = N[i], b = N[j];
+      let dx = (b.x - a.x) / sx, dy = b.y - a.y, d = Math.hypot(dx, dy);
+      if (d < 0.01){ dx = Math.cos(i * 7 + j); dy = Math.sin(i * 7 + j); d = 1; }
+      const req = Math.max((a.tw + b.tw) / 2 / sx + 8, a.r + b.r + 34);
+      let f = sim.charge * al / d;
+      if (d < req) f += (req - d) * 0.25;
+      const ux = dx / d * sx * f, uy = dy / d * f;
+      a.vx -= ux; a.vy -= uy;
+      b.vx += ux; b.vy += uy;
+    }
+  }
+  // 2. Линии — пружины: держат длину, на которой цифрам хватает места.
+  E.forEach(e => {
+    const dx = e.b.x - e.a.x, dy = e.b.y - e.a.y, d = Math.hypot(dx, dy) || 1;
+    const rest = Math.max(e.rest, e.a.r + e.b.r + (e.w ? e.w + 30 : 20));
+    const f = (d - rest) / d * e.k * al;
+    e.a.vx += dx * f; e.a.vy += dy * f;
+    e.b.vx -= dx * f; e.b.vy -= dy * f;
+  });
+  // 3. Узел не лежит на чужой линии — ни кружком, ни названием под ним:
+  // линия его отталкивает.
+  E.forEach(e => {
+    const ax = e.a.x, ay = e.a.y, dx = e.b.x - ax, dy = e.b.y - ay, l2 = dx * dx + dy * dy || 1;
+    N.forEach(n => {
+      if (n === e.a || n === e.b) return;
+      const ly = n.y + n.r + n.th / 2, half = n.tw / 2 - 6;
+      const pts = [[n.x, n.y, n.r + 18]];
+      if (n.tw) pts.push([n.x, ly, n.th / 2 + 8], [n.x - half, ly, n.th / 2 + 6], [n.x + half, ly, n.th / 2 + 6]);
+      for (const [x, y, thr] of pts){
+        const t = ((x - ax) * dx + (y - ay) * dy) / l2;
+        if (t <= 0.05 || t >= 0.95) continue;
+        let nx = x - (ax + dx * t), ny = y - (ay + dy * t), d = Math.hypot(nx, ny);
+        if (d >= thr) continue;
+        if (d < 0.01){ nx = -dy; ny = dx; d = Math.hypot(nx, ny) || 1; }
+        const f = (thr - d) / d * 0.2 * Math.max(al, 0.05);
+        n.vx += nx * f; n.vy += ny * f;
+        e.a.vx -= nx * f / 2; e.a.vy -= ny * f / 2;
+        e.b.vx -= nx * f / 2; e.b.vy -= ny * f / 2;
+        break;
+      }
+    });
+  });
+  // 4. Линии из одного узла расходятся веером: если две идут почти в одну
+  // сторону, их дальние концы разъезжаются по кругу.
+  const minA = 0.55; // ≈ 30°
+  N.forEach(c => {
+    const nb = [];
+    E.forEach(e => { if (e.a === c) nb.push(e.b); else if (e.b === c) nb.push(e.a); });
+    for (let i = 0; i < nb.length; i++){
+      for (let j = i + 1; j < nb.length; j++){
+        const u = nb[i], v = nb[j];
+        const ux = u.x - c.x, uy = u.y - c.y, vx = v.x - c.x, vy = v.y - c.y;
+        const lu = Math.hypot(ux, uy) || 1, lv = Math.hypot(vx, vy) || 1;
+        const ang = Math.acos(Math.max(-1, Math.min(1, (ux * vx + uy * vy) / lu / lv)));
+        if (ang >= minA) continue;
+        // Поворот: u — в сторону от v, v — в сторону от u.
+        const side = ux * vy - uy * vx >= 0 ? 1 : -1;
+        const f = (minA - ang) * 0.35 * Math.max(al, 0.05);
+        u.vx += uy / lu * side * f * lu * 0.1; u.vy += -ux / lu * side * f * lu * 0.1;
+        v.vx -= vy / lv * side * f * lv * 0.1; v.vy -= -vx / lv * side * f * lv * 0.1;
+      }
+    }
+  });
+  // 5. Линии не пересекаются: ближний к чужой линии конец выталкивается на
+  // другую её сторону.
+  for (let i = 0; i < E.length; i++){
+    for (let j = i + 1; j < E.length; j++){
+      const e = E[i], g = E[j];
+      if (e.a === g.a || e.a === g.b || e.b === g.a || e.b === g.b) continue;
+      if (!segCross(e.a, e.b, g.a, g.b)) continue;
+      [[e, g], [g, e]].forEach(([p, q]) => {
+        const dx = q.b.x - q.a.x, dy = q.b.y - q.a.y, l = Math.hypot(dx, dy) || 1;
+        const nx = -dy / l, ny = dx / l;
+        const s1 = (p.a.x - q.a.x) * nx + (p.a.y - q.a.y) * ny;
+        const s2 = (p.b.x - q.a.x) * nx + (p.b.y - q.a.y) * ny;
+        const [n, s, other] = Math.abs(s1) < Math.abs(s2) ? [p.a, s1, s2] : [p.b, s2, s1];
+        const w = p.kind === 'p2p' || q.kind === 'p2p' ? 0.04 : 0.1;
+        const f = (Math.abs(s) + 12) * w * Math.max(al, 0.05) * Math.sign(other || 1);
+        n.vx += nx * f; n.vy += ny * f;
+      });
+    }
+  }
+  // 6. Главный сервер тянется к центру, остальные — чуть-чуть.
+  N.forEach(n => {
+    const g = n.main ? 0.12 : 0.012;
+    n.vx += (sim.W / 2 - n.x) * g * al;
+    n.vy += (sim.H / 2 - n.y) * g * al;
+  });
+  // 7. Сдвиг с трением и границы схемы.
+  N.forEach(n => {
+    if (n.pinned){ n.vx = n.vy = 0; return; }
+    n.vx *= 0.6; n.vy *= 0.6;
+    n.x += n.vx; n.y += n.vy;
+    const mx = Math.max(n.r, n.tw / 2) + 4;
+    n.x = Math.max(mx, Math.min(sim.W - mx, n.x));
+    n.y = Math.max(n.r + 4, Math.min(sim.H - n.r - n.th - 2, n.y));
+  });
+  sim.alpha += (sim.target - sim.alpha) * 0.02;
+}
+
+// simDraw — перенести положения на экран.
+function simDraw(sim){
+  sim.nodes.forEach(n => {
+    n.outer.setAttribute('transform', 'translate(' + n.x.toFixed(1) + ' ' + n.y.toFixed(1) + ')');
+    MAP_POS[n.key] = {fx: n.x / sim.W, fy: n.y / sim.H};
+  });
+  sim.obst = simObstacles(sim);
+  sim.edges.forEach(e => layoutEdge(e, sim.obst));
+}
+
+function simRun(sim){
+  if (sim.raf) return;
+  const step = () => {
+    sim.raf = 0;
+    if (MAP_SIM !== sim || !sim.svg.isConnected) return;
+    simTick(sim);
+    simDraw(sim);
+    if (sim.alpha > 0.005 || sim.target > 0) sim.raf = requestAnimationFrame(step);
+  };
+  sim.raf = requestAnimationFrame(step);
+}
+
+// kickSim — «подогреть» схему: что-то поменялось, пусть узлы подвинутся.
+function kickSim(alpha){
+  const sim = MAP_SIM;
+  if (!sim) return;
+  sim.alpha = Math.max(sim.alpha, alpha);
+  if (REDUCED_MOTION){
+    for (let i = 0; i < 200 && sim.alpha > 0.005; i++) simTick(sim);
+    simDraw(sim);
+    return;
+  }
+  simRun(sim);
+}
+const REDUCED_MOTION = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function svgPoint(svg, x, y){
+  const pt = svg.createSVGPoint();
+  pt.x = x; pt.y = y;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+
+// dragNode — узел можно тащить мышью или пальцем; отпустил — схема
+// успокаивается сама. Короткое касание без движения — обычный щелчок.
+function dragNode(sim, n){
+  n.outer.addEventListener('pointerdown', ev => {
+    if (ev.button !== 0) return;
+    const st = {id: ev.pointerId, x0: ev.clientX, y0: ev.clientY, moved: false};
+    try { n.outer.setPointerCapture(ev.pointerId); } catch (err) {}
+    const move = e2 => {
+      if (e2.pointerId !== st.id) return;
+      if (!st.moved){
+        if (Math.hypot(e2.clientX - st.x0, e2.clientY - st.y0) < 4) return;
+        st.moved = true;
+        sim.dragging = true;
+        n.pinned = true;
+        n.outer.classList.add('dragging');
+        hidePop();
+        sim.target = 0.25;
+        kickSim(0.3);
+      }
+      const p = svgPoint(sim.svg, e2.clientX, e2.clientY);
+      n.x = p.x; n.y = p.y;
+    };
+    const up = e2 => {
+      if (e2.pointerId !== st.id) return;
+      n.outer.removeEventListener('pointermove', move);
+      n.outer.removeEventListener('pointerup', up);
+      n.outer.removeEventListener('pointercancel', up);
+      if (!st.moved) return;
+      // Щелчок, который браузер пришлёт следом, — конец перетаскивания.
+      n.justDragged = true;
+      setTimeout(() => { n.justDragged = false; }, 0);
+      sim.dragging = false;
+      n.pinned = false;
+      n.outer.classList.remove('dragging');
+      sim.target = 0;
+      kickSim(0.2);
+    };
+    n.outer.addEventListener('pointermove', move);
+    n.outer.addEventListener('pointerup', up);
+    n.outer.addEventListener('pointercancel', up);
+  });
 }
 
 function qClass(online, q){ return online ? 'on q-' + (q || 'unknown') : 'off'; }
@@ -2322,7 +2557,7 @@ function renderMap(servers, devices){
     const q = s.main ? 'excellent' : (s.link && s.link.quality);
     if (r.edge){
       r.edge.g.setAttribute('class', 'edge srv ' + qClass(s.online, q));
-      setEdgeLabel(r.edge, s.online && s.link ? edgeMs(s.link.rttMs) : '');
+      setEdgeText(r.edge, s.online && s.link ? edgeMs(s.link.rttMs) : '', qColor(s.online, q));
     }
     r.node.classList.toggle('offline', !s.online);
     r.halo.style.display = s.online ? '' : 'none';
@@ -2332,7 +2567,7 @@ function renderMap(servers, devices){
     const r = MAP_REFS['d:' + d.id];
     if (!r) return;
     r.edge.g.setAttribute('class', 'edge ' + qClass(d.online, d.quality));
-    setEdgeLabel(r.edge, d.online ? edgeMs(d.rttMs) : '');
+    setEdgeText(r.edge, d.online ? edgeMs(d.rttMs) : '', qColor(d.online, d.quality));
     r.node.classList.toggle('offline', !d.online);
     r.halo.style.display = d.online ? '' : 'none';
     r.disc.setAttribute('stroke', qColor(d.online, d.quality));
@@ -2342,46 +2577,44 @@ function renderMap(servers, devices){
 }
 
 // drawDirect — прямые соединения между устройствами (по отчётам самих
-// устройств): зелёная пунктирная дуга мимо сервера. Меняются часто, поэтому
-// рисуются заново при каждом опросе, не трогая раскладку.
+// устройств): синяя пунктирная дуга мимо сервера. Тоже пружина, только
+// слабая: устройства с прямым соединением чуть тянутся друг к другу.
 function drawDirect(devices){
-  if (!MAP_DIRECT) return;
-  const {g, pos} = MAP_DIRECT;
-  g.innerHTML = '';
-  const byIP = {}, seen = new Set();
+  const sim = MAP_SIM;
+  if (!sim) return;
+  const byIP = {}, want = new Map();
   devices.forEach(d => { byIP[d.ip] = d; });
   devices.forEach(d => {
     (d.direct || []).forEach(l => {
       const o = byIP[l.ip];
-      if (!o || !d.online || !o.online || !pos[d.id] || !pos[o.id]) return;
+      const a = sim.byKey['d:' + d.id], b = o && sim.byKey['d:' + o.id];
+      if (!a || !b || !d.online || !o.online) return;
       // Каждая пара — один раз: обычно о ней сообщают оба устройства.
       const key = [d.id, o.id].sort().join('|');
-      if (seen.has(key)) return;
-      seen.add(key);
-      const e = mapEdge(g, g, pos[d.id], pos[o.id], directBend(pos[d.id], pos[o.id]), 'edge p2p', 'p2p');
-      svgEl('title', {}, e.g).textContent = d.display + ' ⇄ ' + o.display + ' · ' + t('map_direct') +
-        (l.rttMs ? ' · ' + fmtMs(l.rttMs) : '');
-      setEdgeLabel(e, edgeMs(l.rttMs));
+      if (!want.has(key)) want.set(key, {a, b, d, o, l});
     });
   });
-}
-
-// directBend — изгиб прямой дуги, при котором она меньше всего проходит
-// сквозь узлы (серверы в центре схемы обычно как раз на пути).
-function directBend(a, b){
-  let best = -0.18, bestHits = Infinity;
-  for (const bend of [-0.18, 0.18, -0.32, 0.32, -0.45, 0.45]){
-    const dx = b.x - a.x, dy = b.y - a.y;
-    const c = {x: (a.x + b.x) / 2 - dy * bend, y: (a.y + b.y) / 2 + dx * bend};
-    let hits = 0;
-    for (let t = 0.12; t <= 0.88; t += 0.04){
-      const x = (1-t)*(1-t)*a.x + 2*t*(1-t)*c.x + t*t*b.x, y = (1-t)*(1-t)*a.y + 2*t*(1-t)*c.y + t*t*b.y;
-      MAP_OBST.forEach(r => { if (x > r.x1 && x < r.x2 && y > r.y1 && y < r.y2) hits++; });
+  let changed = false;
+  sim.direct.forEach((e, key) => {
+    if (want.has(key)) return;
+    removeEdge(sim, e);
+    sim.direct.delete(key);
+    changed = true;
+  });
+  want.forEach((w, key) => {
+    let e = sim.direct.get(key);
+    if (!e){
+      e = mapEdge(sim, w.a, w.b, 'p2p', !sim.many);
+      e.title = svgEl('title', {}, e.g);
+      sim.direct.set(key, e);
+      changed = true;
     }
-    if (hits < bestHits){ bestHits = hits; best = bend; }
-    if (!hits) break;
-  }
-  return best;
+    e.title.textContent = w.d.display + ' ⇄ ' + w.o.display + ' · ' + t('map_direct') +
+      (w.l.rttMs ? ' · ' + fmtMs(w.l.rttMs) : '');
+    setEdgeText(e, edgeMs(w.l.rttMs), 'var(--accent)');
+  });
+  if (changed) kickSim(0.35);
+  else if (!sim.raf) simDraw(sim);
 }
 
 // directText — с кем у устройства прямое соединение, одной строкой.
@@ -2399,94 +2632,68 @@ function qColor(online, q){
 }
 
 function buildMap(svg, W, H, servers, devices, animate){
+  if (MAP_SIM && MAP_SIM.raf) cancelAnimationFrame(MAP_SIM.raf);
   svg.innerHTML = '';
   svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
   MAP_REFS = {};
-  MAP_OBST = [];
   const cx = W / 2, cy = H / 2, S = Math.min(W, H);
   const defs = svgEl('defs', {}, svg);
   const grad = svgEl('linearGradient', {id:'gNode', x1:0, y1:0, x2:0, y2:1}, defs);
   svgEl('stop', {offset:'0', 'stop-color':'var(--accent-muted)'}, grad);
   svgEl('stop', {offset:'1', 'stop-color':'var(--accent-muted-dark)'}, grad);
   for (let i = 1; i <= 3; i++) svgEl('circle', {cx, cy, r: S * 0.155 * i, fill:'none', class:'map-grid'}, svg);
-  const gEdges = svgEl('g', {}, svg), gDirect = svgEl('g', {}, svg), gLabels = svgEl('g', {}, svg);
+  const narrow = W < 520;
+  const many = devices.length > (narrow ? 12 : 28);
+  const sim = MAP_SIM = {svg, W, H, narrow, many, nodes: [], edges: [], byKey: {}, direct: new Map(),
+    alpha: 1, target: 0, raf: 0, charge: narrow ? 160 : 260,
+    gEdges: svgEl('g', {}, svg), gDirect: svgEl('g', {}, svg), gLabels: svgEl('g', {}, svg)};
   const gNodes = svgEl('g', {}, svg);
 
   const main = servers.find(s => s.main);
   const secs = servers.filter(s => !s.main);
-  const narrow = W < 520;
-  const pos = {};
-  if (main) pos[main.id] = {x: cx, y: cy, a: 0};
-  // Серверы — по эллипсу во всю ширину схемы: она шире, чем выше.
-  const rx = W * (narrow ? 0.34 : 0.35), ry = H * 0.33;
-  secs.forEach((s, i) => {
-    const a = i * 2 * Math.PI / secs.length;
-    pos[s.id] = {x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a), a};
-  });
-
-  const byServer = {};
-  devices.forEach(d => {
-    const sid = pos[d.server] ? d.server : (main ? main.id : null);
-    (byServer[sid] = byServer[sid] || []).push(d);
-  });
-  const dpos = {};
-  Object.keys(byServer).forEach(sid => {
-    const list = byServer[sid], p = pos[sid];
-    if (!p) return;
-    if (main && sid === main.id){
-      // Устройства главного — по кругу вокруг него, в промежутках между
-      // лучами к побочным серверам.
-      const kx = secs.length ? rx * 0.48 : W * 0.3, ky = secs.length ? ry * 0.55 : H * 0.34;
-      const start = secs.length ? Math.PI / secs.length : -Math.PI / 2;
-      list.forEach((d, j) => {
-        const a = start + j * 2 * Math.PI / list.length;
-        dpos[d.id] = {x: p.x + kx * Math.cos(a), y: p.y + ky * Math.sin(a), sid, len: Math.hypot(kx, ky) / 1.5};
-      });
-    } else {
-      // Устройства побочного — веером наружу от центра.
-      const n = list.length, spread = Math.min(Math.PI * 1.1, n * 0.5);
-      const rr = Math.min(W, H) * 0.2;
-      list.forEach((d, j) => {
-        const a = p.a + (n === 1 ? 0 : -spread / 2 + j * spread / (n - 1));
-        dpos[d.id] = {x: p.x + rr * Math.cos(a), y: p.y + rr * Math.sin(a), sid, len: rr};
-      });
-    }
-  });
-  relaxLayout(Object.values(pos), dpos, pos, W, H, narrow);
-
-
-  const many = devices.length > (narrow ? 12 : 28);
-  let k = 0;
-  const node = (key, p, r, path, label, sub, data, isServer) => {
+  // Начальные места — где узел стоял раньше; новому — возле его сервера.
+  const start = (key, x, y) => {
+    const p = MAP_POS[key];
+    return p ? {x: p.fx * W, y: p.fy * H} : {x, y};
+  };
+  const rx = W * 0.33, ry = H * 0.3;
+  let k = 0, fresh = 0;
+  const node = (key, p0, r, path, label, sub, data, isServer, isMain) => {
+    if (!MAP_POS[key]) fresh++;
+    const p = start(key, p0.x, p0.y);
     // Положение — атрибутом внешней группы, анимация появления — у внутренней:
     // CSS-свойство transform у SVG перекрывает атрибут, и анимация на той же
     // группе увезла бы узел в угол схемы.
-    const outer = svgEl('g', {class: 'node', transform: 'translate(' +
-      p.x.toFixed(1) + ' ' + p.y.toFixed(1) + ')'}, gNodes);
+    const outer = svgEl('g', {class: 'node'}, gNodes);
     const g = svgEl('g', animate ? {class: 'node-enter'} : {}, outer);
     if (animate) g.style.animationDelay = (k++ * 0.025) + 's';
     const halo = svgEl('circle', {r, fill: isServer ? 'var(--accent)' : 'var(--ok)', class: 'halo'}, g);
     const disc = svgEl('circle', {r, fill: 'url(#gNode)', stroke: 'var(--accent)', class: 'disc'}, g);
     svgEl('path', {d: path, class: 'glyph', transform: 'scale(' + (r / 10.5).toFixed(2) + ')'}, g);
+    let th = 2;
     if (!many || isServer){
       const tx = svgEl('text', {y: r + 13}, g);
       tx.textContent = label.length > 18 ? label.slice(0, 17) + '…' : label;
+      th = 17;
       if (sub && !narrow){
         const st = svgEl('text', {y: r + 24, class: 'sub'}, g);
         st.textContent = sub;
+        th = 28;
       }
     }
-    const ref = {node: outer, halo, disc, data};
-    MAP_REFS[key] = ref;
-    // Кружок и подписи узла — сюда цифрам задержки нельзя.
     let tw = 0;
     outer.querySelectorAll('text').forEach(x => { try { tw = Math.max(tw, x.getComputedTextLength()); } catch (err) {} });
-    MAP_OBST.push({x1: p.x - r - 2, x2: p.x + r + 2, y1: p.y - r - 2, y2: p.y + r + 2});
-    if (tw) MAP_OBST.push({x1: p.x - tw / 2 - 2, x2: p.x + tw / 2 + 2, y1: p.y + r + 2, y2: p.y + r + (sub && !narrow ? 28 : 17)});
-    outer.addEventListener('mouseenter', () => showPop(disc, isServer ? serverPop(ref.data) : devicePop(ref.data)));
+    const n = {key, x: p.x, y: p.y, vx: 0, vy: 0, r, tw, th, main: !!isMain, outer};
+    sim.nodes.push(n);
+    sim.byKey[key] = n;
+    dragNode(sim, n);
+    const ref = {node: outer, halo, disc, data, n};
+    MAP_REFS[key] = ref;
+    outer.addEventListener('mouseenter', () => { if (!sim.dragging) showPop(disc, isServer ? serverPop(ref.data) : devicePop(ref.data)); });
     outer.addEventListener('mouseleave', () => { if (!hintPinned) hidePop(); });
     outer.addEventListener('click', e => {
       e.stopPropagation();
+      if (n.justDragged) return;
       if (isServer){ showPop(disc, serverPop(ref.data), true); return; }
       hidePop();
       focusDevice(ref.data.id);
@@ -2494,64 +2701,34 @@ function buildMap(svg, W, H, servers, devices, animate){
     return ref;
   };
 
-  secs.forEach(s => {
-    const e = mapEdge(gEdges, gLabels, pos[main ? main.id : s.id] || pos[s.id], pos[s.id], 0.08, 'edge srv');
-    const r = node('s:' + s.id, pos[s.id], 17, GLYPH.server, s.name, s.meshHost ? s.meshHost + '.mesh' : (s.host || ''), s, true);
-    r.edge = e;
-  });
   if (main){
-    node('s:' + main.id, pos[main.id], 23, GLYPH.main, main.name, main.meshHost ? main.meshHost + '.mesh' : t('srv_main'), main, true);
+    node('s:' + main.id, {x: cx, y: cy}, 23, GLYPH.main, main.name, main.meshHost ? main.meshHost + '.mesh' : t('srv_main'), main, true, true);
   }
-  devices.forEach(d => {
-    const p = dpos[d.id];
-    if (!p) return;
-    const sid = pos[d.server] ? d.server : main.id;
-    const e = mapEdge(gEdges, many ? null : gLabels, p, pos[sid], 0.12, 'edge');
-    const r = node('d:' + d.id, p, narrow ? 10.5 : 12.5, glyphOf(d.platform), d.display, d.host + '.mesh', d, false);
-    r.edge = e;
+  secs.forEach((s, i) => {
+    const a = i * 2 * Math.PI / secs.length;
+    const r = node('s:' + s.id, {x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a)}, 17, GLYPH.server, s.name,
+      s.meshHost ? s.meshHost + '.mesh' : (s.host || ''), s, true, false);
+    if (main) r.edge = mapEdge(sim, sim.byKey['s:' + main.id], r.n, 'srv', true);
   });
-  MAP_DIRECT = {g: gDirect, pos: dpos};
+  devices.forEach((d, j) => {
+    const sref = MAP_REFS['s:' + d.server] || (main && MAP_REFS['s:' + main.id]);
+    if (!sref) return;
+    const sp = sref.n, a = j * 2.4 + 0.7; // золотой угол — соседи не друг на друге
+    const rr = narrow ? 80 : 115;
+    const r = node('d:' + d.id, {x: sp.x + rr * Math.cos(a), y: sp.y + rr * 0.8 * Math.sin(a)}, narrow ? 10.5 : 12.5,
+      glyphOf(d.platform), d.display, d.host + '.mesh', d, false, false);
+    r.edge = mapEdge(sim, r.n, sp, 'dev', !many);
+  });
   if (!servers.length){
     const tx = svgEl('text', {x: cx, y: cy, 'text-anchor': 'middle', fill: 'var(--dim)'}, svg);
     tx.textContent = '—';
   }
-}
-
-// relaxLayout расталкивает узлы, чтобы кружки и подписи не наезжали друг на
-// друга: серверы стоят на месте, устройства отодвигаются и при этом держатся
-// на своём расстоянии от сервера, как на пружинке. Подпись шире кружка,
-// поэтому по горизонтали узлам нужно больше места, чем по вертикали.
-function relaxLayout(fixed, free, pos, W, H, narrow){
-  const nodes = fixed.map(p => ({p, fixed: true})).concat(Object.values(free).map(p => ({p, fixed: false})));
-  const sx = narrow ? 1.5 : 1.8, need = narrow ? 36 : 46;
-  const minX = 36, maxX = W - 36, minY = 22, maxY = H - (narrow ? 26 : 40);
-  for (let it = 0; it < 180; it++){
-    for (let i = 0; i < nodes.length; i++){
-      for (let j = i + 1; j < nodes.length; j++){
-        const a = nodes[i], b = nodes[j];
-        if (a.fixed && b.fixed) continue;
-        let dx = (b.p.x - a.p.x) / sx, dy = b.p.y - a.p.y;
-        let d = Math.hypot(dx, dy);
-        // У сервера и кружок крупнее, и подпись длиннее — рядом с ним нужно
-        // больше места.
-        const req = (a.fixed || b.fixed) ? need * 1.6 : need;
-        if (d >= req) continue;
-        if (d < 0.01){ dx = Math.cos(i + j); dy = Math.sin(i + j); d = 1; }
-        const push = (req - d) * 0.5, ux = dx / d * sx, uy = dy / d;
-        const ka = a.fixed ? 0 : (b.fixed ? 2 : 1), kb = b.fixed ? 0 : (a.fixed ? 2 : 1);
-        a.p.x -= ux * push * ka; a.p.y -= uy * push * ka;
-        b.p.x += ux * push * kb; b.p.y += uy * push * kb;
-      }
-    }
-    Object.values(free).forEach(p => {
-      const s = pos[p.sid];
-      const dx = p.x - s.x, dy = p.y - s.y, d = Math.hypot(dx, dy) || 1;
-      const k = (d - p.len) / d * 0.08;
-      p.x -= dx * k; p.y -= dy * k;
-      p.x = Math.max(minX, Math.min(maxX, p.x));
-      p.y = Math.max(minY, Math.min(maxY, p.y));
-    });
-  }
+  // Новые узлы сначала «досчитываются» без показа, чтобы схема не
+  // разлеталась на глазах; дальше она успокаивается уже анимацией.
+  sim.alpha = fresh ? 1 : 0.3;
+  if (fresh) for (let i = 0; i < 120; i++) simTick(sim);
+  simDraw(sim);
+  kickSim(fresh ? 0.25 : 0.3);
 }
 
 function popBox(title, rows){
