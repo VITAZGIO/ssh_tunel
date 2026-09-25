@@ -281,8 +281,10 @@
   /* Прямое соединение между устройствами (минуя сервер). */
   .edge.p2p{stroke:var(--accent);stroke-width:2.6;stroke-dasharray:1 6;animation:flow .7s linear infinite;
     filter:drop-shadow(0 0 3px color-mix(in srgb, var(--accent) 70%, transparent))}
-  .p2p-label{font-size:11px;fill:var(--accent);paint-order:stroke;stroke:var(--card2);stroke-width:3px;
-    text-anchor:middle;pointer-events:none}
+  /* Задержка посередине линии; сама линия в этом месте прервана. */
+  .edge-label{font-size:10px;font-weight:600;fill:var(--text);opacity:.8;text-anchor:middle;
+    dominant-baseline:central;pointer-events:none;font-variant-numeric:tabular-nums}
+  .edge-label.p2p{fill:var(--accent);opacity:1}
   @keyframes flow{to{stroke-dashoffset:-24}}
   .q-excellent,.q-good{stroke:var(--ok)} .q-fair{stroke:var(--warn)} .q-poor{stroke:var(--err)}
   .q-unknown{stroke:var(--accent)}
@@ -2214,7 +2216,91 @@ function svgEl(tag, attrs, parent){
   if (parent) parent.appendChild(e);
   return e;
 }
-let MAP_SIG = '', MAP_REFS = {}, MAP_DIRECT = null;
+let MAP_SIG = '', MAP_REFS = {}, MAP_DIRECT = null, MAP_OBST = [];
+
+// edgeMs — задержка для подписи на схеме: «12мс», «135мс».
+function edgeMs(v){
+  if (!v) return '';
+  return (v < 1 ? '<1' : String(Math.round(v))) + (LANG === 'ru' ? 'мс' : 'ms');
+}
+
+// mapEdge — линия схемы от a к b: квадратичная кривая Безье с изгибом bend.
+// Она из двух половинок, чтобы посередине оставить окно под подпись.
+function mapEdge(gEdge, gLabel, a, b, bend, cls, labelCls){
+  const g = svgEl('g', {class: cls}, gEdge);
+  const e = {g, a, b, bend, last: null,
+    p1: svgEl('path', {}, g), p2: svgEl('path', {}, g),
+    tx: svgEl('text', {class: 'edge-label' + (labelCls ? ' ' + labelCls : '')}, gLabel)};
+  setEdgeLabel(e, '');
+  return e;
+}
+
+// setEdgeLabel пишет подпись в середину линии и прерывает линию ровно на
+// ширину подписи с небольшим зазором: цифры стоят «на пути» линии, но её не
+// касаются. Пустая подпись — линия целиком.
+function setEdgeLabel(e, text){
+  if (!e.tx.parentNode) text = ''; // подписи выключены (слишком много устройств)
+  if (e.last === text) return;
+  e.last = text;
+  const {a, b, bend} = e;
+  const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+  const c = {x: (a.x + b.x) / 2 - dy * bend, y: (a.y + b.y) / 2 + dx * bend};
+  const at = t => ({x: (1-t)*(1-t)*a.x + 2*t*(1-t)*c.x + t*t*b.x, y: (1-t)*(1-t)*a.y + 2*t*(1-t)*c.y + t*t*b.y});
+  const tan = t => ({x: 2*(1-t)*(c.x - a.x) + 2*t*(b.x - c.x), y: 2*(1-t)*(c.y - a.y) + 2*t*(b.y - c.y)});
+  const f = v => v.toFixed(1);
+  // Кусок кривой от t0 до t1 — тоже квадратичная кривая (алгоритм де Кастельжо).
+  const seg = (t0, t1) => {
+    const p = at(t0), q = at(t1), v = tan(t0), k = (t1 - t0) / 2;
+    return 'M' + f(p.x) + ' ' + f(p.y) + 'Q' + f(p.x + v.x * k) + ' ' + f(p.y + v.y * k) + ' ' + f(q.x) + ' ' + f(q.y);
+  };
+  e.tx.textContent = text;
+  if (!text){
+    e.p1.setAttribute('d', seg(0, 1));
+    e.p2.setAttribute('d', '');
+    return;
+  }
+  let w = 0;
+  try { w = e.tx.getComputedTextLength(); } catch (err) {}
+  if (!w) w = text.length * 5.8;
+  const hw = w / 2 + 3, hh = 5 + 3;
+  // Место — посередине; если там кружок или название узла, ближайшее
+  // свободное вдоль линии.
+  // Площадь, на которую подпись в точке t наехала бы на узлы.
+  const overlap = t => {
+    const m = at(t);
+    let sum = 0;
+    MAP_OBST.forEach(r => {
+      const ox = Math.min(m.x + hw, r.x2) - Math.max(m.x - hw, r.x1);
+      const oy = Math.min(m.y + hh, r.y2) - Math.max(m.y - hh, r.y1);
+      if (ox > 0 && oy > 0) sum += ox * oy;
+    });
+    return sum;
+  };
+  let tm = 0.5, best = Infinity;
+  for (const t of [0.5, 0.44, 0.56, 0.38, 0.62, 0.32, 0.68, 0.26, 0.74, 0.2, 0.8]){
+    const o = overlap(t);
+    if (o < best - 1e-6){ best = o; tm = t; }
+    if (o === 0) break;
+  }
+  if (best > 0){
+    // Линия слишком короткая: цифры везде наехали бы на узел. Тогда линия
+    // целиком, а задержка — во всплывающей подсказке и карточке.
+    e.tx.textContent = '';
+    e.p1.setAttribute('d', seg(0, 1));
+    e.p2.setAttribute('d', '');
+    return;
+  }
+  const m = at(tm), v = tan(tm), speed = Math.hypot(v.x, v.y) || 1;
+  e.tx.setAttribute('x', f(m.x));
+  e.tx.setAttribute('y', f(m.y));
+  // Прямая через центр прямоугольника подписи выходит из него на расстоянии
+  // min(½ширины/|cos|, ½высоты/|sin|) — столько линии и убираем.
+  const cos = Math.abs(v.x) / speed, sin = Math.abs(v.y) / speed;
+  const half = Math.min(cos > 1e-3 ? hw / cos : Infinity, sin > 1e-3 ? hh / sin : Infinity);
+  const dt = half / speed;
+  e.p1.setAttribute('d', tm - dt > 0.02 ? seg(0, tm - dt) : '');
+  e.p2.setAttribute('d', tm + dt < 0.98 ? seg(tm + dt, 1) : '');
+}
 
 function qClass(online, q){ return online ? 'on q-' + (q || 'unknown') : 'off'; }
 
@@ -2234,7 +2320,10 @@ function renderMap(servers, devices){
     const r = MAP_REFS['s:' + s.id];
     if (!r) return;
     const q = s.main ? 'excellent' : (s.link && s.link.quality);
-    if (r.edge) r.edge.setAttribute('class', 'edge srv ' + qClass(s.online, q));
+    if (r.edge){
+      r.edge.g.setAttribute('class', 'edge srv ' + qClass(s.online, q));
+      setEdgeLabel(r.edge, s.online && s.link ? edgeMs(s.link.rttMs) : '');
+    }
     r.node.classList.toggle('offline', !s.online);
     r.halo.style.display = s.online ? '' : 'none';
     r.data = s;
@@ -2242,7 +2331,8 @@ function renderMap(servers, devices){
   devices.forEach(d => {
     const r = MAP_REFS['d:' + d.id];
     if (!r) return;
-    r.edge.setAttribute('class', 'edge ' + qClass(d.online, d.quality));
+    r.edge.g.setAttribute('class', 'edge ' + qClass(d.online, d.quality));
+    setEdgeLabel(r.edge, d.online ? edgeMs(d.rttMs) : '');
     r.node.classList.toggle('offline', !d.online);
     r.halo.style.display = d.online ? '' : 'none';
     r.disc.setAttribute('stroke', qColor(d.online, d.quality));
@@ -2256,7 +2346,7 @@ function renderMap(servers, devices){
 // рисуются заново при каждом опросе, не трогая раскладку.
 function drawDirect(devices){
   if (!MAP_DIRECT) return;
-  const {g, pos, curve} = MAP_DIRECT;
+  const {g, pos} = MAP_DIRECT;
   g.innerHTML = '';
   const byIP = {}, seen = new Set();
   devices.forEach(d => { byIP[d.ip] = d; });
@@ -2268,20 +2358,30 @@ function drawDirect(devices){
       const key = [d.id, o.id].sort().join('|');
       if (seen.has(key)) return;
       seen.add(key);
-      const a = pos[d.id], b = pos[o.id], bend = -0.18;
-      const e = svgEl('path', {d: curve(a, b, bend), class: 'edge p2p'}, g);
-      const tt = svgEl('title', {}, e);
-      const label = t('map_direct') + (l.rttMs ? ' · ' + fmtMs(l.rttMs) : '');
-      tt.textContent = d.display + ' ⇄ ' + o.display + ' · ' + label;
-      // Подпись — у середины дуги (точка кривой Безье при t = 0.5), чуть
-      // снаружи изгиба, чтобы не лежать на линии.
-      const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
-      const nx = -dy * Math.sign(bend) / len, ny = dx * Math.sign(bend) / len;
-      const mx = (a.x + b.x) / 2 - dy * bend / 2 + nx * 12, my = (a.y + b.y) / 2 + dx * bend / 2 + ny * 12 + 3;
-      const tx = svgEl('text', {x: mx.toFixed(1), y: my.toFixed(1), class: 'p2p-label'}, g);
-      tx.textContent = label;
+      const e = mapEdge(g, g, pos[d.id], pos[o.id], directBend(pos[d.id], pos[o.id]), 'edge p2p', 'p2p');
+      svgEl('title', {}, e.g).textContent = d.display + ' ⇄ ' + o.display + ' · ' + t('map_direct') +
+        (l.rttMs ? ' · ' + fmtMs(l.rttMs) : '');
+      setEdgeLabel(e, edgeMs(l.rttMs));
     });
   });
+}
+
+// directBend — изгиб прямой дуги, при котором она меньше всего проходит
+// сквозь узлы (серверы в центре схемы обычно как раз на пути).
+function directBend(a, b){
+  let best = -0.18, bestHits = Infinity;
+  for (const bend of [-0.18, 0.18, -0.32, 0.32, -0.45, 0.45]){
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const c = {x: (a.x + b.x) / 2 - dy * bend, y: (a.y + b.y) / 2 + dx * bend};
+    let hits = 0;
+    for (let t = 0.12; t <= 0.88; t += 0.04){
+      const x = (1-t)*(1-t)*a.x + 2*t*(1-t)*c.x + t*t*b.x, y = (1-t)*(1-t)*a.y + 2*t*(1-t)*c.y + t*t*b.y;
+      MAP_OBST.forEach(r => { if (x > r.x1 && x < r.x2 && y > r.y1 && y < r.y2) hits++; });
+    }
+    if (hits < bestHits){ bestHits = hits; best = bend; }
+    if (!hits) break;
+  }
+  return best;
 }
 
 // directText — с кем у устройства прямое соединение, одной строкой.
@@ -2302,13 +2402,15 @@ function buildMap(svg, W, H, servers, devices, animate){
   svg.innerHTML = '';
   svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
   MAP_REFS = {};
+  MAP_OBST = [];
   const cx = W / 2, cy = H / 2, S = Math.min(W, H);
   const defs = svgEl('defs', {}, svg);
   const grad = svgEl('linearGradient', {id:'gNode', x1:0, y1:0, x2:0, y2:1}, defs);
   svgEl('stop', {offset:'0', 'stop-color':'var(--accent-muted)'}, grad);
   svgEl('stop', {offset:'1', 'stop-color':'var(--accent-muted-dark)'}, grad);
   for (let i = 1; i <= 3; i++) svgEl('circle', {cx, cy, r: S * 0.155 * i, fill:'none', class:'map-grid'}, svg);
-  const gEdges = svgEl('g', {}, svg), gDirect = svgEl('g', {}, svg), gNodes = svgEl('g', {}, svg);
+  const gEdges = svgEl('g', {}, svg), gDirect = svgEl('g', {}, svg), gLabels = svgEl('g', {}, svg);
+  const gNodes = svgEl('g', {}, svg);
 
   const main = servers.find(s => s.main);
   const secs = servers.filter(s => !s.main);
@@ -2352,12 +2454,7 @@ function buildMap(svg, W, H, servers, devices, animate){
   });
   relaxLayout(Object.values(pos), dpos, pos, W, H, narrow);
 
-  const curve = (a, b, bend) => {
-    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-    const dx = b.x - a.x, dy = b.y - a.y;
-    return 'M' + a.x.toFixed(1) + ' ' + a.y.toFixed(1) + 'Q' + (mx - dy * bend).toFixed(1) + ' ' +
-      (my + dx * bend).toFixed(1) + ' ' + b.x.toFixed(1) + ' ' + b.y.toFixed(1);
-  };
+
   const many = devices.length > (narrow ? 12 : 28);
   let k = 0;
   const node = (key, p, r, path, label, sub, data, isServer) => {
@@ -2381,6 +2478,11 @@ function buildMap(svg, W, H, servers, devices, animate){
     }
     const ref = {node: outer, halo, disc, data};
     MAP_REFS[key] = ref;
+    // Кружок и подписи узла — сюда цифрам задержки нельзя.
+    let tw = 0;
+    outer.querySelectorAll('text').forEach(x => { try { tw = Math.max(tw, x.getComputedTextLength()); } catch (err) {} });
+    MAP_OBST.push({x1: p.x - r - 2, x2: p.x + r + 2, y1: p.y - r - 2, y2: p.y + r + 2});
+    if (tw) MAP_OBST.push({x1: p.x - tw / 2 - 2, x2: p.x + tw / 2 + 2, y1: p.y + r + 2, y2: p.y + r + (sub && !narrow ? 28 : 17)});
     outer.addEventListener('mouseenter', () => showPop(disc, isServer ? serverPop(ref.data) : devicePop(ref.data)));
     outer.addEventListener('mouseleave', () => { if (!hintPinned) hidePop(); });
     outer.addEventListener('click', e => {
@@ -2393,7 +2495,7 @@ function buildMap(svg, W, H, servers, devices, animate){
   };
 
   secs.forEach(s => {
-    const e = svgEl('path', {d: curve(pos[main ? main.id : s.id] || pos[s.id], pos[s.id], 0.08), class: 'edge srv'}, gEdges);
+    const e = mapEdge(gEdges, gLabels, pos[main ? main.id : s.id] || pos[s.id], pos[s.id], 0.08, 'edge srv');
     const r = node('s:' + s.id, pos[s.id], 17, GLYPH.server, s.name, s.meshHost ? s.meshHost + '.mesh' : (s.host || ''), s, true);
     r.edge = e;
   });
@@ -2404,11 +2506,11 @@ function buildMap(svg, W, H, servers, devices, animate){
     const p = dpos[d.id];
     if (!p) return;
     const sid = pos[d.server] ? d.server : main.id;
-    const e = svgEl('path', {d: curve(p, pos[sid], 0.12), class: 'edge'}, gEdges);
+    const e = mapEdge(gEdges, many ? null : gLabels, p, pos[sid], 0.12, 'edge');
     const r = node('d:' + d.id, p, narrow ? 10.5 : 12.5, glyphOf(d.platform), d.display, d.host + '.mesh', d, false);
     r.edge = e;
   });
-  MAP_DIRECT = {g: gDirect, pos: dpos, curve};
+  MAP_DIRECT = {g: gDirect, pos: dpos};
   if (!servers.length){
     const tx = svgEl('text', {x: cx, y: cy, 'text-anchor': 'middle', fill: 'var(--dim)'}, svg);
     tx.textContent = '—';
