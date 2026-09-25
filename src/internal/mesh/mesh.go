@@ -67,6 +67,9 @@ type Config struct {
 	ProbeListen   func(network string) (net.PacketConn, error)
 	ProbeResolver *net.Resolver
 	NoNATProbe    bool
+	// ProbeDial — такой же сокет мимо туннеля, но «соединённый»: по нему
+	// узнаётся свой локальный адрес (см. p2p.routeIP); nil — обычный.
+	ProbeDial func(network, addr string) (net.Conn, error)
 	// NoDirect — не пробовать прямые соединения между устройствами: всё
 	// только через сервер.
 	NoDirect bool
@@ -359,6 +362,9 @@ func (c *Client) session(ctx context.Context) error {
 		switch m.Op {
 		case "peers":
 			c.setPeers(m.Peers)
+			if p := c.direct(); p != nil {
+				go p.autoConnect()
+			}
 		case "incoming":
 			go c.incoming(m)
 		case "p2p":
@@ -526,7 +532,7 @@ func (c *Client) DialPeer(target string) (net.Conn, error) {
 		if conn != nil || err != nil {
 			return conn, err
 		}
-		go p.connect(ip.String())
+		go p.connect(ip.String(), false)
 	}
 
 	conn, err := c.dial("tcp", c.cfg.Addr)

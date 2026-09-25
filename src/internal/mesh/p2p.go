@@ -52,6 +52,9 @@ const (
 	p2pRetry = 45 * time.Second
 	// punchFor — сколько длится одна попытка пробивания.
 	punchFor = 8 * time.Second
+	// p2pRetryMax — реже этого сами (без соединения от человека) не пробуем:
+	// после каждой неудачи пауза удваивается от p2pRetry до этой.
+	p2pRetryMax = 12 * time.Minute
 )
 
 var punchMagic = [4]byte{0, 'p', '2', 'p'}
@@ -85,6 +88,16 @@ type p2pPeer struct {
 	conn    quic.Connection
 	rtt     time.Duration
 	lastTry time.Time
+	fails   int // неудачных попыток подряд (для паузы между ними)
+}
+
+// retryAfter — пауза перед следующей попыткой сама по себе.
+func (peer *p2pPeer) retryAfter() time.Duration {
+	d := p2pRetry
+	for i := 0; i < peer.fails && d < p2pRetryMax; i++ {
+		d *= 2
+	}
+	return min(d, p2pRetryMax)
 }
 
 type p2pAttempt struct {
@@ -354,11 +367,18 @@ func (p *p2p) stunQuery() (netip.AddrPort, error) {
 }
 
 func (p *p2p) stunLoop() {
+	first := true
 	for {
 		if ap, err := p.stunQuery(); err == nil {
 			p.mu.Lock()
 			p.public = ap
 			p.mu.Unlock()
+			if first {
+				// Внешний адрес известен — можно сразу искать прямые пути ко
+				// всем устройствам в сети, не дожидаясь, пока к ним пойдут.
+				first = false
+				go p.autoConnect()
+			}
 		}
 		select {
 		case <-p.ctx.Done():
@@ -381,22 +401,50 @@ func (p *p2p) candidates() []string {
 	if !ok {
 		return out
 	}
+	seen := map[netip.Addr]bool{}
+	add := func(ip netip.Addr) {
+		ip = ip.Unmap()
+		if !ip.Is4() || !ip.IsPrivate() || Range.Contains(ip) || seen[ip] || len(out) >= 8 {
+			return
+		}
+		seen[ip] = true
+		out = append(out, netip.AddrPortFrom(ip, uint16(la.Port)).String())
+	}
+	// Сначала адрес, через который устройство ходит в интернет: система
+	// выбирает его для «соединения» UDP-сокета с сервером (пакеты при этом не
+	// уходят). Это работает и на Android 11+, где список сетевых интерфейсов
+	// приложению не отдают.
+	if ip, ok := p.routeIP(); ok {
+		add(ip)
+	}
 	addrs, _ := net.InterfaceAddrs()
 	for _, a := range addrs {
-		n, ok := a.(*net.IPNet)
-		if !ok {
-			continue
-		}
-		ip, ok := netip.AddrFromSlice(n.IP)
-		if !ok || !ip.Unmap().Is4() || !ip.IsPrivate() || Range.Contains(ip.Unmap()) {
-			continue
-		}
-		out = append(out, netip.AddrPortFrom(ip.Unmap(), uint16(la.Port)).String())
-		if len(out) >= 8 {
-			break
+		if n, ok := a.(*net.IPNet); ok {
+			if ip, ok := netip.AddrFromSlice(n.IP); ok {
+				add(ip)
+			}
 		}
 	}
 	return out
+}
+
+// routeIP — локальный адрес этого устройства в сторону сервера.
+func (p *p2p) routeIP() (netip.Addr, bool) {
+	dial := p.c.cfg.ProbeDial
+	if dial == nil {
+		dial = net.Dial
+	}
+	conn, err := dial("udp4", p.stun.String())
+	if err != nil {
+		return netip.Addr{}, false
+	}
+	defer conn.Close()
+	ua, ok := conn.LocalAddr().(*net.UDPAddr)
+	if !ok {
+		return netip.Addr{}, false
+	}
+	ip, ok := netip.AddrFromSlice(ua.IP)
+	return ip.Unmap(), ok
 }
 
 func parseCands(list []string) []*net.UDPAddr {
@@ -414,16 +462,35 @@ func parseCands(list []string) []*net.UDPAddr {
 
 // ---------- сигнализация через meshd ----------
 
+// autoConnect пробует прямой путь ко всем устройствам сети, которые сейчас
+// на связи: так прямое соединение готово ещё до того, как к устройству
+// пойдут, и видно в панели. Неудачи — всё реже (см. retryAfter).
+func (p *p2p) autoConnect() {
+	st := p.c.Status()
+	for _, peer := range st.Peers {
+		if peer.Self || !peer.Online || serverNodes.Contains(peer.IP) {
+			continue
+		}
+		p.connect(peer.IP.String(), true)
+	}
+}
+
 // connect начинает попытку прямого пути к устройству, если её не было
 // недавно. Не ждёт: соединение, ради которого вызвали, уже идёт через сервер.
-func (p *p2p) connect(peerIP string) {
+// auto — попытка сама по себе (а не ради соединения человека): после
+// неудач реже.
+func (p *p2p) connect(peerIP string, auto bool) {
 	p.mu.Lock()
 	peer := p.peers[peerIP]
 	if peer == nil {
 		peer = &p2pPeer{}
 		p.peers[peerIP] = peer
 	}
-	busy := peer.conn != nil || time.Since(peer.lastTry) < p2pRetry
+	wait := p2pRetry
+	if auto {
+		wait = peer.retryAfter()
+	}
+	busy := peer.conn != nil || (!peer.lastTry.IsZero() && time.Since(peer.lastTry) < wait)
 	for _, a := range p.attempts {
 		if a.peerIP == peerIP {
 			busy = true
@@ -446,10 +513,24 @@ func (p *p2p) connect(peerIP string) {
 		case <-a.answered:
 			p.punch(a)
 		case <-time.After(6 * time.Second):
+			// Не ответило: старая версия программы или прямые выключены.
+			p.failed(peerIP)
 			p.dropAttempt(a)
 		case <-p.ctx.Done():
 		}
 	}()
+}
+
+// failed отмечает неудачную попытку; возвращает, какая она по счёту подряд.
+func (p *p2p) failed(peerIP string) int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	peer := p.peers[peerIP]
+	if peer == nil || peer.conn != nil {
+		return 0
+	}
+	peer.fails++
+	return peer.fails
 }
 
 func (p *p2p) newAttemptLocked(peerIP string, initiator bool) *p2pAttempt {
@@ -545,7 +626,9 @@ func (p *p2p) punch(a *p2pAttempt) {
 		case <-a.done:
 			return
 		case <-deadline:
-			p.c.log("info", "Сеть устройств: прямой путь к "+a.peerIP+" не нашёлся — соединения идут через сервер")
+			if p.failed(a.peerIP) == 1 {
+				p.c.log("info", "Сеть устройств: прямой путь к "+a.peerIP+" не нашёлся — соединения идут через сервер")
+			}
 			return
 		case <-tick.C:
 			for _, c := range cands {
@@ -607,7 +690,7 @@ func (p *p2p) adopt(peerIP string, conn quic.Connection) {
 	if peer.conn != nil && peer.conn != conn {
 		peer.conn.CloseWithError(0, "")
 	}
-	peer.conn = conn
+	peer.conn, peer.fails = conn, 0
 	p.mu.Unlock()
 	p.c.log("info", fmt.Sprintf("Сеть устройств: прямое соединение с %s (%s)", peerIP, conn.RemoteAddr()))
 	go p.serve(peerIP, conn)
@@ -789,6 +872,7 @@ func (p *p2p) healthLoop() {
 			p.measure(ip)
 		}
 		p.report()
+		p.autoConnect()
 	}
 }
 

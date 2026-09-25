@@ -446,6 +446,10 @@ func (t *Tunnel) startMesh(ctx context.Context) {
 			return lc.ListenPacket(context.Background(), network, ":0")
 		}
 	}
+	if mc.ProbeDial == nil {
+		d := net.Dialer{Control: t.cfg.ProtectSocket}
+		mc.ProbeDial = d.Dial
+	}
 	if mc.ProbeResolver == nil {
 		mc.ProbeResolver = t.cfg.Resolver
 	}

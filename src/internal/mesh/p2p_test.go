@@ -229,3 +229,31 @@ func TestПрямоеЧужойКлючОтвергнут(t *testing.T) {
 		t.Fatalf("свой ключ отвергнут: %v", err)
 	}
 }
+
+// Прямой путь ищется сам, как только устройства в сети, — без единого
+// соединения между ними. Оба начинают одновременно («ничья»): остаётся одно
+// соединение, и видят его оба.
+func TestПрямоеСоединениеСамо(t *testing.T) {
+	addr, _, _ := startMeshdSTUN(t)
+	key := NewKey()
+	a, _ := startClientLog(t, addr, Config{Key: key, Name: "a", Via: "127.0.0.1", AllowIncoming: true})
+	b, _ := startClientLog(t, addr, Config{Key: key, Name: "b", Via: "127.0.0.1", AllowIncoming: true})
+	aIP, bIP := a.Status().Self.IP.String(), b.Status().Self.IP.String()
+	waitLong(t, 15*time.Second, func() bool { return peerStatus(a, bIP).Direct && peerStatus(b, aIP).Direct },
+		"прямое соединение само не установилось")
+	// И держится: ни одна сторона не закрыла его в пользу своего.
+	time.Sleep(2 * time.Second)
+	if !peerStatus(a, bIP).Direct || !peerStatus(b, aIP).Direct {
+		t.Fatal("прямое соединение пропало после «ничьей»")
+	}
+}
+
+// Свой локальный адрес находится и без списка интерфейсов (как на Android 11+).
+func TestЛокальныйАдресЧерезМаршрут(t *testing.T) {
+	c := New(Config{}, nil, nil)
+	p := &p2p{c: c, stun: &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 3478}}
+	ip, ok := p.routeIP()
+	if !ok || !ip.IsLoopback() {
+		t.Fatalf("адрес в сторону 127.0.0.1: %v %v", ip, ok)
+	}
+}
