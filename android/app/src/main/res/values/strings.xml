@@ -201,6 +201,9 @@
     <string name="mesh_new">Новая сеть</string>
     <string name="mesh_key_hint">Устройства с одинаковым ключом — одна сеть. Проще всего получить ключ, отсканировав QR-код сервера с компьютера: он приедет вместе с сервером.</string>
     <string name="mesh_incoming">Пускать другие устройства к службам телефона</string>
+    <string name="mesh_direct">Соединяться с устройствами напрямую, когда получается</string>
+    <string name="mesh_direct_hint">Устройства пробуют найти путь друг к другу мимо сервера (пробивание NAT по UDP, шифрование QUIC/TLS 1.3). Не получилось — всё идёт через сервер.</string>
+    <string name="mesh_path_direct">напрямую</string>
     <string name="mesh_reconnect_note">Сохраняется само, применяется при следующем подключении.</string>
     <string name="mesh_devices">Устройства</string>
     <string name="mesh_this">(этот телефон)</string>

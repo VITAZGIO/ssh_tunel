@@ -172,9 +172,10 @@ func (t *Tunnel) Configure(
 // ConfigureMesh задаёт сеть устройств (см. sshtunnel/internal/mesh).
 // Вызывается после Configure и до StartCore: Configure собирает настройки
 // заново и сеть сбрасывает. deviceID — постоянный id телефона, его хранит
-// приложение. Пустой key при enabled — ошибка: ключ сети приложение
+// приложение. direct — пробовать прямые соединения с устройствами (мимо
+// сервера). Пустой key при enabled — ошибка: ключ сети приложение
 // создаёт само (NewMeshKey) или получает импортом сервера.
-func (t *Tunnel) ConfigureMesh(enabled bool, key, name, deviceID string, incoming bool) error {
+func (t *Tunnel) ConfigureMesh(enabled bool, key, name, deviceID string, incoming, direct bool) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	if !enabled {
@@ -192,7 +193,7 @@ func (t *Tunnel) ConfigureMesh(enabled bool, key, name, deviceID string, incomin
 		name = "телефон"
 	}
 	t.cfg.Mesh = &mesh.Config{
-		Key: key, DeviceID: deviceID, Name: name, AllowIncoming: incoming,
+		Key: key, DeviceID: deviceID, Name: name, AllowIncoming: incoming, NoDirect: !direct,
 		Platform: "android", Mode: "vpn", Via: t.cfg.Host, AppVersion: updater.Version,
 	}
 	return nil

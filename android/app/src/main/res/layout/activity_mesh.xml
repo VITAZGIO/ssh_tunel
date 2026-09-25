@@ -109,6 +109,20 @@
                 android:textColor="@color/text"
                 android:text="@string/mesh_incoming" />
 
+            <CheckBox
+                android:id="@+id/meshDirect"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text"
+                android:text="@string/mesh_direct" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="12sp"
+                android:textColor="@color/dim"
+                android:text="@string/mesh_direct_hint" />
+
             <TextView
                 android:id="@+id/meshNote"
                 android:layout_width="match_parent"

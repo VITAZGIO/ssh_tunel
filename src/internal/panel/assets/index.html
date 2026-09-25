@@ -278,6 +278,11 @@
   .edge.srv{stroke-width:2.6}
   .edge.srv.on{stroke-dasharray:9 8;animation-duration:.9s}
   .edge.off{stroke:var(--dim);opacity:.28;stroke-dasharray:2 6}
+  /* Прямое соединение между устройствами (минуя сервер). */
+  .edge.p2p{stroke:var(--accent);stroke-width:2.6;stroke-dasharray:1 6;animation:flow .7s linear infinite;
+    filter:drop-shadow(0 0 3px color-mix(in srgb, var(--accent) 70%, transparent))}
+  .p2p-label{font-size:11px;fill:var(--accent);paint-order:stroke;stroke:var(--card2);stroke-width:3px;
+    text-anchor:middle;pointer-events:none}
   @keyframes flow{to{stroke-dashoffset:-24}}
   .q-excellent,.q-good{stroke:var(--ok)} .q-fair{stroke:var(--warn)} .q-poor{stroke:var(--err)}
   .q-unknown{stroke:var(--accent)}
@@ -1006,7 +1011,7 @@ const I18N = {
     err_autostart_unsupported:'Автозапуском отсюда управлять нечем',
     password_changed:'Пароль изменён',
     nav_mesh:'Сеть устройств',
-    dev_nat:'Сеть (NAT)', nat_easy:'простой NAT', nat_hard:'жёсткий NAT', nat_open:'открытый',
+    dev_direct:'Напрямую с', map_direct:'напрямую', dev_nat:'Сеть (NAT)', nat_easy:'простой NAT', nat_hard:'жёсткий NAT', nat_open:'открытый',
     nat_udp_blocked:'UDP не проходит', nat_unknown:'не проверено',
     fc_title:'Прямые соединения: прогноз', fc_pairs:'Пары устройств',
     fc_note:'Проверка NAT идёт сама при каждом подключении устройства. По её итогам — смогут ли устройства '+
@@ -1228,7 +1233,7 @@ const I18N = {
     err_autostart_unsupported:'There is nothing to switch here',
     password_changed:'Password changed',
     nav_mesh:'Device network',
-    dev_nat:'Network (NAT)', nat_easy:'easy NAT', nat_hard:'hard NAT', nat_open:'open',
+    dev_direct:'Direct with', map_direct:'direct', dev_nat:'Network (NAT)', nat_easy:'easy NAT', nat_hard:'hard NAT', nat_open:'open',
     nat_udp_blocked:'UDP blocked', nat_unknown:'not checked',
     fc_title:'Direct connections: forecast', fc_pairs:'Device pairs',
     fc_note:'A NAT check runs by itself every time a device connects. From it — whether devices could ever '+
@@ -2209,7 +2214,7 @@ function svgEl(tag, attrs, parent){
   if (parent) parent.appendChild(e);
   return e;
 }
-let MAP_SIG = '', MAP_REFS = {};
+let MAP_SIG = '', MAP_REFS = {}, MAP_DIRECT = null;
 
 function qClass(online, q){ return online ? 'on q-' + (q || 'unknown') : 'off'; }
 
@@ -2243,6 +2248,49 @@ function renderMap(servers, devices){
     r.disc.setAttribute('stroke', qColor(d.online, d.quality));
     r.data = d;
   });
+  drawDirect(devices);
+}
+
+// drawDirect — прямые соединения между устройствами (по отчётам самих
+// устройств): зелёная пунктирная дуга мимо сервера. Меняются часто, поэтому
+// рисуются заново при каждом опросе, не трогая раскладку.
+function drawDirect(devices){
+  if (!MAP_DIRECT) return;
+  const {g, pos, curve} = MAP_DIRECT;
+  g.innerHTML = '';
+  const byIP = {}, seen = new Set();
+  devices.forEach(d => { byIP[d.ip] = d; });
+  devices.forEach(d => {
+    (d.direct || []).forEach(l => {
+      const o = byIP[l.ip];
+      if (!o || !d.online || !o.online || !pos[d.id] || !pos[o.id]) return;
+      // Каждая пара — один раз: обычно о ней сообщают оба устройства.
+      const key = [d.id, o.id].sort().join('|');
+      if (seen.has(key)) return;
+      seen.add(key);
+      const a = pos[d.id], b = pos[o.id], bend = -0.18;
+      const e = svgEl('path', {d: curve(a, b, bend), class: 'edge p2p'}, g);
+      const tt = svgEl('title', {}, e);
+      const label = t('map_direct') + (l.rttMs ? ' · ' + fmtMs(l.rttMs) : '');
+      tt.textContent = d.display + ' ⇄ ' + o.display + ' · ' + label;
+      // Подпись — у середины дуги (точка кривой Безье при t = 0.5), чуть
+      // снаружи изгиба, чтобы не лежать на линии.
+      const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+      const nx = -dy * Math.sign(bend) / len, ny = dx * Math.sign(bend) / len;
+      const mx = (a.x + b.x) / 2 - dy * bend / 2 + nx * 12, my = (a.y + b.y) / 2 + dx * bend / 2 + ny * 12 + 3;
+      const tx = svgEl('text', {x: mx.toFixed(1), y: my.toFixed(1), class: 'p2p-label'}, g);
+      tx.textContent = label;
+    });
+  });
+}
+
+// directText — с кем у устройства прямое соединение, одной строкой.
+function directText(d){
+  const list = (d.direct || []).map(l => {
+    const o = meshDevices().find(x => x.ip === l.ip);
+    return (o ? o.display : l.ip) + (l.rttMs ? ' · ' + fmtMs(l.rttMs) : '');
+  });
+  return list.join(', ');
 }
 
 function qColor(online, q){
@@ -2260,7 +2308,7 @@ function buildMap(svg, W, H, servers, devices, animate){
   svgEl('stop', {offset:'0', 'stop-color':'var(--accent-muted)'}, grad);
   svgEl('stop', {offset:'1', 'stop-color':'var(--accent-muted-dark)'}, grad);
   for (let i = 1; i <= 3; i++) svgEl('circle', {cx, cy, r: S * 0.155 * i, fill:'none', class:'map-grid'}, svg);
-  const gEdges = svgEl('g', {}, svg), gNodes = svgEl('g', {}, svg);
+  const gEdges = svgEl('g', {}, svg), gDirect = svgEl('g', {}, svg), gNodes = svgEl('g', {}, svg);
 
   const main = servers.find(s => s.main);
   const secs = servers.filter(s => !s.main);
@@ -2360,6 +2408,7 @@ function buildMap(svg, W, H, servers, devices, animate){
     const r = node('d:' + d.id, p, narrow ? 10.5 : 12.5, glyphOf(d.platform), d.display, d.host + '.mesh', d, false);
     r.edge = e;
   });
+  MAP_DIRECT = {g: gDirect, pos: dpos, curve};
   if (!servers.length){
     const tx = svgEl('text', {x: cx, y: cy, 'text-anchor': 'middle', fill: 'var(--dim)'}, svg);
     tx.textContent = '—';
@@ -2423,6 +2472,7 @@ function devicePop(d){
     [t('dev_mode'), d.mode ? t('mode_' + d.mode) : ''],
     [t('dev_latency'), d.online && d.rttMs ? fmtMs(d.rttMs) + ' · ' + t('q_' + d.quality) : ''],
     [t('dev_via'), serverName(d.server)],
+    [t('dev_direct'), d.online ? directText(d) : ''],
     [d.online ? t('dev_since') : t('dev_last'), d.online ? fmtAgo(d.connectedAt) : fmtClock(d.lastSeen)],
   ]);
 }
@@ -2523,6 +2573,7 @@ function fillDeviceCard(card, d){
   fact(t('dev_mode'), d.mode ? t('mode_' + d.mode) : '—');
   if (d.nat) fact(t('dev_nat'), natLabel(d.nat));
   fact(t('dev_via'), serverName(d.server));
+  if (d.online && d.direct && d.direct.length) fact(t('dev_direct'), directText(d));
   fact(t('dev_traffic'), '↑' + fmtBytes(d.bytesUp) + ' ↓' + fmtBytes(d.bytesDown));
   fact(d.online ? t('dev_since') : t('dev_last'), d.online ? fmtAgo(d.connectedAt) : fmtClock(d.lastSeen));
   if (d.app) fact(t('dev_app'), d.app);

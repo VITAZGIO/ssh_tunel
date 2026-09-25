@@ -141,6 +141,13 @@ type msg struct {
 	// NAT — результат проверки NAT, который устройство прислало о себе.
 	NAT *natInfo `json:"nat,omitempty"`
 
+	// Прямые соединения (p2p): предложение и ответ пересылаются между
+	// устройствами как есть — адреса-кандидаты и отпечаток ключа.
+	Cands []string `json:"cands,omitempty"`
+	FP    string   `json:"fp,omitempty"`
+	// Direct — с кем у устройства сейчас прямое соединение (op p2pstat).
+	Direct []directLink `json:"direct,omitempty"`
+
 	// T — метка времени (наносекунды) в ping/pong для замера задержки.
 	T int64 `json:"t,omitempty"`
 }
@@ -182,6 +189,9 @@ type device struct {
 
 	ctrl        *ctrlConn
 	connectedAt time.Time
+	direct      []directLink // прямые соединения (по отчёту устройства)
+	p2pBudget   int          // сколько предложений p2p осталось в эту минуту
+	p2pMinute   int64
 	up, down    atomic.Int64 // трафик за время жизни процесса, поверх Bytes*
 	activeCalls atomic.Int64
 	link        linkStats
@@ -683,6 +693,10 @@ func (s *server) control(conn net.Conn, m msg) {
 		}
 		s.mu.Unlock()
 	}, func(in msg) {
+		if in.Op == "p2p" || in.Op == "p2pstat" {
+			s.p2pMessage(n, d, c, in)
+			return
+		}
 		if in.Op == "nat" && in.NAT != nil {
 			info := in.NAT.clean()
 			s.mu.Lock()
@@ -697,6 +711,7 @@ func (s *server) control(conn net.Conn, m msg) {
 	s.mu.Lock()
 	if d.ctrl == c {
 		d.ctrl = nil
+		d.direct = nil
 		d.LastSeen = time.Now()
 		s.broadcastLocked(n)
 	}
@@ -1000,32 +1015,33 @@ func (c countingReader) Read(p []byte) (int, error) {
 
 // adminDevice — устройство глазами панели.
 type adminDevice struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Alias       string   `json:"alias,omitempty"`
-	Display     string   `json:"display"`
-	Host        string   `json:"host"`
-	IP          string   `json:"ip"`
-	Online      bool     `json:"online"`
-	Platform    string   `json:"platform,omitempty"`
-	OS          string   `json:"os,omitempty"`
-	App         string   `json:"app,omitempty"`
-	Mode        string   `json:"mode,omitempty"`
-	Via         string   `json:"via,omitempty"`
-	Hostname    string   `json:"hostname,omitempty"`
-	FirstSeen   int64    `json:"firstSeen,omitempty"`
-	LastSeen    int64    `json:"lastSeen,omitempty"`
-	ConnectedAt int64    `json:"connectedAt,omitempty"`
-	Sessions    int64    `json:"sessions"`
-	RTTMs       float64  `json:"rttMs,omitempty"`
-	RTTAvgMs    float64  `json:"rttAvgMs,omitempty"`
-	JitterMs    float64  `json:"jitterMs,omitempty"`
-	LossPct     float64  `json:"lossPct"`
-	Quality     string   `json:"quality"`
-	BytesUp     int64    `json:"bytesUp"`
-	BytesDown   int64    `json:"bytesDown"`
-	ActiveCalls int64    `json:"activeCalls"`
-	NAT         *natInfo `json:"nat,omitempty"`
+	ID          string       `json:"id"`
+	Name        string       `json:"name"`
+	Alias       string       `json:"alias,omitempty"`
+	Display     string       `json:"display"`
+	Host        string       `json:"host"`
+	IP          string       `json:"ip"`
+	Online      bool         `json:"online"`
+	Platform    string       `json:"platform,omitempty"`
+	OS          string       `json:"os,omitempty"`
+	App         string       `json:"app,omitempty"`
+	Mode        string       `json:"mode,omitempty"`
+	Via         string       `json:"via,omitempty"`
+	Hostname    string       `json:"hostname,omitempty"`
+	FirstSeen   int64        `json:"firstSeen,omitempty"`
+	LastSeen    int64        `json:"lastSeen,omitempty"`
+	ConnectedAt int64        `json:"connectedAt,omitempty"`
+	Sessions    int64        `json:"sessions"`
+	RTTMs       float64      `json:"rttMs,omitempty"`
+	RTTAvgMs    float64      `json:"rttAvgMs,omitempty"`
+	JitterMs    float64      `json:"jitterMs,omitempty"`
+	LossPct     float64      `json:"lossPct"`
+	Quality     string       `json:"quality"`
+	BytesUp     int64        `json:"bytesUp"`
+	BytesDown   int64        `json:"bytesDown"`
+	ActiveCalls int64        `json:"activeCalls"`
+	NAT         *natInfo     `json:"nat,omitempty"`
+	Direct      []directLink `json:"direct,omitempty"`
 }
 
 type adminNetwork struct {
@@ -1090,6 +1106,7 @@ func (s *server) adminState() adminState {
 				Hostname: d.Hostname, FirstSeen: unixOrZero(d.FirstSeen), LastSeen: unixOrZero(d.LastSeen),
 				Sessions:  d.Sessions,
 				NAT:       d.NAT,
+				Direct:    d.direct,
 				BytesUp:   d.BytesUp + d.up.Load(),
 				BytesDown: d.BytesDown + d.down.Load(),
 				Quality:   "unknown",
@@ -1590,6 +1607,64 @@ func (s *server) serveCall(conn, peerConn net.Conn, from *device) {
 	var sink1, sink2 atomic.Int64
 	splice(conn, peerConn, &from.up, &sink1, &sink2, &from.down)
 	s.markDirty()
+}
+
+// ---------- прямые соединения (p2p) ----------
+//
+// Устройства пробуют соединяться друг с другом напрямую, минуя сервер. Сам
+// meshd в этом только посредник: пересылает предложение («вот мои адреса и
+// отпечаток ключа») второму устройству той же сети и ответ обратно. Трафик
+// прямого соединения сюда не идёт.
+
+// directLink — прямое соединение устройства с другим (по его отчёту).
+type directLink struct {
+	IP    string  `json:"ip"`
+	RTTMs float64 `json:"rttMs,omitempty"`
+}
+
+const p2pPerMinute = 30
+
+func (s *server) p2pMessage(n *network, d *device, c *ctrlConn, in msg) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if d.ctrl != c {
+		return
+	}
+	if in.Op == "p2pstat" {
+		var out []directLink
+		for _, l := range in.Direct {
+			if _, err := netip.ParseAddr(l.IP); err == nil && len(out) < 64 {
+				out = append(out, directLink{IP: l.IP, RTTMs: round1(l.RTTMs)})
+			}
+		}
+		d.direct = out
+		return
+	}
+	now := time.Now().Unix() / 60
+	if d.p2pMinute != now {
+		d.p2pMinute, d.p2pBudget = now, p2pPerMinute
+	}
+	if d.p2pBudget <= 0 {
+		return
+	}
+	d.p2pBudget--
+	var target *device
+	for _, t := range n.Devices {
+		if t.IP == in.To {
+			target = t
+			break
+		}
+	}
+	if target == nil || target.ctrl == nil || target == d || len(in.Call) > 64 || len(in.FP) > 128 {
+		return
+	}
+	var cands []string
+	for _, a := range in.Cands {
+		if ap, err := netip.ParseAddrPort(a); err == nil && len(cands) < 16 {
+			cands = append(cands, ap.String())
+		}
+	}
+	target.ctrl.send(msg{Op: "p2p", From: d.IP, FromHost: d.Host, Call: in.Call, Cands: cands, FP: in.FP, OK: in.OK})
 }
 
 // ---------- проверка NAT (STUN) ----------

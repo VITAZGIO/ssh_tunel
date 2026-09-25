@@ -279,6 +279,7 @@ class TunnelService : VpnService(), Callbacks {
                     prof.meshName.ifBlank { android.os.Build.MODEL ?: "телефон" },
                     settings.deviceId,
                     prof.meshIncoming,
+                    !prof.meshDirectOff,
                 )
                 tunnel.startCore()
 

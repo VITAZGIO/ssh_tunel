@@ -202,6 +202,9 @@
     <string name="mesh_new">New network</string>
     <string name="mesh_key_hint">Devices with the same key form one network. The easiest way to get the key is to scan the server QR code from the computer: it comes along with the server.</string>
     <string name="mesh_incoming">Let other devices reach services on the phone</string>
+    <string name="mesh_direct">Connect to devices directly when possible</string>
+    <string name="mesh_direct_hint">Devices try to find a path to each other bypassing the server (UDP NAT hole punching, QUIC/TLS 1.3 encryption). If it fails, everything goes through the server.</string>
+    <string name="mesh_path_direct">direct</string>
     <string name="mesh_reconnect_note">Saved automatically, applied on the next connection.</string>
     <string name="mesh_devices">Devices</string>
     <string name="mesh_this">(this phone)</string>

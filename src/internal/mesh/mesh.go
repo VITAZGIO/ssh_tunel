@@ -67,6 +67,9 @@ type Config struct {
 	ProbeListen   func(network string) (net.PacketConn, error)
 	ProbeResolver *net.Resolver
 	NoNATProbe    bool
+	// NoDirect — не пробовать прямые соединения между устройствами: всё
+	// только через сервер.
+	NoDirect bool
 }
 
 // NewKey придумывает ключ новой сети.
@@ -91,6 +94,10 @@ type Peer struct {
 	Online   bool       `json:"online"`
 	LastSeen int64      `json:"lastSeen,omitempty"`
 	Self     bool       `json:"self,omitempty"`
+	// Direct — к устройству есть прямое соединение (минуя сервер),
+	// DirectRTTMs — его задержка.
+	Direct      bool    `json:"direct,omitempty"`
+	DirectRTTMs float64 `json:"directRttMs,omitempty"`
 }
 
 // Status — то, что показывается человеку.
@@ -120,6 +127,7 @@ type Client struct {
 
 	mu     sync.Mutex
 	status Status
+	p2p    *p2p // прямые соединения текущего подключения; nil — нет
 }
 
 // New готовит клиента. log получает строки для журнала ("info", "warn").
@@ -166,6 +174,11 @@ type wire struct {
 
 	Stun []int    `json:"stun,omitempty"`
 	NAT  *NATInfo `json:"nat,omitempty"`
+
+	// Прямые соединения (см. p2p.go).
+	Cands  []string     `json:"cands,omitempty"`
+	FP     string       `json:"fp,omitempty"`
+	Direct []directWire `json:"direct,omitempty"`
 }
 
 type wirePeer struct {
@@ -293,6 +306,28 @@ func (c *Client) session(ctx context.Context) error {
 			wmu.Unlock()
 		}()
 	}
+
+	// Прямые соединения: свой UDP-сокет мимо туннеля, адрес снаружи узнаём
+	// у того же сервера.
+	if len(welcome.Stun) > 0 && c.cfg.Via != "" && !c.cfg.NoDirect {
+		if p, err := c.startDirect(ctx, welcome.Stun[0], func(m wire) error {
+			wmu.Lock()
+			defer wmu.Unlock()
+			return send(conn, m)
+		}); err != nil {
+			c.log("warn", "Сеть устройств: прямые соединения не запустились: "+err.Error())
+		} else {
+			c.mu.Lock()
+			c.p2p = p
+			c.mu.Unlock()
+			defer func() {
+				c.mu.Lock()
+				c.p2p = nil
+				c.mu.Unlock()
+				p.close()
+			}()
+		}
+	}
 	go func() {
 		t := time.NewTicker(25 * time.Second)
 		defer t.Stop()
@@ -326,6 +361,10 @@ func (c *Client) session(ctx context.Context) error {
 			c.setPeers(m.Peers)
 		case "incoming":
 			go c.incoming(m)
+		case "p2p":
+			if p := c.direct(); p != nil {
+				go p.signal(m)
+			}
 		case "ping":
 			// Сервер меряет задержку: вернуть его метку времени как есть.
 			wmu.Lock()
@@ -374,8 +413,35 @@ func (c *Client) Status() Status {
 	defer c.mu.Unlock()
 	st := c.status
 	st.Peers = append([]Peer(nil), c.status.Peers...)
+	if c.p2p != nil {
+		for i := range st.Peers {
+			if ok, rtt := c.p2p.direct(st.Peers[i].IP.String()); ok {
+				st.Peers[i].Direct = true
+				st.Peers[i].DirectRTTMs = float64(rtt.Microseconds()) / 1000
+			}
+		}
+	}
 	return st
 }
+
+func (c *Client) direct() *p2p {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.p2p
+}
+
+// startDirect запускает прямые соединения для одного подключения.
+func (c *Client) startDirect(ctx context.Context, stunPort int, sendFn func(wire) error) (*p2p, error) {
+	ip, err := resolve4(ctx, ProbeEnv{Server: c.cfg.Via, Resolver: c.cfg.ProbeResolver})
+	if err != nil {
+		return nil, err
+	}
+	return startP2P(ctx, c, sendFn, c.cfg.ProbeListen, &net.UDPAddr{IP: ip, Port: stunPort})
+}
+
+// serverNodes — адреса серверов в сети устройств (198.19.255.x): к ним
+// прямых соединений не бывает, только через meshd.
+var serverNodes = netip.MustParsePrefix("198.19.255.0/24")
 
 // Match — ведёт ли цель (host:port) в сеть устройств.
 func (c *Client) Match(target string) bool {
@@ -451,6 +517,16 @@ func (c *Client) DialPeer(target string) (net.Conn, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		return c.LocalDial(ctx, port)
+	}
+
+	if p := c.direct(); p != nil && !serverNodes.Contains(ip) {
+		// Есть прямой путь — по нему; нет — через сервер, а прямой ищем в
+		// фоне к следующим соединениям.
+		conn, err := p.dialDirect(ip.String(), port)
+		if conn != nil || err != nil {
+			return conn, err
+		}
+		go p.connect(ip.String())
 	}
 
 	conn, err := c.dial("tcp", c.cfg.Addr)

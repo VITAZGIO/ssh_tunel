@@ -32,6 +32,7 @@ class MeshActivity : AppCompatActivity() {
     private lateinit var nameEdit: EditText
     private lateinit var keyEdit: EditText
     private lateinit var incomingCheck: CheckBox
+    private lateinit var directCheck: CheckBox
     private lateinit var stateView: TextView
     private lateinit var peersBox: LinearLayout
 
@@ -65,6 +66,7 @@ class MeshActivity : AppCompatActivity() {
         nameEdit = findViewById(R.id.meshName)
         keyEdit = findViewById(R.id.meshKey)
         incomingCheck = findViewById(R.id.meshIncoming)
+        directCheck = findViewById(R.id.meshDirect)
         stateView = findViewById(R.id.meshState)
         peersBox = findViewById(R.id.meshPeers)
 
@@ -75,6 +77,7 @@ class MeshActivity : AppCompatActivity() {
         nameEdit.hint = android.os.Build.MODEL ?: ""
         keyEdit.setText(p.meshKey)
         incomingCheck.isChecked = p.meshIncoming
+        directCheck.isChecked = !p.meshDirectOff
 
         // Включили без ключа — это первое устройство новой сети.
         enabledCheck.setOnCheckedChangeListener { _, checked ->
@@ -132,6 +135,7 @@ class MeshActivity : AppCompatActivity() {
         p.meshKey = keyEdit.text.toString().trim()
         p.meshName = nameEdit.text.toString().trim()
         p.meshIncoming = incomingCheck.isChecked
+        p.meshDirectOff = !directCheck.isChecked
         settings.saveProfile(p)
     }
 
@@ -203,7 +207,14 @@ class MeshActivity : AppCompatActivity() {
         h.textSize = 13f
         h.setTextColor(ContextCompat.getColor(this, R.color.text))
         val n = TextView(this)
-        n.text = peer.optString("name")
+        // Прямое соединение (минуя сервер) — с задержкой.
+        var name = peer.optString("name")
+        if (peer.optBoolean("direct")) {
+            name += " · " + getString(R.string.mesh_path_direct)
+            val rtt = peer.optDouble("directRttMs", 0.0)
+            if (rtt > 0) name += " · " + (if (rtt < 10) String.format(java.util.Locale.US, "%.1f", rtt) else rtt.toLong().toString()) + " ms"
+        }
+        n.text = name
         n.textSize = 12f
         n.setTextColor(ContextCompat.getColor(this, R.color.dim))
         texts.addView(h)

@@ -33,6 +33,10 @@ type adminDev struct {
 	Sessions    int64    `json:"sessions"`
 	ConnectedAt int64    `json:"connectedAt"`
 	NAT         *NATInfo `json:"nat"`
+	Direct      []struct {
+		IP    string  `json:"ip"`
+		RTTMs float64 `json:"rttMs"`
+	} `json:"direct"`
 }
 
 type adminStateResp struct {

@@ -1026,6 +1026,12 @@
       откроется то, что слушает на этом: например «сервер.mesh:8080» — это порт 8080 здесь (Docker, веб-панели,
       SSH). Выключи на устройствах, к которым ходить не нужно, — например на телефоне.</div>
 
+    <label class="chk"><input type="checkbox" id="meshDirect" checked>
+      <span class="lbl" data-i18n="mesh_direct">Соединяться с устройствами напрямую, когда получается</span></label>
+    <div class="hint" style="margin:-4px 0 10px" data-i18n="mesh_direct_hint">Устройства пробуют найти путь
+      друг к другу мимо сервера (пробивание NAT по UDP, шифрование QUIC/TLS 1.3) — так быстрее и не тратит канал
+      сервера. Не получилось — всё идёт через сервер, как раньше.</div>
+
     <div style="display:flex;gap:9px;align-items:center;margin:4px 0 14px">
       <button class="btn primary" id="meshSave" data-i18n="save">Сохранить</button>
       <span class="hint" id="meshNote"></span>
@@ -1337,6 +1343,10 @@ const I18N = {
     mesh_title:'Сеть устройств', mesh_devices:'Устройства', mesh_enable:'Включить сеть устройств на этом сервере',
     mesh_name:'Имя этого устройства', mesh_key:'Ключ сети', mesh_copy:'Скопировать', mesh_new:'Создать новую сеть',
     mesh_incoming:'Пускать другие устройства к моим службам',
+    mesh_direct:'Соединяться с устройствами напрямую, когда получается',
+    mesh_direct_hint:'Устройства пробуют найти путь друг к другу мимо сервера (пробивание NAT по UDP, шифрование '+
+      'QUIC/TLS 1.3) — так быстрее и не тратит канал сервера. Не получилось — всё идёт через сервер, как раньше.',
+    mesh_path_direct:'напрямую',
     mesh_intro:'Твои устройства — компьютер, телефон, домашний сервер — видят друг друга по именам вида '+
       '«ноутбук.mesh», как в NetBird. Всё идёт через этот сервер: белые адреса и проброс портов на роутерах не '+
       'нужны. На сервере должна стоять служба сети устройств — её ставит мастер настройки VPS.',
@@ -1564,6 +1574,11 @@ const I18N = {
     mesh_title:'Device network', mesh_devices:'Devices', mesh_enable:'Turn on the device network on this server',
     mesh_name:'This device name', mesh_key:'Network key', mesh_copy:'Copy', mesh_new:'Create a new network',
     mesh_incoming:'Let other devices reach my services',
+    mesh_direct:'Connect to devices directly when possible',
+    mesh_direct_hint:'Devices try to find a path to each other bypassing the server (UDP NAT hole punching, '+
+      'QUIC/TLS 1.3 encryption) — faster and saves server bandwidth. If it fails, everything goes through the '+
+      'server as before.',
+    mesh_path_direct:'direct',
     mesh_intro:'Your devices — computer, phone, home server — see each other by names like "laptop.mesh", like '+
       'NetBird. Everything goes through this server: no public IPs or router port forwarding needed. The server '+
       'needs the device network service — the VPS setup wizard installs it.',
@@ -2753,6 +2768,7 @@ $('meshEnabled').onchange = () => {
   renderMeshSummary();
 };
 $('meshIncoming').onchange = () => { $('meshIncoming').dataset.touched = '1'; formDirty = true; };
+$('meshDirect').onchange = () => { formDirty = true; };
 $('meshNewKey').onclick = async () => {
   if($('meshKey').value.trim() && !await appConfirm(tr('mesh_new_confirm'))) return;
   $('meshKey').value = newMeshKey();
@@ -2817,7 +2833,9 @@ function renderMesh(st){
     row.title = tr('mesh_click_copy');
     row.innerHTML = '<span class="dot"></span><span class="nm"><div class="h"></div><div class="n"></div></span><span class="ip"></span>';
     row.querySelector('.h').textContent = p.host + '.mesh' + (p.self ? ' ' + tr('mesh_this') : '');
-    row.querySelector('.n').textContent = p.name;
+    // Прямое соединение (минуя сервер) — с его задержкой.
+    row.querySelector('.n').textContent = p.name + (p.direct ? ' · ' + tr('mesh_path_direct') +
+      (p.directRttMs ? ' · ' + (p.directRttMs < 10 ? p.directRttMs.toFixed(1) : Math.round(p.directRttMs)) + ' ms' : '') : '');
     row.querySelector('.ip').textContent = p.ip;
     row.onclick = async () => {
       if(await copyToClipboard(p.host + '.mesh')) $('meshNote').textContent = tr('copied') + ': ' + p.host + '.mesh';
@@ -3317,6 +3335,7 @@ $('save').onclick = async () => {
     p[f] = el.type === 'number' ? parseInt(el.value, 10) || 0 : el.value.trim();
   });
   PROFILE_CHECKS.forEach(f => p[f] = $(f).checked);
+  p.meshDirectOff = !$('meshDirect').checked;
   p.directHosts = splitEntries($('directHosts').value);
   p.filterMode = filterMode;
   p.filterApps = filterApps;
@@ -3349,6 +3368,7 @@ function fillProfileForm(p){
     $(f).value = ($(f).type === 'number' && !p[f]) ? '' : (p[f] ?? '');
   });
   PROFILE_CHECKS.forEach(f => { if($(f)) $(f).checked = !!p[f]; });
+  $('meshDirect').checked = !p.meshDirectOff;
   $('directHosts').value = (p.directHosts || []).join(', ');
   if(!filterDirty){
     filterMode = p.filterMode || 'all';

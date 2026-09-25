@@ -81,6 +81,9 @@ type Profile struct {
 	MeshKey      string `json:"meshKey,omitempty"`
 	MeshName     string `json:"meshName,omitempty"`
 	MeshIncoming bool   `json:"meshIncoming,omitempty"`
+	// MeshDirectOff — не пробовать прямые соединения между устройствами
+	// (см. internal/mesh/p2p.go): всё только через сервер.
+	MeshDirectOff bool `json:"meshDirectOff,omitempty"`
 
 	// Тонкая настройка соединения (экран «Дополнительно»). Ноль и пустая
 	// строка — значения по умолчанию, поэтому старые конфиги не меняются.

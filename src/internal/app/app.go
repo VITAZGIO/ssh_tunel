@@ -263,6 +263,7 @@ func connectionSettingsChanged(a, b config.Config) bool {
 		oldActive.PoolSize != newActive.PoolSize || oldActive.LocalViaTunnel != newActive.LocalViaTunnel ||
 		oldActive.MeshEnabled != newActive.MeshEnabled || oldActive.MeshKey != newActive.MeshKey ||
 		oldActive.MeshName != newActive.MeshName || oldActive.MeshIncoming != newActive.MeshIncoming ||
+		oldActive.MeshDirectOff != newActive.MeshDirectOff ||
 		a.SysProxy != b.SysProxy || a.SetEnvVars != b.SetEnvVars
 }
 

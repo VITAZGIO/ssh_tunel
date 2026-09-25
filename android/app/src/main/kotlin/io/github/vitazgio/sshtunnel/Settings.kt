@@ -47,6 +47,8 @@ class Settings(context: Context) {
         var meshKey: String = "",
         var meshName: String = "",
         var meshIncoming: Boolean = false,
+        // Не пробовать прямые соединения между устройствами.
+        var meshDirectOff: Boolean = false,
     )
 
     private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
@@ -172,6 +174,7 @@ class Settings(context: Context) {
             o.put("panel", p.panel); o.put("deviceName", p.deviceName)
             o.put("meshEnabled", p.meshEnabled); o.put("meshKey", p.meshKey)
             o.put("meshName", p.meshName); o.put("meshIncoming", p.meshIncoming)
+            o.put("meshDirectOff", p.meshDirectOff)
             arr.put(o)
         }
         return arr.toString()
@@ -206,6 +209,7 @@ class Settings(context: Context) {
                         meshKey = o.optString("meshKey", ""),
                         meshName = o.optString("meshName", ""),
                         meshIncoming = o.optBoolean("meshIncoming", false),
+                        meshDirectOff = o.optBoolean("meshDirectOff", false),
                     )
                 )
             }

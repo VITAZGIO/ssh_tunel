@@ -204,6 +204,7 @@ func meshConfig(p config.Profile, mode string) *mesh.Config {
 		DeviceID:      config.DeviceID(),
 		Name:          name,
 		AllowIncoming: p.MeshIncoming,
+		NoDirect:      p.MeshDirectOff,
 		Platform:      runtime.GOOS,
 		AppVersion:    updater.Version,
 		Mode:          mode,

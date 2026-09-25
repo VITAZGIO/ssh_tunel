@@ -97,12 +97,15 @@ jobs:
         working-directory: android/core
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_LATEST_HOME }}
+          VERSION: ${{ inputs.tag || github.ref_name }}
         run: |
           go get golang.org/x/mobile/bind
           go install golang.org/x/mobile/cmd/gomobile@latest
           gomobile init
           mkdir -p ../app/libs
+          # Версия ядра — для экрана сети устройств и панели (иначе «dev»).
           gomobile bind -v \
+            -ldflags "-X sshtunnel/internal/updater.Version=$VERSION" \
             -target=android/arm64,android/arm \
             -androidapi 26 \
             -o ../app/libs/core.aar \

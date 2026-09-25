@@ -40,6 +40,15 @@ type Device struct {
 	BytesDown   int64   `json:"bytesDown"`
 	ActiveCalls int64   `json:"activeCalls"`
 	NAT         *NAT    `json:"nat,omitempty"`
+	// Direct — с какими устройствами у этого сейчас прямое соединение
+	// (минуя сервер), по отчёту самого устройства.
+	Direct []DirectLink `json:"direct,omitempty"`
+}
+
+// DirectLink — прямое соединение с другим устройством сети.
+type DirectLink struct {
+	IP    string  `json:"ip"`
+	RTTMs float64 `json:"rttMs,omitempty"`
 }
 
 // NAT — что устройство узнало о своём NAT (см. mesh.NATInfo).
