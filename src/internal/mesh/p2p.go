@@ -824,6 +824,13 @@ func (p *p2p) openStream(conn quic.Connection, port int) (quic.Stream, error) {
 
 // measure — задержка прямого пути (пустой поток туда и обратно).
 func (p *p2p) measure(peerIP string) bool {
+	_, ok := p.ping(peerIP)
+	return ok
+}
+
+// ping — задержка прямого пути сейчас; false — прямого пути нет (или он
+// только что пропал).
+func (p *p2p) ping(peerIP string) (time.Duration, bool) {
 	p.mu.Lock()
 	peer := p.peers[peerIP]
 	var conn quic.Connection
@@ -832,7 +839,7 @@ func (p *p2p) measure(peerIP string) bool {
 	}
 	p.mu.Unlock()
 	if conn == nil {
-		return false
+		return 0, false
 	}
 	start := time.Now()
 	str, err := p.openStream(conn, 0)
@@ -844,7 +851,7 @@ func (p *p2p) measure(peerIP string) bool {
 	}
 	if err != nil {
 		p.drop(peerIP, conn, fmt.Errorf("замер задержки: %w", err))
-		return false
+		return 0, false
 	}
 	rtt := time.Since(start)
 	p.mu.Lock()
@@ -852,7 +859,7 @@ func (p *p2p) measure(peerIP string) bool {
 		peer.rtt = rtt
 	}
 	p.mu.Unlock()
-	return true
+	return rtt, true
 }
 
 func (p *p2p) healthLoop() {

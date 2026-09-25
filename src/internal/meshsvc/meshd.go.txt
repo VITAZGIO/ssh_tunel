@@ -192,6 +192,8 @@ type device struct {
 	direct      []directLink // прямые соединения (по отчёту устройства)
 	p2pBudget   int          // сколько предложений p2p осталось в эту минуту
 	p2pMinute   int64
+	echoBudget  int // сколько ping к другим устройствам осталось в эту минуту
+	echoMinute  int64
 	up, down    atomic.Int64 // трафик за время жизни процесса, поверх Bytes*
 	activeCalls atomic.Int64
 	link        linkStats
@@ -695,6 +697,10 @@ func (s *server) control(conn net.Conn, m msg) {
 	}, func(in msg) {
 		if in.Op == "p2p" || in.Op == "p2pstat" {
 			s.p2pMessage(n, d, c, in)
+			return
+		}
+		if in.Op == "echo" || in.Op == "echoreply" {
+			s.echoMessage(n, d, c, in)
 			return
 		}
 		if in.Op == "nat" && in.NAT != nil {
@@ -1665,6 +1671,46 @@ func (s *server) p2pMessage(n *network, d *device, c *ctrlConn, in msg) {
 		}
 	}
 	target.ctrl.send(msg{Op: "p2p", From: d.IP, FromHost: d.Host, Call: in.Call, Cands: cands, FP: in.FP, OK: in.OK})
+}
+
+// ---------- ping между устройствами ----------
+//
+// ping к адресу сети устройств: устройство шлёт сюда echo, meshd пересылает
+// его адресату, тот отвечает echoreply, и meshd несёт ответ обратно. За
+// серверы сети (198.19.255.x) отвечает сам meshd, если сервер на связи.
+
+const echoPerMinute = 240
+
+func (s *server) echoMessage(n *network, d *device, c *ctrlConn, in msg) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if d.ctrl != c || len(in.Call) > 64 {
+		return
+	}
+	now := time.Now().Unix() / 60
+	if d.echoMinute != now {
+		d.echoMinute, d.echoBudget = now, echoPerMinute
+	}
+	if d.echoBudget <= 0 {
+		return
+	}
+	d.echoBudget--
+	if in.Op == "echo" {
+		for _, p := range s.serverPeersLocked(n) {
+			if p.IP == in.To {
+				if p.Online {
+					c.send(msg{Op: "echoreply", From: in.To, Call: in.Call})
+				}
+				return
+			}
+		}
+	}
+	for _, t := range n.Devices {
+		if t.IP == in.To && t != d && t.ctrl != nil {
+			t.ctrl.send(msg{Op: in.Op, From: d.IP, Call: in.Call})
+			return
+		}
+	}
 }
 
 // ---------- проверка NAT (STUN) ----------

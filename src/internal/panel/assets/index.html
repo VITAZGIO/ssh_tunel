@@ -2237,7 +2237,7 @@ function svgEl(tag, attrs, parent){
 let MAP_SIG = '', MAP_REFS = {}, MAP_SIM = null;
 // Масштаб и сдвиг карты (как у обычной карты): k — во сколько раз
 // приближено, x/y — сдвиг. Переживает перестройку схемы.
-const MAP_VIEW = {k: 1, x: 0, y: 0};
+const MAP_VIEW = {k: 1, x: 0, y: 0, user: false}; // user — человек сам двигал карту
 // Где стояли узлы (в долях ширины и высоты схемы): перестройка — новое
 // устройство, смена языка, другой размер окна — не раскидывает их заново.
 const MAP_POS = {};
@@ -2260,8 +2260,8 @@ function mapEdge(sim, a, b, kind, labelOn){
   const cls = kind === 'srv' ? 'edge srv' : kind === 'p2p' ? 'edge p2p' : 'edge';
   const g = svgEl('g', {class: cls}, kind === 'p2p' ? sim.gDirect : sim.gEdges);
   const e = {a, b, kind, g, labelOn, text: '', w: 0,
-    bend: kind === 'p2p' ? 0.16 : 0.06,
-    rest: kind === 'srv' ? (sim.narrow ? 150 : 230) : kind === 'p2p' ? (sim.narrow ? 110 : 150) : (sim.narrow ? 90 : 125),
+    bend: 0,
+    rest: 1.5 * (kind === 'srv' ? (sim.narrow ? 150 : 230) : kind === 'p2p' ? (sim.narrow ? 110 : 150) : (sim.narrow ? 90 : 125)),
     k: kind === 'p2p' ? 0.04 : 0.2,
     p1: svgEl('path', {}, g), p2: svgEl('path', {}, g),
     tx: svgEl('text', {class: 'edge-label'}, sim.gLabels)};
@@ -2295,6 +2295,7 @@ function setEdgeText(e, text, color){
 // касаются. Если середина занята кружком или названием узла — цифры
 // сдвигаются вдоль линии; места нет совсем — линия целиком.
 function layoutEdge(e, obst){
+  e.bend = pickBend(e, obst);
   const a = e.a, b = e.b, bend = e.bend;
   const dx = b.x - a.x, dy = b.y - a.y;
   const c = {x: (a.x + b.x) / 2 - dy * bend, y: (a.y + b.y) / 2 + dx * bend};
@@ -2348,10 +2349,44 @@ function layoutEdge(e, obst){
 function simObstacles(sim){
   const out = [];
   sim.nodes.forEach(n => {
-    out.push({x1: n.x - n.r - 2, x2: n.x + n.r + 2, y1: n.y - n.r - 2, y2: n.y + n.r + 2});
-    if (n.tw) out.push({x1: n.x - n.tw / 2 - 2, x2: n.x + n.tw / 2 + 2, y1: n.y + n.r + 2, y2: n.y + n.r + n.th});
+    out.push({x1: n.x - n.r - 2, x2: n.x + n.r + 2, y1: n.y - n.r - 2, y2: n.y + n.r + 2, n, disc: true});
+    if (n.tw) out.push(n.up
+      ? {x1: n.x - n.tw / 2 - 2, x2: n.x + n.tw / 2 + 2, y1: n.y - n.r - n.th - 2, y2: n.y - n.r - 2, n}
+      : {x1: n.x - n.tw / 2 - 2, x2: n.x + n.tw / 2 + 2, y1: n.y + n.r + 2, y2: n.y + n.r + n.th, n});
   });
   return out;
+}
+
+// pickBend — изгиб линии: прямая, если путь свободен; иначе наименьший
+// изгиб (влево или вправо), при котором линия не задевает чужие кружки и
+// ничьи названия, включая название под своим же узлом. При равенстве —
+// прежний изгиб, чтобы линия не дёргалась с боку на бок.
+function pickBend(e, obst){
+  const a = e.a, b = e.b, dx = b.x - a.x, dy = b.y - a.y;
+  const hits = bend => {
+    const cx = (a.x + b.x) / 2 - dy * bend, cy = (a.y + b.y) / 2 + dx * bend;
+    let h = 0;
+    for (let t = 0.05; t < 0.96; t += 0.045){
+      const x = (1-t)*(1-t)*a.x + 2*t*(1-t)*cx + t*t*b.x, y = (1-t)*(1-t)*a.y + 2*t*(1-t)*cy + t*t*b.y;
+      for (const r of obst){
+        if (r.disc && (r.n === a || r.n === b)) continue;
+        if (x > r.x1 - 3 && x < r.x2 + 3 && y > r.y1 - 3 && y < r.y2 + 3) h++;
+      }
+    }
+    return h;
+  };
+  const side = e.bend < 0 ? -1 : 1;
+  let best = e.bend, bestH = hits(e.bend);
+  if (bestH === 0 && Math.abs(e.bend) < 0.005) return e.bend;
+  for (const m of [0, 0.07, 0.14, 0.22, 0.31, 0.42]){
+    for (const b2 of m ? [side * m, -side * m] : [0]){
+      const h = hits(b2);
+      // Лучше — меньше задеваний; при равных — меньше изгиб.
+      if (h < bestH || (h === bestH && Math.abs(b2) < Math.abs(best) - 0.01)){ best = b2; bestH = h; }
+    }
+    if (bestH === 0 && Math.abs(best) <= m) break;
+  }
+  return best;
 }
 
 // Пересекаются ли отрезки ab и cd.
@@ -2393,7 +2428,7 @@ function simTick(sim){
     const ax = e.a.x, ay = e.a.y, dx = e.b.x - ax, dy = e.b.y - ay, l2 = dx * dx + dy * dy || 1;
     N.forEach(n => {
       if (n === e.a || n === e.b) return;
-      const ly = n.y + n.r + n.th / 2, half = n.tw / 2 - 6;
+      const ly = n.up ? n.y - n.r - n.th / 2 : n.y + n.r + n.th / 2, half = n.tw / 2 - 6;
       const pts = [[n.x, n.y, n.r + 18]];
       if (n.tw) pts.push([n.x, ly, n.th / 2 + 8], [n.x - half, ly, n.th / 2 + 6], [n.x + half, ly, n.th / 2 + 6]);
       for (const [x, y, thr] of pts){
@@ -2461,9 +2496,12 @@ function simTick(sim){
     if (n.pinned){ n.vx = n.vy = 0; return; }
     n.vx *= 0.6; n.vy *= 0.6;
     n.x += n.vx; n.y += n.vy;
+    // Мир карты шире окна: узлы не упираются в края, а карта сама
+    // отдаляется, чтобы всё было видно (см. fitView).
+    const ex = sim.W * 0.3, ey = sim.H * 0.3;
     const mx = Math.max(n.r, n.tw / 2) + 4;
-    n.x = Math.max(mx, Math.min(sim.W - mx, n.x));
-    n.y = Math.max(n.r + 4, Math.min(sim.H - n.r - n.th - 2, n.y));
+    n.x = Math.max(mx - ex, Math.min(sim.W + ex - mx, n.x));
+    n.y = Math.max(n.r + 4 - ey, Math.min(sim.H + ey - n.r - n.th - 2, n.y));
   });
   sim.alpha += (sim.target - sim.alpha) * 0.02;
 }
@@ -2474,8 +2512,55 @@ function simDraw(sim){
     n.outer.setAttribute('transform', 'translate(' + n.x.toFixed(1) + ' ' + n.y.toFixed(1) + ')');
     MAP_POS[n.key] = {fx: n.x / sim.W, fy: n.y / sim.H};
   });
+  labelSides(sim);
   sim.obst = simObstacles(sim);
   sim.edges.forEach(e => layoutEdge(e, sim.obst));
+  if (!MAP_VIEW.user && !sim.dragging) fitView(sim);
+}
+
+// labelSides — название узла под кружком, но если вниз от узла уходит
+// больше линий, чем вверх, — над ним: иначе линии шли бы прямо через текст.
+// Сторона меняется, только когда на другой строго свободнее.
+function labelSides(sim){
+  sim.nodes.forEach(n => {
+    if (!n.tx) return;
+    let down = 0, up = 0;
+    sim.edges.forEach(e => {
+      const o = e.a === n ? e.b : e.b === n ? e.a : null;
+      if (!o) return;
+      const vx = o.x - n.x, vy = o.y - n.y;
+      if (Math.abs(vx) < Math.abs(vy) * 1.3){ if (vy > 0) down++; else up++; }
+    });
+    const want = n.up ? !(up > down) : down > up;
+    if (want === n.up) return;
+    n.up = want;
+    if (want){
+      n.tx.setAttribute('y', -(n.r + (n.st ? 19 : 8)));
+      if (n.st) n.st.setAttribute('y', -(n.r + 8));
+    } else {
+      n.tx.setAttribute('y', n.r + 13);
+      if (n.st) n.st.setAttribute('y', n.r + 24);
+    }
+  });
+}
+
+// fitView — масштаб и сдвиг, при которых видна вся сеть с названиями (но не
+// крупнее, чем 1:1). Работает, пока человек сам не двигал карту.
+function fitView(sim){
+  if (!sim.nodes.length) return;
+  let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+  sim.nodes.forEach(n => {
+    const hw = Math.max(n.r, n.tw / 2);
+    x1 = Math.min(x1, n.x - hw); x2 = Math.max(x2, n.x + hw);
+    y1 = Math.min(y1, n.y - n.r - (n.up ? n.th : 0)); y2 = Math.max(y2, n.y + n.r + (n.up ? 0 : n.th));
+  });
+  // Справа — место под кнопки масштаба, чтобы они не закрывали узлы.
+  const pad = 24, right = 56;
+  const k = Math.min(1, (sim.W - pad - right) / Math.max(1, x2 - x1), (sim.H - 2 * pad) / Math.max(1, y2 - y1));
+  MAP_VIEW.k = k;
+  MAP_VIEW.x = (sim.W - right + pad) / 2 - (x1 + x2) / 2 * k;
+  MAP_VIEW.y = sim.H / 2 - (y1 + y2) / 2 * k;
+  applyView();
 }
 
 function simRun(sim){
@@ -2514,7 +2599,8 @@ function applyView(){
 
 // zoomAt — приблизить в k2 раз так, чтобы точка p экрана осталась на месте.
 function zoomAt(p, k2){
-  k2 = Math.max(0.3, Math.min(4, k2));
+  MAP_VIEW.user = true;
+  k2 = Math.max(0.2, Math.min(4, k2));
   MAP_VIEW.x = p.x - (p.x - MAP_VIEW.x) * k2 / MAP_VIEW.k;
   MAP_VIEW.y = p.y - (p.y - MAP_VIEW.y) * k2 / MAP_VIEW.k;
   MAP_VIEW.k = k2;
@@ -2540,6 +2626,7 @@ function zoomAt(p, k2){
     if (e.target.closest('.node') || (e.pointerType === 'mouse' && e.button !== 0)) return;
     try { svg.setPointerCapture(e.pointerId); } catch (err) {}
     pts.set(e.pointerId, svgPoint(svg, e.clientX, e.clientY));
+    MAP_VIEW.user = true;
     svg.classList.add('panning');
     hidePop();
     snapshot();
@@ -2552,7 +2639,7 @@ function zoomAt(p, k2){
       // Щипок: масштаб по расстоянию между пальцами, середина — на месте.
       const d = Math.hypot(list[0].x - list[1].x, list[0].y - list[1].y);
       const mid = {x: (list[0].x + list[1].x) / 2, y: (list[0].y + list[1].y) / 2};
-      const k = Math.max(0.3, Math.min(4, v.k * d / start.d));
+      const k = Math.max(0.2, Math.min(4, v.k * d / start.d));
       const wx = (start.mid.x - v.x) / v.k, wy = (start.mid.y - v.y) / v.k;
       MAP_VIEW.k = k; MAP_VIEW.x = mid.x - wx * k; MAP_VIEW.y = mid.y - wy * k;
     } else if (list.length === 1 && start.list.length === 1){
@@ -2574,8 +2661,8 @@ function zoomAt(p, k2){
   $('mapZoomIn').addEventListener('click', () => zoomAt(center(), MAP_VIEW.k * 1.3));
   $('mapZoomOut').addEventListener('click', () => zoomAt(center(), MAP_VIEW.k / 1.3));
   $('mapZoomFit').addEventListener('click', () => {
-    MAP_VIEW.k = 1; MAP_VIEW.x = 0; MAP_VIEW.y = 0;
-    applyView();
+    MAP_VIEW.user = false;
+    if (MAP_SIM) fitView(MAP_SIM);
   });
 })();
 
@@ -2739,7 +2826,7 @@ function buildMap(svg, W, H, servers, devices, animate){
   const narrow = W < 520;
   const many = devices.length > (narrow ? 12 : 28);
   const sim = MAP_SIM = {svg, W, H, narrow, many, nodes: [], edges: [], byKey: {}, direct: new Map(),
-    alpha: 1, target: 0, raf: 0, charge: narrow ? 160 : 260, gView: view,
+    alpha: 1, target: 0, raf: 0, charge: 1.5 * (narrow ? 160 : 260), gView: view,
     gEdges: svgEl('g', {}, view), gDirect: svgEl('g', {}, view), gLabels: svgEl('g', {}, view)};
   const gNodes = svgEl('g', {}, view);
   applyView();
@@ -2765,20 +2852,20 @@ function buildMap(svg, W, H, servers, devices, animate){
     const halo = svgEl('circle', {r, fill: isServer ? 'var(--accent)' : 'var(--ok)', class: 'halo'}, g);
     const disc = svgEl('circle', {r, fill: 'url(#gNode)', stroke: 'var(--accent)', class: 'disc'}, g);
     svgEl('path', {d: path, class: 'glyph', transform: 'scale(' + (r / 10.5).toFixed(2) + ')'}, g);
-    let th = 2;
+    let th = 2, tx = null, st = null;
     if (!many || isServer){
-      const tx = svgEl('text', {y: r + 13}, g);
+      tx = svgEl('text', {y: r + 13}, g);
       tx.textContent = label.length > 18 ? label.slice(0, 17) + '…' : label;
       th = 17;
       if (sub && !narrow){
-        const st = svgEl('text', {y: r + 24, class: 'sub'}, g);
+        st = svgEl('text', {y: r + 24, class: 'sub'}, g);
         st.textContent = sub;
         th = 28;
       }
     }
     let tw = 0;
     outer.querySelectorAll('text').forEach(x => { try { tw = Math.max(tw, x.getComputedTextLength()); } catch (err) {} });
-    const n = {key, x: p.x, y: p.y, vx: 0, vy: 0, r, tw, th, main: !!isMain, outer};
+    const n = {key, x: p.x, y: p.y, vx: 0, vy: 0, r, tw, th, main: !!isMain, outer, tx, st, up: false};
     sim.nodes.push(n);
     sim.byKey[key] = n;
     dragNode(sim, n);

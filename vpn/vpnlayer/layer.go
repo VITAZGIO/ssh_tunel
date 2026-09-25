@@ -204,6 +204,15 @@ func (l *Layer) startStack(dev core.Device) error {
 			}
 			return nil
 		},
+		// ping к устройствам сети (198.19.x.y) — через саму сеть устройств.
+		Ping: func() core.Pinger {
+			if t := l.current.Load(); t != nil {
+				if m := t.Mesh(); m != nil {
+					return m
+				}
+			}
+			return nil
+		},
 	})
 	if err != nil {
 		return err // StartDevice уже закрыл устройство

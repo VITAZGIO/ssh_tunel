@@ -130,7 +130,9 @@ type Client struct {
 
 	mu     sync.Mutex
 	status Status
-	p2p    *p2p // прямые соединения текущего подключения; nil — нет
+	p2p    *p2p             // прямые соединения текущего подключения; nil — нет
+	ctrl   func(wire) error // отправить строку по управляющему соединению; nil — нет его
+	echo   map[string]chan struct{}
 }
 
 // New готовит клиента. log получает строки для журнала ("info", "warn").
@@ -290,6 +292,19 @@ func (c *Client) session(ctx context.Context) error {
 	// Пинг держит соединение живым через NAT и даёт серверу знать, что мы
 	// на месте.
 	var wmu sync.Mutex
+	ctrl := func(m wire) error {
+		wmu.Lock()
+		defer wmu.Unlock()
+		return send(conn, m)
+	}
+	c.mu.Lock()
+	c.ctrl = ctrl
+	c.mu.Unlock()
+	defer func() {
+		c.mu.Lock()
+		c.ctrl = nil
+		c.mu.Unlock()
+	}()
 
 	// Проверка NAT — один раз на подключение: сеть сменилась — подключение
 	// пересобирается, и проверка идёт заново.
@@ -371,6 +386,16 @@ func (c *Client) session(ctx context.Context) error {
 			if p := c.direct(); p != nil {
 				go p.signal(m)
 			}
+		case "echo":
+			// Кто-то пингует это устройство (ping 198.19.x.y) — ответить.
+			go ctrl(wire{Op: "echoreply", To: m.From, Call: m.Call})
+		case "echoreply":
+			c.mu.Lock()
+			if ch := c.echo[m.Call]; ch != nil {
+				close(ch)
+				delete(c.echo, m.Call)
+			}
+			c.mu.Unlock()
 		case "ping":
 			// Сервер меряет задержку: вернуть его метку времени как есть.
 			wmu.Lock()
@@ -428,6 +453,53 @@ func (c *Client) Status() Status {
 		}
 	}
 	return st
+}
+
+// PingMatch — отвечает ли за ping на этот адрес сеть устройств.
+func (c *Client) PingMatch(dst netip.Addr) bool { return Range.Contains(dst.Unmap()) }
+
+// Ping — «ping» до устройства или сервера сети: настоящая задержка туда и
+// обратно. По прямому соединению, если оно есть, иначе через meshd.
+// Ошибка — устройство не ответило (не на связи или старая версия программы).
+func (c *Client) Ping(dst netip.Addr) (time.Duration, error) {
+	dst = dst.Unmap()
+	c.mu.Lock()
+	self, ctrl, p := c.status.Self.IP, c.ctrl, c.p2p
+	c.mu.Unlock()
+	if ctrl == nil {
+		return 0, errors.New("сеть устройств не подключена")
+	}
+	if dst == self {
+		return 0, nil
+	}
+	if p != nil && !serverNodes.Contains(dst) {
+		if rtt, ok := p.ping(dst.String()); ok {
+			return rtt, nil
+		}
+	}
+	id := randomString(9)
+	ch := make(chan struct{})
+	c.mu.Lock()
+	if c.echo == nil {
+		c.echo = map[string]chan struct{}{}
+	}
+	c.echo[id] = ch
+	c.mu.Unlock()
+	defer func() {
+		c.mu.Lock()
+		delete(c.echo, id)
+		c.mu.Unlock()
+	}()
+	start := time.Now()
+	if err := ctrl(wire{Op: "echo", To: dst.String(), Call: id}); err != nil {
+		return 0, err
+	}
+	select {
+	case <-ch:
+		return time.Since(start), nil
+	case <-time.After(3 * time.Second):
+		return 0, errors.New("нет ответа")
+	}
 }
 
 func (c *Client) direct() *p2p {

@@ -10,6 +10,7 @@ import (
 	"crypto/rand"
 	"io"
 	"net"
+	"net/netip"
 	"strconv"
 	"strings"
 	"sync"
@@ -283,5 +284,36 @@ func TestПрямоеСоединениеДолгаяЖизнь(t *testing.T) {
 	}
 	if !peerStatus(a, bIP).Direct {
 		t.Fatal("прямое соединение пропало")
+	}
+}
+
+// ping до устройства: через сервер (прямые выключены), по прямому пути, до
+// себя и до адреса, которого нет в сети.
+func TestPingУстройства(t *testing.T) {
+	addr, _, _ := startMeshdSTUN(t)
+	key := NewKey()
+	a, _ := startClientLog(t, addr, Config{Key: key, Name: "a", Via: "127.0.0.1", NoDirect: true})
+	b, _ := startClientLog(t, addr, Config{Key: key, Name: "b", Via: "127.0.0.1", NoDirect: true})
+	bIP := b.Status().Self.IP
+	if rtt, err := a.Ping(bIP); err != nil || rtt <= 0 {
+		t.Fatalf("через сервер: %v %v", rtt, err)
+	}
+	if _, err := a.Ping(a.Status().Self.IP); err != nil {
+		t.Fatalf("до себя: %v", err)
+	}
+	start := time.Now()
+	if _, err := a.Ping(netip.MustParseAddr("198.19.0.200")); err == nil {
+		t.Fatal("ответил несуществующий адрес")
+	}
+	if time.Since(start) > 4*time.Second {
+		t.Fatal("ожидание ответа не ограничено")
+	}
+
+	c, _ := startClientLog(t, addr, Config{Key: key, Name: "c", Via: "127.0.0.1"})
+	d, _ := startClientLog(t, addr, Config{Key: key, Name: "d", Via: "127.0.0.1"})
+	dIP := d.Status().Self.IP
+	waitLong(t, 15*time.Second, func() bool { return peerStatus(c, dIP.String()).Direct }, "прямое соединение не установилось")
+	if rtt, err := c.Ping(dIP); err != nil || rtt <= 0 {
+		t.Fatalf("напрямую: %v %v", rtt, err)
 	}
 }

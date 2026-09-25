@@ -127,6 +127,10 @@ type Handler struct {
 	// tunnel.Tunnel.UDPRelay). nil, либо когда сам вызов вернул nil, — UDP
 	// кроме DNS по-прежнему отбрасывается, как и раньше.
 	UDPRelay func() *udprelay.Client
+
+	// Ping отдаёт того, кто отвечает на ping к своим адресам (сеть устройств,
+	// см. ping.go); nil или вызов, вернувший nil, — ping туда не отвечается.
+	Ping func() Pinger
 }
 
 func (h *Handler) logf(format string, a ...any) {
@@ -270,8 +274,13 @@ func StartDevice(dev device.Device, h *Handler) (*Engine, error) {
 			return false
 		})
 
+	// ping к адресам сети устройств перехватывается до стека (см. ping.go).
+	var link stack.LinkEndpoint = dev
+	if h.Ping != nil {
+		link = &pingDevice{Device: dev, pinger: h.Ping}
+	}
 	nicID := s.NextNICID()
-	if tErr := s.CreateNIC(nicID, dev); tErr != nil {
+	if tErr := s.CreateNIC(nicID, link); tErr != nil {
 		return fail("создать сетевую карту: %s", tErr)
 	}
 	// Адрес назначения у пакетов чужой — стек должен принимать всё подряд

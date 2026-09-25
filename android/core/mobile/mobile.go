@@ -399,6 +399,13 @@ func (t *Tunnel) StartStack(tunFD int, mtu int) error {
 		// переподключается. Значение проверяется на каждый новый поток, не
 		// один раз, — поэтому здесь достаточно функции-обёртки без вызова.
 		UDPRelay: tun.UDPRelay,
+		// ping к устройствам сети (198.19.x.y) — через саму сеть устройств.
+		Ping: func() core.Pinger {
+			if m := tun.Mesh(); m != nil {
+				return m
+			}
+			return nil
+		},
 	})
 	if err != nil {
 		return err
