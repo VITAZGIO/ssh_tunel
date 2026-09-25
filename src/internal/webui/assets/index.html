@@ -181,6 +181,12 @@
   .qmark:hover,.qmark.on{border-color:var(--accent);color:var(--accent)}
   .help{background:var(--card);border:1px solid var(--line);border-radius:10px;
         padding:11px 12px;margin:6px 0 12px}
+  .help:not([hidden]){animation:helpIn .2s ease both}
+  @keyframes helpIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion: reduce){ .help:not([hidden]){animation:none} }
+  .sect{margin:16px 0 8px;color:var(--dim);font-size:11.5px;font-weight:600;
+        text-transform:uppercase;letter-spacing:.5px}
+  .adv-addr{font-family:var(--mono);font-size:12px;color:var(--text)}
   .help p{margin:0 0 8px;font-size:12px;color:var(--dim);line-height:1.45}
   .help ol{margin:0 0 8px;padding-left:18px;font-size:12px;color:var(--dim);
            line-height:1.5}
@@ -612,6 +618,13 @@
       <span class="arr">›</span>
     </button>
 
+    <button class="row-link" id="toAdvanced" style="margin-top:8px">
+      <span class="t"><span data-i18n="adv_title">Дополнительно</span>
+        <div class="v" id="advSummary">По умолчанию</div>
+      </span>
+      <span class="arr">›</span>
+    </button>
+
     <div class="chk-row">
       <label class="chk"><input type="checkbox" id="localViaTunnel">
         <span class="lbl" data-i18n="local_via_tunnel">Локальную сеть тоже вести через сервер</span></label>
@@ -1023,6 +1036,101 @@
     <div id="meshPeers"></div>
   </div>
 
+  <div class="view" id="viewAdvanced">
+    <div class="head">
+      <button class="ico" id="backFromAdvanced" title="Назад" data-i18n-title="back">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <span class="t" data-i18n="adv_title">Дополнительно</span>
+    </div>
+    <p class="note" style="margin-top:0" data-i18n="adv_intro">Тонкая настройка соединения с этим сервером.
+      Не уверен — оставь как есть: значения по умолчанию подходят почти всем. Пустое поле — значение по умолчанию.</p>
+
+    <div class="sect" data-i18n="adv_ssh">SSH-соединение</div>
+    <div class="two">
+      <div class="field">
+        <div class="lbl-row"><label for="keepAliveSec" data-i18n="adv_keepalive">Проверка связи, сек</label>
+          <button class="qmark" id="kaHelpBtn" title="Подробнее">?</button></div>
+        <input type="number" id="keepAliveSec" min="5" max="300" placeholder="20">
+      </div>
+      <div class="field">
+        <div class="lbl-row"><label for="connectTimeoutSec" data-i18n="adv_timeout">Ждать подключения, сек</label>
+          <button class="qmark" id="toHelpBtn" title="Подробнее">?</button></div>
+        <input type="number" id="connectTimeoutSec" min="3" max="120" placeholder="15">
+      </div>
+    </div>
+    <div class="help" id="kaHelp" hidden><p data-i18n="adv_keepalive_help">Раз в столько секунд программа
+      спрашивает сервер «ты тут?». Не ответил — соединение пересобирается. Меньше — обрыв замечается быстрее,
+      и роутер не выкидывает тихую сессию из своей таблицы; больше — меньше служебного трафика на мобильном интернете.
+      По умолчанию 20, разумно от 10 до 60.</p></div>
+    <div class="help" id="toHelp" hidden><p data-i18n="adv_timeout_help">Сколько ждать, пока сервер примет
+      соединение и пройдёт рукопожатие SSH. На медленном мобильном интернете или через спутник стоит увеличить
+      до 30–40, на хорошем канале можно уменьшить — тогда переход на запасной сервер случится быстрее.
+      По умолчанию 15.</p></div>
+
+    <div class="two">
+      <div class="field">
+        <div class="lbl-row"><label for="cipher" data-i18n="adv_cipher">Шифр</label>
+          <button class="qmark" id="cipherHelpBtn" title="Подробнее">?</button></div>
+        <select id="cipher" style="width:100%">
+          <option value="" data-i18n="adv_cipher_auto">Автоматически</option>
+          <option value="aes">AES-GCM</option>
+          <option value="chacha">ChaCha20-Poly1305</option>
+        </select>
+      </div>
+      <div class="field">
+        <div class="lbl-row"><label for="ipVersion" data-i18n="adv_ip">Протокол до сервера</label>
+          <button class="qmark" id="ipHelpBtn" title="Подробнее">?</button></div>
+        <select id="ipVersion" style="width:100%">
+          <option value="" data-i18n="adv_ip_any">IPv4 или IPv6</option>
+          <option value="4" data-i18n="adv_ip4">Только IPv4</option>
+          <option value="6" data-i18n="adv_ip6">Только IPv6</option>
+        </select>
+      </div>
+    </div>
+    <div class="help" id="cipherHelp" hidden><p data-i18n="adv_cipher_help">Каким шифром защищать трафик.
+      AES-GCM — быстрее всего на компьютерах и телефонах последних лет: у процессора есть для него отдельные
+      инструкции. ChaCha20 — быстрее на старых и слабых процессорах без них. Выбор только ставит шифр первым
+      в списке: если сервер его не умеет, договорятся на другом. Провайдер разницы не видит — снаружи это
+      обычный SSH.</p></div>
+    <div class="help" id="ipHelp" hidden><p data-i18n="adv_ip_help">У части провайдеров (особенно мобильных)
+      IPv6 есть, но работает плохо: подключение сначала долго ждёт по нему и только потом идёт по IPv4.
+      «Только IPv4» убирает эту задержку. «Только IPv6» — если у сервера адрес только IPv6.</p></div>
+    <div class="hint" style="margin:-2px 0 6px" data-i18n="adv_pool_note">Число параллельных каналов SSH задаётся
+      в настройках сервера («Каналов SSH»). Каждое устройство держит столько соединений — это учитывает
+      «Ёмкость сервера» в панели на VPS.</div>
+
+    <div class="sect" data-i18n="adv_proxy">Прокси</div>
+    <div class="chk-row">
+      <label class="chk"><input type="checkbox" id="shareLan">
+        <span class="lbl" data-i18n="adv_share_lan">Раздавать прокси в локальную сеть</span></label>
+      <button class="qmark" id="lanHelpBtn" title="Подробнее">?</button>
+    </div>
+    <div class="help" id="lanHelp" hidden><p data-i18n="adv_share_lan_help">Другие устройства дома — телевизор,
+      приставка, второй компьютер — смогут ходить через туннель этого компьютера: в их настройках сети указывается
+      прокси с адресом ниже. Пускаются только устройства локальной сети; из интернета — никогда, даже при белом
+      адресе. Windows при первом включении спросит разрешение в брандмауэре — разреши для частных сетей.
+      Действует в обычном режиме (прокси); в режиме VPN прокси не поднимается.</p></div>
+    <div class="hint" id="lanAddrsBox" hidden style="margin:2px 0 8px"></div>
+
+    <div class="sect" data-i18n="adv_vpn">Режим VPN</div>
+    <div class="chk-row" style="border-top:none">
+      <span class="lbl" style="flex:1;font-size:12.5px;color:var(--dim)" data-i18n="adv_vpn_note">Настройки SSH выше
+        действуют и в режиме VPN (ssh_tunnel_vpn).</span>
+      <button class="qmark" id="vpnHelpBtn" title="Подробнее">?</button>
+    </div>
+    <div class="help" id="vpnHelp" hidden><p data-i18n="adv_vpn_help">В режиме VPN через туннель идёт всё, что
+      ходит в сеть, — и программы, которые про прокси не знают. Трафик мимо сервера не уходит даже пока связь
+      переподключается: соединения ждут восстановления, а не утекают напрямую. DNS тоже не утекает — имена
+      разрешаются на сервере. Мимо туннеля — только то, что ты сам разрешил: «Всегда напрямую», локальная сеть и
+      программы из правил.</p></div>
+
+    <div style="display:flex;gap:9px;align-items:center;margin:14px 0 4px">
+      <button class="btn primary" id="advSave" data-i18n="save">Сохранить</button>
+      <span class="hint" id="advNote"></span>
+    </div>
+  </div>
+
   <div class="view" id="viewSelfCheck">
     <div class="head">
       <button class="ico" id="backFromSelfCheck" title="Назад" data-i18n-title="back">
@@ -1190,6 +1298,41 @@ const I18N = {
     vps_install_panel:'Заодно поставить веб-панель для клиентов',
     vps_install_panel_note:'Отдельная веб-страница для администрирования сервера (системные службы, '+
       'сеть, диски) — новый открытый порт наружу. Показывает адрес и одноразовый пароль после установки.',
+    adv_title:'Дополнительно', adv_default:'По умолчанию', adv_sec:'с', adv_timeout_short:'ожидание',
+    adv_lan_short:'прокси в локальной сети',
+    adv_intro:'Тонкая настройка соединения с этим сервером. Не уверен — оставь как есть: значения по умолчанию '+
+      'подходят почти всем. Пустое поле — значение по умолчанию.',
+    adv_ssh:'SSH-соединение', adv_keepalive:'Проверка связи, сек', adv_timeout:'Ждать подключения, сек',
+    adv_keepalive_help:'Раз в столько секунд программа спрашивает сервер «ты тут?». Не ответил — соединение '+
+      'пересобирается. Меньше — обрыв замечается быстрее, и роутер не выкидывает тихую сессию из своей таблицы; '+
+      'больше — меньше служебного трафика на мобильном интернете. По умолчанию 20, разумно от 10 до 60.',
+    adv_timeout_help:'Сколько ждать, пока сервер примет соединение и пройдёт рукопожатие SSH. На медленном '+
+      'мобильном интернете стоит увеличить до 30–40, на хорошем канале можно уменьшить — тогда переход на '+
+      'запасной сервер случится быстрее. По умолчанию 15.',
+    adv_cipher:'Шифр', adv_cipher_auto:'Автоматически', adv_ip:'Протокол до сервера',
+    adv_ip_any:'IPv4 или IPv6', adv_ip4:'Только IPv4', adv_ip6:'Только IPv6',
+    adv_cipher_help:'Каким шифром защищать трафик. AES-GCM — быстрее всего на компьютерах и телефонах последних '+
+      'лет: у процессора есть для него отдельные инструкции. ChaCha20 — быстрее на старых и слабых процессорах без '+
+      'них. Выбор только ставит шифр первым в списке: если сервер его не умеет, договорятся на другом. Провайдер '+
+      'разницы не видит — снаружи это обычный SSH.',
+    adv_ip_help:'У части провайдеров (особенно мобильных) IPv6 есть, но работает плохо: подключение сначала долго '+
+      'ждёт по нему и только потом идёт по IPv4. «Только IPv4» убирает эту задержку. «Только IPv6» — если у '+
+      'сервера адрес только IPv6.',
+    adv_pool_note:'Число параллельных каналов SSH задаётся в настройках сервера («Каналов SSH»). Каждое устройство '+
+      'держит столько соединений — это учитывает «Ёмкость сервера» в панели на VPS.',
+    adv_proxy:'Прокси', adv_share_lan:'Раздавать прокси в локальную сеть',
+    adv_share_lan_help:'Другие устройства дома — телевизор, приставка, второй компьютер — смогут ходить через '+
+      'туннель этого компьютера: в их настройках сети указывается прокси с адресом ниже. Пускаются только '+
+      'устройства локальной сети; из интернета — никогда, даже при белом адресе. Windows при первом включении '+
+      'спросит разрешение в брандмауэре — разреши для частных сетей. Действует в обычном режиме (прокси); в '+
+      'режиме VPN прокси не поднимается.',
+    adv_lan_addrs:'Адрес для других устройств:', adv_lan_none:'Не нашёл у компьютера адреса в локальной сети — '+
+      'подключись к домашнему Wi-Fi или кабелем.',
+    adv_vpn:'Режим VPN', adv_vpn_note:'Настройки SSH выше действуют и в режиме VPN (ssh_tunnel_vpn).',
+    adv_vpn_help:'В режиме VPN через туннель идёт всё, что ходит в сеть, — и программы, которые про прокси не '+
+      'знают. Трафик мимо сервера не уходит даже пока связь переподключается: соединения ждут восстановления, а '+
+      'не утекают напрямую. DNS тоже не утекает — имена разрешаются на сервере. Мимо туннеля — только то, что ты '+
+      'сам разрешил: «Всегда напрямую», локальная сеть и программы из правил.',
     mesh_title:'Сеть устройств', mesh_devices:'Устройства', mesh_enable:'Включить сеть устройств на этом сервере',
     mesh_name:'Имя этого устройства', mesh_key:'Ключ сети', mesh_copy:'Скопировать', mesh_new:'Создать новую сеть',
     mesh_incoming:'Пускать другие устройства к моим службам',
@@ -1382,6 +1525,40 @@ const I18N = {
     vps_install_panel:'Also install the client web panel',
     vps_install_panel_note:'A separate web page for administering the server (system services, network, '+
       'disks) — one more open port. Shows the address and a one-time password once installed.',
+    adv_title:'Advanced', adv_default:'Defaults', adv_sec:'s', adv_timeout_short:'timeout',
+    adv_lan_short:'proxy shared on LAN',
+    adv_intro:'Fine tuning of the connection to this server. Not sure — leave it as is: the defaults suit almost '+
+      'everyone. An empty field means the default.',
+    adv_ssh:'SSH connection', adv_keepalive:'Link check, sec', adv_timeout:'Connect timeout, sec',
+    adv_keepalive_help:'Every this many seconds the app asks the server "are you there?". No answer — the '+
+      'connection is rebuilt. Lower — drops are noticed sooner and the router does not evict an idle session; '+
+      'higher — less service traffic on mobile internet. Default 20, sensible from 10 to 60.',
+    adv_timeout_help:'How long to wait for the server to accept the connection and finish the SSH handshake. On '+
+      'slow mobile internet raise it to 30–40; on a good link lower it so that failover to a backup server is '+
+      'faster. Default 15.',
+    adv_cipher:'Cipher', adv_cipher_auto:'Automatic', adv_ip:'Protocol to the server',
+    adv_ip_any:'IPv4 or IPv6', adv_ip4:'IPv4 only', adv_ip6:'IPv6 only',
+    adv_cipher_help:'Which cipher protects the traffic. AES-GCM is fastest on computers and phones of recent '+
+      'years: the CPU has dedicated instructions for it. ChaCha20 is faster on old and weak CPUs without them. The '+
+      'choice only puts the cipher first: if the server cannot do it, they agree on another. The provider sees no '+
+      'difference — from the outside it is plain SSH.',
+    adv_ip_help:'Some providers (mobile ones especially) have IPv6 that works badly: the connection first waits '+
+      'on it for a long time and only then goes over IPv4. "IPv4 only" removes that delay. "IPv6 only" — if the '+
+      'server has an IPv6 address only.',
+    adv_pool_note:'The number of parallel SSH channels is set in the server settings ("SSH channels"). Each device '+
+      'keeps that many connections — "Server capacity" in the VPS panel accounts for it.',
+    adv_proxy:'Proxy', adv_share_lan:'Share the proxy on the local network',
+    adv_share_lan_help:'Other devices at home — a TV, a set-top box, a second computer — can go through this '+
+      'computer\'s tunnel: set a proxy with the address below in their network settings. Only local network devices '+
+      'are let in; the internet never is, even with a public IP. Windows asks for a firewall permission the first '+
+      'time — allow it for private networks. Works in the regular (proxy) mode; in VPN mode no proxy is started.',
+    adv_lan_addrs:'Address for other devices:', adv_lan_none:'This computer has no local network address — '+
+      'connect to the home Wi-Fi or a cable.',
+    adv_vpn:'VPN mode', adv_vpn_note:'The SSH settings above apply in VPN mode too (ssh_tunnel_vpn).',
+    adv_vpn_help:'In VPN mode everything that uses the network goes through the tunnel — including programs that '+
+      'know nothing about proxies. Traffic does not leave past the server even while the link reconnects: '+
+      'connections wait for it instead of leaking directly. DNS does not leak either — names are resolved on the '+
+      'server. Only what you allowed goes around the tunnel: "Always direct", the local network and program rules.',
     mesh_title:'Device network', mesh_devices:'Devices', mesh_enable:'Turn on the device network on this server',
     mesh_name:'This device name', mesh_key:'Network key', mesh_copy:'Copy', mesh_new:'Create a new network',
     mesh_incoming:'Let other devices reach my services',
@@ -1534,8 +1711,9 @@ $('language').addEventListener('change', () => {
   formDirty = true;
 });
 
-const FIELDS = ['host','user','keyPath','sshPort','socksPort','httpPort','poolSize','meshName','meshKey'];
-const PROFILE_CHECKS = ['localViaTunnel', 'udpRelayEnabled', 'meshEnabled', 'meshIncoming'];
+const FIELDS = ['host','user','keyPath','sshPort','socksPort','httpPort','poolSize','meshName','meshKey',
+                'keepAliveSec','connectTimeoutSec','cipher','ipVersion'];
+const PROFILE_CHECKS = ['localViaTunnel', 'udpRelayEnabled', 'meshEnabled', 'meshIncoming', 'shareLan'];
 const CHECKS = ['verbose'];
 
 /* Правила фильтра живут отдельно от полей формы: они правятся на своём
@@ -1893,7 +2071,7 @@ function docWithProfile(p){
 
 /* ---------- переключение экранов ---------- */
 const VIEWS = ['viewMain','viewSettings','viewFilter','viewWizard',
-               'viewVpsSetup','viewSelfCheck','viewLog','viewMesh'];
+               'viewVpsSetup','viewSelfCheck','viewLog','viewMesh','viewAdvanced'];
 let current = 'viewMain';
 
 function show(name){
@@ -1925,6 +2103,8 @@ let meshFrom = 'viewSettings';
 $('toMesh').onclick = () => { meshFrom = 'viewSettings'; show('viewMesh'); pollMesh(); };
 $('toMeshMain').onclick = () => { meshFrom = 'viewMain'; show('viewMesh'); pollMesh(); };
 $('backFromMesh').onclick = () => show(meshFrom);
+$('toAdvanced').onclick = () => { show('viewAdvanced'); renderLanAddrs(); };
+$('backFromAdvanced').onclick = () => show('viewSettings');
 $('toSelfCheck').onclick = () => { show('viewSelfCheck'); runSelfCheck(); };
 // «Настроить сервер по SSH» — вариант «автоматически» внутри вкладки VPS
 // мастера настройки, поэтому назад возвращает туда же, а не в настройки.
@@ -2486,6 +2666,12 @@ toggleHelp('keyHelpBtn', 'keyHelp', renderSetupCmd);
 toggleHelp('localHelpBtn', 'localHelp');
 toggleHelp('udpRelayHelpBtn', 'udpRelayHelp');
 toggleHelp('directHelpBtn', 'directHelp');
+toggleHelp('kaHelpBtn', 'kaHelp');
+toggleHelp('toHelpBtn', 'toHelp');
+toggleHelp('cipherHelpBtn', 'cipherHelp');
+toggleHelp('ipHelpBtn', 'ipHelp');
+toggleHelp('lanHelpBtn', 'lanHelp');
+toggleHelp('vpnHelpBtn', 'vpnHelp');
 
 function hideKeyHelp(){
   ['keyHelp','localHelp','directHelp','scanResult'].forEach(id => $(id).hidden = true);
@@ -3143,7 +3329,12 @@ $('save').onclick = async () => {
 };
 
 function fillProfileForm(p){
-  FIELDS.forEach(f => { if($(f)) $(f).value = p[f] ?? ''; });
+  // Ноль в числовом поле тонкой настройки — «по умолчанию»: показываем пустое
+  // поле с подсказкой, а не «0», который выглядел бы как настоящее значение.
+  FIELDS.forEach(f => {
+    if(!$(f)) return;
+    $(f).value = ($(f).type === 'number' && !p[f]) ? '' : (p[f] ?? '');
+  });
   PROFILE_CHECKS.forEach(f => { if($(f)) $(f).checked = !!p[f]; });
   $('directHosts').value = (p.directHosts || []).join(', ');
   if(!filterDirty){
@@ -3156,7 +3347,49 @@ function fillProfileForm(p){
   renderIssuedByPanel(p);
   delete $('meshIncoming').dataset.touched;
   renderMeshSummary();
+  renderAdvSummary();
 }
+
+/* ---------- «Дополнительно» ---------- */
+function renderAdvSummary(){
+  const parts = [];
+  const ka = parseInt($('keepAliveSec').value, 10), to = parseInt($('connectTimeoutSec').value, 10);
+  if(ka) parts.push('keepalive ' + ka + ' ' + tr('adv_sec'));
+  if(to) parts.push(tr('adv_timeout_short') + ' ' + to + ' ' + tr('adv_sec'));
+  if($('cipher').value) parts.push($('cipher').value === 'chacha' ? 'ChaCha20' : 'AES-GCM');
+  if($('ipVersion').value) parts.push('IPv' + $('ipVersion').value);
+  if($('shareLan').checked) parts.push(tr('adv_lan_short'));
+  $('advSummary').textContent = parts.length ? parts.join(' · ') : tr('adv_default');
+}
+['keepAliveSec','connectTimeoutSec','cipher','ipVersion','shareLan'].forEach(id =>
+  $(id).addEventListener('change', renderAdvSummary));
+$('shareLan').addEventListener('change', renderLanAddrs);
+
+async function renderLanAddrs(){
+  const box = $('lanAddrsBox');
+  if(!$('shareLan').checked){ box.hidden = true; return; }
+  let r;
+  try { r = await api('/api/lanaddrs'); } catch(e) { return; }
+  const addrs = (r && r.addrs) || [];
+  box.innerHTML = '';
+  box.hidden = false;
+  if(!addrs.length){ box.textContent = tr('adv_lan_none'); return; }
+  box.appendChild(document.createTextNode(tr('adv_lan_addrs') + ' '));
+  const socks = $('socksPort').value || 1080, http = $('httpPort').value || 1081;
+  addrs.forEach((a, i) => {
+    const s = document.createElement('span');
+    s.className = 'adv-addr';
+    s.textContent = a + ':' + socks + ' (SOCKS5), ' + a + ':' + http + ' (HTTP)';
+    if(i) box.appendChild(document.createTextNode('; '));
+    box.appendChild(s);
+  });
+}
+
+$('advSave').onclick = () => {
+  $('save').click();
+  $('advNote').textContent = tr('saved');
+  setTimeout(() => { $('advNote').textContent = ''; }, 2500);
+};
 
 // renderIssuedByPanel — сервер настроен вручную почти всегда, поле panel в
 // нём пусто, и строка вообще не появляется. Заполняется только у сервера,

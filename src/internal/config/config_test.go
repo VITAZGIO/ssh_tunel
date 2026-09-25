@@ -142,3 +142,17 @@ func TestAddRemoveProfile(t *testing.T) {
 		t.Error("последний профиль удалять нельзя — подключаться будет не к чему")
 	}
 }
+
+func TestТонкаяНастройкаВГраницах(t *testing.T) {
+	p := Profile{KeepAliveSec: 1, ConnectTimeoutSec: 999, Cipher: "rc4", IPVersion: "5"}
+	p.normalize(1)
+	if p.KeepAliveSec != MinKeepAliveSec || p.ConnectTimeoutSec != MaxConnectTimeoutSec ||
+		p.Cipher != "" || p.IPVersion != "" {
+		t.Fatalf("после normalize: %+v", p)
+	}
+	p = Profile{KeepAliveSec: -3, Cipher: "chacha", IPVersion: "4"}
+	p.normalize(1)
+	if p.KeepAliveSec != 0 || p.ConnectTimeoutSec != 0 || p.Cipher != "chacha" || p.IPVersion != "4" {
+		t.Fatalf("ноль и допустимые значения должны сохраниться: %+v", p)
+	}
+}

@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"time"
 
 	"sshtunnel/internal/config"
 	"sshtunnel/internal/tunnel"
@@ -24,6 +25,9 @@ func (a *App) SelfCheck(ctx context.Context) []tunnel.CheckStep {
 			User:           active.User,
 			KeyPath:        active.KeyPath,
 			KnownHostsPath: config.KnownHostsPath(),
+			Cipher:         active.Cipher,
+			IPVersion:      active.IPVersion,
 		},
+		DialTimeout: time.Duration(active.ConnectTimeoutSec) * time.Second,
 	})
 }

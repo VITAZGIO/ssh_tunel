@@ -196,6 +196,7 @@ func (s *Server) Serve() error {
 	mux.HandleFunc("/api/update/check", s.guard(s.handleUpdateCheck))
 	mux.HandleFunc("/api/update/download", s.guard(s.handleUpdateDownload))
 	mux.HandleFunc("/api/mesh", s.guard(s.handleMesh))
+	mux.HandleFunc("/api/lanaddrs", s.guard(s.handleLANAddrs))
 
 	srv := &http.Server{
 		Handler:           mux,
@@ -352,6 +353,31 @@ func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 // handleMesh — состояние сети устройств: кто в сети, какие у кого имена.
 func (s *Server) handleMesh(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.app.MeshStatus())
+}
+
+// handleLANAddrs — адреса компьютера в локальной сети: по ним другие
+// устройства дома подключаются к прокси, когда он открыт для локальной сети.
+func (s *Server) handleLANAddrs(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, map[string]any{"addrs": lanAddrs()})
+}
+
+// lanAddrs — частные IPv4-адреса интерфейсов (домашняя или офисная сеть).
+func lanAddrs() []string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return []string{}
+	}
+	out := []string{}
+	for _, a := range addrs {
+		ipn, ok := a.(*net.IPNet)
+		if !ok {
+			continue
+		}
+		if v4 := ipn.IP.To4(); v4 != nil && v4.IsPrivate() {
+			out = append(out, v4.String())
+		}
+	}
+	return out
 }
 
 func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {

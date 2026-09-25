@@ -56,6 +56,28 @@ type Config struct {
 	// Ноль означает пятнадцать секунд.
 	DialTimeout time.Duration
 
+	// KeepAlive — как часто проверять, живо ли каждое SSH-соединение пула.
+	// Ноль — 20 секунд. Чаще — быстрее замечается обрыв (и NAT роутера не
+	// выкидывает тихую сессию), реже — меньше служебного трафика.
+	KeepAlive time.Duration
+
+	// Cipher — какой шифр предлагать серверу первым: "" (AES-GCM, он быстрее
+	// на любом процессоре с AES-NI), "aes" или "chacha" (быстрее на слабых
+	// процессорах без AES-NI). Остальные шифры остаются запасными: сервер,
+	// который не умеет выбранный, всё равно договорится.
+	Cipher string
+
+	// IPVersion — по какому протоколу подключаться к серверу: "" (любой),
+	// "4" или "6". Нужен, когда у провайдера сломан IPv6: соединение тогда
+	// сначала долго ждёт по нему и только потом пробует IPv4.
+	IPVersion string
+
+	// LANAccess — локальные прокси слушают не только этот компьютер
+	// (SocksAddr/HTTPAddr на 0.0.0.0), и соединения принимаются от устройств
+	// домашней сети. Адреса из интернета отбрасываются всегда — даже если у
+	// компьютера белый адрес и брандмауэр выключен.
+	LANAccess bool
+
 	// Policy решает по имени программы, вести соединение через сервер или
 	// выпустить напрямую. nil означает «всё через туннель».
 	Policy *routing.Policy
@@ -188,6 +210,9 @@ type Tunnel struct {
 	// подключился (UnixNano). По нему слив понимает, что к нему перестали
 	// обращаться и пора закрываться.
 	lastAccept atomic.Int64
+	// lanWarnAt — когда последний раз писали в журнал об отказе чужому адресу
+	// (см. LANAccess): сканеры из интернета не должны засыпать журнал.
+	lanWarnAt  atomic.Int64
 	drainMu    sync.Mutex
 	drainTimer *time.Timer
 
@@ -554,8 +579,32 @@ func (t *Tunnel) acceptLoop(ln net.Listener, handle func(net.Conn)) {
 			}
 			continue
 		}
+		if t.cfg.LANAccess && !lanSource(conn.RemoteAddr()) {
+			if now := time.Now().UnixNano(); now-t.lanWarnAt.Load() > int64(time.Minute) {
+				t.lanWarnAt.Store(now)
+				t.bus.Warnf("Отклонено соединение с прокси от %s: пускаю только устройства локальной сети", conn.RemoteAddr())
+			}
+			conn.Close()
+			continue
+		}
 		go handle(conn)
 	}
+}
+
+// lanSource — пускать ли на прокси соединение с этого адреса, когда прокси
+// открыт для локальной сети: сам компьютер и частные сети (192.168.x.x,
+// 10.x.x.x, 172.16–31.x.x, их IPv6-аналог fc00::/7 и адреса канала). Общие
+// адреса операторов (100.64.0.0/10) сюда не входят: за ними — чужие абоненты.
+func lanSource(a net.Addr) bool {
+	tcp, ok := a.(*net.TCPAddr)
+	if !ok {
+		return false
+	}
+	ip := tcp.IP
+	if v4 := ip.To4(); v4 != nil {
+		ip = v4
+	}
+	return ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast()
 }
 
 // stopGrace — сколько ждать фоновые горутины при остановке.
@@ -877,6 +926,44 @@ func (t *Tunnel) dialTimeout() time.Duration {
 	return 15 * time.Second
 }
 
+// keepAliveEvery — пауза между проверками связи.
+func (t *Tunnel) keepAliveEvery() time.Duration {
+	if t.cfg.KeepAlive > 0 {
+		return t.cfg.KeepAlive
+	}
+	return 20 * time.Second
+}
+
+// sshCiphers — шифры в порядке предпочтения. Выбор человека только ставит
+// свой шифр первым: остальные остаются, чтобы не потерять совместимость со
+// старыми серверами.
+func sshCiphers(pref string) []string {
+	gcm := []string{"aes128-gcm@openssh.com", "aes256-gcm@openssh.com"}
+	chacha := []string{"chacha20-poly1305@openssh.com"}
+	ctr := []string{"aes128-ctr", "aes256-ctr"}
+	var out []string
+	if pref == "chacha" {
+		out = append(append(out, chacha...), gcm...)
+	} else {
+		// Порядок по умолчанию: AES-GCM первым, потому что на любом
+		// современном процессоре есть AES-NI и он заметно быстрее
+		// программного chacha20; chacha — запасной для серверов без GCM.
+		out = append(append(out, gcm...), chacha...)
+	}
+	return append(out, ctr...)
+}
+
+// sshNetwork — "tcp", "tcp4" или "tcp6" по выбору IPVersion.
+func sshNetwork(v string) string {
+	switch v {
+	case "4":
+		return "tcp4"
+	case "6":
+		return "tcp6"
+	}
+	return "tcp"
+}
+
 func (t *Tunnel) clientConfig() *ssh.ClientConfig {
 	cb := hostkey.Callback(t.cfg.KnownHostsPath, func(host, fp string) {
 		t.bus.Infof("Ключ сервера %s запомнен: %s", host, fp)
@@ -887,17 +974,8 @@ func (t *Tunnel) clientConfig() *ssh.ClientConfig {
 		HostKeyCallback: cb,
 		Timeout:         t.dialTimeout(),
 		Config: ssh.Config{
-			// Порядок задаёт предпочтения клиента. AES-GCM первым, потому что
-			// на любом современном процессоре есть AES-NI и он заметно быстрее
-			// программного chacha20; chacha оставлена запасной для серверов
-			// без поддержки GCM.
-			Ciphers: []string{
-				"aes128-gcm@openssh.com",
-				"aes256-gcm@openssh.com",
-				"chacha20-poly1305@openssh.com",
-				"aes128-ctr",
-				"aes256-ctr",
-			},
+			// Порядок задаёт предпочтения клиента (см. sshCiphers).
+			Ciphers: sshCiphers(t.cfg.Cipher),
 		},
 	}
 }
@@ -921,7 +999,7 @@ func (t *Tunnel) dial() (*ssh.Client, error) {
 // сервером ушло бы в собственный туннель.
 func (t *Tunnel) dialSSH(addr string) (*ssh.Client, error) {
 	cfg := t.clientConfig()
-	conn, err := t.directDialer(cfg.Timeout).Dial("tcp", addr)
+	conn, err := t.directDialer(cfg.Timeout).Dial(sshNetwork(t.cfg.IPVersion), addr)
 	if err != nil {
 		return nil, err
 	}
@@ -1012,7 +1090,7 @@ func (t *Tunnel) keepLinkAlive(ctx context.Context, l *link, idx int) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(20 * time.Second):
+		case <-time.After(t.keepAliveEvery()):
 		case <-kickCh:
 		}
 

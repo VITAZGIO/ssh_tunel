@@ -142,7 +142,7 @@ func RunSelfCheck(ctx context.Context, opt SelfCheckOptions) []CheckStep {
 	addr := net.JoinHostPort(opt.Host, strconv.Itoa(opt.SSHPort))
 	dialer := &net.Dialer{Timeout: opt.DialTimeout, Control: opt.ProtectSocket}
 	start := time.Now()
-	conn, err := dialer.DialContext(ctx, "tcp", addr)
+	conn, err := dialer.DialContext(ctx, sshNetwork(opt.IPVersion), addr)
 	if err != nil {
 		if appendStep(&steps, CheckStep{Name: StepPort, Code: classifyDialCode(err), Detail: err.Error()}) {
 			return steps
@@ -258,6 +258,7 @@ func sshHandshake(conn net.Conn, addr string, opt SelfCheckOptions) (*ssh.Client
 		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
 		HostKeyCallback: hostkey.Callback(opt.KnownHostsPath, nil),
 		Timeout:         opt.DialTimeout,
+		Config:          ssh.Config{Ciphers: sshCiphers(opt.Cipher)},
 	}
 	if err := conn.SetDeadline(time.Now().Add(opt.DialTimeout)); err != nil {
 		conn.Close()

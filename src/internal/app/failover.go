@@ -153,13 +153,24 @@ func (a *App) tunnelConfig(cfg config.Config, p config.Profile) (_ tunnel.Config
 		mode = "vpn"
 	}
 	a.mu.Unlock()
+	// Прокси для локальной сети слушает все адреса компьютера, но системный
+	// прокси и подсказки в окне по-прежнему смотрят на 127.0.0.1.
+	listenHost := "127.0.0.1"
+	if p.ShareLAN {
+		listenHost = "0.0.0.0"
+	}
 	c := tunnel.Config{
 		Host:            p.Host,
 		SSHPort:         p.SSHPort,
 		User:            p.User,
 		KeyPath:         p.KeyPath,
-		SocksAddr:       socksAddr,
-		HTTPAddr:        httpAddr,
+		SocksAddr:       net.JoinHostPort(listenHost, strconv.Itoa(p.SocksPort)),
+		HTTPAddr:        net.JoinHostPort(listenHost, strconv.Itoa(p.HTTPPort)),
+		LANAccess:       p.ShareLAN,
+		DialTimeout:     time.Duration(p.ConnectTimeoutSec) * time.Second,
+		KeepAlive:       time.Duration(p.KeepAliveSec) * time.Second,
+		Cipher:          p.Cipher,
+		IPVersion:       p.IPVersion,
 		PoolSize:        p.PoolSize,
 		KnownHostsPath:  config.KnownHostsPath(),
 		Verbose:         cfg.Verbose,

@@ -81,6 +81,42 @@ type Profile struct {
 	MeshKey      string `json:"meshKey,omitempty"`
 	MeshName     string `json:"meshName,omitempty"`
 	MeshIncoming bool   `json:"meshIncoming,omitempty"`
+
+	// Тонкая настройка соединения (экран «Дополнительно»). Ноль и пустая
+	// строка — значения по умолчанию, поэтому старые конфиги не меняются.
+	//
+	// KeepAliveSec — как часто проверять, жива ли связь с сервером (0 — 20 с).
+	// ConnectTimeoutSec — сколько ждать подключения к серверу (0 — 15 с).
+	// Cipher — какой шифр предлагать первым: "" (сам выбор), "aes", "chacha".
+	// IPVersion — по какому протоколу идти к серверу: "" (любой), "4", "6".
+	// ShareLAN — пускать на локальные прокси другие устройства домашней сети.
+	KeepAliveSec      int    `json:"keepAliveSec,omitempty"`
+	ConnectTimeoutSec int    `json:"connectTimeoutSec,omitempty"`
+	Cipher            string `json:"cipher,omitempty"`
+	IPVersion         string `json:"ipVersion,omitempty"`
+	ShareLAN          bool   `json:"shareLan,omitempty"`
+}
+
+// Границы тонкой настройки: за ними значения уже вредят, а не помогают.
+const (
+	MinKeepAliveSec      = 5
+	MaxKeepAliveSec      = 300
+	MinConnectTimeoutSec = 3
+	MaxConnectTimeoutSec = 120
+)
+
+// clampOrZero оставляет ноль нулём (значение по умолчанию), остальное
+// загоняет в границы.
+func clampOrZero(v, lo, hi int) int {
+	switch {
+	case v <= 0:
+		return 0
+	case v < lo:
+		return lo
+	case v > hi:
+		return hi
+	}
+	return v
 }
 
 // Config — вся программа целиком: список серверов и настройки, общие для
@@ -513,5 +549,17 @@ func (p *Profile) normalize(n int) {
 	case "only", "except":
 	default:
 		p.FilterMode = "all"
+	}
+	p.KeepAliveSec = clampOrZero(p.KeepAliveSec, MinKeepAliveSec, MaxKeepAliveSec)
+	p.ConnectTimeoutSec = clampOrZero(p.ConnectTimeoutSec, MinConnectTimeoutSec, MaxConnectTimeoutSec)
+	switch p.Cipher {
+	case "aes", "chacha":
+	default:
+		p.Cipher = ""
+	}
+	switch p.IPVersion {
+	case "4", "6":
+	default:
+		p.IPVersion = ""
 	}
 }
