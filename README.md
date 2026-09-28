@@ -21,50 +21,58 @@
 
 <table>
   <tr>
-    <th colspan="2">🪟 Windows</th>
-    <th colspan="2">🐧 Linux</th>
-    <th>🤖 Android</th>
-    <th>🖥 VPS-сервер</th>
+    <th>Система</th>
+    <th>Вариант</th>
+    <th>Скачать</th>
+    <th>Что делает</th>
+    <th>Права</th>
+    <th>🕸 Сеть устройств</th>
   </tr>
   <tr>
-    <td align="center"><b>Прокси</b></td>
-    <td align="center"><b>VPN</b></td>
-    <td align="center"><b>Прокси</b></td>
-    <td align="center"><b>VPN</b></td>
-    <td align="center"><b>Приложение</b></td>
-    <td align="center"><b>Панель</b></td>
-  </tr>
-  <tr>
-    <td align="center"><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe">⬇ ssh_tunnel.exe</a></td>
-    <td align="center"><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn.exe">⬇ ssh_tunnel_vpn.exe</a></td>
-    <td align="center"><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux">⬇ ssh_tunnel_linux</a><br><a href="docs/LINUX_SETUP.md">установка</a></td>
-    <td align="center"><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn_linux">⬇ ssh_tunnel_vpn_linux</a><br><a href="docs/VPN.md#linux">установка</a></td>
-    <td align="center"><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.apk">⬇ ssh_tunnel.apk</a></td>
-    <td align="center"><a href="docs/PANEL_SETUP.md">📖 инструкция</a></td>
-  </tr>
-  <tr>
+    <td rowspan="2">🪟 <b>Windows</b></td>
+    <td><b>Прокси</b></td>
+    <td><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe">⬇ ssh_tunnel.exe</a></td>
     <td>Через сервер идут браузер и программы с настройкой прокси</td>
+    <td>не нужны</td>
+    <td align="center">только в браузере</td>
+  </tr>
+  <tr>
+    <td><b>VPN</b></td>
+    <td><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn.exe">⬇ ssh_tunnel_vpn.exe</a></td>
     <td>Через сервер идёт <b>весь</b> интернет компьютера</td>
+    <td>⚠️ администратор</td>
+    <td align="center">✅</td>
+  </tr>
+  <tr>
+    <td rowspan="2">🐧 <b>Linux</b></td>
+    <td><b>Прокси</b></td>
+    <td><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux">⬇ ssh_tunnel_linux</a> · <a href="docs/LINUX_SETUP.md">установка</a></td>
     <td>Через сервер идут браузер и программы с настройкой прокси</td>
+    <td>не нужны</td>
+    <td align="center">только в браузере</td>
+  </tr>
+  <tr>
+    <td><b>VPN</b></td>
+    <td><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn_linux">⬇ ssh_tunnel_vpn_linux</a> · <a href="docs/VPN.md#linux">установка</a></td>
     <td>Через сервер идёт <b>весь</b> интернет компьютера</td>
+    <td>⚠️ <code>sudo</code></td>
+    <td align="center">✅</td>
+  </tr>
+  <tr>
+    <td>🤖 <b>Android</b></td>
+    <td><b>Приложение</b></td>
+    <td><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.apk">⬇ ssh_tunnel.apk</a></td>
     <td>Через сервер идёт интернет телефона, можно выбрать приложения</td>
+    <td>не нужны</td>
+    <td align="center">✅</td>
+  </tr>
+  <tr>
+    <td>🖥 <b>VPS-сервер</b></td>
+    <td><b>Панель</b></td>
+    <td><a href="docs/PANEL_SETUP.md">📖 инструкция</a></td>
     <td>Ставится на твой сервер: новые устройства добавляются кнопкой</td>
-  </tr>
-  <tr>
-    <td>✅ без прав администратора</td>
-    <td>⚠️ нужны права администратора</td>
-    <td>✅ без root</td>
-    <td>⚠️ запуск через <code>sudo</code></td>
-    <td>✅ без root</td>
     <td>нужен сервер с Linux</td>
-  </tr>
-  <tr>
-    <td>🕸 сеть устройств: только в браузере</td>
-    <td>🕸 сеть устройств: ✅</td>
-    <td>🕸 сеть устройств: только в браузере</td>
-    <td>🕸 сеть устройств: ✅</td>
-    <td>🕸 сеть устройств: ✅</td>
-    <td>🕸 связывает устройства между собой</td>
+    <td align="center">связывает устройства</td>
   </tr>
 </table>
 

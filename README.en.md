@@ -21,50 +21,58 @@ standard SSH mechanism.
 
 <table>
   <tr>
-    <th colspan="2">🪟 Windows</th>
-    <th colspan="2">🐧 Linux</th>
-    <th>🤖 Android</th>
-    <th>🖥 VPS server</th>
+    <th>System</th>
+    <th>Edition</th>
+    <th>Download</th>
+    <th>What it does</th>
+    <th>Rights</th>
+    <th>🕸 Device network</th>
   </tr>
   <tr>
-    <td align="center"><b>Proxy</b></td>
-    <td align="center"><b>VPN</b></td>
-    <td align="center"><b>Proxy</b></td>
-    <td align="center"><b>VPN</b></td>
-    <td align="center"><b>App</b></td>
-    <td align="center"><b>Panel</b></td>
-  </tr>
-  <tr>
-    <td align="center"><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe">⬇ ssh_tunnel.exe</a></td>
-    <td align="center"><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn.exe">⬇ ssh_tunnel_vpn.exe</a></td>
-    <td align="center"><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux">⬇ ssh_tunnel_linux</a><br><a href="docs/LINUX_SETUP.en.md">setup</a></td>
-    <td align="center"><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn_linux">⬇ ssh_tunnel_vpn_linux</a><br><a href="docs/VPN.md#linux">setup</a></td>
-    <td align="center"><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.apk">⬇ ssh_tunnel.apk</a></td>
-    <td align="center"><a href="docs/PANEL_SETUP.en.md">📖 guide</a></td>
-  </tr>
-  <tr>
+    <td rowspan="2">🪟 <b>Windows</b></td>
+    <td><b>Proxy</b></td>
+    <td><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe">⬇ ssh_tunnel.exe</a></td>
     <td>Your browser and apps with proxy settings go through the server</td>
+    <td>not needed</td>
+    <td align="center">browser only</td>
+  </tr>
+  <tr>
+    <td><b>VPN</b></td>
+    <td><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn.exe">⬇ ssh_tunnel_vpn.exe</a></td>
     <td><b>All</b> of the computer's internet goes through the server</td>
+    <td>⚠️ administrator</td>
+    <td align="center">✅</td>
+  </tr>
+  <tr>
+    <td rowspan="2">🐧 <b>Linux</b></td>
+    <td><b>Proxy</b></td>
+    <td><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux">⬇ ssh_tunnel_linux</a> · <a href="docs/LINUX_SETUP.en.md">setup</a></td>
     <td>Your browser and apps with proxy settings go through the server</td>
+    <td>not needed</td>
+    <td align="center">browser only</td>
+  </tr>
+  <tr>
+    <td><b>VPN</b></td>
+    <td><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn_linux">⬇ ssh_tunnel_vpn_linux</a> · <a href="docs/VPN.md#linux">setup</a></td>
     <td><b>All</b> of the computer's internet goes through the server</td>
+    <td>⚠️ <code>sudo</code></td>
+    <td align="center">✅</td>
+  </tr>
+  <tr>
+    <td>🤖 <b>Android</b></td>
+    <td><b>App</b></td>
+    <td><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.apk">⬇ ssh_tunnel.apk</a></td>
     <td>The phone's internet goes through the server, per-app choice</td>
+    <td>not needed</td>
+    <td align="center">✅</td>
+  </tr>
+  <tr>
+    <td>🖥 <b>VPS server</b></td>
+    <td><b>Panel</b></td>
+    <td><a href="docs/PANEL_SETUP.en.md">📖 guide</a></td>
     <td>Installed on your server: add new devices with a button</td>
-  </tr>
-  <tr>
-    <td>✅ no admin rights</td>
-    <td>⚠️ needs admin rights</td>
-    <td>✅ no root</td>
-    <td>⚠️ run with <code>sudo</code></td>
-    <td>✅ no root</td>
     <td>needs a Linux server</td>
-  </tr>
-  <tr>
-    <td>🕸 device network: browser only</td>
-    <td>🕸 device network: ✅</td>
-    <td>🕸 device network: browser only</td>
-    <td>🕸 device network: ✅</td>
-    <td>🕸 device network: ✅</td>
-    <td>🕸 links your devices together</td>
+    <td align="center">links your devices</td>
   </tr>
 </table>
 
