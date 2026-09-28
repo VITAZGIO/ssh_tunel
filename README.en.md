@@ -19,32 +19,62 @@ standard SSH mechanism.
 
 ### Download
 
-**Desktop — proxy or VPN.** Both editions share settings and servers; only
-one of them runs at a time.
+<table>
+  <tr>
+    <th colspan="2">🪟 Windows</th>
+    <th colspan="2">🐧 Linux</th>
+    <th>🤖 Android</th>
+    <th>🖥 VPS server</th>
+  </tr>
+  <tr>
+    <td align="center"><b>Proxy</b></td>
+    <td align="center"><b>VPN</b></td>
+    <td align="center"><b>Proxy</b></td>
+    <td align="center"><b>VPN</b></td>
+    <td align="center"><b>App</b></td>
+    <td align="center"><b>Panel</b></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe">⬇ ssh_tunnel.exe</a></td>
+    <td align="center"><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn.exe">⬇ ssh_tunnel_vpn.exe</a></td>
+    <td align="center"><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux">⬇ ssh_tunnel_linux</a><br><a href="docs/LINUX_SETUP.en.md">setup</a></td>
+    <td align="center"><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn_linux">⬇ ssh_tunnel_vpn_linux</a><br><a href="docs/VPN.md#linux">setup</a></td>
+    <td align="center"><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.apk">⬇ ssh_tunnel.apk</a></td>
+    <td align="center"><a href="docs/PANEL_SETUP.en.md">📖 guide</a></td>
+  </tr>
+  <tr>
+    <td>Your browser and apps with proxy settings go through the server</td>
+    <td><b>All</b> of the computer's internet goes through the server</td>
+    <td>Your browser and apps with proxy settings go through the server</td>
+    <td><b>All</b> of the computer's internet goes through the server</td>
+    <td>The phone's internet goes through the server, per-app choice</td>
+    <td>Installed on your server: add new devices with a button</td>
+  </tr>
+  <tr>
+    <td>✅ no admin rights</td>
+    <td>⚠️ needs admin rights</td>
+    <td>✅ no root</td>
+    <td>⚠️ run with <code>sudo</code></td>
+    <td>✅ no root</td>
+    <td>needs a Linux server</td>
+  </tr>
+  <tr>
+    <td>🕸 device network: browser only</td>
+    <td>🕸 device network: ✅</td>
+    <td>🕸 device network: browser only</td>
+    <td>🕸 device network: ✅</td>
+    <td>🕸 device network: ✅</td>
+    <td>🕸 links your devices together</td>
+  </tr>
+</table>
 
-| | Proxy | VPN |
-|---|---|---|
-| **Windows** | [**ssh_tunnel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe) | [**ssh_tunnel_vpn.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn.exe) |
-| **Linux** | [**ssh_tunnel_linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux) · [setup](docs/LINUX_SETUP.en.md) | [**ssh_tunnel_vpn_linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn_linux) · [details](docs/VPN.md#linux) (in Russian) |
-| What goes through the tunnel | apps that support a proxy: browsers, curl, npm, pip… | **all** system traffic, including games, Docker and tools with no proxy support |
-| Administrator rights | not needed | needed: a UAC prompt on Windows, `sudo` on Linux |
-| How it works | local proxy + system settings | a virtual network adapter (Wintun / TUN) |
+**Not sure which one?** Proxy is simpler and asks for no rights. VPN — when you
+want absolutely everything to go through the server, including games and apps
+without proxy settings.
 
-Not sure which one? Start with the proxy: it's lighter and asks for no
-rights. Take the VPN when some program keeps bypassing the tunnel.
-
-**Other:**
-
-| | Link | |
-|---|---|---|
-| **Android** | [**ssh_tunnel.apk**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.apk) | VPN connection, quick-settings tile |
-| **VPS server** | [**Installing the panel**](docs/PANEL_SETUP.en.md) | a web panel on the server itself: adds clients with a button, no console needed |
-
-Besides the file itself, Linux has a [setup guide](docs/LINUX_SETUP.en.md):
-systemd service, web interface and commands for every major distro. A VPS
-isn't a file at all — it's a sequence of steps on a fresh server. Manual server setup without the panel (one shared tunnel
-user, set up over SSH) is in the
-[first-time server setup](docs/SERVER_SETUP.md) (in Russian).
+**🕸 Device network** — your computer, phone and home server see each other by
+names like `laptop.mesh`, wherever they are.
+[More](docs/MESH.md) (in Russian)
 
 The ARM build and the checksums are on the
 [release page](https://github.com/VITAZGIO/ssh_tunel/releases/latest).

@@ -19,32 +19,62 @@
 
 ### Скачать
 
-**Компьютер — прокси или VPN.** Настройки и серверы у обеих версий общие,
-запущена может быть только одна из них.
+<table>
+  <tr>
+    <th colspan="2">🪟 Windows</th>
+    <th colspan="2">🐧 Linux</th>
+    <th>🤖 Android</th>
+    <th>🖥 VPS-сервер</th>
+  </tr>
+  <tr>
+    <td align="center"><b>Прокси</b></td>
+    <td align="center"><b>VPN</b></td>
+    <td align="center"><b>Прокси</b></td>
+    <td align="center"><b>VPN</b></td>
+    <td align="center"><b>Приложение</b></td>
+    <td align="center"><b>Панель</b></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe">⬇ ssh_tunnel.exe</a></td>
+    <td align="center"><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn.exe">⬇ ssh_tunnel_vpn.exe</a></td>
+    <td align="center"><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux">⬇ ssh_tunnel_linux</a><br><a href="docs/LINUX_SETUP.md">установка</a></td>
+    <td align="center"><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn_linux">⬇ ssh_tunnel_vpn_linux</a><br><a href="docs/VPN.md#linux">установка</a></td>
+    <td align="center"><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.apk">⬇ ssh_tunnel.apk</a></td>
+    <td align="center"><a href="docs/PANEL_SETUP.md">📖 инструкция</a></td>
+  </tr>
+  <tr>
+    <td>Через сервер идут браузер и программы с настройкой прокси</td>
+    <td>Через сервер идёт <b>весь</b> интернет компьютера</td>
+    <td>Через сервер идут браузер и программы с настройкой прокси</td>
+    <td>Через сервер идёт <b>весь</b> интернет компьютера</td>
+    <td>Через сервер идёт интернет телефона, можно выбрать приложения</td>
+    <td>Ставится на твой сервер: новые устройства добавляются кнопкой</td>
+  </tr>
+  <tr>
+    <td>✅ без прав администратора</td>
+    <td>⚠️ нужны права администратора</td>
+    <td>✅ без root</td>
+    <td>⚠️ запуск через <code>sudo</code></td>
+    <td>✅ без root</td>
+    <td>нужен сервер с Linux</td>
+  </tr>
+  <tr>
+    <td>🕸 сеть устройств: только в браузере</td>
+    <td>🕸 сеть устройств: ✅</td>
+    <td>🕸 сеть устройств: только в браузере</td>
+    <td>🕸 сеть устройств: ✅</td>
+    <td>🕸 сеть устройств: ✅</td>
+    <td>🕸 связывает устройства между собой</td>
+  </tr>
+</table>
 
-| | Прокси | VPN |
-|---|---|---|
-| **Windows** | [**ssh_tunnel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe) | [**ssh_tunnel_vpn.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn.exe) |
-| **Linux** | [**ssh_tunnel_linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux) · [установка](docs/LINUX_SETUP.md) | [**ssh_tunnel_vpn_linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn_linux) · [подробнее](docs/VPN.md#linux) |
-| Что идёт через туннель | программы, которые умеют в прокси: браузеры, curl, npm, pip… | **весь** трафик системы, включая игры, Docker и утилиты без поддержки прокси |
-| Права администратора | не нужны | нужны: окно UAC на Windows, `sudo` на Linux |
-| Как устроено | локальный прокси + системные настройки | виртуальная сетевая карта (Wintun / TUN) — [VPN.md](docs/VPN.md) |
+**Не знаешь, что выбрать?** Прокси — проще и не просит прав. VPN — если нужно,
+чтобы через сервер шло вообще всё, включая игры и программы без настроек
+прокси.
 
-Не знаешь, что выбрать, — начни с прокси: он легче и не просит прав. VPN
-нужен, когда какая-то программа упрямо ходит мимо туннеля.
-
-**Остальное:**
-
-| | Ссылка | |
-|---|---|---|
-| **Android** | [**ssh_tunnel.apk**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.apk) | VPN-подключение, кнопка в шторке |
-| **VPS-сервер** | [**Установка панели**](docs/PANEL_SETUP.md) | веб-панель на самом сервере: заводит клиентов по кнопке, без консоли |
-
-Для Linux, кроме самого файла, есть [инструкция](docs/LINUX_SETUP.md):
-служба systemd, веб-интерфейс и команды под все основные дистрибутивы. VPS —
-это не файл, а порядок действий на новом сервере. Ручная настройка сервера без панели (один пользователь для
-туннеля, заводится через SSH) — в
-[первой настройке сервера](docs/SERVER_SETUP.md).
+**🕸 Сеть устройств** — твои компьютер, телефон и домашний сервер видят друг
+друга по именам вроде `ноутбук.mesh`, где бы ни находились.
+[Подробнее](docs/MESH.md)
 
 Сборка под ARM и контрольные суммы — на
 [странице релиза](https://github.com/VITAZGIO/ssh_tunel/releases/latest).
