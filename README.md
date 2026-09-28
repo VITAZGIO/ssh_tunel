@@ -4,12 +4,12 @@
 
 **Пропускает трафик приложений через твой собственный Linux-сервер по обычному SSH.**
 
-Один файл, без установки, без прав администратора.
-Учебный проект: показывает, как из штатного механизма SSH собирается рабочий
+Один файл, без установки. Для компьютера — две версии: **прокси** (без прав
+администратора) и **VPN** (весь трафик системы). Учебный проект: показывает, как из штатного механизма SSH собирается рабочий
 локальный прокси.
 
 [![Лицензия: MIT](https://img.shields.io/badge/лицензия-MIT-4c8dff)](LICENSE)
-[![Версия](https://img.shields.io/badge/версия-1.0.0-4c8dff)](https://github.com/VITAZGIO/ssh_tunel/releases)
+[![Версия](https://img.shields.io/badge/версия-1.5.0-4c8dff)](https://github.com/VITAZGIO/ssh_tunel/releases)
 [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
 [![Linux](https://img.shields.io/badge/Linux-amd64%20%7C%20arm64-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
 [![Android](https://img.shields.io/badge/Android-8.0+-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
@@ -19,19 +19,30 @@
 
 ### Скачать
 
-| Система | Ссылка | |
+**Компьютер — прокси или VPN.** Настройки и серверы у обеих версий общие,
+запущена может быть только одна из них.
+
+| | Прокси | VPN |
 |---|---|---|
-| **Windows** | [**ssh_tunnel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe) | окно с кнопкой, значок у часов |
-| **Windows, режим VPN** | [**ssh_tunnel_vpn.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn.exe) | весь трафик системы, нужны права администратора — [подробнее](docs/VPN.md) |
-| **Linux, режим VPN** | [**ssh_tunnel_vpn_linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn_linux) | весь трафик системы, запуск через `sudo` — [подробнее](docs/VPN.md#linux) |
+| **Windows** | [**ssh_tunnel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe) | [**ssh_tunnel_vpn.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn.exe) |
+| **Linux** | [**ssh_tunnel_linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux) · [установка](docs/LINUX_SETUP.md) | [**ssh_tunnel_vpn_linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn_linux) · [подробнее](docs/VPN.md#linux) |
+| Что идёт через туннель | программы, которые умеют в прокси: браузеры, curl, npm, pip… | **весь** трафик системы, включая игры, Docker и утилиты без поддержки прокси |
+| Права администратора | не нужны | нужны: окно UAC на Windows, `sudo` на Linux |
+| Как устроено | локальный прокси + системные настройки | виртуальная сетевая карта (Wintun / TUN) — [VPN.md](docs/VPN.md) |
+
+Не знаешь, что выбрать, — начни с прокси: он легче и не просит прав. VPN
+нужен, когда какая-то программа упрямо ходит мимо туннеля.
+
+**Остальное:**
+
+| | Ссылка | |
+|---|---|---|
 | **Android** | [**ssh_tunnel.apk**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.apk) | VPN-подключение, кнопка в шторке |
-| **Linux** | [**Установка на Linux**](docs/LINUX_SETUP.md) | консоль + веб-интерфейс, служба systemd, команды под все основные дистрибутивы |
 | **VPS-сервер** | [**Установка панели**](docs/PANEL_SETUP.md) | веб-панель на самом сервере: заводит клиентов по кнопке, без консоли |
 
-Windows и Android — прямые ссылки на файл. Linux и VPS-сервер открывают
-страницу с инструкцией: у Linux слишком много разных систем, чтобы обойтись
-одной командой, а VPS — это вообще не файл, а порядок действий на новом
-сервере. Ручная настройка сервера без панели (один пользователь для
+Для Linux, кроме самого файла, есть [инструкция](docs/LINUX_SETUP.md):
+служба systemd, веб-интерфейс и команды под все основные дистрибутивы. VPS —
+это не файл, а порядок действий на новом сервере. Ручная настройка сервера без панели (один пользователь для
 туннеля, заводится через SSH) — в
 [первой настройке сервера](docs/SERVER_SETUP.md).
 
@@ -131,7 +142,9 @@ HTTP CONNECT, каналы SSH и определение процесса по �
 ## Windows
 
 1. Скачай [**ssh_tunnel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe)
-   и положи в постоянную папку.
+   (прокси) или [**ssh_tunnel_vpn.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn.exe)
+   (VPN, см. [ниже](#режим-vpn)) и положи в постоянную папку. Дальше всё
+   одинаково, в командах ниже для VPN замени имя файла.
 
    Браузер может обозвать файл опасным — программа не подписана сертификатом
    (это стоит денег и требует юрлица), а к неподписанным и малоизвестным файлам
@@ -155,7 +168,10 @@ HTTP CONNECT, каналы SSH и определение процесса по �
 4. Сохрани, вернись назад, нажми круглую кнопку.
 
 Крестик прячет программу в трей, туннель продолжает работать. Выйти совсем —
-правый щелчок по значку у часов → «Выход».
+правый щелчок по значку у часов → «Выход». Windows 11 новые значки прячет под
+стрелку «^» рядом с часами — при первом закрытии программа сама подскажет,
+где её искать. Закрепить значок на виду: перетащи его из-под стрелки на
+панель задач.
 
 Нужна консольная версия для Windows — она есть в исходниках, собирается одной
 командой: `GOOS=windows go build -o ssh_tunnel_cli.exe ./cmd/ssh_tunnel_cli`.
@@ -166,7 +182,9 @@ HTTP CONNECT, каналы SSH и определение процесса по �
 в прокси. `ssh_tunnel_vpn.exe` создаёт виртуальную сетевую карту, и через
 сервер идёт **всё** — в том числе игры, Docker и утилиты, которые про прокси
 не знают. Цена — окно UAC при каждом запуске: сетевые адаптеры Windows даёт
-создавать только администратору. Настройки и серверы у обеих версий общие.
+создавать только администратору. Окно, трей и настройки — те же, что у
+прокси, серверы у обеих версий общие. Одновременно работает только одна
+версия: если уже запущена другая, откроется её окно.
 Для Linux то же самое — `ssh_tunnel_vpn_linux`. Как это устроено — в
 [VPN.md](docs/VPN.md).
 
@@ -253,7 +271,9 @@ ssh-keygen -t ed25519 -f ~/.ssh/phone -C "phone"
   случайном порту: посторонняя страница, открытая в браузере, не должна иметь
   возможности достучаться до `127.0.0.1` и выключить туннель или прочитать
   настройки.
-- **Прав администратора не требуется.** Всё пишется под текущим пользователем.
+- **Прокси-версии прав администратора не требуется.** Всё пишется под текущим
+  пользователем. Права нужны только VPN-версии — чтобы создать сетевой
+  адаптер и поменять маршруты.
 
 Чего программа не делает: она не маскирует сама себя. Со стороны это обычное
 SSH-соединение с твоим сервером — со всеми свойствами обычного SSH-соединения,
@@ -289,7 +309,7 @@ go test ./... -race     # проверить, что всё работает
 ```
 src/          исходный код (модуль Go)
 android/      приложение (Kotlin) и сетевой стек к нему (Go)
-vpn/          режим VPN для Windows и Linux (свой модуль: Go 1.26, Wintun)
+vpn/          режим VPN для Windows и Linux (свой модуль: Go 1.26, Wintun; vpn/build.sh)
 packaging/    служба systemd и установщик для Linux
 docs/         архитектура, безопасность, диагностика
 ```

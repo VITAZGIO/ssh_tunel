@@ -10,7 +10,9 @@
 // Три вещи, которых не давал браузерный вариант, сделаны здесь руками:
 //
 //   - закрытие окна крестиком прячет его в трей, а не завершает программу
-//     (иначе туннель обрывался бы при каждом случайном закрытии);
+//     (иначе туннель обрывался бы при каждом случайном закрытии). Если значка
+//     в трее нет, окно лишь сворачивается в панель задач — спрятать программу
+//     туда, откуда её не достать, хуже, чем не прятать вовсе;
 //   - значок в трее с меню — чтобы отключиться, не открывая окно;
 //   - повторный запуск не поднимает вторую копию, а показывает уже
 //     работающую (иначе вторая копия просто падала бы на занятых портах).
@@ -74,6 +76,10 @@ var (
 	pGetDpiForWindow  = user32.NewProc("GetDpiForWindow")
 	pFindWindow       = user32.NewProc("FindWindowW")
 	pPostMessage      = user32.NewProc("PostMessageW")
+	pRegisterWinMsg   = user32.NewProc("RegisterWindowMessageW")
+	pChangeMsgFilter  = user32.NewProc("ChangeWindowMessageFilterEx")
+	pSetTimer         = user32.NewProc("SetTimer")
+	pKillTimer        = user32.NewProc("KillTimer")
 
 	pDwmSetWindowAttribute = dwmapi.NewProc("DwmSetWindowAttribute")
 
@@ -84,6 +90,8 @@ var (
 
 const (
 	wmClose      = 0x0010
+	wmTimer      = 0x0113
+	wmUser       = 0x0400
 	wmApp        = 0x8000
 	wmTrayCallby = wmApp + 1 // сообщение от значка в трее
 	wmShowWindow = wmApp + 2 // «покажись» от второй копии программы
@@ -91,6 +99,17 @@ const (
 	wmLButtonUp     = 0x0202
 	wmLButtonDblClk = 0x0203
 	wmRButtonUp     = 0x0205
+
+	// Щелчок по всплывающему уведомлению значка.
+	ninBalloonUserClick = wmUser + 5
+
+	// Разрешить сообщение в окно, даже если его шлёт процесс с меньшими
+	// правами (см. allowMessagesFromShell).
+	msgfltAllow = 1
+
+	// Таймер повторных попыток добавить значок, пока трея ещё нет.
+	trayRetryTimer = 1
+	trayRetryMs    = 2000
 
 	// Индексы отрицательные, а принимаются как uintptr — записываем их
 	// сразу в дополнительном коде, иначе константа не переводится в uintptr.
@@ -100,9 +119,10 @@ const (
 	wsThickFrame  = 0x00040000
 	wsMaximizeBox = 0x00010000
 
-	swHide    = 0
-	swShow    = 5
-	swRestore = 9
+	swHide     = 0
+	swShow     = 5
+	swMinimize = 6
+	swRestore  = 9
 
 	swpNoMove       = 0x0002
 	swpNoZOrder     = 0x0004
@@ -115,6 +135,9 @@ const (
 	nifMessage = 0x01
 	nifIcon    = 0x02
 	nifTip     = 0x04
+	nifInfo    = 0x10
+
+	niifInfo = 0x01
 
 	tpmRightButton = 0x0002
 	tpmReturnCmd   = 0x0100
@@ -177,7 +200,15 @@ type ui struct {
 	icon    uintptr
 	nid     notifyIconData
 	tipMu   sync.Mutex // подсказку трея обновляет посторонняя горутина
+	inTray  bool       // значок действительно стоит в трее (под tipMu)
 	once    sync.Once
+
+	// taskbarCreated — сообщение, которое Проводник рассылает всем окнам,
+	// когда (пере)создаёт панель задач: после своего падения или если
+	// программа запустилась раньше, чем он успел её нарисовать. Значки в трее
+	// при этом пропадают, и добавлять их надо заново.
+	taskbarCreated uintptr
+	hintShown      bool // подсказку «я в трее» показываем один раз за запуск
 }
 
 var active *ui // окно в программе одно, поэтому глобальная ссылка достаточна
@@ -241,6 +272,7 @@ func Run(opts Options) error {
 	u.fixWindowStyle()
 	u.themeTitleBar()
 	u.hookWindowProc()
+	u.allowMessagesFromShell()
 	u.addTrayIcon()
 
 	view.Navigate(opts.URL)
@@ -348,11 +380,25 @@ func (u *ui) hookWindowProc() {
 
 		case wmTrayCallby:
 			switch lparam & 0xFFFF {
-			case wmLButtonUp, wmLButtonDblClk:
+			case wmLButtonUp, wmLButtonDblClk, ninBalloonUserClick:
 				u.show()
 			case wmRButtonUp:
 				u.showMenu()
 			}
+			return 0
+
+		case wmTimer:
+			if wparam == trayRetryTimer {
+				u.addTrayIcon()
+				return 0
+			}
+		}
+		if msg == u.taskbarCreated && msg != 0 {
+			// Проводник перезапустился — старого значка больше нет.
+			u.tipMu.Lock()
+			u.inTray = false
+			u.tipMu.Unlock()
+			u.addTrayIcon()
 			return 0
 		}
 		r, _, _ := pCallWindowProc.Call(u.oldProc, hwnd, msg, wparam, lparam)
@@ -368,7 +414,36 @@ func (u *ui) show() {
 }
 
 func (u *ui) hide() {
+	u.tipMu.Lock()
+	inTray := u.inTray
+	u.tipMu.Unlock()
+	if !inTray {
+		// Значка нет — спрятанное окно было бы не вернуть ничем, кроме
+		// диспетчера задач. Сворачиваем в панель задач: туннель всё так же
+		// работает, а окно остаётся под рукой.
+		pShowWindow.Call(u.hwnd, swMinimize)
+		return
+	}
 	pShowWindow.Call(u.hwnd, swHide)
+	if !u.hintShown {
+		u.hintShown = true
+		u.showTrayHint()
+	}
+}
+
+// showTrayHint один раз за запуск говорит, куда делось окно. Особенно нужно в
+// Windows 11: новые значки она по умолчанию убирает под стрелку «^», и без
+// подсказки кажется, что программа закрылась «в никуда».
+func (u *ui) showTrayHint() {
+	u.tipMu.Lock()
+	defer u.tipMu.Unlock()
+	nid := u.nid
+	nid.UFlags = nifInfo // только уведомление: иконку и подсказку не трогаем
+	nid.DwInfoFlags = niifInfo
+	copyUTF16(nid.SzInfoTitle[:], u.opts.Title+" работает в фоне")
+	copyUTF16(nid.SzInfo[:], "Окно спрятано в значок у часов (если его не видно — "+
+		"нажми стрелку ^). Выход — правый щелчок по значку → «Выход».")
+	pShellNotifyIcon.Call(nimModify, uintptr(unsafe.Pointer(&nid)))
 }
 
 // showMenu показывает меню у значка в трее.
@@ -425,10 +500,46 @@ func (u *ui) quit() {
 	})
 }
 
-func (u *ui) addTrayIcon() {
-	hinst, _, _ := pGetModuleHandle.Call(0)
-	u.icon, _, _ = pLoadImage.Call(hinst, iconResourceID, imageIcon, 0, 0, lrDefaultSize|lrShared)
+// allowMessagesFromShell пропускает в окно сообщения от Проводника и от
+// второй копии программы.
+//
+// Версия с VPN работает с правами администратора, а Проводник — с обычными.
+// Windows (механизм UIPI) по умолчанию не пускает сообщения из процесса с
+// меньшими правами в окно с большими: щелчки по значку, «панель задач
+// создана заново» и «покажись» от второй копии просто терялись бы. Для
+// обычной версии вызов ничего не меняет.
+func (u *ui) allowMessagesFromShell() {
+	name, _ := windows.UTF16PtrFromString("TaskbarCreated")
+	u.taskbarCreated, _, _ = pRegisterWinMsg.Call(uintptr(unsafe.Pointer(name)))
 
+	if pChangeMsgFilter.Find() != nil {
+		return // Windows старее 7 — там UIPI ещё нет
+	}
+	for _, msg := range []uintptr{wmTrayCallby, wmShowWindow, u.taskbarCreated} {
+		if msg != 0 {
+			pChangeMsgFilter.Call(u.hwnd, msg, msgfltAllow, 0)
+		}
+	}
+}
+
+// addTrayIcon ставит значок в трей. Если трея ещё нет (программа стартовала
+// вместе с системой раньше Проводника) — пробует снова по таймеру, а когда
+// Проводник поднимет панель задач, придёт TaskbarCreated и значок добавится
+// сразу.
+func (u *ui) addTrayIcon() {
+	u.tipMu.Lock()
+	defer u.tipMu.Unlock()
+	if u.inTray {
+		pKillTimer.Call(u.hwnd, trayRetryTimer)
+		return
+	}
+
+	if u.icon == 0 {
+		hinst, _, _ := pGetModuleHandle.Call(0)
+		u.icon, _, _ = pLoadImage.Call(hinst, iconResourceID, imageIcon, 0, 0, lrDefaultSize|lrShared)
+	}
+
+	tip := u.nid.SzTip // подсказка с состоянием, если SetStatus уже успел
 	u.nid = notifyIconData{
 		CbSize:           uint32(unsafe.Sizeof(notifyIconData{})),
 		HWnd:             u.hwnd,
@@ -436,25 +547,46 @@ func (u *ui) addTrayIcon() {
 		UFlags:           nifMessage | nifIcon | nifTip,
 		UCallbackMessage: wmTrayCallby,
 		HIcon:            u.icon,
+		SzTip:            tip,
 	}
-	copyTip(&u.nid, "ssh_tunnel")
-	pShellNotifyIcon.Call(nimAdd, uintptr(unsafe.Pointer(&u.nid)))
+	if tip[0] == 0 {
+		copyUTF16(u.nid.SzTip[:], u.opts.Title)
+	}
+
+	ok, _, _ := pShellNotifyIcon.Call(nimAdd, uintptr(unsafe.Pointer(&u.nid)))
+	if ok == 0 {
+		// Значок мог остаться с прошлого раза (TaskbarCreated приходит и
+		// при смене масштаба экрана) — тогда его достаточно обновить.
+		ok, _, _ = pShellNotifyIcon.Call(nimModify, uintptr(unsafe.Pointer(&u.nid)))
+	}
+	u.inTray = ok != 0
+	if u.inTray {
+		pKillTimer.Call(u.hwnd, trayRetryTimer)
+	} else {
+		pSetTimer.Call(u.hwnd, trayRetryTimer, trayRetryMs, 0)
+	}
 }
 
 func (u *ui) removeTrayIcon() {
+	u.tipMu.Lock()
+	defer u.tipMu.Unlock()
+	pKillTimer.Call(u.hwnd, trayRetryTimer)
 	pShellNotifyIcon.Call(nimDelete, uintptr(unsafe.Pointer(&u.nid)))
+	u.inTray = false
 }
 
-func copyTip(nid *notifyIconData, text string) {
+// copyUTF16 кладёт строку в поле фиксированной длины, обрезая лишнее и
+// оставляя место под завершающий ноль.
+func copyUTF16(dst []uint16, text string) {
 	s, err := windows.UTF16FromString(text)
 	if err != nil {
 		return
 	}
-	if len(s) > len(nid.SzTip) {
-		s = s[:len(nid.SzTip)-1]
+	if len(s) > len(dst) {
+		s = s[:len(dst)]
 		s[len(s)-1] = 0
 	}
-	copy(nid.SzTip[:], s)
+	copy(dst, s)
 }
 
 // SetStatus обновляет подсказку у значка в трее, чтобы состояние было видно,
@@ -469,8 +601,11 @@ func SetStatus(text string) {
 		return
 	}
 	u.tipMu.Lock()
-	copyTip(&u.nid, "ssh_tunnel — "+text)
-	pShellNotifyIcon.Call(nimModify, uintptr(unsafe.Pointer(&u.nid)))
+	u.nid.SzTip = [len(u.nid.SzTip)]uint16{}
+	copyUTF16(u.nid.SzTip[:], u.opts.Title+" — "+text)
+	if u.inTray {
+		pShellNotifyIcon.Call(nimModify, uintptr(unsafe.Pointer(&u.nid)))
+	}
 	u.tipMu.Unlock()
 }
 

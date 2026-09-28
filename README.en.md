@@ -4,12 +4,12 @@
 
 **Routes application traffic through your own Linux server over plain SSH.**
 
-A single file. No installer, no administrator rights.
-An educational project: it shows how a working local proxy is built out of a
+A single file, no installer. Two desktop editions: **proxy** (no administrator
+rights) and **VPN** (all system traffic). An educational project: it shows how a working local proxy is built out of a
 standard SSH mechanism.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-4c8dff)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-4c8dff)](https://github.com/VITAZGIO/ssh_tunel/releases)
+[![Version](https://img.shields.io/badge/version-1.5.0-4c8dff)](https://github.com/VITAZGIO/ssh_tunel/releases)
 [![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
 [![Linux](https://img.shields.io/badge/Linux-amd64%20%7C%20arm64-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
 [![Android](https://img.shields.io/badge/Android-8.0+-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
@@ -19,17 +19,30 @@ standard SSH mechanism.
 
 ### Download
 
-| System | Link | |
+**Desktop — proxy or VPN.** Both editions share settings and servers; only
+one of them runs at a time.
+
+| | Proxy | VPN |
 |---|---|---|
-| **Windows** | [**ssh_tunnel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe) | window with a button, tray icon |
+| **Windows** | [**ssh_tunnel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe) | [**ssh_tunnel_vpn.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn.exe) |
+| **Linux** | [**ssh_tunnel_linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux) · [setup](docs/LINUX_SETUP.en.md) | [**ssh_tunnel_vpn_linux**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn_linux) · [details](docs/VPN.md#linux) (in Russian) |
+| What goes through the tunnel | apps that support a proxy: browsers, curl, npm, pip… | **all** system traffic, including games, Docker and tools with no proxy support |
+| Administrator rights | not needed | needed: a UAC prompt on Windows, `sudo` on Linux |
+| How it works | local proxy + system settings | a virtual network adapter (Wintun / TUN) |
+
+Not sure which one? Start with the proxy: it's lighter and asks for no
+rights. Take the VPN when some program keeps bypassing the tunnel.
+
+**Other:**
+
+| | Link | |
+|---|---|---|
 | **Android** | [**ssh_tunnel.apk**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.apk) | VPN connection, quick-settings tile |
-| **Linux** | [**Installing on Linux**](docs/LINUX_SETUP.en.md) | console + web interface, systemd service, commands for every major distro |
 | **VPS server** | [**Installing the panel**](docs/PANEL_SETUP.en.md) | a web panel on the server itself: adds clients with a button, no console needed |
 
-Windows and Android are direct file links. Linux and VPS server open an
-instructions page instead: Linux has too many different systems for one
-command to cover, and a VPS isn't a file at all — it's a sequence of steps on
-a fresh server. Manual server setup without the panel (one shared tunnel
+Besides the file itself, Linux has a [setup guide](docs/LINUX_SETUP.en.md):
+systemd service, web interface and commands for every major distro. A VPS
+isn't a file at all — it's a sequence of steps on a fresh server. Manual server setup without the panel (one shared tunnel
 user, set up over SSH) is in the
 [first-time server setup](docs/SERVER_SETUP.md) (in Russian).
 
@@ -132,7 +145,8 @@ firewall on first — a ready-to-paste block of commands is in
 ## Windows
 
 1. Download [**ssh_tunnel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe)
-   and put it in a permanent folder.
+   (proxy) or [**ssh_tunnel_vpn.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn.exe)
+   (VPN, see [below](#vpn-mode)) and put it in a permanent folder.
 2. Run it. Windows will warn about an unknown publisher — «More info» → «Run
    anyway» (the binary is not signed with a certificate: that costs money and
    requires a legal entity).
@@ -142,10 +156,26 @@ firewall on first — a ready-to-paste block of commands is in
 4. Save, go back, press the round button.
 
 The close button hides the program in the tray, the tunnel keeps running. To
-quit for real: right-click the tray icon → «Exit».
+quit for real: right-click the tray icon → «Exit». Windows 11 hides new icons
+under the «^» arrow next to the clock — the first time you close the window,
+the program shows a notification telling you where it went. To keep the icon
+visible, drag it from under the arrow onto the taskbar.
 
 If you want a console build for Windows, it is in the sources and takes one
 command: `GOOS=windows go build -o ssh_tunnel_cli.exe ./cmd/ssh_tunnel_cli`.
+
+### VPN mode
+
+`ssh_tunnel.exe` is a proxy: only programs that know how to use a proxy go
+through the tunnel. `ssh_tunnel_vpn.exe` creates a virtual network adapter, so
+**everything** goes through your server — including games, Docker and tools
+that know nothing about proxies. The price is a UAC prompt on every start:
+Windows only lets administrators create network adapters. The window, tray
+icon and settings are the same as in the proxy edition, and both share the
+same servers. Only one edition runs at a time: starting the other one just
+opens the window of the running one. For Linux the same thing is
+`ssh_tunnel_vpn_linux` (run it with `sudo`). How it works —
+[VPN.md](docs/VPN.md) (in Russian).
 
 ---
 
@@ -231,7 +261,9 @@ Linux flags: `-host`, `-sshport`, `-user`, `-key`, `-port`, `-httpport`,
 - **The local web interface is protected by a random token** and an `Origin`
   check, on a random port: an arbitrary page open in your browser must not be
   able to reach `127.0.0.1` and switch the tunnel off or read the settings.
-- **No administrator rights.** Everything is written under the current user.
+- **No administrator rights for the proxy edition.** Everything is written
+  under the current user. Only the VPN edition needs them — to create a
+  network adapter and change routes.
 
 What the program does not do: disguise itself. From the outside it is an
 ordinary SSH connection to your server, with exactly the properties an ordinary
@@ -268,6 +300,7 @@ go test ./... -race     # check that everything works
 ```
 src/          source code (a Go module)
 android/      the app (Kotlin) and its network stack (Go)
+vpn/          VPN mode for Windows and Linux (own module: Go 1.26, Wintun; vpn/build.sh)
 packaging/    systemd service and installer for Linux
 docs/         architecture, security, troubleshooting
 ```
