@@ -1473,6 +1473,7 @@ const I18N = {
     boot_start:'Запускать при старте системы',
     boot_note_linux:'Программа сама поставит службу systemd и разрешит ей работать без входа в систему — служба будет подниматься при загрузке машины.',
     boot_note_windows:'Программа пропишет себя в автозагрузке Windows (для текущего пользователя, без прав администратора) — запустится сама при следующем входе в систему.',
+    boot_note_linux_vpn:'Программа поставит системную службу ssh_tunnel_vpn: VPN будет подниматься при загрузке машины, до входа в систему. Включится со следующей загрузки — чтобы сразу, закрой программу (Ctrl+C) и выполни: sudo systemctl start ssh_tunnel_vpn.',
     boot_note_windows_service:'Программа установит себя службой Windows (один раз попросит права администратора): VPN и сеть устройств будут подниматься при включении компьютера, ещё до входа в учётную запись, — к нему можно подключиться по RDP прямо с экрана ввода пароля. Окно при входе откроется значком в трее. Ярлык в папке «Автозагрузка» больше не нужен — удали его.',
     boot_ready:'Включено: туннель поднимется сам при загрузке машины.',
     boot_need_root:'Включено, но только после входа в систему — чтобы поднимался при загрузке, нужен пароль sudo.',
@@ -1709,6 +1710,7 @@ const I18N = {
     boot_start:'Start at system boot',
     boot_note_linux:'The program will install a systemd service itself and allow it to run without logging in — the service will come up at boot.',
     boot_note_windows:'The program will add itself to Windows startup (for the current user, no administrator rights needed) — it will launch on the next login.',
+    boot_note_linux_vpn:'The program will install the ssh_tunnel_vpn system service: the VPN will come up at boot, before anyone logs in. It takes effect from the next boot — to start it now, close the program (Ctrl+C) and run: sudo systemctl start ssh_tunnel_vpn.',
     boot_note_windows_service:'The program will install itself as a Windows service (asking for administrator rights once): the VPN and device network will come up when the computer turns on, before anyone logs in — you can RDP into it straight from the password screen. At login the window opens as a tray icon. A shortcut in the Startup folder is no longer needed — delete it.',
     boot_ready:'Enabled: the tunnel will come up on its own at boot.',
     boot_need_root:'Enabled, but only after logging in — a sudo password is needed for it to come up at boot.',
@@ -2719,12 +2721,12 @@ function renderBootState(st){
   if(!st || !st.supported){ $('bootBlock').hidden = true; return; }
   $('bootBlock').hidden = false;
   $('bootStart').checked = !!st.enabled;
-  $('bootNote').textContent = tr(st.service ? 'boot_note_windows_service'
+  $('bootNote').textContent = tr(st.service ? (isWindows() ? 'boot_note_windows_service' : 'boot_note_linux_vpn')
     : isWindows() ? 'boot_note_windows' : 'boot_note_linux');
 
   if(!st.enabled){
     $('bootStatus').textContent = '';
-  } else if(isWindows() || st.linger){
+  } else if(isWindows() || st.linger || st.service){
     // На Windows отдельного понятия "linger" нет — запись в реестре (или
     // служба у VPN-версии) и так срабатывает сама.
     $('bootStatus').textContent = tr('boot_ready');
