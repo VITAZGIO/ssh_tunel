@@ -149,21 +149,236 @@ Windows** — программу, которую система запускае
 
 ## Linux
 
+Файл `ssh_tunnel_vpn_linux` — то же, что `ssh_tunnel_linux`, но через сервер
+идёт **весь** трафик машины, а не только программы с настройкой прокси, и сама
+машина ходит к устройствам сети по именам `.mesh` (ssh, ping, RDP-клиенты —
+что угодно). Цена — права root: создавать сетевое устройство и менять маршруты
+ядро разрешает только ему. Поэтому:
+
+- запускать — через `sudo` (настройки при этом остаются в **твоей** домашней
+  папке, `~/.config/ssh_tunnel`, общие с обычной версией);
+- автозапуск — **системной** службой, командами ниже. Галочка «Запускать при
+  старте системы» в панели рассчитана на обычную версию и для VPN не годится.
+
+Учти: торренты, игры и другие VPN на этой машине (WireGuard, NetBird) ходят по
+UDP — через SSH он не проходит, без ретранслятора UDP на сервере они
+перестанут работать. Домашняя сеть (192.168.x.x) и Docker остаются как были.
+
+Нужен только доступ к этой машине с других устройств (её порты, SSH, панели),
+а её собственный интернет пусть идёт напрямую? Тогда хватит обычной версии —
+[LINUX_SETUP.md](LINUX_SETUP.md).
+
+### Команды под свою систему
+
+Разверни свою систему, выполни блок, потом — общий блок автозапуска ниже.
+
+<details>
+<summary><b>Ubuntu · Debian · Linux Mint · Raspberry Pi OS</b></summary>
+
 ```bash
-# скачать (на ARM — Raspberry Pi и т.п. — возьмётся сборка _arm64) и сделать исполняемым
+sudo apt update && sudo apt install -y curl
+
+# скачать (на Raspberry Pi и других ARM возьмётся сборка _arm64) и поставить
 F=ssh_tunnel_vpn_linux; [ "$(uname -m)" = aarch64 ] && F=${F}_arm64
-curl -fL -o ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
-chmod +x ssh_tunnel_vpn_linux
+curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
+sudo install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
 
 # задать сервер один раз
-sudo ./ssh_tunnel_vpn_linux -host ТВОЙ_СЕРВЕР -user tunnel -save
+sudo ssh_tunnel_vpn_linux -host ТВОЙ_СЕРВЕР -user tunnel -save
 
-# запустить с веб-интерфейсом — те же флаги, что у ssh_tunnel_linux
-sudo ./ssh_tunnel_vpn_linux -web
+# проверить руками: поднимется VPN и панель (Ctrl+C — выключить)
+sudo ssh_tunnel_vpn_linux -web
 ```
 
-Чтобы поднимался сам при загрузке — блок «Домашний сервер одной вставкой» в
-[LINUX_SETUP.md](LINUX_SETUP.md) с `B=ssh_tunnel_vpn_linux`.
+DNS: в Ubuntu работает systemd-resolved — программа настроит его сама. В
+Debian без resolved на время работы подменяется `/etc/resolv.conf` и потом
+возвращается как было.
+
+Если включён ufw и панель нужна с других устройств домашней сети:
+
+```bash
+sudo ufw allow from 192.168.0.0/16 to any port 47821 proto tcp
+```
+</details>
+
+<details>
+<summary><b>Proxmox VE</b></summary>
+
+Proxmox — это Debian, но работают там под `root`, поэтому `sudo` не нужен, а
+настройки лежат в `/root/.config/ssh_tunnel/`.
+
+```bash
+apt update && apt install -y curl
+
+F=ssh_tunnel_vpn_linux; [ "$(uname -m)" = aarch64 ] && F=${F}_arm64
+curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
+install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
+
+ssh_tunnel_vpn_linux -host ТВОЙ_СЕРВЕР -user tunnel -save
+ssh_tunnel_vpn_linux -web          # проверить руками, Ctrl+C — выключить
+```
+
+Важно для Proxmox:
+
+- **На самом хосте** VPN заворачивает весь интернет хоста — в том числе
+  скачивание обновлений и шаблонов. Виртуальные машины и контейнеры ходят
+  через свой мост (`vmbr0`) и VPN хоста не затрагиваются. Если хосту нужна
+  только сеть устройств (доступ к веб-панели Proxmox с других устройств по
+  `имя.mesh:8006`), поставь обычную версию — [LINUX_SETUP.md](LINUX_SETUP.md).
+- **В LXC-контейнере** по умолчанию нет устройства TUN, без него VPN не
+  запустится. Разреши его на хосте (номер контейнера вместо `101`) и
+  перезапусти контейнер:
+
+  ```bash
+  printf '%s\n' 'lxc.cgroup2.devices.allow: c 10:200 rwm' \
+    'lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file' >> /etc/pve/lxc/101.conf
+  pct reboot 101
+  ```
+- Firewall Proxmox (Datacenter → Firewall), если включён: порт `47821`
+  разрешается там, в веб-интерфейсе Proxmox, — `ufw` в нём не участвует.
+</details>
+
+<details>
+<summary><b>Fedora · RHEL · CentOS Stream · Rocky · AlmaLinux</b></summary>
+
+```bash
+sudo dnf install -y curl
+
+F=ssh_tunnel_vpn_linux; [ "$(uname -m)" = aarch64 ] && F=${F}_arm64
+curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
+sudo install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
+
+sudo ssh_tunnel_vpn_linux -host ТВОЙ_СЕРВЕР -user tunnel -save
+sudo ssh_tunnel_vpn_linux -web     # проверить руками, Ctrl+C — выключить
+```
+
+Firewall здесь `firewalld`; если панель нужна с других устройств:
+
+```bash
+sudo firewall-cmd --permanent --add-port=47821/tcp && sudo firewall-cmd --reload
+```
+</details>
+
+<details>
+<summary><b>Arch · Manjaro · EndeavourOS</b></summary>
+
+```bash
+sudo pacman -S --needed curl
+
+F=ssh_tunnel_vpn_linux; [ "$(uname -m)" = aarch64 ] && F=${F}_arm64
+curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
+sudo install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
+
+sudo ssh_tunnel_vpn_linux -host ТВОЙ_СЕРВЕР -user tunnel -save
+sudo ssh_tunnel_vpn_linux -web     # проверить руками, Ctrl+C — выключить
+```
+
+Firewall по умолчанию не стоит; если поставил свой — порт `47821` открывай в
+нём.
+</details>
+
+<details>
+<summary><b>openSUSE</b></summary>
+
+```bash
+sudo zypper install -y curl
+
+F=ssh_tunnel_vpn_linux; [ "$(uname -m)" = aarch64 ] && F=${F}_arm64
+curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
+sudo install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
+
+sudo ssh_tunnel_vpn_linux -host ТВОЙ_СЕРВЕР -user tunnel -save
+sudo ssh_tunnel_vpn_linux -web     # проверить руками, Ctrl+C — выключить
+```
+
+Порт панели — через `firewalld`, как в Fedora:
+
+```bash
+sudo firewall-cmd --permanent --add-port=47821/tcp && sudo firewall-cmd --reload
+```
+</details>
+
+<details>
+<summary><b>Alpine Linux</b></summary>
+
+Здесь нет systemd (вместо него OpenRC), поэтому общий блок автозапуска ниже не
+подходит — служба заводится прямо здесь. Работают под `root`.
+
+```sh
+apk add curl
+modprobe tun   # устройство TUN; на большинстве ядер уже есть
+
+F=ssh_tunnel_vpn_linux; [ "$(uname -m)" = aarch64 ] && F=${F}_arm64
+curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
+install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
+
+ssh_tunnel_vpn_linux -host ТВОЙ_СЕРВЕР -user tunnel -save
+
+cat > /etc/init.d/ssh_tunnel_vpn <<'EOF'
+#!/sbin/openrc-run
+command="/usr/local/bin/ssh_tunnel_vpn_linux"
+command_args="-web -web-lan"
+command_background=true
+pidfile="/run/ssh_tunnel_vpn.pid"
+depend() { need net; }
+EOF
+chmod +x /etc/init.d/ssh_tunnel_vpn
+rc-update add ssh_tunnel_vpn default
+rc-service ssh_tunnel_vpn start
+```
+
+DNS без systemd-resolved: на время работы подменяется `/etc/resolv.conf` и
+потом возвращается как было.
+</details>
+
+### Автозапуск при включении машины
+
+Для всех систем с systemd (всё, кроме Alpine). Выполни **тем же
+пользователем**, которым задавал сервер (`-save`): служба возьмёт настройки из
+его домашней папки. Блок годится и для обновления — просто вставь его снова
+после установки нового файла.
+
+```bash
+S=sudo; [ "$(id -u)" = 0 ] && S=   # под root (Proxmox) sudo не нужен — его там и нет
+printf '%s\n' '[Unit]' 'Description=ssh_tunnel VPN' \
+  'After=network-online.target systemd-resolved.service' 'Wants=network-online.target' '' \
+  '[Service]' "Environment=XDG_CONFIG_HOME=$HOME/.config" \
+  'ExecStart=/usr/local/bin/ssh_tunnel_vpn_linux -web -web-lan' \
+  'Restart=always' 'RestartSec=5' 'TimeoutStopSec=15' '' \
+  '[Install]' 'WantedBy=multi-user.target' | $S tee /etc/systemd/system/ssh_tunnel_vpn.service >/dev/null
+$S systemctl daemon-reload
+$S systemctl enable ssh_tunnel_vpn
+$S systemctl restart ssh_tunnel_vpn
+
+sleep 3
+systemctl is-active ssh_tunnel_vpn
+echo "Панель: http://$(hostname -I | awk '{print $1}'):47821"
+```
+
+В конце — `active` и адрес панели. Она открыта только для домашней сети
+(`-web-lan`), из интернета к ней не попасть. Чтобы VPN подключался сам, в
+панели должна стоять галочка «Подключаться сразу при запуске» (включена по
+умолчанию). Журнал службы — `journalctl -u ssh_tunnel_vpn -f`.
+
+Обычную версию (`ssh_tunnel.service`) одновременно с VPN не запускай — хватит
+одной: `sudo systemctl disable --now ssh_tunnel`, а если она стояла как
+пользовательская — `systemctl --user disable --now ssh_tunnel`.
+
+<details>
+<summary>Удалить всё</summary>
+
+```bash
+sudo systemctl disable --now ssh_tunnel_vpn
+sudo rm -f /etc/systemd/system/ssh_tunnel_vpn.service /usr/local/bin/ssh_tunnel_vpn_linux
+sudo systemctl daemon-reload
+```
+
+Настройки (`~/.config/ssh_tunnel`) остаются — они общие с обычной версией.
+На Alpine: `rc-service ssh_tunnel_vpn stop; rc-update del ssh_tunnel_vpn;
+rm -f /etc/init.d/ssh_tunnel_vpn /usr/local/bin/ssh_tunnel_vpn_linux`.
+</details>
+
+### Как устроено
 
 Устроено так же, как на Windows, со своими средствами системы:
 

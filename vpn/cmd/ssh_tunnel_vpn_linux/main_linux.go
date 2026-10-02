@@ -12,6 +12,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"strconv"
+	"syscall"
 
 	"sshtunnel/internal/app"
 	"sshtunnel/internal/events"
@@ -22,6 +23,9 @@ import (
 
 func main() {
 	uid, gid, ok := useSudoUserConfig()
+	if !ok {
+		uid, gid, ok = configDirOwner()
+	}
 	if ok {
 		defer giveBack(uid, gid)
 		giveBack(uid, gid) // вдруг прошлый запуск упал и оставил файлы root'у
@@ -53,6 +57,26 @@ func useSudoUserConfig() (uid, gid int, ok bool) {
 	}
 	os.Setenv("XDG_CONFIG_HOME", filepath.Join(u.HomeDir, ".config"))
 	return uid, gid, true
+}
+
+// configDirOwner — служба systemd работает от root, но с XDG_CONFIG_HOME
+// пользователя (см. docs/VPN.md, автозапуск на Linux): настройки общие с
+// обычной версией. Файлы, которые служба там создаст или перепишет, должны
+// остаться его, иначе обычная версия не сможет их сохранить.
+func configDirOwner() (uid, gid int, ok bool) {
+	base := os.Getenv("XDG_CONFIG_HOME")
+	if os.Geteuid() != 0 || base == "" {
+		return 0, 0, false
+	}
+	st, err := os.Stat(base)
+	if err != nil {
+		return 0, 0, false
+	}
+	sys, isUnix := st.Sys().(*syscall.Stat_t)
+	if !isUnix || sys.Uid == 0 {
+		return 0, 0, false
+	}
+	return int(sys.Uid), int(sys.Gid), true
 }
 
 // giveBack возвращает владельца файлам настроек: иначе после запуска под
