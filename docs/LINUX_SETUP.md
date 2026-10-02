@@ -107,6 +107,9 @@ sudo ufw status 2>/dev/null | grep -q 47821 && sudo ufw delete allow from 192.16
 Сама программа везде одна и та же — отличается только то, чем ставится `curl`,
 чем открывается порт в firewall и как заводится служба. Разверни свою систему:
 
+> Здесь — обычная версия (прокси). Команды для **VPN-версии** под каждую
+> систему — в [VPN.md](VPN.md#linux): ей нужен root и системная служба.
+
 <details>
 <summary><b>Ubuntu · Debian · Linux Mint · Raspberry Pi OS</b></summary>
 
