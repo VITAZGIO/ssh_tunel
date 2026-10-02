@@ -177,19 +177,24 @@ UDP — через SSH он не проходит, без ретранслято
 
 ### Команды под свою систему
 
+Блоки работают и под обычным пользователем (через `sudo`), и под `root`, где
+`sudo` нет. На **Proxmox** открывай его собственный блок — там есть важные
+отличия.
+
 <details>
 <summary><b>Ubuntu · Debian · Linux Mint · Raspberry Pi OS</b></summary>
 
 ```bash
-sudo apt update && sudo apt install -y curl
+S=sudo; [ "$(id -u)" = 0 ] && S=   # под root (Proxmox и т.п.) sudo не нужен
+$S apt update && $S apt install -y curl
 
 # скачать (на Raspberry Pi и других ARM возьмётся сборка _arm64) и поставить
 F=ssh_tunnel_vpn_linux; [ "$(uname -m)" = aarch64 ] && F=${F}_arm64
 curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
-sudo install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
+$S install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
 
 # запустить с панелью: http://АДРЕС_ЭТОЙ_МАШИНЫ:47821 (Ctrl+C — выключить)
-sudo ssh_tunnel_vpn_linux -web -web-lan
+$S ssh_tunnel_vpn_linux -web -web-lan
 ```
 
 DNS: в Ubuntu работает systemd-resolved — программа настроит его сама. В
@@ -199,7 +204,8 @@ Debian без resolved на время работы подменяется `/etc
 Если включён ufw и панель нужна с других устройств домашней сети:
 
 ```bash
-sudo ufw allow from 192.168.0.0/16 to any port 47821 proto tcp
+S=sudo; [ "$(id -u)" = 0 ] && S=   # под root (Proxmox и т.п.) sudo не нужен
+$S ufw allow from 192.168.0.0/16 to any port 47821 proto tcp
 ```
 </details>
 
@@ -244,20 +250,22 @@ ssh_tunnel_vpn_linux -web -web-lan
 <summary><b>Fedora · RHEL · CentOS Stream · Rocky · AlmaLinux</b></summary>
 
 ```bash
-sudo dnf install -y curl
+S=sudo; [ "$(id -u)" = 0 ] && S=   # под root (Proxmox и т.п.) sudo не нужен
+$S dnf install -y curl
 
 F=ssh_tunnel_vpn_linux; [ "$(uname -m)" = aarch64 ] && F=${F}_arm64
 curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
-sudo install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
+$S install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
 
 # запустить с панелью: http://АДРЕС_ЭТОЙ_МАШИНЫ:47821 (Ctrl+C — выключить)
-sudo ssh_tunnel_vpn_linux -web -web-lan
+$S ssh_tunnel_vpn_linux -web -web-lan
 ```
 
 Firewall здесь `firewalld`; если панель нужна с других устройств:
 
 ```bash
-sudo firewall-cmd --permanent --add-port=47821/tcp && sudo firewall-cmd --reload
+S=sudo; [ "$(id -u)" = 0 ] && S=   # под root (Proxmox и т.п.) sudo не нужен
+$S firewall-cmd --permanent --add-port=47821/tcp && $S firewall-cmd --reload
 ```
 </details>
 
@@ -265,14 +273,15 @@ sudo firewall-cmd --permanent --add-port=47821/tcp && sudo firewall-cmd --reload
 <summary><b>Arch · Manjaro · EndeavourOS</b></summary>
 
 ```bash
-sudo pacman -S --needed curl
+S=sudo; [ "$(id -u)" = 0 ] && S=   # под root (Proxmox и т.п.) sudo не нужен
+$S pacman -S --needed curl
 
 F=ssh_tunnel_vpn_linux; [ "$(uname -m)" = aarch64 ] && F=${F}_arm64
 curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
-sudo install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
+$S install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
 
 # запустить с панелью: http://АДРЕС_ЭТОЙ_МАШИНЫ:47821 (Ctrl+C — выключить)
-sudo ssh_tunnel_vpn_linux -web -web-lan
+$S ssh_tunnel_vpn_linux -web -web-lan
 ```
 
 Firewall по умолчанию не стоит; если поставил свой — порт `47821` открывай в
@@ -283,20 +292,22 @@ Firewall по умолчанию не стоит; если поставил св
 <summary><b>openSUSE</b></summary>
 
 ```bash
-sudo zypper install -y curl
+S=sudo; [ "$(id -u)" = 0 ] && S=   # под root (Proxmox и т.п.) sudo не нужен
+$S zypper install -y curl
 
 F=ssh_tunnel_vpn_linux; [ "$(uname -m)" = aarch64 ] && F=${F}_arm64
 curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
-sudo install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
+$S install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
 
 # запустить с панелью: http://АДРЕС_ЭТОЙ_МАШИНЫ:47821 (Ctrl+C — выключить)
-sudo ssh_tunnel_vpn_linux -web -web-lan
+$S ssh_tunnel_vpn_linux -web -web-lan
 ```
 
 Порт панели — через `firewalld`, как в Fedora:
 
 ```bash
-sudo firewall-cmd --permanent --add-port=47821/tcp && sudo firewall-cmd --reload
+S=sudo; [ "$(id -u)" = 0 ] && S=   # под root (Proxmox и т.п.) sudo не нужен
+$S firewall-cmd --permanent --add-port=47821/tcp && $S firewall-cmd --reload
 ```
 </details>
 
