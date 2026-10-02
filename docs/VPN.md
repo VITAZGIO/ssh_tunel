@@ -150,8 +150,20 @@ Windows** — программу, которую система запускае
 ## Linux
 
 ```bash
-sudo ./ssh_tunnel_vpn_linux -web      # те же флаги, что у ssh_tunnel_linux
+# скачать (на ARM — Raspberry Pi и т.п. — возьмётся сборка _arm64) и сделать исполняемым
+F=ssh_tunnel_vpn_linux; [ "$(uname -m)" = aarch64 ] && F=${F}_arm64
+curl -fL -o ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
+chmod +x ssh_tunnel_vpn_linux
+
+# задать сервер один раз
+sudo ./ssh_tunnel_vpn_linux -host ТВОЙ_СЕРВЕР -user tunnel -save
+
+# запустить с веб-интерфейсом — те же флаги, что у ssh_tunnel_linux
+sudo ./ssh_tunnel_vpn_linux -web
 ```
+
+Чтобы поднимался сам при загрузке — блок «Домашний сервер одной вставкой» в
+[LINUX_SETUP.md](LINUX_SETUP.md) с `B=ssh_tunnel_vpn_linux`.
 
 Устроено так же, как на Windows, со своими средствами системы:
 

@@ -46,14 +46,14 @@ standard SSH mechanism.
   <tr>
     <td rowspan="2">🐧 <b>Linux</b></td>
     <td><b>Proxy</b></td>
-    <td><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux">⬇ ssh_tunnel_linux</a> · <a href="docs/LINUX_SETUP.en.md">setup</a></td>
+    <td><a href="docs/LINUX_SETUP.en.md">📖 instructions</a></td>
     <td>Your browser and apps with proxy settings go through the server</td>
     <td>not needed</td>
     <td align="center">browser only</td>
   </tr>
   <tr>
     <td><b>VPN</b></td>
-    <td><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn_linux">⬇ ssh_tunnel_vpn_linux</a> · <a href="docs/VPN.md#linux">setup</a></td>
+    <td><a href="docs/VPN.md#linux">📖 instructions</a></td>
     <td><b>All</b> of the computer's internet goes through the server</td>
     <td>⚠️ <code>sudo</code></td>
     <td align="center">✅</td>

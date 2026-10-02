@@ -46,14 +46,14 @@
   <tr>
     <td rowspan="2">🐧 <b>Linux</b></td>
     <td><b>Прокси</b></td>
-    <td><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux">⬇ ssh_tunnel_linux</a> · <a href="docs/LINUX_SETUP.md">установка</a></td>
+    <td><a href="docs/LINUX_SETUP.md">📖 инструкция</a></td>
     <td>Через сервер идут браузер и программы с настройкой прокси</td>
     <td>не нужны</td>
     <td align="center">только в браузере</td>
   </tr>
   <tr>
     <td><b>VPN</b></td>
-    <td><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn_linux">⬇ ssh_tunnel_vpn_linux</a> · <a href="docs/VPN.md#linux">установка</a></td>
+    <td><a href="docs/VPN.md#linux">📖 инструкция</a></td>
     <td>Через сервер идёт <b>весь</b> интернет компьютера</td>
     <td>⚠️ <code>sudo</code></td>
     <td align="center">✅</td>
