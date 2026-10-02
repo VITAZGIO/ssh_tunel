@@ -21,7 +21,10 @@ type bootState struct {
 	// Linger — служба стартует при загрузке машины, не дожидаясь входа
 	// пользователя. Понятие чисто Linux/systemd: на Windows автозапуск через
 	// реестр и так срабатывает при входе пользователя, без отдельной ручки.
-	Linger   bool   `json:"linger,omitempty"`
+	Linger bool `json:"linger,omitempty"`
+	// Task — автозапуск через Планировщик заданий Windows с правами
+	// администратора (версия с режимом VPN), а не через реестр.
+	Task     bool   `json:"task,omitempty"`
 	UnitPath string `json:"unitPath,omitempty"`
 }
 
@@ -33,6 +36,7 @@ func currentBootState() bootState {
 		Supported: true,
 		Enabled:   platformBootEnabled(),
 		Linger:    platformBootLinger(),
+		Task:      platformBootTask(),
 		UnitPath:  platformUnitPath(),
 	}
 }
@@ -47,4 +51,15 @@ func applyBoot(enable bool, password string, flags []string) error {
 		return errors.New("автозапуск при старте системы не поддерживается на этой системе")
 	}
 	return platformSetBoot(enable, password, flags)
+}
+
+// RepairBootStart приводит уже включённый автозапуск в рабочий вид — то, что
+// прописали прежние версии программы. Вызывается при запуске; если
+// автозапуск выключен, ничего не делает. Сейчас нужно только версии с режимом
+// VPN на Windows (см. platformRepairBoot в boot_windows.go).
+func RepairBootStart() error {
+	if !platformBootSupported() {
+		return nil
+	}
+	return platformRepairBoot()
 }

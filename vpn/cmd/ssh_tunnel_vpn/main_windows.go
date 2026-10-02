@@ -46,6 +46,16 @@ func main() {
 
 	updater.VPN = true
 
+	// Автозапуск, прописанный прежними версиями, Windows для программы с
+	// правами администратора молча игнорировала — переделываем его в задачу
+	// Планировщика (см. src/internal/webui/boot_task.go).
+	// В фоне: schtasks — внешняя программа, окно ждать её не должно.
+	go func() {
+		if err := webui.RepairBootStart(); err != nil {
+			fmt.Fprintln(os.Stderr, "автозапуск:", err)
+		}
+	}()
+
 	cfg := config.Load()
 	a := app.New(cfg)
 	a.SetNetLayer(vpnlayer.New(a.Bus))
@@ -71,9 +81,9 @@ func main() {
 	if cfg.AutoStart && cfg.Active().Host != "" {
 		go func() {
 			time.Sleep(300 * time.Millisecond)
-			if err := a.Start(); err != nil {
-				a.Bus.Errorf("Автозапуск не удался: %v", err)
-			}
+			// При старте вместе с системой сети может ещё не быть —
+			// StartOnLaunch подождёт её несколько минут.
+			a.StartOnLaunch()
 		}()
 	}
 

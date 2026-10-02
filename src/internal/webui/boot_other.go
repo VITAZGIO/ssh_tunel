@@ -7,5 +7,7 @@ package webui
 func platformBootSupported() bool                                        { return false }
 func platformBootEnabled() bool                                          { return false }
 func platformBootLinger() bool                                           { return false }
+func platformBootTask() bool                                             { return false }
+func platformRepairBoot() error                                          { return nil }
 func platformUnitPath() string                                           { return "" }
 func platformSetBoot(enable bool, password string, flags []string) error { return nil }

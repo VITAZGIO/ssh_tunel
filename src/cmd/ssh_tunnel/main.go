@@ -67,9 +67,9 @@ func main() {
 	if cfg.AutoStart && cfg.Active().Host != "" {
 		go func() {
 			time.Sleep(300 * time.Millisecond) // дать окну подписаться на события
-			if err := a.Start(); err != nil {
-				a.Bus.Errorf("Автозапуск не удался: %v", err)
-			}
+			// При старте вместе с системой сети может ещё не быть —
+			// StartOnLaunch подождёт её несколько минут.
+			a.StartOnLaunch()
 		}()
 	}
 

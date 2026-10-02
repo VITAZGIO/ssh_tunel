@@ -26,6 +26,17 @@ import (
 
 func newFakeSSHServer(t *testing.T, clientPub ssh.PublicKey, acceptKey bool) string {
 	t.Helper()
+	cfg := fakeSSHConfig(t, clientPub, acceptKey)
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	serveFakeSSH(t, ln, cfg)
+	return ln.Addr().String()
+}
+
+func fakeSSHConfig(t *testing.T, clientPub ssh.PublicKey, acceptKey bool) *ssh.ServerConfig {
+	t.Helper()
 	_, hostPriv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -44,11 +55,14 @@ func newFakeSSHServer(t *testing.T, clientPub ssh.PublicKey, acceptKey bool) str
 		},
 	}
 	cfg.AddHostKey(hostSigner)
+	return cfg
+}
 
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
+// serveFakeSSH обслуживает уже открытый ln как подставной SSH-сервер. Отдельно
+// от newFakeSSHServer — для тестов, где сервер появляется по заранее
+// известному адресу не сразу, а «когда поднялась сеть».
+func serveFakeSSH(t *testing.T, ln net.Listener, cfg *ssh.ServerConfig) {
+	t.Helper()
 	t.Cleanup(func() { ln.Close() })
 
 	go func() {
@@ -71,7 +85,6 @@ func newFakeSSHServer(t *testing.T, clientPub ssh.PublicKey, acceptKey bool) str
 			}()
 		}
 	}()
-	return ln.Addr().String()
 }
 
 // closedPort — адрес, где заведомо никто не слушает: TCP-подключение к нему
