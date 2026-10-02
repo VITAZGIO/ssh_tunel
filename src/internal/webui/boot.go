@@ -22,13 +22,29 @@ type bootState struct {
 	// пользователя. Понятие чисто Linux/systemd: на Windows автозапуск через
 	// реестр и так срабатывает при входе пользователя, без отдельной ручки.
 	Linger bool `json:"linger,omitempty"`
-	// Task — автозапуск через Планировщик заданий Windows с правами
-	// администратора (версия с режимом VPN), а не через реестр.
-	Task     bool   `json:"task,omitempty"`
+	// Service — автозапуск устроен службой Windows (версия с режимом VPN):
+	// поднимается при включении компьютера, ещё до входа в систему.
+	Service  bool   `json:"service,omitempty"`
 	UnitPath string `json:"unitPath,omitempty"`
 }
 
+// BootControl — свой способ автозапуска вместо обычного для этой системы.
+// Нужен версии с режимом VPN на Windows: ей запись в реестре не годится,
+// её ядро ставится службой Windows (см. vpn/internal/winsvc).
+type BootControl interface {
+	Enabled() bool
+	Set(enable bool) error
+}
+
+var bootControl BootControl
+
+// SetBootControl подменяет автозапуск. Вызывать до запуска интерфейса.
+func SetBootControl(c BootControl) { bootControl = c }
+
 func currentBootState() bootState {
+	if c := bootControl; c != nil {
+		return bootState{Supported: true, Enabled: c.Enabled(), Service: true}
+	}
 	if !platformBootSupported() {
 		return bootState{}
 	}
@@ -36,7 +52,6 @@ func currentBootState() bootState {
 		Supported: true,
 		Enabled:   platformBootEnabled(),
 		Linger:    platformBootLinger(),
-		Task:      platformBootTask(),
 		UnitPath:  platformUnitPath(),
 	}
 }
@@ -47,19 +62,11 @@ func currentBootState() bootState {
 // собственные настройки текущего пользователя, поэтому пароль там не нужен
 // вовсе.
 func applyBoot(enable bool, password string, flags []string) error {
+	if c := bootControl; c != nil {
+		return c.Set(enable)
+	}
 	if !platformBootSupported() {
 		return errors.New("автозапуск при старте системы не поддерживается на этой системе")
 	}
 	return platformSetBoot(enable, password, flags)
-}
-
-// RepairBootStart приводит уже включённый автозапуск в рабочий вид — то, что
-// прописали прежние версии программы. Вызывается при запуске; если
-// автозапуск выключен, ничего не делает. Сейчас нужно только версии с режимом
-// VPN на Windows (см. platformRepairBoot в boot_windows.go).
-func RepairBootStart() error {
-	if !platformBootSupported() {
-		return nil
-	}
-	return platformRepairBoot()
 }

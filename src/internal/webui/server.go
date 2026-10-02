@@ -118,6 +118,14 @@ func NewOpenLocalOn(a *App, addr string) (*Server, error) {
 	return s, nil
 }
 
+// Token — ключ доступа к интерфейсу. Нужен окну, которое работает отдельно
+// от службы с ядром (VPN-версия на Windows), чтобы ходить к ней от имени
+// пользователя.
+func (s *Server) Token() string { return s.token }
+
+// Addr — адрес, на котором слушает интерфейс.
+func (s *Server) Addr() string { return s.ln.Addr().String() }
+
 // URL — адрес, который надо открыть в браузере.
 func (s *Server) URL() string {
 	addr := s.ln.Addr().String()
@@ -171,6 +179,8 @@ func (s *Server) Serve() error {
 	mux.HandleFunc("/api/status", s.guard(s.handleStatus))
 	mux.HandleFunc("/api/start", s.guard(s.handleStart))
 	mux.HandleFunc("/api/stop", s.guard(s.handleStop))
+	mux.HandleFunc("/api/bypass", s.guard(s.handleBypass))
+	mux.HandleFunc("/api/meshmode", s.guard(s.handleMeshMode))
 	mux.HandleFunc("/api/config", s.guard(s.handleConfig))
 	mux.HandleFunc("/api/profile/add", s.guard(s.handleProfileAdd))
 	mux.HandleFunc("/api/profile/remove", s.guard(s.handleProfileRemove))
@@ -310,6 +320,9 @@ type statusResp struct {
 	// Version — версия сборки, её же показывает кнопка проверки обновлений.
 	// "dev" у сборки не из релиза (см. internal/updater).
 	Version string `json:"version"`
+	// Modes — две кнопки главного экрана: обход блокировок и сеть
+	// устройств (см. app.Modes).
+	Modes app.Modes `json:"modes"`
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -325,6 +338,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		OS:               runtime.GOOS,
 		EffectiveProfile: s.app.EffectiveProfileID(),
 		Version:          updater.Version,
+		Modes:            s.app.Modes(),
 	})
 }
 
@@ -348,6 +362,37 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 	s.app.Stop()
 	writeJSON(w, map[string]bool{"ok": true})
+}
+
+// handleBypass — большая кнопка, когда у сервера есть сеть устройств:
+// выключает только обход блокировок, оставляя сеть (см. app.SetBypass).
+func (s *Server) handleBypass(w http.ResponseWriter, r *http.Request) {
+	s.handleMode(w, r, s.app.SetBypass)
+}
+
+// handleMeshMode — маленькая кнопка «Сеть» на главном экране.
+func (s *Server) handleMeshMode(w http.ResponseWriter, r *http.Request) {
+	s.handleMode(w, r, s.app.SetMesh)
+}
+
+func (s *Server) handleMode(w http.ResponseWriter, r *http.Request, set func(bool) error) {
+	var req struct {
+		On bool `json:"on"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, map[string]any{"error": "не разобрал запрос: " + err.Error()})
+		return
+	}
+	if err := set(req.On); err != nil {
+		resp := map[string]any{"error": err.Error()}
+		var ce *tunnel.ConnError
+		if errors.As(err, &ce) {
+			resp["errorKind"] = string(ce.Kind)
+		}
+		writeJSON(w, resp)
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true, "modes": s.app.Modes()})
 }
 
 // handleMesh — состояние сети устройств: кто в сети, какие у кого имена.
@@ -533,7 +578,13 @@ func (s *Server) handleAppIcon(w http.ResponseWriter, r *http.Request) {
 
 // handlePickFile показывает системный диалог выбора программы. Отмена — не
 // ошибка, поэтому возвращается пустой путь без сообщения.
-func (s *Server) handlePickFile(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handlePickFile(w http.ResponseWriter, r *http.Request) { HandlePickFile(w, r) }
+
+// HandlePickFile — то же без сервера. Диалог должен открыться на рабочем
+// столе пользователя, поэтому окно VPN-версии, у которой ядро в службе
+// Windows, обрабатывает этот запрос само, а не пересылает службе (у службы
+// рабочего стола нет).
+func HandlePickFile(w http.ResponseWriter, r *http.Request) {
 	path, err := filedialog.PickExecutable()
 	if errors.Is(err, filedialog.ErrCancelled) {
 		writeJSON(w, map[string]string{"path": ""})
@@ -552,6 +603,11 @@ func (s *Server) handlePickFile(w http.ResponseWriter, r *http.Request) {
 // буфер обмена, а человеку остаётся вставить её и нажать Enter — так он ещё и
 // видит, что именно выполняет.
 func (s *Server) handleOpenTerminal(w http.ResponseWriter, r *http.Request) {
+	HandleOpenTerminal(w, r)
+}
+
+// HandleOpenTerminal — то же без сервера (см. HandlePickFile).
+func HandleOpenTerminal(w http.ResponseWriter, r *http.Request) {
 	if runtime.GOOS != "windows" {
 		writeJSON(w, map[string]string{"error": "поддерживается только на Windows"})
 		return
@@ -594,6 +650,14 @@ func (s *Server) handleGenKey(w http.ResponseWriter, r *http.Request) {
 // понадобился, живёт ровно на время одной команды sudo: он не сохраняется, не
 // попадает в журнал и не возвращается обратно на страницу.
 func (s *Server) handleBootStart(w http.ResponseWriter, r *http.Request) {
+	bootStartHandler(w, r, s.bootFlags)
+}
+
+// HandleBootStart — галочка автозапуска без сервера: окно VPN-версии решает
+// её само (ставит и снимает службу, см. SetBootControl).
+func HandleBootStart(w http.ResponseWriter, r *http.Request) { bootStartHandler(w, r, nil) }
+
+func bootStartHandler(w http.ResponseWriter, r *http.Request, bootFlags []string) {
 	if r.Method != http.MethodPost {
 		writeJSON(w, currentBootState())
 		return
@@ -606,7 +670,7 @@ func (s *Server) handleBootStart(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"error": "не разобрал запрос: " + err.Error()})
 		return
 	}
-	err := applyBoot(req.Enabled, req.Password, s.bootFlags)
+	err := applyBoot(req.Enabled, req.Password, bootFlags)
 	if errors.Is(err, errNeedRoot) {
 		// Служба к этому моменту уже включена — не хватает только права
 		// стартовать без входа в систему. Так и говорим, вместе с просьбой

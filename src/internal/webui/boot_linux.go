@@ -28,13 +28,6 @@ func platformBootEnabled() bool {
 
 func platformBootLinger() bool { return lingerOn() }
 
-// platformBootTask — Планировщик заданий бывает только на Windows.
-func platformBootTask() bool { return false }
-
-// platformRepairBoot — чинить на Linux нечего: служба systemd от прежних
-// версий и так работает.
-func platformRepairBoot() error { return nil }
-
 func platformUnitPath() string {
 	p, err := unitPath()
 	if err != nil {

@@ -25,8 +25,14 @@ var (
 // Сдаёмся сразу, если дело в ключе или имени пользователя (ожиданием это не
 // чинится), и тихо выходим, если за это время человек сам нажал «Подключить»
 // или «Отключить»: решение уже за ним.
-func (a *App) StartOnLaunch() {
-	deadline := time.Now().Add(launchRetryFor)
+func (a *App) StartOnLaunch() { a.StartOnLaunchWithin(launchRetryFor) }
+
+// StartOnLaunchWithin — то же, но с другим сроком ожидания сети; 0 — ждать
+// сколько угодно. Так работает служба Windows: компьютер, включённый
+// удалённо, должен появиться в сети устройств, когда бы ни поднялась его
+// сеть, — сдаться через три минуты значило бы потерять его до перезагрузки.
+func (a *App) StartOnLaunchWithin(limit time.Duration) {
+	deadline := time.Now().Add(limit)
 	for attempt := 1; ; attempt++ {
 		err := a.Start()
 		if err == nil || a.Running() {
@@ -35,7 +41,7 @@ func (a *App) StartOnLaunch() {
 			}
 			return
 		}
-		if tunnel.IsAuthError(err) || time.Now().After(deadline) {
+		if tunnel.IsAuthError(err) || (limit > 0 && time.Now().After(deadline)) {
 			a.Bus.Errorf("Автозапуск не удался: %v", err)
 			return
 		}

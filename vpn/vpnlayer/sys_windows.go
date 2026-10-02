@@ -32,9 +32,16 @@ type sys struct {
 
 	dev   *device
 	guard *wfp.Guard
+	v6    bool // у адаптера есть IPv6 — маршруты ::/1 ставить есть куда
+	full  bool // стоят маршруты всего интернета (обход блокировок включён)
 }
 
-func newSys(bus *events.Bus) *sys { return &sys{bus: bus} }
+func newSys(bus *events.Bus) *sys {
+	// Правило для .mesh могло остаться от аварийно закрытого прошлого запуска.
+	// Без адаптера оно только мешало бы: имена .mesh уходили бы в пустоту.
+	removeMeshDNSRule()
+	return &sys{bus: bus}
+}
 
 func (s *sys) name() string { return adapterName }
 
@@ -162,31 +169,84 @@ func (s *sys) open() (core.Device, error) {
 	return dev, nil
 }
 
-// configure назначает адаптеру адреса, маршруты, DNS и наименьшую метрику —
-// так Windows считает его главной сетью, — и ставит запрет DNS мимо него.
-func (s *sys) configure() error {
+// configure назначает адаптеру адреса и наименьшую метрику — так Windows
+// считает его главной сетью. full — весь трафик (обход блокировок включён):
+// маршруты всего интернета, DNS системы через нас и запрет DNS мимо адаптера.
+// Иначе — только сеть устройств: её адреса (198.19.x.y) и наш DNS лежат в
+// подсети самого адаптера, а имена .mesh отдаёт правило NRPT.
+func (s *sys) configure(full bool) error {
 	luid := s.dev.luid
 	families := []struct {
 		family winipcfg.AddressFamily
 		prefix netip.Prefix
-		routes []netip.Prefix
-		next   netip.Addr
 	}{
-		{windows.AF_INET, adapterPrefix4, routes4, netip.IPv4Unspecified()},
-		{windows.AF_INET6, adapterPrefix6, routes6, netip.IPv6Unspecified()},
+		{windows.AF_INET, adapterPrefix4},
+		{windows.AF_INET6, adapterPrefix6},
 	}
+	s.v6 = true
 	for _, f := range families {
-		err := configureFamily(luid, f.family, f.prefix, f.routes, f.next)
+		err := configureFamily(luid, f.family, f.prefix)
 		// «Element not found» на IPv6 — на компьютере выключен IPv6 (галочка
 		// в свойствах адаптера или DisabledComponents в реестре): у адаптера
 		// просто нет IPv6-интерфейса. Работаем по IPv4, как WireGuard.
 		if f.family == windows.AF_INET6 && errors.Is(err, windows.ERROR_NOT_FOUND) {
+			s.v6 = false
 			s.bus.Warnf("IPv6 на этом компьютере выключен — VPN работает только по IPv4. " +
 				"Если IPv6 выключен лишь у адаптера VPN, а у сетевой карты включён, IPv6-соединения пойдут мимо туннеля.")
 			continue
 		}
 		if err != nil {
 			return err
+		}
+	}
+
+	// Имена .mesh — в наш DNS при любом режиме. Не встало правило — сеть
+	// устройств всё равно работает по адресам 198.19.x.y.
+	if err := setMeshDNSRule(); err != nil {
+		s.bus.Warnf("Имена .mesh могут не разрешаться (правило DNS не встало: %v) — устройства доступны по адресам 198.19.x.y", err)
+	}
+	if full {
+		return s.setFull(true)
+	}
+	return nil
+}
+
+// setFull переключает режим на живом адаптере: соединения к устройствам сети
+// при этом не рвутся — их адреса в подсети самого адаптера.
+func (s *sys) setFull(full bool) error {
+	if s.dev == nil || s.full == full {
+		return nil
+	}
+	luid := s.dev.luid
+	if !full {
+		// Сначала запрет DNS и DNS адаптера, потом маршруты — порядок не
+		// важен для утечек (обход выключают нарочно), но так Windows быстрее
+		// перестаёт спрашивать у нас имена обычных сайтов.
+		s.guard.Close()
+		s.guard = nil
+		_ = luid.FlushDNS(windows.AF_INET)
+		for _, r := range routes4 {
+			_ = luid.DeleteRoute(r, netip.IPv4Unspecified())
+		}
+		if s.v6 {
+			for _, r := range routes6 {
+				_ = luid.DeleteRoute(r, netip.IPv6Unspecified())
+			}
+		}
+		s.full = false
+		return nil
+	}
+
+	for _, r := range routes4 {
+		if err := addRoute(luid, r, netip.IPv4Unspecified()); err != nil {
+			return fmt.Errorf("IPv4, маршрут %s: %w", r, err)
+		}
+	}
+	if s.v6 {
+		for _, r := range routes6 {
+			if err := addRoute(luid, r, netip.IPv6Unspecified()); err != nil {
+				return fmt.Errorf("IPv6, маршрут %s: %w", r, err)
+			}
 		}
 	}
 	if err := luid.SetDNS(windows.AF_INET, []netip.Addr{dnsAddr}, nil); err != nil {
@@ -202,29 +262,19 @@ func (s *sys) configure() error {
 	} else {
 		s.guard = guard
 	}
+	s.full = true
 	return nil
 }
 
-// configureFamily — адрес, маршруты и метрика адаптера для одного семейства
-// адресов (IPv4 или IPv6).
-func configureFamily(luid winipcfg.LUID, family winipcfg.AddressFamily, prefix netip.Prefix, routes []netip.Prefix, next netip.Addr) error {
+// configureFamily — адрес и метрика адаптера для одного семейства адресов
+// (IPv4 или IPv6). Маршруты всего интернета ставит setFull.
+func configureFamily(luid winipcfg.LUID, family winipcfg.AddressFamily, prefix netip.Prefix) error {
 	name := "IPv4"
 	if family == windows.AF_INET6 {
 		name = "IPv6"
 	}
 	if err := luid.SetIPAddressesForFamily(family, []netip.Prefix{prefix}); err != nil {
 		return fmt.Errorf("%s, адрес %s: %w", name, prefix, err)
-	}
-	// Маршруты — только добавляем. SetRoutesForFamily из winipcfg сначала
-	// удаляет все маршруты адаптера, а среди них служебные (подсеть,
-	// широковещательный, мультикаст), которые Windows как раз создаёт после
-	// назначения адреса. Если Windows успевала их поменять, удаление
-	// возвращало «Element not found», и до наших маршрутов дело не доходило.
-	// Адаптер только что создан — удалять на нём нечего.
-	for _, r := range routes {
-		if err := addRoute(luid, r, next); err != nil {
-			return fmt.Errorf("%s, маршрут %s: %w", name, r, err)
-		}
 	}
 	ipif, err := luid.IPInterface(family)
 	if err != nil {
@@ -241,7 +291,12 @@ func configureFamily(luid winipcfg.LUID, family winipcfg.AddressFamily, prefix n
 	return nil
 }
 
-// addRoute добавляет маршрут через адаптер. Уже есть — хорошо. «Не найден» —
+// addRoute добавляет маршрут через адаптер. Маршруты — только добавляем и
+// удаляем поштучно: SetRoutesForFamily из winipcfg сначала удаляет все
+// маршруты адаптера, а среди них служебные (подсеть, широковещательный,
+// мультикаст), которые Windows как раз создаёт после назначения адреса. Если
+// Windows успевала их поменять, удаление возвращало «Element not found», и до
+// наших маршрутов дело не доходило. Уже есть — хорошо. «Не найден» —
 // интерфейс адаптера ещё поднимается: пробуем ещё несколько раз.
 func addRoute(luid winipcfg.LUID, dst netip.Prefix, next netip.Addr) error {
 	var err error
@@ -263,6 +318,8 @@ func addRoute(luid winipcfg.LUID, dst netip.Prefix, next netip.Addr) error {
 func (s *sys) close() {
 	s.guard.Close()
 	s.guard = nil
+	removeMeshDNSRule()
+	s.full = false
 	s.mu.Lock()
 	s.dev, s.ours = nil, 0
 	s.mu.Unlock()

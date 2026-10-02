@@ -218,6 +218,15 @@ type Tunnel struct {
 
 	// mesh — клиент сети устройств, пока пул жив (см. startMesh).
 	mesh atomic.Pointer[mesh.Client]
+	// meshCancel гасит клиента сети устройств отдельно от пула — для кнопки
+	// «Сеть» на главном экране (см. SetMeshPaused). Под mu.
+	meshCancel context.CancelFunc
+	// meshPaused — сеть устройств выключена кнопкой, хотя в настройках
+	// сервера включена.
+	meshPaused atomic.Bool
+	// bypassOff — обход блокировок выключен: туннель держится только ради
+	// сети устройств, а всё остальное идёт напрямую (см. SetBypass).
+	bypassOff atomic.Bool
 
 	// learned — адреса, выданные телефоном для имён из «всегда напрямую»
 	// (см. LearnDirect). Нужно только на Android.
@@ -388,7 +397,10 @@ func (t *Tunnel) loadSigner() error {
 // живом сервере. Вынесено из Start отдельно, потому что после слива пул надо
 // уметь поднять заново, не трогая локальные слушатели (см. Resume).
 func (t *Tunnel) startPool() error {
-	t.poolCtx, t.poolCancel = context.WithCancel(t.ctx)
+	poolCtx, poolCancel := context.WithCancel(t.ctx)
+	t.mu.Lock() // poolCtx читает и SetMeshPaused
+	t.poolCtx, t.poolCancel = poolCtx, poolCancel
+	t.mu.Unlock()
 	// Горутинам пула контекст — параметром, а не чтением поля: после слива и
 	// Resume поле перезаписывается, пока горутины прежнего пула ещё живы.
 	ctx := t.poolCtx
@@ -433,10 +445,17 @@ func (t *Tunnel) startMesh(ctx context.Context) {
 	t.mu.RLock()
 	cfg := t.cfg.Mesh
 	t.mu.RUnlock()
-	if cfg == nil || cfg.Key == "" {
+	if cfg == nil || cfg.Key == "" || t.meshPaused.Load() {
 		t.mesh.Store(nil)
 		return
 	}
+	ctx, cancel := context.WithCancel(ctx)
+	t.mu.Lock()
+	if t.meshCancel != nil {
+		t.meshCancel()
+	}
+	t.meshCancel = cancel
+	t.mu.Unlock()
 	mc := *cfg
 	// Проверка NAT идёт мимо туннеля — теми же сокетами, что и соединения
 	// «напрямую» (на Android и в режиме VPN они помечены).
@@ -470,6 +489,57 @@ func (t *Tunnel) startMesh(ctx context.Context) {
 
 // Mesh — клиент сети устройств, если она включена и туннель работает.
 func (t *Tunnel) Mesh() *mesh.Client { return t.mesh.Load() }
+
+// MeshConfigured — сеть устройств включена в настройках сервера (неважно,
+// поставлена ли она сейчас на паузу кнопкой).
+func (t *Tunnel) MeshConfigured() bool {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.cfg.Mesh != nil && t.cfg.Mesh.Key != ""
+}
+
+// SetMeshPaused выключает или снова включает сеть устройств, не трогая
+// остальной туннель: соединения через сервер не рвутся, гаснет только
+// управляющее соединение с meshd и всё, что шло к устройствам.
+func (t *Tunnel) SetMeshPaused(paused bool) {
+	if t.meshPaused.Swap(paused) == paused {
+		return
+	}
+	if paused {
+		t.mesh.Store(nil)
+		t.mu.Lock()
+		cancel := t.meshCancel
+		t.meshCancel = nil
+		t.mu.Unlock()
+		if cancel != nil {
+			cancel()
+		}
+		return
+	}
+	// Включаем обратно, только если пул жив: без сервера сети нет, а при
+	// следующем подключении startMesh поднимет её сам.
+	t.mu.RLock()
+	ctx := t.poolCtx
+	t.mu.RUnlock()
+	if ctx != nil && ctx.Err() == nil && !t.draining.Load() {
+		t.startMesh(ctx)
+	}
+}
+
+// MeshPaused — сеть устройств выключена кнопкой.
+func (t *Tunnel) MeshPaused() bool { return t.meshPaused.Load() }
+
+// SetBypass включает или выключает обход блокировок. Выключенный обход —
+// режим «только сеть устройств»: связь с сервером держится ради неё, а всё,
+// что не к устройствам, идёт напрямую с этого компьютера, как без туннеля.
+func (t *Tunnel) SetBypass(on bool) { t.bypassOff.Store(!on) }
+
+// Bypass — включён ли обход блокировок.
+func (t *Tunnel) Bypass() bool { return !t.bypassOff.Load() }
+
+// viaServer — вести ли соединение не к сети устройств через сервер. Нет —
+// при сливе (сервера уже нет) и при выключенном обходе блокировок.
+func (t *Tunnel) viaServer() bool { return !t.draining.Load() && !t.bypassOff.Load() }
 
 // meshTarget — цель ведёт в сеть устройств, и сеть включена.
 func (t *Tunnel) meshTarget(target string) *mesh.Client {
@@ -895,7 +965,7 @@ func (t *Tunnel) UDPRelay() *udprelay.Client {
 	// Во время слива ретранслятора нет: он живёт на сервере, а связь с
 	// сервером уже разорвана. Подменить UDP прямым соединением нечем,
 	// поэтому ведём себя как при выключенной функции — отказом.
-	if !t.cfg.UDPRelayEnabled || t.draining.Load() {
+	if !t.cfg.UDPRelayEnabled || !t.viaServer() {
 		return nil
 	}
 
@@ -936,16 +1006,24 @@ func (t *Tunnel) snapLinks() []*link {
 }
 
 func (t *Tunnel) dialTimeout() time.Duration {
-	if t.cfg.DialTimeout > 0 {
-		return t.cfg.DialTimeout
+	// Под замком: Rebind меняет cfg, пока горутины прежнего пула живы.
+	t.mu.RLock()
+	d := t.cfg.DialTimeout
+	t.mu.RUnlock()
+	if d > 0 {
+		return d
 	}
 	return 15 * time.Second
 }
 
 // keepAliveEvery — пауза между проверками связи.
 func (t *Tunnel) keepAliveEvery() time.Duration {
-	if t.cfg.KeepAlive > 0 {
-		return t.cfg.KeepAlive
+	// Под замком: Rebind меняет cfg, пока горутины прежнего пула живы.
+	t.mu.RLock()
+	d := t.cfg.KeepAlive
+	t.mu.RUnlock()
+	if d > 0 {
+		return d
 	}
 	return 20 * time.Second
 }

@@ -15,6 +15,22 @@ type fakeNetLayer struct {
 	attached  []*tunnel.Tunnel
 	detached  int
 	attachErr error
+	bypass    []bool // что приходило в SetBypass (ModeLayer)
+}
+
+func (f *fakeNetLayer) SetBypass(on bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.bypass = append(f.bypass, on)
+}
+
+func (f *fakeNetLayer) lastBypass() (bool, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.bypass) == 0 {
+		return false, false
+	}
+	return f.bypass[len(f.bypass)-1], true
 }
 
 func (f *fakeNetLayer) Prepare(cfg *tunnel.Config) {

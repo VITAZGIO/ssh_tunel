@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -35,16 +36,25 @@ func newFakeSSHServer(t *testing.T, clientPub ssh.PublicKey, acceptKey bool) str
 	return ln.Addr().String()
 }
 
-func fakeSSHConfig(t *testing.T, clientPub ssh.PublicKey, acceptKey bool) *ssh.ServerConfig {
-	t.Helper()
+// fakeHostSigner — ключ всех подставных серверов пакета. Один на всех
+// нарочно: known_hosts у тестов общий, а порт закрытого сервера система
+// может отдать следующему — со своим ключом он выглядел бы как подменённый
+// сервер, и подключение честно отказывало бы.
+var fakeHostSigner = sync.OnceValue(func() ssh.Signer {
 	_, hostPriv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
-	hostSigner, err := ssh.NewSignerFromKey(hostPriv)
+	s, err := ssh.NewSignerFromKey(hostPriv)
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
+	return s
+})
+
+func fakeSSHConfig(t *testing.T, clientPub ssh.PublicKey, acceptKey bool) *ssh.ServerConfig {
+	t.Helper()
+	hostSigner := fakeHostSigner()
 
 	cfg := &ssh.ServerConfig{
 		PublicKeyCallback: func(c ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {

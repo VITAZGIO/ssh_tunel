@@ -31,6 +31,11 @@ func main() {
 	noWindow := flag.Bool("nowindow", false, "не открывать окно, только напечатать адрес")
 	flag.Parse()
 
+	// Служба VPN-версии уже держит туннель — показываем её окно.
+	if !*noWindow && openVPNServiceWindow() {
+		return
+	}
+
 	// Вторая копия не нужна: она всё равно не займёт уже занятые порты.
 	// Вместо неё показываем окно той, что уже работает.
 	if !*noWindow && nativeui.AlreadyRunning(windowTitle) {

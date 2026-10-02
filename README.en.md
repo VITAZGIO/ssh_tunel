@@ -207,10 +207,14 @@ command: `GOOS=windows go build -o ssh_tunnel_cli.exe ./cmd/ssh_tunnel_cli`.
 `ssh_tunnel.exe` is a proxy: only programs that know how to use a proxy go
 through the tunnel. `ssh_tunnel_vpn.exe` creates a virtual network adapter, so
 **everything** goes through your server — including games, Docker and tools
-that know nothing about proxies. The price is a UAC prompt on every start:
-Windows only lets administrators create network adapters. The window, tray
-icon and settings are the same as in the proxy edition, and both share the
-same servers. Only one edition runs at a time: starting the other one just
+that know nothing about proxies. Windows only lets administrators create
+network adapters, so without the service there is a UAC prompt on every
+start. The "Start at system boot" checkbox installs the program as a
+**Windows service** (one UAC prompt): the VPN and device network come up when
+the computer turns on, before anyone logs in — you can RDP into it straight
+from the password screen, like with NetBird. Unblocking and the device
+network have separate buttons. The window, tray icon and settings are the
+same as in the proxy edition, and both share the same servers. Only one edition runs at a time: starting the other one just
 opens the window of the running one. For Linux the same thing is
 `ssh_tunnel_vpn_linux` (run it with `sudo`). How it works —
 [VPN.md](docs/VPN.md) (in Russian).

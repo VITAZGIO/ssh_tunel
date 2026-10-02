@@ -99,6 +99,19 @@
   #power.bad{border-color:var(--err);color:var(--err)}
   @keyframes breathe{50%{opacity:.55}}
 
+  /* Маленькая кнопка сети устройств под большой: сеть включается и
+     выключается отдельно от обхода блокировок. */
+  #meshBtn{display:flex;align-items:center;gap:7px;background:var(--card);
+           border:1px solid var(--line);border-radius:999px;padding:6px 13px;
+           font:inherit;font-size:12.5px;font-weight:600;color:var(--dim);
+           cursor:pointer;flex:none;transition:.2s}
+  #meshBtn[hidden]{display:none}
+  #meshBtn .dot{width:8px;height:8px;border-radius:50%;background:var(--line);transition:.2s}
+  #meshBtn:hover{border-color:var(--accent);color:var(--accent)}
+  #meshBtn.on{border-color:var(--ok);color:var(--ok)}
+  #meshBtn.on .dot{background:var(--ok);box-shadow:0 0 6px var(--ok)}
+  #meshBtn:disabled{opacity:.55;cursor:default}
+
   .tiles{display:grid;grid-template-columns:1fr 1fr;gap:9px;flex:none}
   /* Плитки со скоростью до замера пустые, но место занимают: пропади они
      совсем, сетка схлопнулась бы с двух рядов в один и утянула бы за собой
@@ -425,6 +438,11 @@
         <svg viewBox="0 0 24 24"><path d="M12 3.2v8.6"/><path d="M6.5 7a8.5 8.5 0 1 0 11 0"/></svg>
         <span class="cap" id="powerCap" data-i18n="connect">Подключить</span>
       </button>
+
+      <!-- Сеть устройств — своей кнопкой: большая включает и выключает обход
+           блокировок, а сеть (RDP, имена .mesh) живёт отдельно. Видна, только
+           когда у сервера включена сеть устройств. -->
+      <button id="meshBtn" hidden><span class="dot"></span><span id="meshBtnCap"></span></button>
 
       <!-- Появляется только когда серверов больше одного и включена галочка
            «Показывать выбор сервера на главном экране» — до этого просто
@@ -1295,6 +1313,9 @@ const I18N = {
   ru: {
     log:'Журнал', settings:'Настройки', back:'Назад', back_to_settings:'Назад в настройки',
     connect:'Подключить', disconnect:'Отключить', cancel:'Отмена',
+    mesh_btn_on:'Сеть устройств: вкл', mesh_btn_off:'Сеть устройств: выкл',
+    mesh_btn_hint:'Виртуальная сеть между твоими устройствами (имена .mesh, RDP). Включается и выключается отдельно от обхода блокировок — большая кнопка её не трогает.',
+    state_mesh_only:'Только сеть устройств',
     state_stopped:'Отключено', state_connecting:'Подключаюсь…', state_connected:'Защищено',
     state_reconnecting:'Связь потеряна', state_error:'Ошибка',
     check_ip_hint:'нажми, чтобы проверить настоящий внешний адрес',
@@ -1452,7 +1473,7 @@ const I18N = {
     boot_start:'Запускать при старте системы',
     boot_note_linux:'Программа сама поставит службу systemd и разрешит ей работать без входа в систему — служба будет подниматься при загрузке машины.',
     boot_note_windows:'Программа пропишет себя в автозагрузке Windows (для текущего пользователя, без прав администратора) — запустится сама при следующем входе в систему.',
-    boot_note_windows_task:'VPN-версию с правами администратора Windows из обычной автозагрузки не запускает, поэтому программа создаст задачу в Планировщике заданий («ssh_tunnel VPN», с наивысшими правами): при входе в систему VPN поднимется сам, без окна UAC. Ярлык в папке «Автозагрузка» после этого не нужен — удали его.',
+    boot_note_windows_service:'Программа установит себя службой Windows (один раз попросит права администратора): VPN и сеть устройств будут подниматься при включении компьютера, ещё до входа в учётную запись, — к нему можно подключиться по RDP прямо с экрана ввода пароля. Окно при входе откроется значком в трее. Ярлык в папке «Автозагрузка» больше не нужен — удали его.',
     boot_ready:'Включено: туннель поднимется сам при загрузке машины.',
     boot_need_root:'Включено, но только после входа в систему — чтобы поднимался при загрузке, нужен пароль sudo.',
     boot_configuring:'настраиваю…',
@@ -1530,6 +1551,9 @@ const I18N = {
   en: {
     log:'Log', settings:'Settings', back:'Back', back_to_settings:'Back to settings',
     connect:'Connect', disconnect:'Disconnect', cancel:'Cancel',
+    mesh_btn_on:'Device network: on', mesh_btn_off:'Device network: off',
+    mesh_btn_hint:'Virtual network between your devices (.mesh names, RDP). Turned on and off separately from unblocking — the big button leaves it alone.',
+    state_mesh_only:'Device network only',
     state_stopped:'Disconnected', state_connecting:'Connecting…', state_connected:'Protected',
     state_reconnecting:'Connection lost', state_error:'Error',
     check_ip_hint:'click to check the real external address',
@@ -1685,7 +1709,7 @@ const I18N = {
     boot_start:'Start at system boot',
     boot_note_linux:'The program will install a systemd service itself and allow it to run without logging in — the service will come up at boot.',
     boot_note_windows:'The program will add itself to Windows startup (for the current user, no administrator rights needed) — it will launch on the next login.',
-    boot_note_windows_task:'Windows won\'t launch the administrator VPN build from regular startup, so the program will create a Task Scheduler task ("ssh_tunnel VPN", highest privileges): the VPN will come up on its own at login, with no UAC prompt. A shortcut in the Startup folder is no longer needed — delete it.',
+    boot_note_windows_service:'The program will install itself as a Windows service (asking for administrator rights once): the VPN and device network will come up when the computer turns on, before anyone logs in — you can RDP into it straight from the password screen. At login the window opens as a tray icon. A shortcut in the Startup folder is no longer needed — delete it.',
     boot_ready:'Enabled: the tunnel will come up on its own at boot.',
     boot_need_root:'Enabled, but only after logging in — a sudo password is needed for it to come up at boot.',
     boot_configuring:'configuring…',
@@ -2214,7 +2238,44 @@ function setState(s, detail){
   running = (s === 'connected' || s === 'reconnecting' || s === 'connecting');
   if(s !== 'connected') showPing(0);
   $('speedtest').disabled = !running || speedRunning;
+  if(!running) netModes = {...netModes, bypass:false, mesh:false};
+  renderNetModes();
 }
+
+/* ---------- обход блокировок и сеть устройств ---------- */
+/* Обе едут через одно SSH-соединение, но включаются по отдельности (см.
+   internal/app/modes.go). Туннель живёт, пока включена хотя бы одна. */
+let netModes = {bypass:false, mesh:false, meshConfigured:false};
+function renderNetModes(){
+  const b = $('meshBtn');
+  b.hidden = !netModes.meshConfigured;
+  b.classList.toggle('on', !!netModes.mesh);
+  $('meshBtnCap').textContent = tr(netModes.mesh ? 'mesh_btn_on' : 'mesh_btn_off');
+  b.title = tr('mesh_btn_hint');
+  // Туннель держится только ради сети — большая кнопка выглядит выключенной:
+  // обход блокировок и правда выключен.
+  if(running && !netModes.bypass && lastState === 'connected'){
+    $('power').className = '';
+    $('powerCap').textContent = tr('connect');
+    $('stateText').textContent = tr('state_mesh_only');
+  }
+}
+async function refreshNetModes(){
+  const st = await api('/api/status');
+  if(st && st.modes){ netModes = st.modes; renderNetModes(); }
+}
+$('meshBtn').onclick = async () => {
+  $('meshBtn').disabled = true;
+  showError('');
+  try{
+    const r = await api('/api/meshmode', {on: !netModes.mesh});
+    if(r.error) showError(connErrorText(r.errorKind, r.error));
+    if(r.modes){ netModes = r.modes; renderNetModes(); }
+  } finally {
+    $('meshBtn').disabled = false;
+    refresh();
+  }
+};
 function showError(msg, where){
   const box = $(where || 'error');
   box.textContent = msg || '';
@@ -2295,6 +2356,7 @@ function connectEvents(){
     if(e.kind === 'state'){
       setState(e.state, e.state === 'connected' ? e.detail : '');
       showError(e.state === 'error' ? connErrorText(e.errorKind, e.detail) : '');
+      if(e.state === 'connected' || e.state === 'stopped') refreshNetModes();
       return;
     }
     if(e.kind === 'stats'){
@@ -2320,7 +2382,10 @@ $('power').onclick = async () => {
   $('power').disabled = true;
   showError('');
   try{
-    const r = running ? await api('/api/stop', {}) : await api('/api/start', {});
+    // Есть сеть устройств — большая кнопка отвечает только за обход
+    // блокировок: выключение оставляет сеть работать.
+    const r = running && netModes.meshConfigured ? await api('/api/bypass', {on: !netModes.bypass})
+            : running ? await api('/api/stop', {}) : await api('/api/start', {});
     if(r.error){ showError(connErrorText(r.errorKind, r.error)); show('viewMain'); }
   } finally {
     $('power').disabled = false;
@@ -2654,14 +2719,14 @@ function renderBootState(st){
   if(!st || !st.supported){ $('bootBlock').hidden = true; return; }
   $('bootBlock').hidden = false;
   $('bootStart').checked = !!st.enabled;
-  $('bootNote').textContent = tr(st.task ? 'boot_note_windows_task'
+  $('bootNote').textContent = tr(st.service ? 'boot_note_windows_service'
     : isWindows() ? 'boot_note_windows' : 'boot_note_linux');
 
   if(!st.enabled){
     $('bootStatus').textContent = '';
   } else if(isWindows() || st.linger){
     // На Windows отдельного понятия "linger" нет — запись в реестре (или
-    // задача Планировщика у VPN-версии) и так срабатывает сама при входе.
+    // служба у VPN-версии) и так срабатывает сама.
     $('bootStatus').textContent = tr('boot_ready');
   } else {
     $('bootStatus').textContent = tr('boot_need_root');
@@ -3530,6 +3595,7 @@ async function refresh(){
   const active = (st.config.profiles || []).find(p => p.id === shownId) || {};
   let detail = st.state === 'connected' ? active.host : '';
   if(detail && usingBackup) detail += ' (' + tr('backup_server_note') + ')';
+  if(st.modes) netModes = st.modes;
   setState(st.state, detail);
   // Пока пользователь правит форму, обновление с сервера её не трогает —
   // иначе набранный, но ещё не сохранённый адрес затирался бы.
