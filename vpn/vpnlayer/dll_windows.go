@@ -20,6 +20,12 @@ import (
 //go:embed wintun
 var wintunFiles embed.FS
 
+// WintunDir — куда класть драйвер. Пусто — в папку настроек пользователя.
+// Служба Windows ставит сюда папку в Program Files: она работает от имени
+// SYSTEM, и загружать библиотеку из папки, куда может писать любая программа
+// пользователя, ей нельзя — подменённый файл выполнился бы с правами SYSTEM.
+var WintunDir string
+
 // loadWintun кладёт драйвер в папку настроек и загружает его по полному пути.
 //
 // Библиотека WireGuard ищет «wintun.dll» по имени — рядом с exe и в System32.
@@ -34,6 +40,9 @@ func loadWintun() error {
 		return fmt.Errorf("программа собрана без драйвера Wintun — собери её через vpn/build.sh")
 	}
 	dir := filepath.Join(config.Dir(), "wintun")
+	if WintunDir != "" {
+		dir = WintunDir
+	}
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("папка для драйвера: %w", err)
 	}

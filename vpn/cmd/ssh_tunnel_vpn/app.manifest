@@ -3,12 +3,15 @@
   <assemblyIdentity type="win32" name="ssh_tunnel_vpn" version="1.0.0.0" processorArchitecture="amd64"/>
   <description>SSH-туннель до собственного сервера, режим VPN</description>
 
-  <!-- Нужны права администратора: создать сетевой адаптер и поменять маршруты
-       Windows позволяет только им. Окно UAC появится при каждом запуске. -->
+  <!-- Сам exe прав администратора не требует: со службой (галочка «Запускать
+       при старте системы») окно — обычная программа, а ядро с адаптером
+       работает в службе. Без службы программа сама перезапускается через окно
+       UAC (см. main_windows.go). Требуй манифест прав всегда — Windows не
+       запускала бы окно из автозагрузки при входе в систему. -->
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
     <security>
       <requestedPrivileges>
-        <requestedExecutionLevel level="requireAdministrator" uiAccess="false"/>
+        <requestedExecutionLevel level="asInvoker" uiAccess="false"/>
       </requestedPrivileges>
     </security>
   </trustInfo>

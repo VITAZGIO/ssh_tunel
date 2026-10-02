@@ -38,6 +38,34 @@ type Layer struct {
 	unwatch func()
 	servers []netip.Addr
 	sshPort int
+	// meshOnly — обход блокировок выключен: в адаптер идёт только сеть
+	// устройств, интернет — как без VPN (см. SetBypass).
+	meshOnly bool
+}
+
+// SetBypass переключает «весь трафик» и «только сеть устройств» (реализует
+// app.ModeLayer). На поднятом адаптере меняются маршруты и DNS, сам адаптер
+// не пересоздаётся — соединения к устройствам сети (RDP и прочее) не рвутся.
+func (l *Layer) SetBypass(on bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.meshOnly == !on {
+		return
+	}
+	l.meshOnly = !on
+	if !l.up {
+		return
+	}
+	if err := l.sys.setFull(on); err != nil {
+		l.bus.Errorf("Не удалось переключить VPN: %v", err)
+		return
+	}
+	l.sys.flushDNS()
+	if on {
+		l.bus.Infof("VPN: весь трафик системы снова идёт через адаптер %s", l.sys.name())
+	} else {
+		l.bus.Infof("VPN: через адаптер идёт только сеть устройств, интернет — напрямую")
+	}
 }
 
 // New готовит слой. Адаптер появится только при подключении.
@@ -79,7 +107,11 @@ func (l *Layer) Attach(tun *tunnel.Tunnel, p config.Profile) error {
 		l.current.Store(nil)
 		return err
 	}
-	l.bus.Infof("VPN включён: весь трафик системы идёт через адаптер %s", l.sys.name())
+	if l.meshOnly {
+		l.bus.Infof("VPN включён: через адаптер %s идёт только сеть устройств", l.sys.name())
+	} else {
+		l.bus.Infof("VPN включён: весь трафик системы идёт через адаптер %s", l.sys.name())
+	}
 	return nil
 }
 
@@ -110,7 +142,7 @@ func (l *Layer) bringUp() error {
 	if err := l.startStack(dev); err != nil {
 		return err
 	}
-	if err := l.sys.configure(); err != nil {
+	if err := l.sys.configure(!l.meshOnly); err != nil {
 		return err
 	}
 

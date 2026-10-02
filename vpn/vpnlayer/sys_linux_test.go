@@ -107,7 +107,7 @@ func runNetnsChild(t *testing.T) {
 		t.Fatalf("стек: %v", err)
 	}
 	defer eng.Close()
-	if err := s.configureRoutes(); err != nil {
+	if err := s.configureRoutes(true); err != nil {
 		t.Fatalf("маршруты: %v", err)
 	}
 

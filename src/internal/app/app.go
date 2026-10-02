@@ -69,6 +69,15 @@ type App struct {
 	// net — режим VPN: трафик системы заворачивается в туннель виртуальным
 	// сетевым адаптером, а не системным прокси. nil — обычный режим прокси.
 	net NetLayer
+
+	// bypassOff и meshOff — две кнопки главного экрана (см. modes.go):
+	// большая включает и выключает обход блокировок, маленькая — сеть
+	// устройств. Туннель держится, пока нужна хотя бы одна из них.
+	bypassOff bool
+	meshOff   bool
+	// sysProxyArgs — с чем включать системный прокси, когда обход
+	// блокировок включают обратно на живом туннеле.
+	sysProxyArgs *sysProxyArgs
 }
 
 // NetLayer заворачивает в туннель весь трафик системы — вместо системного
@@ -195,8 +204,21 @@ func (a *App) SwitchProfile(id string) (string, error) {
 	// Выключенный туннель так и остаётся выключенным — включать его без
 	// просьбы было бы сюрпризом.
 	if wasRunning {
+		// Кнопки главного экрана переживают смену сервера: был включён
+		// только режим сети устройств — так и останется, если сеть есть и у
+		// нового сервера.
+		a.mu.Lock()
+		bypassOff, meshOff := a.bypassOff, a.meshOff
+		a.mu.Unlock()
 		a.Stop()
+		if bypassOff && !a.meshConfigured() {
+			bypassOff, meshOff = false, false
+		}
+		a.mu.Lock()
+		a.bypassOff, a.meshOff = bypassOff, meshOff
+		a.mu.Unlock()
 		if err := a.Start(); err != nil {
+			a.resetModes()
 			return "", fmt.Errorf("сервер переключён, но подключиться к нему не вышло: %w", err)
 		}
 		return "сервер переключён — туннель поднят на новом", nil
@@ -346,6 +368,7 @@ func (a *App) Start() error {
 // строит туннель заново.
 func (a *App) resumeDraining(tun *tunnel.Tunnel, cfg config.Config, p config.Profile) error {
 	newCfg, _, _ := a.tunnelConfig(cfg, p)
+	a.applyModes(tun)
 	err := tun.Rebind(newCfg)
 
 	a.mu.Lock()
@@ -370,13 +393,19 @@ func (a *App) resumeDraining(tun *tunnel.Tunnel, cfg config.Config, p config.Pro
 // Снаружи (состояние, экран, /api/status) она неотличима от прежней резкой:
 // «выключен» появляется сразу же. Разница только в том, что происходит потом
 // — см. tunnel.Drain и docs/DRAIN_SPEC.md.
-func (a *App) Stop() { a.stop(true) }
+func (a *App) Stop() {
+	a.resetModes()
+	a.stop(true)
+}
 
 // StopNow — резкая остановка без слива: авария и выход из программы. Водить
 // трафик напрямую после аварии человек не просил, а при выходе сливать нечего
 // — процесс всё равно умирает. Смена сервера идёт через обычный Stop: там
 // слив как раз и нужен, чтобы сокеты браузера пережили переключение.
-func (a *App) StopNow() { a.stop(false) }
+func (a *App) StopNow() {
+	a.resetModes()
+	a.stop(false)
+}
 
 func (a *App) stop(drain bool) {
 	a.mu.Lock()

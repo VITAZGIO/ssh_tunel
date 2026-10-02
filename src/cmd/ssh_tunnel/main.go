@@ -31,6 +31,11 @@ func main() {
 	noWindow := flag.Bool("nowindow", false, "не открывать окно, только напечатать адрес")
 	flag.Parse()
 
+	// Служба VPN-версии уже держит туннель — показываем её окно.
+	if !*noWindow && openVPNServiceWindow() {
+		return
+	}
+
 	// Вторая копия не нужна: она всё равно не займёт уже занятые порты.
 	// Вместо неё показываем окно той, что уже работает.
 	if !*noWindow && nativeui.AlreadyRunning(windowTitle) {
@@ -67,9 +72,9 @@ func main() {
 	if cfg.AutoStart && cfg.Active().Host != "" {
 		go func() {
 			time.Sleep(300 * time.Millisecond) // дать окну подписаться на события
-			if err := a.Start(); err != nil {
-				a.Bus.Errorf("Автозапуск не удался: %v", err)
-			}
+			// При старте вместе с системой сети может ещё не быть —
+			// StartOnLaunch подождёт её несколько минут.
+			a.StartOnLaunch()
 		}()
 	}
 

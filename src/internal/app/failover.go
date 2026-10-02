@@ -90,6 +90,9 @@ func (a *App) connectFrom(cfg config.Config, candidates []config.Profile, idx in
 		a.mu.Lock()
 		netLayer := a.net
 		a.mu.Unlock()
+		if ml, ok := netLayer.(ModeLayer); ok {
+			ml.SetBypass(a.bypassOn())
+		}
 		if netLayer != nil {
 			// Адаптер — дело всей системы, а не одного сервера: не поднялся он
 			// у этого, не поднимется и у запасного. Пробовать дальше незачем.
@@ -137,7 +140,9 @@ func (a *App) connectFrom(cfg config.Config, candidates []config.Profile, idx in
 
 func (a *App) buildTunnel(cfg config.Config, p config.Profile) (tun *tunnel.Tunnel, socksAddr, httpAddr string) {
 	tunCfg, socksAddr, httpAddr := a.tunnelConfig(cfg, p)
-	return tunnel.New(tunCfg, a.Bus), socksAddr, httpAddr
+	tun = tunnel.New(tunCfg, a.Bus)
+	a.applyModes(tun)
+	return tun, socksAddr, httpAddr
 }
 
 // tunnelConfig собирает настройки туннеля отдельно от самого туннеля: те же
@@ -215,6 +220,15 @@ func meshConfig(p config.Profile, mode string) *mesh.Config {
 
 func (a *App) enableSysProxy(cfg config.Config, p config.Profile, httpAddr, socksAddr string) {
 	if !cfg.SysProxy {
+		return
+	}
+	a.mu.Lock()
+	a.sysProxyArgs = &sysProxyArgs{cfg: cfg, p: p, httpAddr: httpAddr, socksAddr: socksAddr}
+	off := a.bypassOff
+	a.mu.Unlock()
+	// Обход блокировок выключен (туннель держится только ради сети
+	// устройств) — системный прокси не нужен: браузер ходит напрямую.
+	if off {
 		return
 	}
 	if err := a.sys.Enable(httpAddr, socksAddr, cfg.SetEnvVars, !p.LocalViaTunnel, p.DirectHosts); err != nil {

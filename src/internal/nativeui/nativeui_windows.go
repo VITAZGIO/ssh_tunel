@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/jchv/go-webview2"
@@ -47,6 +48,11 @@ type Options struct {
 	// рядом с exe, а если программу положили в Program Files, туда писать
 	// нельзя и окно просто не откроется. Поэтому указываем папку настроек.
 	DataPath string
+
+	// StartHidden — не показывать окно при запуске, только значок в трее.
+	// Так программа поднимается при входе в систему: работать она должна
+	// сразу, а окно на весь рабочий стол никто не просил.
+	StartHidden bool
 }
 
 // Идентификатор иконки в ресурсах exe. Манифест занимает ID 1, группа
@@ -95,6 +101,7 @@ const (
 	wmApp        = 0x8000
 	wmTrayCallby = wmApp + 1 // сообщение от значка в трее
 	wmShowWindow = wmApp + 2 // «покажись» от второй копии программы
+	wmQuitApp    = wmApp + 3 // выйти из программы (см. Quit)
 
 	wmLButtonUp     = 0x0202
 	wmLButtonDblClk = 0x0203
@@ -226,6 +233,35 @@ func AlreadyRunning(title string) bool {
 	return false
 }
 
+// WaitSingleInstance дожидается, пока закроется прежняя копия программы, и
+// занимает её место. Нужно при перезапуске программы самой собой (переход на
+// службу и обратно): новая копия стартует раньше, чем старая успевает выйти.
+// false — старая так и не закрылась за timeout.
+func WaitSingleInstance(timeout time.Duration) bool {
+	name, _ := windows.UTF16PtrFromString("Local\\ssh_tunnel_single_instance")
+	deadline := time.Now().Add(timeout)
+	for {
+		h, _, err := pCreateMutex.Call(0, 0, uintptr(unsafe.Pointer(name)))
+		errno, _ := err.(windows.Errno)
+		if uintptr(errno) != errAlreadyExists {
+			return true // мьютекс наш и живёт до конца процесса
+		}
+		windows.CloseHandle(windows.Handle(h))
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+// Quit закрывает окно и выходит из цикла сообщений — как пункт «Выход» в
+// трее. Можно звать из любой горутины.
+func Quit() {
+	if u := active; u != nil {
+		pPostMessage.Call(u.hwnd, wmQuitApp, 0, 0)
+	}
+}
+
 func showExistingWindow(title string) {
 	class, _ := windows.UTF16PtrFromString("webview")
 	name, _ := windows.UTF16PtrFromString(title)
@@ -274,6 +310,9 @@ func Run(opts Options) error {
 	u.hookWindowProc()
 	u.allowMessagesFromShell()
 	u.addTrayIcon()
+	if opts.StartHidden {
+		u.hide()
+	}
 
 	view.Navigate(opts.URL)
 	view.Run() // крутится, пока не придёт WM_QUIT
@@ -376,6 +415,10 @@ func (u *ui) hookWindowProc() {
 
 		case wmShowWindow:
 			u.show()
+			return 0
+
+		case wmQuitApp:
+			u.quit()
 			return 0
 
 		case wmTrayCallby:

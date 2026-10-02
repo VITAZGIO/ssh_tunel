@@ -46,7 +46,7 @@ GOOS=windows GOARCH=amd64 go vet ./...
 go test ./...
 ( cd ../android/core && go test ./... )
 
-# Манифест с requireAdministrator и иконка — секцией ресурсов в exe, как и у
+# Манифест и иконка — секцией ресурсов в exe, как и у
 # обычной версии (см. src/build.sh).
 echo "Вшиваю иконку и манифест..."
 go run github.com/akavel/rsrc@v0.10.2 \

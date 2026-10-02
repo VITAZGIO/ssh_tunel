@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -26,14 +27,34 @@ import (
 
 func newFakeSSHServer(t *testing.T, clientPub ssh.PublicKey, acceptKey bool) string {
 	t.Helper()
+	cfg := fakeSSHConfig(t, clientPub, acceptKey)
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	serveFakeSSH(t, ln, cfg)
+	return ln.Addr().String()
+}
+
+// fakeHostSigner — ключ всех подставных серверов пакета. Один на всех
+// нарочно: known_hosts у тестов общий, а порт закрытого сервера система
+// может отдать следующему — со своим ключом он выглядел бы как подменённый
+// сервер, и подключение честно отказывало бы.
+var fakeHostSigner = sync.OnceValue(func() ssh.Signer {
 	_, hostPriv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
-	hostSigner, err := ssh.NewSignerFromKey(hostPriv)
+	s, err := ssh.NewSignerFromKey(hostPriv)
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
+	return s
+})
+
+func fakeSSHConfig(t *testing.T, clientPub ssh.PublicKey, acceptKey bool) *ssh.ServerConfig {
+	t.Helper()
+	hostSigner := fakeHostSigner()
 
 	cfg := &ssh.ServerConfig{
 		PublicKeyCallback: func(c ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
@@ -44,11 +65,14 @@ func newFakeSSHServer(t *testing.T, clientPub ssh.PublicKey, acceptKey bool) str
 		},
 	}
 	cfg.AddHostKey(hostSigner)
+	return cfg
+}
 
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
+// serveFakeSSH обслуживает уже открытый ln как подставной SSH-сервер. Отдельно
+// от newFakeSSHServer — для тестов, где сервер появляется по заранее
+// известному адресу не сразу, а «когда поднялась сеть».
+func serveFakeSSH(t *testing.T, ln net.Listener, cfg *ssh.ServerConfig) {
+	t.Helper()
 	t.Cleanup(func() { ln.Close() })
 
 	go func() {
@@ -71,7 +95,6 @@ func newFakeSSHServer(t *testing.T, clientPub ssh.PublicKey, acceptKey bool) str
 			}()
 		}
 	}()
-	return ln.Addr().String()
 }
 
 // closedPort — адрес, где заведомо никто не слушает: TCP-подключение к нему

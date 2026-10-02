@@ -41,6 +41,8 @@ type sys struct {
 	dns    []netip.Addr
 	link   netlink.Link
 	dnsVia string // "resolved", "file" или "" — как мы настроили DNS системы
+	v6     bool   // у интерфейса есть IPv6 — маршруты ::/1 ставить есть куда
+	full   bool   // стоят маршруты всего интернета (обход блокировок включён)
 }
 
 func newSys(bus *events.Bus) *sys {
@@ -169,62 +171,110 @@ func (s *sys) open() (core.Device, error) {
 	return dev, nil
 }
 
-// configure прописывает маршруты в TUN и направляет туда DNS системы.
-func (s *sys) configure() error {
-	if err := s.configureRoutes(); err != nil {
+// configure прописывает маршруты в TUN и направляет туда DNS системы. full —
+// весь трафик (обход блокировок включён); иначе — только сеть устройств.
+func (s *sys) configure(full bool) error {
+	if err := s.configureRoutes(full); err != nil {
 		return err
 	}
-	return s.configureDNS()
+	return s.configureDNS(full)
 }
 
-func (s *sys) configureRoutes() error {
+// setFull переключает режим на живом интерфейсе: соединения к устройствам
+// сети при этом не рвутся — их адреса в подсети самого интерфейса.
+func (s *sys) setFull(full bool) error {
+	if s.link == nil || s.full == full {
+		return nil
+	}
+	if err := s.setInternetRoutes(full); err != nil {
+		return err
+	}
+	return s.configureDNS(full)
+}
+
+func (s *sys) configureRoutes(full bool) error {
 	link := s.link
 	// IPv6 может быть выключен в системе целиком — тогда без него, но IPv4
 	// обязателен.
-	v6 := true
+	s.v6 = true
 	if err := netlink.AddrAdd(link, &netlink.Addr{IPNet: prefixNet(adapterPrefix6)}); err != nil {
-		v6 = false
+		s.v6 = false
 		s.bus.Warnf("IPv6 на адаптере не настроился (%v) — только IPv4", err)
 	}
+	// Адреса сети устройств (198.19.x.y) и наш DNS лежат в подсети самого
+	// интерфейса — маршрут до них ядро поставило вместе с адресом. Маршруты
+	// всего интернета — только при включённом обходе блокировок.
+	if full {
+		return s.setInternetRoutes(true)
+	}
+	return nil
+}
+
+func (s *sys) setInternetRoutes(on bool) error {
+	link := s.link
+	route := func(r netip.Prefix) *netlink.Route {
+		return &netlink.Route{LinkIndex: link.Attrs().Index, Dst: prefixNet(r)}
+	}
+	if !on {
+		for _, r := range append(append([]netip.Prefix{}, routes4...), routes6...) {
+			_ = netlink.RouteDel(route(r))
+		}
+		s.full = false
+		return nil
+	}
 	for _, r := range routes4 {
-		if err := netlink.RouteReplace(&netlink.Route{LinkIndex: link.Attrs().Index, Dst: prefixNet(r)}); err != nil {
+		if err := netlink.RouteReplace(route(r)); err != nil {
 			return fmt.Errorf("маршрут %s: %w", r, err)
 		}
 	}
-	if v6 {
+	if s.v6 {
 		for _, r := range routes6 {
-			if err := netlink.RouteReplace(&netlink.Route{LinkIndex: link.Attrs().Index, Dst: prefixNet(r)}); err != nil {
+			if err := netlink.RouteReplace(route(r)); err != nil {
 				s.bus.Warnf("маршрут %s не встал: %v", r, err)
 			}
 		}
 	}
-
+	s.full = true
 	return nil
 }
 
-func (s *sys) configureDNS() error {
+func (s *sys) configureDNS(full bool) error {
 	switch {
 	case hasResolved():
-		// systemd-resolved: DNS на нашем интерфейсе и домен «~.» — все
-		// запросы идут только сюда. Исчезнет интерфейс — resolved забудет
-		// настройку сам, так что падение программы DNS не ломает.
+		// systemd-resolved: DNS на нашем интерфейсе. При обходе блокировок —
+		// домен «~.»: все запросы идут только сюда. В режиме «только сеть
+		// устройств» — «~mesh»: сюда идут лишь имена .mesh, остальное — как
+		// обычно. Исчезнет интерфейс — resolved забудет настройку сам, так что
+		// падение программы DNS не ломает.
+		domain, defRoute := "~mesh", "no"
+		if full {
+			domain, defRoute = "~.", "yes"
+		}
 		cmds := [][]string{
 			{"dns", linuxIfName, dnsAddr.String()},
-			{"domain", linuxIfName, "~."},
+			{"domain", linuxIfName, domain},
 		}
 		for _, c := range cmds {
 			if out, err := exec.Command("resolvectl", c...).CombinedOutput(); err != nil {
 				return fmt.Errorf("resolvectl %s: %v %s", strings.Join(c, " "), err, bytes.TrimSpace(out))
 			}
 		}
-		// Есть не во всех версиях — без неё «~.» и так делает своё дело.
-		_ = exec.Command("resolvectl", "default-route", linuxIfName, "yes").Run()
+		// Есть не во всех версиях — без неё домены и так делают своё дело.
+		_ = exec.Command("resolvectl", "default-route", linuxIfName, defRoute).Run()
 		s.dnsVia = "resolved"
-	default:
+	case full:
 		if err := replaceResolvConf(); err != nil {
 			return err
 		}
 		s.dnsVia = "file"
+	default:
+		// Без resolved DNS делится только целиком. В режиме «только сеть
+		// устройств» системный DNS не трогаем: устройства доступны по адресам
+		// 198.19.x.y, а имена .mesh — лишь там, где есть resolved.
+		if s.dnsVia == "file" && restoreResolvConf() {
+			s.bus.Infof("/etc/resolv.conf возвращён как было")
+		}
+		s.dnsVia = ""
 	}
 	return nil
 }

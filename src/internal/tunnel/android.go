@@ -82,7 +82,7 @@ func (t *Tunnel) dialForTun(target string, forceDirect bool) (net.Conn, bool, er
 	}
 	// Слив (см. Drain): связи с сервером уже нет, но интерфейс VPN ещё
 	// поднят ради уже открытых сокетов приложений — ведём их напрямую.
-	if !t.draining.Load() && !forceDirect && !t.localDirect(target) && !t.listedDirect(target) {
+	if t.viaServer() && !forceDirect && !t.localDirect(target) && !t.listedDirect(target) {
 		c, err := t.Dial("tcp", target)
 		return c, false, err
 	}
