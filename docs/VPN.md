@@ -168,9 +168,14 @@ UDP — через SSH он не проходит, без ретранслято
 а её собственный интернет пусть идёт напрямую? Тогда хватит обычной версии —
 [LINUX_SETUP.md](LINUX_SETUP.md).
 
-### Команды под свою систему
+### Как это выглядит
 
-Разверни свою систему, выполни блок, потом — общий блок автозапуска ниже.
+1. Скачать и запустить программу — блок под свою систему ниже.
+2. Добавить сервер в панели — как в программе на Windows (см. «Добавить
+   сервер» ниже). Адрес VPS в командах не нужен.
+3. Включить автозапуск — общий блок в конце.
+
+### Команды под свою систему
 
 <details>
 <summary><b>Ubuntu · Debian · Linux Mint · Raspberry Pi OS</b></summary>
@@ -183,11 +188,8 @@ F=ssh_tunnel_vpn_linux; [ "$(uname -m)" = aarch64 ] && F=${F}_arm64
 curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
 sudo install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
 
-# задать сервер один раз
-sudo ssh_tunnel_vpn_linux -host ТВОЙ_СЕРВЕР -user tunnel -save
-
-# проверить руками: поднимется VPN и панель (Ctrl+C — выключить)
-sudo ssh_tunnel_vpn_linux -web
+# запустить с панелью: http://АДРЕС_ЭТОЙ_МАШИНЫ:47821 (Ctrl+C — выключить)
+sudo ssh_tunnel_vpn_linux -web -web-lan
 ```
 
 DNS: в Ubuntu работает systemd-resolved — программа настроит его сама. В
@@ -214,8 +216,8 @@ F=ssh_tunnel_vpn_linux; [ "$(uname -m)" = aarch64 ] && F=${F}_arm64
 curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
 install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
 
-ssh_tunnel_vpn_linux -host ТВОЙ_СЕРВЕР -user tunnel -save
-ssh_tunnel_vpn_linux -web          # проверить руками, Ctrl+C — выключить
+# запустить с панелью: http://АДРЕС_ХОСТА:47821 (Ctrl+C — выключить)
+ssh_tunnel_vpn_linux -web -web-lan
 ```
 
 Важно для Proxmox:
@@ -248,8 +250,8 @@ F=ssh_tunnel_vpn_linux; [ "$(uname -m)" = aarch64 ] && F=${F}_arm64
 curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
 sudo install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
 
-sudo ssh_tunnel_vpn_linux -host ТВОЙ_СЕРВЕР -user tunnel -save
-sudo ssh_tunnel_vpn_linux -web     # проверить руками, Ctrl+C — выключить
+# запустить с панелью: http://АДРЕС_ЭТОЙ_МАШИНЫ:47821 (Ctrl+C — выключить)
+sudo ssh_tunnel_vpn_linux -web -web-lan
 ```
 
 Firewall здесь `firewalld`; если панель нужна с других устройств:
@@ -269,8 +271,8 @@ F=ssh_tunnel_vpn_linux; [ "$(uname -m)" = aarch64 ] && F=${F}_arm64
 curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
 sudo install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
 
-sudo ssh_tunnel_vpn_linux -host ТВОЙ_СЕРВЕР -user tunnel -save
-sudo ssh_tunnel_vpn_linux -web     # проверить руками, Ctrl+C — выключить
+# запустить с панелью: http://АДРЕС_ЭТОЙ_МАШИНЫ:47821 (Ctrl+C — выключить)
+sudo ssh_tunnel_vpn_linux -web -web-lan
 ```
 
 Firewall по умолчанию не стоит; если поставил свой — порт `47821` открывай в
@@ -287,8 +289,8 @@ F=ssh_tunnel_vpn_linux; [ "$(uname -m)" = aarch64 ] && F=${F}_arm64
 curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
 sudo install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
 
-sudo ssh_tunnel_vpn_linux -host ТВОЙ_СЕРВЕР -user tunnel -save
-sudo ssh_tunnel_vpn_linux -web     # проверить руками, Ctrl+C — выключить
+# запустить с панелью: http://АДРЕС_ЭТОЙ_МАШИНЫ:47821 (Ctrl+C — выключить)
+sudo ssh_tunnel_vpn_linux -web -web-lan
 ```
 
 Порт панели — через `firewalld`, как в Fedora:
@@ -312,8 +314,6 @@ F=ssh_tunnel_vpn_linux; [ "$(uname -m)" = aarch64 ] && F=${F}_arm64
 curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
 install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
 
-ssh_tunnel_vpn_linux -host ТВОЙ_СЕРВЕР -user tunnel -save
-
 cat > /etc/init.d/ssh_tunnel_vpn <<'EOF'
 #!/sbin/openrc-run
 command="/usr/local/bin/ssh_tunnel_vpn_linux"
@@ -331,11 +331,28 @@ DNS без systemd-resolved: на время работы подменяется
 потом возвращается как было.
 </details>
 
+### Добавить сервер
+
+Сервер здесь — твой **VPS**, тот же, что в программе на Windows, а не роутер.
+Удобнее всего перенести его вместе с ключом:
+
+1. В программе на компьютере: настройки своего сервера → **«Экспорт»** (с
+   ключом) — получится файл.
+2. Открой панель этой машины (`http://АДРЕС_ЭТОЙ_МАШИНЫ:47821`) с любого
+   устройства в домашней сети → **«Импорт»** → этот файл → **«Подключить»**.
+   Вместе с сервером приезжают SSH-ключ и ключ сети устройств: машина сразу
+   появляется в сети как `имя-машины.mesh`.
+3. Файл экспорта удали — он равносилен паролю от сервера.
+
+Можно и вписать руками в той же панели: адрес VPS, пользователь, путь к
+ключу — как в первый раз на Windows.
+
 ### Автозапуск при включении машины
 
 Для всех систем с systemd (всё, кроме Alpine). Выполни **тем же
-пользователем**, которым задавал сервер (`-save`): служба возьмёт настройки из
-его домашней папки. Блок годится и для обновления — просто вставь его снова
+пользователем**, которым запускал программу через `sudo`: служба возьмёт
+настройки (и добавленный сервер) из его домашней папки. Окно с ручным запуском
+перед этим закрой (Ctrl+C). Блок годится и для обновления — просто вставь его снова
 после установки нового файла.
 
 ```bash
