@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Цвета оформления — атрибутами темы, а не прямыми ссылками на @color: так
+    одна и та же разметка перекрашивается выбранной темой (оригинал, тёмная,
+    светлая, консоль). Значения — в themes.xml.
+-->
+<resources>
+    <attr name="c_bg" format="color" />
+    <attr name="c_card" format="color" />
+    <attr name="c_card2" format="color" />
+    <attr name="c_line" format="color" />
+    <attr name="c_text" format="color" />
+    <attr name="c_dim" format="color" />
+    <attr name="c_accent" format="color" />
+    <attr name="c_accent_muted" format="color" />
+    <attr name="c_accent_muted_dark" format="color" />
+    <attr name="c_ok" format="color" />
+    <attr name="c_warn" format="color" />
+    <attr name="c_err" format="color" />
+    <attr name="c_err_muted" format="color" />
+    <attr name="c_err_muted_dark" format="color" />
+    <attr name="c_logo" format="color" />
+</resources>

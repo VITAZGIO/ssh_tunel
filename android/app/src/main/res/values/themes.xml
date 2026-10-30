@@ -9,6 +9,100 @@
         <item name="colorControlActivated">@color/accent_muted</item>
         <item name="android:statusBarColor">@color/bg</item>
         <item name="android:navigationBarColor">@color/card</item>
+        <item name="c_bg">@color/bg</item>
+        <item name="c_card">@color/card</item>
+        <item name="c_card2">@color/card2</item>
+        <item name="c_line">@color/line</item>
+        <item name="c_text">@color/text</item>
+        <item name="c_dim">@color/dim</item>
+        <item name="c_accent">@color/accent</item>
+        <item name="c_accent_muted">@color/accent_muted</item>
+        <item name="c_accent_muted_dark">@color/accent_muted_dark</item>
+        <item name="c_ok">@color/ok</item>
+        <item name="c_warn">@color/warn</item>
+        <item name="c_err">@color/err</item>
+        <item name="c_err_muted">@color/err_muted</item>
+        <item name="c_err_muted_dark">@color/err_muted_dark</item>
+        <item name="c_logo">@color/logo</item>
+    </style>
+
+    <style name="AppTheme.Dark">
+        <item name="android:colorBackground">@color/t_dark_colorBackground</item>
+        <item name="android:windowBackground">@color/t_dark_windowBackground</item>
+        <item name="android:textColor">@color/t_dark_textColor</item>
+        <item name="colorPrimary">@color/t_dark_colorPrimary</item>
+        <item name="colorAccent">@color/t_dark_colorAccent</item>
+        <item name="colorControlActivated">@color/t_dark_colorControlActivated</item>
+        <item name="android:statusBarColor">@color/t_dark_statusBarColor</item>
+        <item name="android:navigationBarColor">@color/t_dark_navigationBarColor</item>
+        <item name="c_bg">@color/t_dark_bg</item>
+        <item name="c_card">@color/t_dark_card</item>
+        <item name="c_card2">@color/t_dark_card2</item>
+        <item name="c_line">@color/t_dark_line</item>
+        <item name="c_text">@color/t_dark_text</item>
+        <item name="c_dim">@color/t_dark_dim</item>
+        <item name="c_accent">@color/t_dark_accent</item>
+        <item name="c_accent_muted">@color/t_dark_accent_muted</item>
+        <item name="c_accent_muted_dark">@color/t_dark_accent_muted_dark</item>
+        <item name="c_ok">@color/t_dark_ok</item>
+        <item name="c_warn">@color/t_dark_warn</item>
+        <item name="c_err">@color/t_dark_err</item>
+        <item name="c_err_muted">@color/t_dark_err_muted</item>
+        <item name="c_err_muted_dark">@color/t_dark_err_muted_dark</item>
+        <item name="c_logo">@color/t_dark_logo</item>
+    </style>
+
+    <style name="AppTheme.Light">
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:colorBackground">@color/t_light_colorBackground</item>
+        <item name="android:windowBackground">@color/t_light_windowBackground</item>
+        <item name="android:textColor">@color/t_light_textColor</item>
+        <item name="colorPrimary">@color/t_light_colorPrimary</item>
+        <item name="colorAccent">@color/t_light_colorAccent</item>
+        <item name="colorControlActivated">@color/t_light_colorControlActivated</item>
+        <item name="android:statusBarColor">@color/t_light_statusBarColor</item>
+        <item name="android:navigationBarColor">@color/t_light_navigationBarColor</item>
+        <item name="c_bg">@color/t_light_bg</item>
+        <item name="c_card">@color/t_light_card</item>
+        <item name="c_card2">@color/t_light_card2</item>
+        <item name="c_line">@color/t_light_line</item>
+        <item name="c_text">@color/t_light_text</item>
+        <item name="c_dim">@color/t_light_dim</item>
+        <item name="c_accent">@color/t_light_accent</item>
+        <item name="c_accent_muted">@color/t_light_accent_muted</item>
+        <item name="c_accent_muted_dark">@color/t_light_accent_muted_dark</item>
+        <item name="c_ok">@color/t_light_ok</item>
+        <item name="c_warn">@color/t_light_warn</item>
+        <item name="c_err">@color/t_light_err</item>
+        <item name="c_err_muted">@color/t_light_err_muted</item>
+        <item name="c_err_muted_dark">@color/t_light_err_muted_dark</item>
+        <item name="c_logo">@color/t_light_logo</item>
+    </style>
+
+    <style name="AppTheme.Console">
+        <item name="android:colorBackground">@color/t_console_colorBackground</item>
+        <item name="android:windowBackground">@color/t_console_windowBackground</item>
+        <item name="android:textColor">@color/t_console_textColor</item>
+        <item name="colorPrimary">@color/t_console_colorPrimary</item>
+        <item name="colorAccent">@color/t_console_colorAccent</item>
+        <item name="colorControlActivated">@color/t_console_colorControlActivated</item>
+        <item name="android:statusBarColor">@color/t_console_statusBarColor</item>
+        <item name="android:navigationBarColor">@color/t_console_navigationBarColor</item>
+        <item name="c_bg">@color/t_console_bg</item>
+        <item name="c_card">@color/t_console_card</item>
+        <item name="c_card2">@color/t_console_card2</item>
+        <item name="c_line">@color/t_console_line</item>
+        <item name="c_text">@color/t_console_text</item>
+        <item name="c_dim">@color/t_console_dim</item>
+        <item name="c_accent">@color/t_console_accent</item>
+        <item name="c_accent_muted">@color/t_console_accent_muted</item>
+        <item name="c_accent_muted_dark">@color/t_console_accent_muted_dark</item>
+        <item name="c_ok">@color/t_console_ok</item>
+        <item name="c_warn">@color/t_console_warn</item>
+        <item name="c_err">@color/t_console_err</item>
+        <item name="c_err_muted">@color/t_console_err_muted</item>
+        <item name="c_err_muted_dark">@color/t_console_err_muted_dark</item>
+        <item name="c_logo">@color/t_console_logo</item>
     </style>
 
     <!-- Плитка со счётчиком: карточка с подписью и значением. -->
@@ -25,7 +119,7 @@
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:textSize">10.5sp</item>
-        <item name="android:textColor">@color/dim</item>
+        <item name="android:textColor">?attr/c_dim</item>
         <item name="android:letterSpacing">0.06</item>
     </style>
 
@@ -36,7 +130,7 @@
         <item name="android:textSize">15sp</item>
         <item name="android:textStyle">bold</item>
         <item name="android:fontFamily">monospace</item>
-        <item name="android:textColor">@color/text</item>
+        <item name="android:textColor">?attr/c_text</item>
         <item name="android:text">—</item>
     </style>
 
@@ -46,7 +140,7 @@
         <item name="android:paddingBottom">10dp</item>
         <item name="android:textSize">15sp</item>
         <item name="android:textStyle">bold</item>
-        <item name="android:textColor">@color/text</item>
+        <item name="android:textColor">?attr/c_text</item>
     </style>
 
     <style name="FieldLabel">
@@ -54,7 +148,7 @@
         <item name="android:layout_height">wrap_content</item>
         <item name="android:paddingBottom">3dp</item>
         <item name="android:textSize">12sp</item>
-        <item name="android:textColor">@color/dim</item>
+        <item name="android:textColor">?attr/c_dim</item>
     </style>
 
     <style name="Field">
@@ -64,7 +158,7 @@
         <item name="android:background">@drawable/bg_field</item>
         <item name="android:padding">10dp</item>
         <item name="android:textSize">14sp</item>
-        <item name="android:textColor">@color/text</item>
+        <item name="android:textColor">?attr/c_text</item>
     </style>
 
     <style name="PrimaryButton">
@@ -114,7 +208,7 @@
         <item name="android:layout_marginStart">8dp</item>
         <item name="android:textSize">15sp</item>
         <item name="android:textStyle">bold</item>
-        <item name="android:textColor">@color/text</item>
+        <item name="android:textColor">?attr/c_text</item>
     </style>
 
     <style name="HeadIcon">
@@ -124,5 +218,123 @@
         <item name="android:clickable">true</item>
         <item name="android:focusable">true</item>
         <item name="android:background">?android:attr/selectableItemBackgroundBorderless</item>
+    </style>
+
+    <!-- Новый интерфейс. -->
+    <!-- Сведения на главном: подпись · точки · значение. Не кнопки. -->
+    <style name="StatKey">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">?attr/c_dim</item>
+    </style>
+
+    <style name="StatValue">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:textColor">?attr/c_text</item>
+        <item name="android:text">—</item>
+    </style>
+
+    <!-- Кнопки главного экрана: без скруглений, форму задаёт ShapeBg. -->
+    <style name="ActButton">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">?attr/c_text</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
+    <style name="DevHead">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textSize">10.5sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.06</item>
+        <item name="android:textColor">?attr/c_dim</item>
+    </style>
+
+    <style name="Hairline">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">1dp</item>
+        <item name="android:background">?attr/c_line</item>
+    </style>
+
+    <!-- Строка-переход на экран настроек: линия снизу вместо карточки. -->
+    <style name="NavRow">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingTop">13dp</item>
+        <item name="android:paddingBottom">13dp</item>
+        <item name="android:paddingStart">4dp</item>
+        <item name="android:paddingEnd">4dp</item>
+        <item name="android:background">@drawable/bg_row</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
+    <style name="NavTitle">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">?attr/c_text</item>
+    </style>
+
+    <style name="NavSub">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">2dp</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textColor">?attr/c_dim</item>
+    </style>
+
+    <style name="SectTitle">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">20dp</item>
+        <item name="android:layout_marginBottom">8dp</item>
+        <item name="android:textSize">11.5sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.05</item>
+        <item name="android:textColor">?attr/c_dim</item>
+    </style>
+
+    <!-- Вариант в ряду (тема, фон, режим запуска, импорт/экспорт). -->
+    <style name="SegItem">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">center</item>
+        <item name="android:paddingStart">4dp</item>
+        <item name="android:paddingEnd">4dp</item>
+        <item name="android:maxLines">2</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textColor">?attr/c_text</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:background">?android:attr/selectableItemBackground</item>
+    </style>
+
+    <style name="OutlineButton">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">36dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textColor">?attr/c_text</item>
+        <item name="android:background">@drawable/bg_outline</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
     </style>
 </resources>

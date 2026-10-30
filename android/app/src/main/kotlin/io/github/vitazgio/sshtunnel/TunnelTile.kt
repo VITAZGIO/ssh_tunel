@@ -35,7 +35,10 @@ class TunnelTile : TileService() {
     override fun onClick() {
         super.onClick()
 
+        // Включение и выключение плиткой — тоже «руками»: запоминается для
+        // режима «как при закрытии».
         if (TunnelService.state != "stopped") {
+            Settings(this).lastRunning = false
             startService(
                 Intent(this, TunnelService::class.java).setAction(TunnelService.ACTION_STOP)
             )
@@ -48,6 +51,7 @@ class TunnelTile : TileService() {
             return
         }
 
+        Settings(this).lastRunning = true
         startService(
             Intent(this, TunnelService::class.java).setAction(TunnelService.ACTION_START)
         )

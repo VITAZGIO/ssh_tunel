@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Выбранный вариант в ряду кнопок: подложка и полоса снизу. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item><shape android:shape="rectangle"><solid android:color="?attr/c_card2" /></shape></item>
+    <item android:gravity="bottom" android:height="2dp">
+        <shape android:shape="rectangle"><solid android:color="?attr/c_accent" /></shape>
+    </item>
+</layer-list>

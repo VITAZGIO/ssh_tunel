@@ -46,6 +46,7 @@ class MeshActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Look.apply(this)
         setContentView(R.layout.activity_mesh)
         settings = Settings(this)
 
@@ -195,7 +196,7 @@ class MeshActivity : AppCompatActivity() {
         val dot = View(this)
         val d = GradientDrawable()
         d.shape = GradientDrawable.OVAL
-        d.setColor(ContextCompat.getColor(this, if (peer.optBoolean("online")) R.color.ok else R.color.dim))
+        d.setColor(tc(if (peer.optBoolean("online")) R.color.ok else R.color.dim))
         dot.background = d
         row.addView(dot, LinearLayout.LayoutParams(dp(8), dp(8)).also { it.marginEnd = dp(10) })
 
@@ -205,7 +206,7 @@ class MeshActivity : AppCompatActivity() {
         h.text = if (peer.optBoolean("self")) host + " " + getString(R.string.mesh_this) else host
         h.typeface = android.graphics.Typeface.MONOSPACE
         h.textSize = 13f
-        h.setTextColor(ContextCompat.getColor(this, R.color.text))
+        h.setTextColor(tc(R.color.text))
         val n = TextView(this)
         // Прямое соединение (минуя сервер) — с задержкой.
         var name = peer.optString("name")
@@ -216,7 +217,7 @@ class MeshActivity : AppCompatActivity() {
         }
         n.text = name
         n.textSize = 12f
-        n.setTextColor(ContextCompat.getColor(this, R.color.dim))
+        n.setTextColor(tc(R.color.dim))
         texts.addView(h)
         texts.addView(n)
         row.addView(texts, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
@@ -225,7 +226,7 @@ class MeshActivity : AppCompatActivity() {
         ip.text = peer.optString("ip")
         ip.typeface = android.graphics.Typeface.MONOSPACE
         ip.textSize = 12f
-        ip.setTextColor(ContextCompat.getColor(this, R.color.dim))
+        ip.setTextColor(tc(R.color.dim))
         row.addView(ip)
 
         row.setOnClickListener {

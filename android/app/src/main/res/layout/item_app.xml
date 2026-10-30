@@ -21,7 +21,7 @@
         android:layout_weight="1"
         android:layout_marginStart="12dp"
         android:textSize="15sp"
-        android:textColor="@color/text" />
+        android:textColor="?attr/c_text" />
 
     <CheckBox
         android:id="@+id/appCheck"

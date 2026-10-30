@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/bg"
+    android:background="?attr/c_bg"
     android:padding="16dp">
 
     <LinearLayout style="@style/HeadRow">
@@ -32,7 +32,7 @@
                 android:layout_height="wrap_content"
                 android:paddingBottom="10dp"
                 android:textSize="13sp"
-                android:textColor="@color/text"
+                android:textColor="?attr/c_text"
                 android:text="@string/users_intro" />
 
             <TextView
@@ -41,13 +41,13 @@
                 android:layout_height="wrap_content"
                 android:paddingBottom="6dp"
                 android:textSize="12.5sp"
-                android:textColor="@color/dim" />
+                android:textColor="?attr/c_dim" />
 
             <TextView style="@style/FieldLabel" android:text="@string/users_name" />
             <EditText android:id="@+id/usersName" style="@style/Field"
                 android:inputType="text" android:maxLength="80"
                 android:hint="@string/users_name_hint"
-                android:textColorHint="@color/dim" android:autofillHints="" />
+                android:textColorHint="?attr/c_dim" android:autofillHints="" />
 
             <TextView style="@style/FieldLabel" android:text="@string/users_type" />
             <RadioGroup
@@ -61,28 +61,28 @@
                     android:layout_width="0dp"
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
-                    android:textColor="@color/text"
+                    android:textColor="?attr/c_text"
                     android:text="Android" />
                 <RadioButton
                     android:id="@+id/usersTypeWindows"
                     android:layout_width="0dp"
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
-                    android:textColor="@color/text"
+                    android:textColor="?attr/c_text"
                     android:text="Windows" />
                 <RadioButton
                     android:id="@+id/usersTypeLinux"
                     android:layout_width="0dp"
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
-                    android:textColor="@color/text"
+                    android:textColor="?attr/c_text"
                     android:text="Linux" />
             </RadioGroup>
 
             <TextView style="@style/FieldLabel" android:text="@string/users_pass" />
             <EditText android:id="@+id/usersPass" style="@style/Field"
                 android:inputType="textPassword"
-                android:textColorHint="@color/dim" android:autofillHints="" />
+                android:textColorHint="?attr/c_dim" android:autofillHints="" />
 
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/usersCreate"
@@ -98,7 +98,7 @@
                 android:layout_height="wrap_content"
                 android:paddingTop="8dp"
                 android:textSize="12.5sp"
-                android:textColor="@color/dim" />
+                android:textColor="?attr/c_dim" />
 
             <LinearLayout
                 android:id="@+id/usersResult"
@@ -113,7 +113,7 @@
                     android:paddingTop="6dp"
                     android:paddingBottom="8dp"
                     android:textSize="13sp"
-                    android:textColor="@color/text"
+                    android:textColor="?attr/c_text"
                     android:text="@string/users_done" />
 
                 <LinearLayout

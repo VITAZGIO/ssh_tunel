@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/bg"
+    android:background="?attr/c_bg"
     android:padding="16dp">
 
     <LinearLayout style="@style/HeadRow">
@@ -30,7 +30,7 @@
                 android:id="@+id/adBlockEnabled"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="@color/text"
+                android:textColor="?attr/c_text"
                 android:text="@string/ad_block_enabled" />
 
             <TextView
@@ -40,7 +40,7 @@
                 android:layout_marginTop="2dp"
                 android:paddingBottom="8dp"
                 android:textSize="12.5sp"
-                android:textColor="@color/dim" />
+                android:textColor="?attr/c_dim" />
 
             <!-- Две вкладки, как у экрана приложений: список блокировки
                  отдельно от списка исключений — оба применяются одновременно. -->
@@ -83,7 +83,7 @@
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
                     android:textSize="12sp"
-                    android:textColor="@color/dim" />
+                    android:textColor="?attr/c_dim" />
                 <TextView
                     android:id="@+id/tabInfo"
                     android:layout_width="16dp"
@@ -92,7 +92,7 @@
                     android:gravity="center"
                     android:textSize="9sp"
                     android:textStyle="bold"
-                    android:textColor="@color/dim"
+                    android:textColor="?attr/c_dim"
                     android:text="?"
                     android:clickable="true"
                     android:focusable="true" />
@@ -104,7 +104,7 @@
                 android:inputType="textMultiLine"
                 android:minLines="6"
                 android:gravity="top"
-                android:textColorHint="@color/dim"
+                android:textColorHint="?attr/c_dim"
                 android:autofillHints="" />
 
             <LinearLayout
@@ -151,7 +151,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="10dp"
                     android:textSize="12.5sp"
-                    android:textColor="@color/dim" />
+                    android:textColor="?attr/c_dim" />
                 <TextView
                     android:id="@+id/adBlockUpdateInfo"
                     android:layout_width="16dp"
@@ -161,7 +161,7 @@
                     android:gravity="center"
                     android:textSize="9sp"
                     android:textStyle="bold"
-                    android:textColor="@color/dim"
+                    android:textColor="?attr/c_dim"
                     android:text="?"
                     android:clickable="true"
                     android:focusable="true" />

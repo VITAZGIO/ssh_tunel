@@ -36,6 +36,7 @@ class UsersActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Look.apply(this)
         setContentView(R.layout.activity_users)
 
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(
