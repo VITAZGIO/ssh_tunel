@@ -49,6 +49,10 @@ type Server struct {
 	// Оба могут быть nil (тесты): тогда их ручки отвечают, что недоступны.
 	settings *SettingsStore
 	mesh     *MeshManager
+
+	// connUID узнаёт uid звонящего на входе создания пользователей
+	// (selfservice.go); nil — по /proc/net/tcp. Подменяется в тестах.
+	connUID func(*http.Request) (int, bool)
 }
 
 // WithHistory подключает историю трафика по дням (traffic_history.go).
@@ -299,6 +303,9 @@ func (s *Server) handleClients(w http.ResponseWriter, r *http.Request) {
 	list := s.clients.List()
 	if list == nil {
 		list = []Client{}
+	}
+	for i := range list {
+		list[i].CreatorHash = "" // странице хеш пароля ни к чему
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"clients": list})
 }

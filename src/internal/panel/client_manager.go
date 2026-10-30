@@ -3,6 +3,7 @@ package panel
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -30,6 +31,10 @@ type ClientManager struct {
 	// cmd/ssh_tunnel_panel подставляет log.Printf, чтобы они были видны в
 	// журнале, не прерывая работу панели.
 	warnf func(format string, args ...any)
+
+	// editMu — Update читает и пишет запись целиком: два изменения подряд
+	// (группы и право создавать) не должны затирать друг друга.
+	editMu sync.Mutex
 }
 
 func NewClientManager(store *ClientStore, provisioner Provisioner) *ClientManager {
@@ -75,6 +80,31 @@ const maxNameLength = 80
 // изменения — незавершённый клиент, застрявший в системе без записи в
 // хранилище, было бы сложнее найти и убрать вручную, чем ошибку сейчас.
 func (m *ClientManager) CreateClient(name string, deviceType DeviceType) (Client, error) {
+	return m.createClient(name, deviceType, nil)
+}
+
+// CreateClientBy — то же, но клиента заводит другой клиент (selfservice.go):
+// новый получает его группы и не больше, а права создавать — нет.
+func (m *ClientManager) CreateClientBy(name string, deviceType DeviceType, creator Client) (Client, error) {
+	return m.createClient(name, deviceType, func(c *Client) {
+		c.CreatedBy = creator.ID
+		c.Groups = append([]string(nil), creator.Groups...)
+	})
+}
+
+// Update меняет запись клиента в хранилище (группы, право создавать).
+func (m *ClientManager) Update(id string, fn func(*Client)) error {
+	m.editMu.Lock()
+	defer m.editMu.Unlock()
+	c, ok := m.store.Get(id)
+	if !ok {
+		return fmt.Errorf("нет клиента %q", id)
+	}
+	fn(&c)
+	return m.store.Put(c)
+}
+
+func (m *ClientManager) createClient(name string, deviceType DeviceType, extra func(*Client)) (Client, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return Client{}, fmt.Errorf("имя клиента не может быть пустым")
@@ -132,6 +162,9 @@ func (m *ClientManager) CreateClient(name string, deviceType DeviceType) (Client
 		PublicKey:  pubKey,
 		PrivateKey: privKey,
 		UID:        uid,
+	}
+	if extra != nil {
+		extra(&c)
 	}
 	if err := m.store.Put(c); err != nil {
 		// Пользователь в системе уже есть, а записи о нём нет — оставлять

@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -27,7 +28,7 @@ var buildMeshdOnce = sync.OnceValues(func() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	bin := filepath.Join(dir, "meshd")
+	bin := filepath.Join(dir, "meshd"+exeSuffix())
 	out, err := exec.Command("go", "build", "-o", bin, "../../cmd/meshd").CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("сборка meshd: %v: %s", err, out)
@@ -130,4 +131,12 @@ func TestСетьУстройствЧерезТуннель(t *testing.T) {
 	defer app.Close()
 	go a.ServeConn(ours, net.JoinHostPort(bIP.String(), strconv.Itoa(target.Port)), true)
 	assertHTTPBody(t, app, "b.mesh", "/hello", "привет от b.mesh")
+}
+
+// exeSuffix — на Windows собранной программе нужно расширение .exe.
+func exeSuffix() string {
+	if runtime.GOOS == "windows" {
+		return ".exe"
+	}
+	return ""
 }

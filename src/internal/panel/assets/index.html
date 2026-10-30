@@ -156,6 +156,15 @@
              text-overflow:ellipsis;white-space:nowrap}
   .dev .meta{font-size:11.5px;color:var(--dim);margin-top:5px;line-height:1.5}
   .dev .actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
+  .acc-checks{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+  .acc-checks .g{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;
+                 border:1px solid var(--line);background:var(--card2);font-size:12.5px}
+  .acc-checks .g button{border:0;background:none;color:var(--dim);cursor:pointer;padding:0;font-size:14px}
+  .acc-line{display:flex;align-items:center;gap:8px;margin:6px 0 10px;font-size:13px}
+  .acc-rule{display:grid;grid-template-columns:1fr auto 1fr 1fr auto;gap:6px;align-items:center;margin-bottom:6px}
+  .acc-rule select,.acc-rule input{min-width:0;width:100%}
+  @media (max-width:560px){.acc-rule{grid-template-columns:1fr auto 1fr}
+    .acc-rule input{grid-column:1/3}}
 
   /* ---------- QR: маленький в карточке, во весь экран по нажатию ---------- */
   #qrThumb{width:190px;height:190px;border-radius:8px;background:#fff;padding:8px;
@@ -589,6 +598,41 @@
         <div class="col card"><h2>Android <span class="count" id="cntAndroid">0</span></h2>
           <div id="colAndroid"></div></div>
       </div>
+      <!-- права одного клиента: группы и право создавать пользователей -->
+      <div class="card" id="clientAccessCard" hidden>
+        <h1 id="clientAccessTitle"></h1>
+        <div id="clientAccessMsg"></div>
+        <h2><span data-i18n="acc_groups">Группы</span><button class="hint" data-hint="hint_acc_client_groups">?</button></h2>
+        <div id="clientAccessGroups" class="acc-checks"></div>
+        <h2><span data-i18n="acc_creator">Создание пользователей</span><button class="hint" data-hint="hint_acc_creator">?</button></h2>
+        <label class="acc-line"><input type="checkbox" id="clientCanCreate"> <span data-i18n="acc_can_create">Может создавать пользователей</span></label>
+        <div class="field">
+          <input type="password" id="clientCreatorPass" autocomplete="new-password" data-i18n-ph="acc_pass_ph" placeholder="Пароль для создания (от 8 символов)">
+        </div>
+        <div class="row-inline">
+          <button class="btn" id="saveClientAccessBtn" data-i18n="save">Сохранить</button>
+          <button class="btn ghost" id="closeClientAccessBtn" data-i18n="close">Закрыть</button>
+        </div>
+      </div>
+
+      <!-- права доступа в сети устройств -->
+      <div class="card" id="accessCard">
+        <h1><span data-i18n="acc_title">Права доступа</span><button class="hint" data-hint="hint_acc">?</button></h1>
+        <div id="accessMsg"></div>
+        <label class="acc-line"><input type="checkbox" id="accEnabled"> <span data-i18n="acc_enabled">Правила включены</span></label>
+        <h2 data-i18n="acc_groups">Группы</h2>
+        <div id="accGroups" class="acc-checks"></div>
+        <div class="row-inline">
+          <input type="text" id="accNewGroup" data-i18n-ph="acc_new_group_ph" placeholder="Новая группа" style="flex:1">
+          <button class="btn ghost small" id="accAddGroupBtn" data-i18n="acc_add">Добавить</button>
+        </div>
+        <h2><span data-i18n="acc_rules">Правила</span><button class="hint" data-hint="hint_acc_rules">?</button></h2>
+        <div id="accRules"></div>
+        <div class="row-inline" style="margin-top:10px">
+          <button class="btn ghost small" id="accAddRuleBtn" data-i18n="acc_add_rule">+ Правило</button>
+          <button class="btn" id="accSaveBtn" data-i18n="save">Сохранить</button>
+        </div>
+      </div>
     </section>
 
     <!-- ======== СЕТЬ УСТРОЙСТВ ======== -->
@@ -1014,6 +1058,28 @@ const I18N = {
     traffic_down:'принято', traffic_up:'отдано',
     sessions_online:'на связи ({n})', last_seen:'был на связи', never_connected:'ещё не подключался',
     created_on:'создан', devices_empty:'пусто',
+    acc_title:'Права доступа', acc_enabled:'Правила включены', acc_groups:'Группы', acc_rules:'Правила',
+    acc_add:'Добавить', acc_add_rule:'+ Правило', acc_new_group_ph:'Новая группа', acc_ports_ph:'порты: все',
+    acc_all:'Все', acc_servers:'Серверы', acc_no_groups:'Групп пока нет',
+    acc_no_rules:'Правил нет — при включённых правилах устройства не видят друг друга',
+    acc_saved:'Сохранено', save:'Сохранить', acc_client_btn:'Права', acc_client_title:'Права', acc_creator:'Создание пользователей',
+    acc_can_create:'Может создавать пользователей', acc_pass_ph:'Пароль для создания (от 8 символов)',
+    acc_creator_short:'создаёт пользователей',
+    hint_acc:'<p>Кто к кому может подключаться в сети устройств — как политики в NetBird.</p>'+
+      '<p>Устройства кладёшь в группы (кнопка «Права» у устройства), правила говорят «группа → группа, порты». '+
+      'Выключено — все видят всех, как раньше.</p><p>Права привязаны к ключу устройства на сервере: '+
+      'подделать их с другого устройства нельзя. Устройства, пришедшие через побочный сервер, '+
+      'получают только правила для «Все».</p>',
+    hint_acc_rules:'<p>«Откуда → куда»: устройства первой группы могут открывать соединения к устройствам второй. '+
+      'Обратно — только если есть правило в другую сторону.</p><p>Порты: пусто — все, или «22,80,8000-8100».</p>'+
+      '<p>«Все» — все устройства и серверы, «Серверы» — сами серверы сети. Прямые соединения (минуя сервер) '+
+      'бывают только между устройствами, которым разрешено всё в обе стороны.</p>'+
+      '<p>Новые правила действуют на новые соединения; чтобы оборвать уже идущие — переподключи устройство.</p>',
+    hint_acc_client_groups:'<p>Группы этого устройства. Без групп — только правила для «Все».</p>',
+    hint_acc_creator:'<p>Устройство сможет само заводить новых пользователей из программы (мастер настройки) '+
+      'по этому паролю. Новые получают его группы и не получают права создавать.</p>'+
+      '<p>Не больше 10 пользователей с одного устройства. Пароль хранится только как хеш. '+
+      'Оставь поле пустым, чтобы не менять пароль.</p>',
     device_windows:'Windows', device_linux:'Linux', device_android:'Android',
     account_title:'Учётная запись', sign_out:'Выйти',
     err_bad_credentials:'Неверный логин или пароль',
@@ -1239,6 +1305,27 @@ const I18N = {
     traffic_down:'down', traffic_up:'up',
     sessions_online:'online ({n})', last_seen:'last seen', never_connected:'never connected',
     created_on:'created', devices_empty:'empty',
+    acc_title:'Access control', acc_enabled:'Rules enabled', acc_groups:'Groups', acc_rules:'Rules',
+    acc_add:'Add', acc_add_rule:'+ Rule', acc_new_group_ph:'New group', acc_ports_ph:'ports: all',
+    acc_all:'All', acc_servers:'Servers', acc_no_groups:'No groups yet',
+    acc_no_rules:'No rules — with rules enabled devices cannot see each other',
+    acc_saved:'Saved', save:'Save', acc_client_btn:'Access', acc_client_title:'Access', acc_creator:'Creating users',
+    acc_can_create:'Can create users', acc_pass_ph:'Password for creating (8+ characters)',
+    acc_creator_short:'creates users',
+    hint_acc:'<p>Who can connect to whom in the device network — like NetBird policies.</p>'+
+      '<p>Put devices into groups (the “Access” button on a device); rules say “group → group, ports”. '+
+      'Disabled — everyone sees everyone, as before.</p><p>Rights are bound to the device key on the server '+
+      'and cannot be faked from another device. Devices that come through a secondary server get only '+
+      'the rules for “All”.</p>',
+    hint_acc_rules:'<p>“From → to”: devices of the first group may open connections to devices of the second. '+
+      'The reverse needs its own rule.</p><p>Ports: empty — all, or “22,80,8000-8100”.</p>'+
+      '<p>“All” — every device and server, “Servers” — the network servers. Direct (peer-to-peer) links are '+
+      'used only between devices allowed everything both ways.</p>'+
+      '<p>New rules apply to new connections; reconnect a device to drop the existing ones.</p>',
+    hint_acc_client_groups:'<p>Groups of this device. No groups — only rules for “All” apply.</p>',
+    hint_acc_creator:'<p>The device will be able to create new users from the app (setup wizard) with this password. '+
+      'New users get its groups and no right to create.</p>'+
+      '<p>At most 10 users per device. Only a hash of the password is stored. Leave empty to keep the password.</p>',
     device_windows:'Windows', device_linux:'Linux', device_android:'Android',
     account_title:'Account', sign_out:'Sign out',
     err_bad_credentials:'Wrong username or password',
@@ -1437,6 +1524,7 @@ function showTab(name){
   });
   hidePop();
   if (name === 'Settings'){ loadAutostart(); loadCapacity(); }
+  if (name === 'Devices') loadAccess();
   if (name === 'Mesh'){ MAP_SIG = ''; loadMesh(); } else { clearTimeout(MESH_TIMER); }
 }
 document.querySelectorAll('.side button').forEach(b => {
@@ -1682,11 +1770,19 @@ function deviceCard(c){
   settings.className = 'btn ghost small';
   settings.textContent = t('show_settings');
   settings.addEventListener('click', () => showClientConfig(c.id, false));
+  const access = document.createElement('button');
+  access.className = 'btn ghost small';
+  access.textContent = t('acc_client_btn');
+  access.addEventListener('click', () => openClientAccess(c.id));
   const del = document.createElement('button');
   del.className = 'btn danger small';
   del.textContent = t('delete_client');
   del.addEventListener('click', () => deleteClient(c.id));
-  [freeze, disconnect, settings, del].forEach(b => actions.appendChild(b));
+  [freeze, disconnect, settings, access, del].forEach(b => actions.appendChild(b));
+  if ((c.groups && c.groups.length) || c.canCreate){
+    meta.textContent += '\n' + t('acc_groups') + ': ' + ((c.groups || []).join(', ') || '—') +
+      (c.canCreate ? ' · ' + t('acc_creator_short') : '');
+  }
 
   box.appendChild(top); box.appendChild(meta); box.appendChild(actions);
   return box;
@@ -1698,6 +1794,142 @@ async function clientAction(action, id){
   if (!ok){ showMsg($('devicesMsg'), errText(data.error, data), 'err'); return; }
   loadClients();
 }
+
+/* ---------- права доступа в сети устройств ---------- */
+let ACCESS = {enabled:false, groups:[], rules:[]};
+async function loadAccess(){
+  const {ok, data} = await api('/api/access');
+  if (!ok) return;
+  ACCESS = data.access || {};
+  ACCESS.groups = ACCESS.groups || [];
+  ACCESS.rules = ACCESS.rules || [];
+  // Первое включение: начинаем с «все → все», чтобы ничего не отвалилось.
+  if (!ACCESS.rules.length && !ACCESS.enabled) ACCESS.rules = [{from:'*', to:'*', ports:''}];
+  renderAccess();
+}
+function groupLabel(g){
+  return g === '*' ? t('acc_all') : g === '@servers' ? t('acc_servers') : g;
+}
+function accNote(box, key){
+  const e = document.createElement('span');
+  e.className = 'note';
+  e.textContent = t(key);
+  box.appendChild(e);
+}
+function renderAccess(){
+  $('accEnabled').checked = !!ACCESS.enabled;
+  const box = $('accGroups');
+  box.innerHTML = '';
+  ACCESS.groups.forEach(g => {
+    const chip = document.createElement('span');
+    chip.className = 'g';
+    chip.textContent = g;
+    const x = document.createElement('button');
+    x.textContent = '×';
+    x.addEventListener('click', () => {
+      ACCESS.groups = ACCESS.groups.filter(v => v !== g);
+      ACCESS.rules = ACCESS.rules.filter(r => r.from !== g && r.to !== g);
+      renderAccess();
+    });
+    chip.appendChild(x);
+    box.appendChild(chip);
+  });
+  if (!ACCESS.groups.length) accNote(box, 'acc_no_groups');
+
+  const rules = $('accRules');
+  rules.innerHTML = '';
+  const opts = withServers => ['*'].concat(ACCESS.groups, withServers ? ['@servers'] : []);
+  ACCESS.rules.forEach((r, i) => {
+    const row = document.createElement('div');
+    row.className = 'acc-rule';
+    const sel = (val, withServers, key) => {
+      const s = document.createElement('select');
+      opts(withServers).forEach(g => {
+        const o = document.createElement('option');
+        o.value = g; o.textContent = groupLabel(g);
+        s.appendChild(o);
+      });
+      s.value = val;
+      s.addEventListener('change', () => { ACCESS.rules[i][key] = s.value; });
+      return s;
+    };
+    const arrow = document.createElement('span');
+    arrow.textContent = '→';
+    const ports = document.createElement('input');
+    ports.type = 'text';
+    ports.placeholder = t('acc_ports_ph');
+    ports.value = r.ports || '';
+    ports.addEventListener('input', () => { ACCESS.rules[i].ports = ports.value; });
+    const del = document.createElement('button');
+    del.className = 'btn ghost small';
+    del.textContent = '×';
+    del.addEventListener('click', () => { ACCESS.rules.splice(i, 1); renderAccess(); });
+    [sel(r.from, false, 'from'), arrow, sel(r.to, true, 'to'), ports, del].forEach(el => row.appendChild(el));
+    rules.appendChild(row);
+  });
+  if (!ACCESS.rules.length) accNote(rules, 'acc_no_rules');
+}
+$('accEnabled').addEventListener('change', e => { ACCESS.enabled = e.target.checked; });
+$('accAddGroupBtn').addEventListener('click', () => {
+  const g = $('accNewGroup').value.trim();
+  if (!g || ACCESS.groups.includes(g)) return;
+  ACCESS.groups.push(g);
+  $('accNewGroup').value = '';
+  renderAccess();
+});
+$('accAddRuleBtn').addEventListener('click', () => {
+  ACCESS.rules.push({from:'*', to:'*', ports:''});
+  renderAccess();
+});
+$('accSaveBtn').addEventListener('click', async () => {
+  showMsg($('accessMsg'), '', '');
+  const {ok, data} = await api('/api/access', ACCESS);
+  if (!ok){ showMsg($('accessMsg'), errText(data.error, data), 'err'); return; }
+  showMsg($('accessMsg'), data.warning || t('acc_saved'), data.warning ? 'err' : 'ok');
+  loadAccess();
+});
+
+// Права одного клиента — отдельной карточкой: список устройств
+// перерисовывается раз в 15 секунд и смахнул бы открытую форму.
+let ACCESS_CLIENT = '';
+function openClientAccess(id){
+  const c = CLIENTS.find(v => v.id === id);
+  if (!c) return;
+  ACCESS_CLIENT = id;
+  $('clientAccessTitle').textContent = t('acc_client_title') + ': ' + c.name;
+  showMsg($('clientAccessMsg'), '', '');
+  const box = $('clientAccessGroups');
+  box.innerHTML = '';
+  ACCESS.groups.forEach(g => {
+    const l = document.createElement('label');
+    l.className = 'g';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.value = g;
+    cb.checked = (c.groups || []).includes(g);
+    l.appendChild(cb);
+    l.appendChild(document.createTextNode(g));
+    box.appendChild(l);
+  });
+  if (!ACCESS.groups.length) accNote(box, 'acc_no_groups');
+  $('clientCanCreate').checked = !!c.canCreate;
+  $('clientCreatorPass').value = '';
+  $('clientAccessCard').hidden = false;
+  $('clientAccessCard').scrollIntoView({behavior:'smooth', block:'start'});
+}
+$('closeClientAccessBtn').addEventListener('click', () => { $('clientAccessCard').hidden = true; });
+$('saveClientAccessBtn').addEventListener('click', async () => {
+  const msg = $('clientAccessMsg');
+  showMsg(msg, '', '');
+  const groups = [...$('clientAccessGroups').querySelectorAll('input:checked')].map(cb => cb.value);
+  let r = await api('/api/clients/groups', {id: ACCESS_CLIENT, groups});
+  if (!r.ok){ showMsg(msg, errText(r.data.error, r.data), 'err'); return; }
+  r = await api('/api/clients/creator', {id: ACCESS_CLIENT, canCreate: $('clientCanCreate').checked,
+    password: $('clientCreatorPass').value});
+  if (!r.ok){ showMsg(msg, errText(r.data.error, r.data), 'err'); return; }
+  $('clientCreatorPass').value = '';
+  showMsg(msg, t('acc_saved'), 'ok');
+  loadClients();
+});
 
 async function deleteClient(id){
   if (!await appConfirm(t('confirm_delete_client'))) return;

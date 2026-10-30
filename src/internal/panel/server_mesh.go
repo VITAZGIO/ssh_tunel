@@ -20,6 +20,9 @@ func (s *Server) WithMesh(m *MeshManager) *Server {
 
 func (s *Server) meshRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/settings/capacity", s.requireAuth(s.handleCapacity))
+	mux.HandleFunc("/api/access", s.requireAuth(s.handleAccess))
+	mux.HandleFunc("/api/clients/groups", s.requireAuth(s.handleClientGroups))
+	mux.HandleFunc("/api/clients/creator", s.requireAuth(s.handleClientCreator))
 	mux.HandleFunc("/api/mesh/state", s.requireAuth(s.withMesh(s.handleMeshState)))
 	mux.HandleFunc("/api/mesh/role", s.requireAuth(s.withMesh(s.handleMeshRole)))
 	mux.HandleFunc("/api/mesh/reinstall", s.requireAuth(s.withMesh(s.handleMeshReinstall)))

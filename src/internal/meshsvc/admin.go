@@ -20,6 +20,7 @@ type Device struct {
 	Display     string  `json:"display"`
 	Host        string  `json:"host"`
 	IP          string  `json:"ip"`
+	User        string  `json:"user,omitempty"`
 	Online      bool    `json:"online"`
 	Platform    string  `json:"platform,omitempty"`
 	OS          string  `json:"os,omitempty"`
@@ -195,4 +196,26 @@ func (a *Admin) SetSelf(ctx context.Context, name string, enabled bool, ports st
 // ForgetServer забывает адрес отключённого побочного сервера.
 func (a *Admin) ForgetServer(ctx context.Context, id string) error {
 	return a.do(ctx, http.MethodPost, "/v1/forget-server", deviceReq{Device: id}, nil)
+}
+
+// PolicyRule — правило доступа: устройства группы From могут открывать
+// соединения к устройствам группы To на порты Ports (пусто — на все).
+// Группа "*" — все, "@servers" — серверы сети.
+type PolicyRule struct {
+	From  string `json:"from"`
+	To    string `json:"to"`
+	Ports string `json:"ports,omitempty"`
+}
+
+// Policy — права доступа устройств для meshd: Users — SSH-пользователь
+// сервера (tun_*) → его группы.
+type Policy struct {
+	Enabled bool                `json:"enabled"`
+	Users   map[string][]string `json:"users,omitempty"`
+	Rules   []PolicyRule        `json:"rules,omitempty"`
+}
+
+// SetPolicy передаёт meshd права доступа устройств (он их сохраняет сам).
+func (a *Admin) SetPolicy(ctx context.Context, p Policy) error {
+	return a.do(ctx, http.MethodPost, "/v1/policy", p, nil)
 }

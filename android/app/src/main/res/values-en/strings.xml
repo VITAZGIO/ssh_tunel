@@ -222,4 +222,22 @@
     <string name="nat_udp_blocked">UDP to the server is blocked</string>
     <string name="mesh_state_stopped">Tunnel is off</string>
     <string name="mesh_cancel">Cancel</string>
+    <string name="users_title">New user</string>
+    <string name="users_summary">Create a user on the server</string>
+    <string name="users_intro">A new user on the server you are connected to. Works if the server panel allows this device to create users. The new user gets your access groups and cannot create others.</string>
+    <string name="users_name">Name</string>
+    <string name="users_name_hint">Work laptop</string>
+    <string name="users_type">Device</string>
+    <string name="users_pass">Creator password</string>
+    <string name="users_create">Create</string>
+    <string name="users_checking">Asking the server…</string>
+    <string name="users_can">You are “%1$s” on the server — you can create users.</string>
+    <string name="users_cannot">You are “%1$s” on the server — creating users is off (enabled in the server panel).</string>
+    <string name="users_need_name">Enter a name</string>
+    <string name="users_creating">Creating…</string>
+    <string name="users_created">Created “%1$s”</string>
+    <string name="users_done">Done. Give the settings to that device: copy or send them.</string>
+    <string name="users_copy">Copy</string>
+    <string name="users_share">Send</string>
+    <string name="users_copied">Settings copied</string>
 </resources>

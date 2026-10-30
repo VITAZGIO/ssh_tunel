@@ -137,6 +137,7 @@
        color:var(--text);font:inherit}
   input:focus{outline:none;border-color:var(--accent)}
   .two{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
   .wztab{background:var(--card2);border:1px solid var(--line);color:var(--dim)}
   .wztab.on{background:var(--accent-muted);border-color:var(--accent-muted);color:#fff;font-weight:600}
   .hint{font-size:11.5px;color:var(--dim);margin-top:3px;line-height:1.35}
@@ -855,9 +856,10 @@
       <span class="t" data-i18n="wizard_title">Мастер настройки</span>
     </div>
 
-    <div class="two" style="margin-bottom:14px">
+    <div class="three" style="margin-bottom:14px">
       <button class="btn wztab on" id="wzTabAndroid" data-i18n="wizard_android">Android</button>
       <button class="btn wztab" id="wzTabVPS" data-i18n="wizard_vps">VPS</button>
+      <button class="btn wztab" id="wzTabUser" data-i18n="wizard_user">Пользователь</button>
     </div>
 
     <!-- Android: свой ключ для телефона + QR с настройками -->
@@ -955,6 +957,38 @@
         </div>
       </div>
       </div><!-- /#wzVpsManual -->
+    </div>
+
+    <!-- новый пользователь прямо на текущем сервере (панель, право «может создавать») -->
+    <div id="wzUser" hidden>
+      <p class="note" style="margin-top:0"><span data-i18n="wizard_user_intro">Новый пользователь на сервере, к которому ты подключён.</span>
+        <span class="infoq" onclick="event.preventDefault();event.stopPropagation();toggleInfoq(this)">?<span class="tip" data-i18n="wizard_user_note">Работает,
+        если в панели сервера твоему устройству включено «Может создавать пользователей». Пароль — тот, что задан там.
+        Новый пользователь получает твои группы доступа и не может сам создавать других.</span></span></p>
+      <p class="note" id="wzUserWho"></p>
+      <div class="two">
+        <div class="field"><label for="wzUserName" data-i18n="wizard_user_name">Имя</label>
+          <input type="text" id="wzUserName" spellcheck="false" maxlength="80" data-i18n-ph="wizard_user_name_ph"></div>
+        <div class="field"><label for="wzUserType" data-i18n="wizard_user_type">Устройство</label>
+          <select id="wzUserType">
+            <option value="windows">Windows</option>
+            <option value="linux">Linux</option>
+            <option value="android">Android</option>
+          </select></div>
+      </div>
+      <div class="field"><label for="wzUserPass" data-i18n="wizard_user_pass">Пароль создателя</label>
+        <input type="password" id="wzUserPass" autocomplete="off" spellcheck="false"></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 10px">
+        <button class="btn" id="wzUserBtn" data-i18n="wizard_user_create">Создать</button>
+        <span class="hint" id="wzUserNote"></span>
+      </div>
+      <div id="wzUserResult" hidden>
+        <p class="step" data-i18n="wizard_user_done">Готово. Отдай настройки этому устройству — или добавь сервер сюда.</p>
+        <div class="two">
+          <button class="btn" id="wzUserCopy" data-i18n="wizard_user_copy">Скопировать</button>
+          <button class="btn" id="wzUserImport" data-i18n="wizard_user_import">Добавить сюда</button>
+        </div>
+      </div>
     </div>
   </div><!-- /view viewWizard -->
   <!-- НАСТРОЙКА VPS -->
@@ -1523,7 +1557,16 @@ const I18N = {
     export_apps:'Экспортировать список', import_apps:'Импортировать список',
     apps_imported:'список программ импортирован',
     wizard_title:'Мастер настройки', wizard_sub:'Подключить телефон или новый сервер',
-    wizard_android:'Android', wizard_vps:'VPS',
+    wizard_android:'Android', wizard_vps:'VPS', wizard_user:'Пользователь',
+    wizard_user_intro:'Новый пользователь на сервере, к которому ты подключён.',
+    wizard_user_note:'Работает, если в панели сервера твоему устройству включено «Может создавать пользователей». '+
+      'Пароль — тот, что задан там. Новый пользователь получает твои группы доступа и не может сам создавать других.',
+    wizard_user_name_ph:'Ноутбук Маши', wizard_user_name:'Имя', wizard_user_type:'Устройство', wizard_user_pass:'Пароль создателя',
+    wizard_user_create:'Создать', wizard_user_copy:'Скопировать', wizard_user_import:'Добавить сюда',
+    wizard_user_done:'Готово. Отдай настройки этому устройству — или добавь сервер сюда.',
+    wizard_user_checking:'Спрашиваю сервер…', wizard_user_can:'Ты на сервере как «{name}» — создавать можно.',
+    wizard_user_cannot:'Ты на сервере как «{name}» — создавать нельзя: включается в панели сервера.',
+    wizard_user_need_name:'Впиши имя', wizard_user_creating:'Создаю…', wizard_user_created:'Создан «{name}»',
     wizard_android_intro:'Выбери, какой ключ отдать телефону, и получишь QR с готовыми настройками для текущего выбранного сервера.',
     wizard_key_mode_local:'Взять ключ этого компьютера',
     wizard_key_mode_own:'Сделать отдельный ключ для телефона',
@@ -1759,7 +1802,16 @@ const I18N = {
     export_apps:'Export list', import_apps:'Import list',
     apps_imported:'app list imported',
     wizard_title:'Setup wizard', wizard_sub:'Connect a phone or a new server',
-    wizard_android:'Android', wizard_vps:'VPS',
+    wizard_android:'Android', wizard_vps:'VPS', wizard_user:'User',
+    wizard_user_intro:'A new user on the server you are connected to.',
+    wizard_user_note:'Works if the server panel allows your device to create users. The password is the one set there. '+
+      'The new user gets your access groups and cannot create others.',
+    wizard_user_name_ph:'Anna\'s laptop', wizard_user_name:'Name', wizard_user_type:'Device', wizard_user_pass:'Creator password',
+    wizard_user_create:'Create', wizard_user_copy:'Copy', wizard_user_import:'Add here',
+    wizard_user_done:'Done. Give the settings to that device — or add the server here.',
+    wizard_user_checking:'Asking the server…', wizard_user_can:'You are “{name}” on the server — you can create users.',
+    wizard_user_cannot:'You are “{name}” on the server — creating users is off (enabled in the server panel).',
+    wizard_user_need_name:'Enter a name', wizard_user_creating:'Creating…', wizard_user_created:'Created “{name}”',
     wizard_android_intro:'Pick which key to hand the phone, and get a QR with ready-made settings for the currently selected server.',
     wizard_key_mode_local:'Use this computer\'s key',
     wizard_key_mode_own:'Make a separate key for the phone',
@@ -3728,13 +3780,44 @@ $('toWizard').onclick = () => {
 };
 $('backFromWizard').onclick = () => show('viewSettings');
 
-$('wzTabAndroid').onclick = () => {
-  $('wzTabAndroid').classList.add('on'); $('wzTabVPS').classList.remove('on');
-  $('wzAndroid').hidden = false; $('wzVPS').hidden = true;
+function wzTab(name){
+  ['Android','VPS','User'].forEach(n => {
+    $('wzTab' + n).classList.toggle('on', n === name);
+    $('wz' + n).hidden = n !== name;
+  });
+}
+$('wzTabAndroid').onclick = () => wzTab('Android');
+$('wzTabVPS').onclick = () => wzTab('VPS');
+$('wzTabUser').onclick = async () => {
+  wzTab('User');
+  $('wzUserWho').textContent = tr('wizard_user_checking');
+  const r = await api('/api/serverusers', {op:'whoami'});
+  if(r.error){ $('wzUserWho').textContent = r.error; return; }
+  $('wzUserWho').textContent = (r.canCreate ? tr('wizard_user_can') : tr('wizard_user_cannot')).replace('{name}', r.name || '');
 };
-$('wzTabVPS').onclick = () => {
-  $('wzTabVPS').classList.add('on'); $('wzTabAndroid').classList.remove('on');
-  $('wzVPS').hidden = false; $('wzAndroid').hidden = true;
+
+let wzUserConfig = '';
+$('wzUserBtn').onclick = async () => {
+  const name = $('wzUserName').value.trim();
+  if(!name){ $('wzUserNote').textContent = tr('wizard_user_need_name'); return; }
+  $('wzUserBtn').disabled = true;
+  $('wzUserNote').textContent = tr('wizard_user_creating');
+  $('wzUserResult').hidden = true;
+  const r = await api('/api/serverusers', {op:'create', name, deviceType: $('wzUserType').value,
+    password: $('wzUserPass').value});
+  $('wzUserBtn').disabled = false;
+  if(r.error){ $('wzUserNote').textContent = r.error; return; }
+  $('wzUserPass').value = '';
+  wzUserConfig = r.config || '';
+  $('wzUserNote').textContent = tr('wizard_user_created').replace('{name}', r.name || name);
+  $('wzUserResult').hidden = false;
+};
+$('wzUserCopy').onclick = async () => {
+  if(await copyToClipboard(wzUserConfig)) $('wzUserNote').textContent = tr('copied');
+};
+$('wzUserImport').onclick = async () => {
+  try { await importProfileDoc(JSON.parse(wzUserConfig)); show('viewSettings'); }
+  catch(e){ $('wzUserNote').textContent = String(e); }
 };
 
 let wzQrPayload = '';

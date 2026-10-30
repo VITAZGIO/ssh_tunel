@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Новый пользователь на сервере — отдельным экраном, как сеть устройств. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg"
+    android:padding="16dp">
+
+    <LinearLayout style="@style/HeadRow">
+        <ImageView
+            android:id="@+id/backFromUsers"
+            style="@style/HeadIcon"
+            android:src="@drawable/ic_back"
+            android:contentDescription="@string/back" />
+
+        <TextView style="@style/HeadTitle" android:text="@string/users_title" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="10dp"
+                android:textSize="13sp"
+                android:textColor="@color/text"
+                android:text="@string/users_intro" />
+
+            <TextView
+                android:id="@+id/usersWho"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="6dp"
+                android:textSize="12.5sp"
+                android:textColor="@color/dim" />
+
+            <TextView style="@style/FieldLabel" android:text="@string/users_name" />
+            <EditText android:id="@+id/usersName" style="@style/Field"
+                android:inputType="text" android:maxLength="80"
+                android:hint="@string/users_name_hint"
+                android:textColorHint="@color/dim" android:autofillHints="" />
+
+            <TextView style="@style/FieldLabel" android:text="@string/users_type" />
+            <RadioGroup
+                android:id="@+id/usersType"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:checkedButton="@+id/usersTypeAndroid">
+                <RadioButton
+                    android:id="@+id/usersTypeAndroid"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/text"
+                    android:text="Android" />
+                <RadioButton
+                    android:id="@+id/usersTypeWindows"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/text"
+                    android:text="Windows" />
+                <RadioButton
+                    android:id="@+id/usersTypeLinux"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/text"
+                    android:text="Linux" />
+            </RadioGroup>
+
+            <TextView style="@style/FieldLabel" android:text="@string/users_pass" />
+            <EditText android:id="@+id/usersPass" style="@style/Field"
+                android:inputType="textPassword"
+                android:textColorHint="@color/dim" android:autofillHints="" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/usersCreate"
+                style="@style/PrimaryButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/users_create" />
+
+            <TextView
+                android:id="@+id/usersStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="8dp"
+                android:textSize="12.5sp"
+                android:textColor="@color/dim" />
+
+            <LinearLayout
+                android:id="@+id/usersResult"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="6dp"
+                    android:paddingBottom="8dp"
+                    android:textSize="13sp"
+                    android:textColor="@color/text"
+                    android:text="@string/users_done" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/usersCopy"
+                        style="@style/SecondaryButton"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:text="@string/users_copy" />
+                    <Space android:layout_width="6dp" android:layout_height="1dp" />
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/usersShare"
+                        style="@style/SecondaryButton"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:text="@string/users_share" />
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

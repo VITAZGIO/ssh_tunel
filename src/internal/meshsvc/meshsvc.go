@@ -56,17 +56,19 @@ WantedBy=multi-user.target
 
 // FirewallExemption дописывается в конец установки ретранслятора UDP и meshd.
 // Брандмауэр пользователя туннеля (tunnel-user.sh, «закрыть доступ к самому
-// серверу») запрещает ему соединения с 127.0.0.1 — а обе службы слушают как
+// серверу») запрещает ему соединения с 127.0.0.1 — а службы ssh_tunnel
+// (ретранслятор UDP, meshd, создание пользователей панели) слушают как
 // раз там. В свежем tunnel-user.sh исключение уже есть; на серверах,
 // настроенных раньше, его добавляем и в действующие правила, и в сам скрипт,
 // чтобы пережило перезагрузку.
 const FirewallExemption = `
 if iptables -L SSHTUNNEL -n >/dev/null 2>&1; then
-  iptables -C SSHTUNNEL -p tcp -d 127.0.0.1 --dport 47830:47831 -j RETURN 2>/dev/null || \
-    iptables -I SSHTUNNEL 1 -p tcp -d 127.0.0.1 --dport 47830:47831 -j RETURN
+  iptables -C SSHTUNNEL -p tcp -d 127.0.0.1 --dport 47830:47832 -j RETURN 2>/dev/null || \
+    iptables -I SSHTUNNEL 1 -p tcp -d 127.0.0.1 --dport 47830:47832 -j RETURN
 fi
-if [ -f /usr/local/sbin/tunnel-fw.sh ] && ! grep -q 47831 /usr/local/sbin/tunnel-fw.sh; then
-  sed -i 's|^for N in 127.0.0.0/8|iptables -A SSHTUNNEL -p tcp -d 127.0.0.1 --dport 47830:47831 -j RETURN\nfor N in 127.0.0.0/8|' /usr/local/sbin/tunnel-fw.sh
+if [ -f /usr/local/sbin/tunnel-fw.sh ] && ! grep -q 47832 /usr/local/sbin/tunnel-fw.sh; then
+  grep -q 47830:47831 /usr/local/sbin/tunnel-fw.sh && sed -i 's|47830:47831|47830:47832|' /usr/local/sbin/tunnel-fw.sh || \
+  sed -i 's|^for N in 127.0.0.0/8|iptables -A SSHTUNNEL -p tcp -d 127.0.0.1 --dport 47830:47832 -j RETURN\nfor N in 127.0.0.0/8|' /usr/local/sbin/tunnel-fw.sh
   echo "брандмауэр: службам ssh_tunnel на 127.0.0.1 открыт доступ через туннель"
 fi
 `

@@ -237,6 +237,9 @@ class MainActivity : AppCompatActivity() {
         meshRow = findViewById(R.id.meshRow)
         meshSummary = findViewById(R.id.meshSummary)
         meshRow.setOnClickListener { startActivity(Intent(this, MeshActivity::class.java)) }
+        findViewById<View>(R.id.usersRow).setOnClickListener {
+            startActivity(Intent(this, UsersActivity::class.java))
+        }
         udpRelayEnabledCheck = findViewById(R.id.udpRelayEnabled)
         showServerPickerCheck = findViewById(R.id.showServerPicker)
 
