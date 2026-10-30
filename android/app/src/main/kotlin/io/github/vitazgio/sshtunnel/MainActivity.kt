@@ -1286,9 +1286,49 @@ class MainActivity : AppCompatActivity() {
 
         showStats(state)
 
-        val lines = synchronized(TunnelService.log) { TunnelService.log.toList() }
+        showLog(synchronized(TunnelService.log) { TunnelService.log.toList() })
+    }
+
+    // Строки журнала, показанные в последний раз: по ним видно, сколько старых
+    // строк срезано сверху, чтобы не сдвинуть место, которое сейчас читают.
+    private var shownLog: List<String> = emptyList()
+
+    // Вниз прокручиваем, только если пользователь и так внизу: отмотал вверх
+    // почитать — новые строки не должны выдёргивать его обратно.
+    private fun showLog(lines: List<String>) {
+        if (lines == shownLog) return
+        val atBottom = logScroll.scrollY + logScroll.height >= logView.height - dp(24)
+        // Якорь — первая видимая строка: её смещение в тексте и сдвиг в пикселях.
+        var anchor = -1
+        var shift = 0
+        val layout = logView.layout
+        if (!atBottom && layout != null) {
+            val line = layout.getLineForVertical(logScroll.scrollY)
+            anchor = layout.getLineStart(line) - droppedChars(shownLog, lines)
+            shift = logScroll.scrollY - layout.getLineTop(line)
+        }
+        shownLog = lines
         logView.text = lines.joinToString("\n")
-        logScroll.post { logScroll.fullScroll(View.FOCUS_DOWN) }
+        logScroll.post {
+            val l = logView.layout
+            when {
+                atBottom || l == null -> logScroll.fullScroll(View.FOCUS_DOWN)
+                anchor >= 0 -> logScroll.scrollTo(0, l.getLineTop(l.getLineForOffset(anchor)) + shift)
+                // Читаемые строки уже срезаны — остаёмся в самом верху.
+                else -> logScroll.scrollTo(0, 0)
+            }
+        }
+    }
+
+    // Сколько символов срезано в начале: старый журнал — это новый без
+    // нескольких первых строк и без свежего хвоста. Не совпало — очищен целиком.
+    private fun droppedChars(old: List<String>, new: List<String>): Int {
+        for (k in old.indices) {
+            val rest = old.size - k
+            if (rest <= new.size && old.subList(k, old.size) == new.subList(0, rest))
+                return old.subList(0, k).sumOf { it.length + 1 }
+        }
+        return Int.MAX_VALUE / 2
     }
 
     private fun appsSummaryText(p: Settings.Profile): String = when (p.filterMode) {
