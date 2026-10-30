@@ -16,7 +16,7 @@
 
 [Unit]
 Description=ssh_tunnel_panel — веб-панель управления сервером и клиентами
-Documentation=https://github.com/VITAZGIO/ssh_tunel
+Documentation=https://github.com/VITAZGIO/ssh_tunnel
 After=network-online.target
 Wants=network-online.target
 

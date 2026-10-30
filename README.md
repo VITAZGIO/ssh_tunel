@@ -9,10 +9,10 @@
 локальный прокси.
 
 [![Лицензия: MIT](https://img.shields.io/badge/лицензия-MIT-4c8dff)](LICENSE)
-[![Версия](https://img.shields.io/badge/версия-1.5.0-4c8dff)](https://github.com/VITAZGIO/ssh_tunel/releases)
-[![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
-[![Linux](https://img.shields.io/badge/Linux-amd64%20%7C%20arm64-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
-[![Android](https://img.shields.io/badge/Android-8.0+-2de2ff)](https://github.com/VITAZGIO/ssh_tunel/releases/latest)
+[![Версия](https://img.shields.io/badge/версия-1.5.0-4c8dff)](https://github.com/VITAZGIO/ssh_tunnel/releases)
+[![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-2de2ff)](https://github.com/VITAZGIO/ssh_tunnel/releases/latest)
+[![Linux](https://img.shields.io/badge/Linux-amd64%20%7C%20arm64-2de2ff)](https://github.com/VITAZGIO/ssh_tunnel/releases/latest)
+[![Android](https://img.shields.io/badge/Android-8.0+-2de2ff)](https://github.com/VITAZGIO/ssh_tunnel/releases/latest)
 [![Go](https://img.shields.io/badge/Go-1.22+-2de2ff)](src)
 
 🇷🇺 Русский · [🇬🇧 English](README.en.md)
@@ -31,14 +31,14 @@
   <tr>
     <td rowspan="2">🪟 <b>Windows</b></td>
     <td><b>Прокси</b></td>
-    <td><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe">⬇ ssh_tunnel.exe</a></td>
+    <td><a href="https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel.exe">⬇ ssh_tunnel.exe</a></td>
     <td>Через сервер идут браузеры и программы, которые берут системный прокси (<a href="#что-идёт-через-прокси-а-что-нет">какие</a>)</td>
     <td>не нужны</td>
     <td align="center">через прокси</td>
   </tr>
   <tr>
     <td><b>VPN</b></td>
-    <td><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn.exe">⬇ ssh_tunnel_vpn.exe</a></td>
+    <td><a href="https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel_vpn.exe">⬇ ssh_tunnel_vpn.exe</a></td>
     <td>Через сервер идёт <b>весь</b> интернет компьютера</td>
     <td>⚠️ администратор</td>
     <td align="center">✅</td>
@@ -61,7 +61,7 @@
   <tr>
     <td>🤖 <b>Android</b></td>
     <td><b>Приложение</b></td>
-    <td><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.apk">⬇ ssh_tunnel.apk</a></td>
+    <td><a href="https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel.apk">⬇ ssh_tunnel.apk</a></td>
     <td>Через сервер идёт интернет телефона, можно выбрать приложения</td>
     <td>не нужны</td>
     <td align="center">✅</td>
@@ -87,7 +87,7 @@
 [Подробнее](docs/MESH.md)
 
 Сборка под ARM и контрольные суммы — на
-[странице релиза](https://github.com/VITAZGIO/ssh_tunel/releases/latest).
+[странице релиза](https://github.com/VITAZGIO/ssh_tunnel/releases/latest).
 
 <img src="docs/screenshot.png" width="300" alt="главный экран">
 <img src="docs/screenshot_filter.png" width="300" alt="выбор программ">
@@ -181,8 +181,8 @@ HTTP CONNECT, каналы SSH и определение процесса по �
 
 ## Windows
 
-1. Скачай [**ssh_tunnel.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe)
-   (прокси) или [**ssh_tunnel_vpn.exe**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_vpn.exe)
+1. Скачай [**ssh_tunnel.exe**](https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel.exe)
+   (прокси) или [**ssh_tunnel_vpn.exe**](https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel_vpn.exe)
    (VPN, см. [ниже](#режим-vpn)) и положи в постоянную папку. Дальше всё
    одинаково, в командах ниже для VPN замени имя файла.
 
@@ -192,7 +192,7 @@ HTTP CONNECT, каналы SSH и определение процесса по �
    PowerShell — заодно файл не получит метку «загружено из интернета»:
 
    ```powershell
-   curl.exe -fL --ssl-no-revoke -o "$env:USERPROFILE\Desktop\ssh_tunnel.exe" https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe
+   curl.exe -fL --ssl-no-revoke -o "$env:USERPROFILE\Desktop\ssh_tunnel.exe" https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel.exe
    Get-FileHash "$env:USERPROFILE\Desktop\ssh_tunnel.exe" -Algorithm SHA256
    ```
 
@@ -247,7 +247,7 @@ Android 8.0 и новее. Устроено иначе, чем на компью
 всё тем же SSH-соединением. Приложениям настраивать нечего — они просто ходят
 в интернет, а система отдаёт их трафик нам.
 
-1. Скачай [**ssh_tunnel.apk**](https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.apk).
+1. Скачай [**ssh_tunnel.apk**](https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel.apk).
 2. Открой файл. Android спросит разрешение ставить приложения из этого
    источника — оно нужно один раз.
 3. Шестерёнка → адрес сервера, пользователь `tunnel`, закрытый ключ. Ключ
@@ -416,7 +416,7 @@ docs/         архитектура, безопасность, диагност
 [docs/ANDROID_SIGNING.md](docs/ANDROID_SIGNING.md).
 
 Готовые файлы в репозитории не лежат — они публикуются в
-[релизах](https://github.com/VITAZGIO/ssh_tunel/releases), чтобы история не
+[релизах](https://github.com/VITAZGIO/ssh_tunnel/releases), чтобы история не
 пухла от бинарников.
 
 ---

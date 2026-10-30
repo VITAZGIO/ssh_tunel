@@ -2,10 +2,10 @@
 # Ставит ssh_tunnel_panel как системную службу (root) на Debian/Ubuntu — одной
 # командой на чистом сервере, без похода в браузер за файлами:
 #
-#   curl -fsSL https://raw.githubusercontent.com/VITAZGIO/ssh_tunel/main/packaging/panel/install.sh \
+#   curl -fsSL https://raw.githubusercontent.com/VITAZGIO/ssh_tunnel/main/packaging/panel/install.sh \
 #     | sudo bash
 #
-#   curl -fsSL https://raw.githubusercontent.com/VITAZGIO/ssh_tunel/main/packaging/panel/install.sh \
+#   curl -fsSL https://raw.githubusercontent.com/VITAZGIO/ssh_tunnel/main/packaging/panel/install.sh \
 #     | sudo bash -s -- --domain=panel.example.com
 #
 # Скрипт сам скачивает бинарь под архитектуру сервера (amd64/arm64) со
@@ -38,7 +38,7 @@
 # остальное (см. install_unit() ниже).
 set -euo pipefail
 
-REPO="VITAZGIO/ssh_tunel"
+REPO="VITAZGIO/ssh_tunnel"
 
 BIN=""
 MODE="local"   # local | lan | domain
@@ -108,7 +108,7 @@ install_unit() {
 cat > "$UNIT" <<'UNITEOF'
 [Unit]
 Description=ssh_tunnel_panel — веб-панель управления сервером и клиентами
-Documentation=https://github.com/VITAZGIO/ssh_tunel
+Documentation=https://github.com/VITAZGIO/ssh_tunnel
 After=network-online.target
 Wants=network-online.target
 

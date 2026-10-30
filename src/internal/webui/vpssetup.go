@@ -342,7 +342,7 @@ esac
 GOT=0
 if [ -n "$BIN" ] && command -v curl >/dev/null; then
   if curl -fsSL -o /usr/local/bin/udprelay \
-      "https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$BIN"; then
+      "https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/$BIN"; then
     chmod +x /usr/local/bin/udprelay
     GOT=1
     echo "ретранслятор скачан"
@@ -406,7 +406,7 @@ case "$(uname -m)" in
 esac
 echo "скачиваю панель ($BIN)"
 curl -fsSL -o /usr/local/bin/ssh_tunnel_panel \
-  "https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$BIN"
+  "https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/$BIN"
 chmod +x /usr/local/bin/ssh_tunnel_panel
 install -d -m 700 /etc/ssh_tunnel_panel
 
@@ -439,7 +439,7 @@ echo "панель запущена"
 func panelUnit(host string, sshPort int) string {
 	return `[Unit]
 Description=ssh_tunnel_panel — веб-панель управления сервером и клиентами
-Documentation=https://github.com/VITAZGIO/ssh_tunel
+Documentation=https://github.com/VITAZGIO/ssh_tunnel
 After=network-online.target
 Wants=network-online.target
 

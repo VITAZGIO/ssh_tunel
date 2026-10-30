@@ -16,7 +16,7 @@ import java.net.URL
 object UpdateCheck {
 
     private const val API =
-        "https://api.github.com/repos/VITAZGIO/ssh_tunel/releases/latest"
+        "https://api.github.com/repos/VITAZGIO/ssh_tunnel/releases/latest"
 
     /** Что показать человеку после нажатия кнопки. */
     data class Result(

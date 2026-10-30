@@ -53,7 +53,7 @@ systemd сужает ей всё остальное (`PrivateTmp`, `ProtectSyste
 домен и nginx/Caddy позже (см. «Домен и TLS» ниже):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/VITAZGIO/ssh_tunel/main/packaging/panel/install.sh \
+curl -fsSL https://raw.githubusercontent.com/VITAZGIO/ssh_tunnel/main/packaging/panel/install.sh \
   | sudo bash -s -- --lan --ssh-host=АДРЕС_ЭТОГО_СЕРВЕРА
 ```
 
@@ -62,7 +62,7 @@ curl -fsSL https://raw.githubusercontent.com/VITAZGIO/ssh_tunel/main/packaging/p
 доступна по HTTPS сразу:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/VITAZGIO/ssh_tunel/main/packaging/panel/install.sh \
+curl -fsSL https://raw.githubusercontent.com/VITAZGIO/ssh_tunnel/main/packaging/panel/install.sh \
   | sudo bash -s -- --domain=panel.example.com
 ```
 
@@ -79,7 +79,7 @@ journalctl -u ssh_tunnel_panel -n 50
 `--domain` (это режим по умолчанию, подробнее — «Домен и TLS» ниже):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/VITAZGIO/ssh_tunel/main/packaging/panel/install.sh \
+curl -fsSL https://raw.githubusercontent.com/VITAZGIO/ssh_tunnel/main/packaging/panel/install.sh \
   | sudo bash -s -- --ssh-host=АДРЕС_ЭТОГО_СЕРВЕРА
 ```
 

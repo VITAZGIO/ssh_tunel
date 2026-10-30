@@ -48,7 +48,7 @@
 метку «загружено из интернета» и предупреждения не будет вовсе:
 
 ```powershell
-curl.exe -fLO --ssl-no-revoke https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe
+curl.exe -fLO --ssl-no-revoke https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel.exe
 Get-FileHash .\ssh_tunnel.exe -Algorithm SHA256
 ```
 
@@ -60,7 +60,7 @@ Get-FileHash .\ssh_tunnel.exe -Algorithm SHA256
 ### Linux
 
 ```bash
-curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
+curl -LO https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel_linux
 chmod +x ssh_tunnel_linux
 ./ssh_tunnel_linux -host ТВОЙ_СЕРВЕР -user tunnel -save
 ./ssh_tunnel_linux -web      # тот же интерфейс на 127.0.0.1:47821
@@ -73,7 +73,7 @@ chmod +x ssh_tunnel_linux
 Ставить ничего не надо, хватает штатного `sshd`. Но если сервер только что
 арендован, стоит закрыть вход по паролю и включить firewall — готовый набор
 команд одним блоком лежит в
-[SERVER_SETUP.md](https://github.com/VITAZGIO/ssh_tunel/blob/main/docs/SERVER_SETUP.md).
+[SERVER_SETUP.md](https://github.com/VITAZGIO/ssh_tunnel/blob/main/docs/SERVER_SETUP.md).
 Там же — как завести пользователя, которому можно только пробрасывать
 соединения: если ключ с компьютера утечёт, сервер этим ключом не откроют.
 

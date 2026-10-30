@@ -132,7 +132,7 @@
 ```bash
 # на сервере под root; для arm64 — meshd_arm64
 curl -fsSL -o /usr/local/bin/meshd \
-  https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/meshd
+  https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/meshd
 chmod +x /usr/local/bin/meshd
 cat > /etc/systemd/system/meshd.service <<'UNIT'
 [Unit]
