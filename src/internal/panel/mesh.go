@@ -86,6 +86,7 @@ type meshAdmin interface {
 	Forget(ctx context.Context, netID, device string) error
 	SetSelf(ctx context.Context, name string, enabled bool, ports string) error
 	ForgetServer(ctx context.Context, id string) error
+	SetPolicy(ctx context.Context, p meshsvc.Policy) error
 }
 
 const meshdUnit = "meshd.service"

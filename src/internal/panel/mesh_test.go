@@ -118,7 +118,7 @@ var buildMeshdOnce = sync.OnceValues(func() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	bin := filepath.Join(dir, "meshd")
+	bin := filepath.Join(dir, "meshd"+exeSuffix())
 	out, err := exec.Command("go", "build", "-o", bin, "../../cmd/meshd").CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("сборка meshd: %v: %s", err, out)
@@ -381,6 +381,9 @@ func (fakeDownAdmin) SetSelf(context.Context, string, bool, string) error {
 	return meshsvc.ErrNotRunning
 }
 func (fakeDownAdmin) ForgetServer(context.Context, string) error { return meshsvc.ErrNotRunning }
+func (fakeDownAdmin) SetPolicy(context.Context, meshsvc.Policy) error {
+	return meshsvc.ErrNotRunning
+}
 
 func TestКодПодключенияПроверяется(t *testing.T) {
 	for _, code := range []string{"", "что-то", invitePrefix + "!!!", invitePrefix + "e30"} {

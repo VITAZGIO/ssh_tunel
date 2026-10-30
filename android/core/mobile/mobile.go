@@ -21,6 +21,7 @@ import (
 	"sshtunnel/internal/events"
 	"sshtunnel/internal/mesh"
 	"sshtunnel/internal/routing"
+	"sshtunnel/internal/serverusers"
 	"sshtunnel/internal/share"
 	"sshtunnel/internal/speedtest"
 	"sshtunnel/internal/tunnel"
@@ -631,6 +632,33 @@ func (t *Tunnel) SpeedTest() string {
 	b, err := json.Marshal(res)
 	if err != nil {
 		return `{"error":"не удалось разобрать результат"}`
+	}
+	return string(b)
+}
+
+// ServerUsers — создание пользователя на сервере, к которому подключён
+// туннель (вход панели, см. internal/serverusers): op "whoami" — можно ли
+// мне, "create" — завести (имя, тип устройства, пароль создателя). Ответ —
+// JSON сервера или {"error":...}. Ходит в сеть — вызывать из отдельного потока.
+func (t *Tunnel) ServerUsers(op, name, deviceType, password string) string {
+	t.mu.Lock()
+	tun := t.core
+	t.mu.Unlock()
+	if tun == nil {
+		return `{"error":"сначала подключись к серверу, на котором заводить пользователя"}`
+	}
+	var body any
+	if op == "create" {
+		body = serverusers.CreateBody(name, deviceType, password)
+	}
+	out, err := serverusers.Call(tun.Dial, op, body)
+	if err != nil {
+		b, _ := json.Marshal(map[string]string{"error": err.Error()})
+		return string(b)
+	}
+	b, err := json.Marshal(out)
+	if err != nil {
+		return `{"error":"не удалось разобрать ответ"}`
 	}
 	return string(b)
 }
