@@ -32,9 +32,9 @@ standard SSH mechanism.
     <td rowspan="2">🪟 <b>Windows</b></td>
     <td><b>Proxy</b></td>
     <td><a href="https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe">⬇ ssh_tunnel.exe</a></td>
-    <td>Your browser and apps with proxy settings go through the server</td>
+    <td>Browsers and apps that use the system proxy go through the server (<a href="#what-goes-through-the-proxy-and-what-does-not">which ones</a>)</td>
     <td>not needed</td>
-    <td align="center">browser only</td>
+    <td align="center">via the proxy</td>
   </tr>
   <tr>
     <td><b>VPN</b></td>
@@ -47,9 +47,9 @@ standard SSH mechanism.
     <td rowspan="2">🐧 <b>Linux</b></td>
     <td><b>Proxy</b></td>
     <td><a href="docs/LINUX_SETUP.en.md">📖 instructions</a></td>
-    <td>Your browser and apps with proxy settings go through the server</td>
+    <td>Browsers and apps that use the system proxy go through the server (<a href="#what-goes-through-the-proxy-and-what-does-not">which ones</a>)</td>
     <td>not needed</td>
-    <td align="center">browser only</td>
+    <td align="center">via the proxy</td>
   </tr>
   <tr>
     <td><b>VPN</b></td>
@@ -76,9 +76,11 @@ standard SSH mechanism.
   </tr>
 </table>
 
-**Not sure which one?** Proxy is simpler and asks for no rights. VPN — when you
-want absolutely everything to go through the server, including games and apps
-without proxy settings.
+**Not sure which one?** Proxy is simpler and asks for no rights: browsers, most
+apps (Claude, VS Code, Discord…) and command-line tools go through the server.
+VPN — when you want absolutely everything to go through it, including RDP,
+games and programs that ignore the system proxy.
+[What goes where](#what-goes-through-the-proxy-and-what-does-not).
 
 **🕸 Device network** — your computer, phone and home server see each other by
 names like `laptop.mesh`, wherever they are.
@@ -204,8 +206,8 @@ command: `GOOS=windows go build -o ssh_tunnel_cli.exe ./cmd/ssh_tunnel_cli`.
 
 ### VPN mode
 
-`ssh_tunnel.exe` is a proxy: only programs that know how to use a proxy go
-through the tunnel. `ssh_tunnel_vpn.exe` creates a virtual network adapter, so
+`ssh_tunnel.exe` is a proxy: programs that use the system proxy or the proxy
+environment variables go through the tunnel ([which ones](#what-goes-through-the-proxy-and-what-does-not)). `ssh_tunnel_vpn.exe` creates a virtual network adapter, so
 **everything** goes through your server — including games, Docker and tools
 that know nothing about proxies. Windows only lets administrators create
 network adapters, so without the service there is a UAC prompt on every
@@ -314,18 +316,66 @@ SSH connection has — no more, no less. The full picture is in
 
 ---
 
-## What the tunnel does not cover
+## What goes through the proxy and what does not
 
-- Programs with their own network stack that ignore both the system proxy and
-  the environment variables — some games, some messengers.
-- UDP entirely: SSH forwards TCP only. Browsers fall back to TCP by themselves
-  when QUIC is unavailable.
-- DNS lookups made by applications that resolve names on their own, before they
-  ever talk to the proxy. Such connections are marked in the log.
-- The local network, deliberately: `192.168.x.x`, `10.x.x.x`, dotless names and
-  the `.local`/`.lan`/`.home` suffixes go direct, otherwise your home services
-  would stop opening. If you need the opposite — the server's own internal
-  network — tick «Локальную сеть тоже вести через сервер» in the settings.
+The proxy edition does not intercept anything by force: it turns on the
+**Windows system proxy** (for the current user) and sets the `HTTP_PROXY`/
+`HTTPS_PROXY` environment variables. Each program then decides for itself
+whether to use them. So it is not "browser only" — everything that honours
+these settings goes through the server, which in practice is most programs
+that talk to the internet over HTTP(S). Linux works the same way: environment
+variables plus the GNOME desktop proxy (`gsettings`) when present.
+
+**Goes through the proxy:**
+
+- Browsers — Chrome, Edge, Firefox (it follows the system settings by
+  default).
+- Electron and Chromium apps — Claude, VS Code, Discord, Slack, Teams,
+  Spotify, Obsidian and the like: their network stack comes from Chrome, so
+  they see the system proxy the same way.
+- Programs built on the standard Windows network APIs (WinINet, .NET
+  `HttpClient`) — many regular Windows apps, their updaters and installers.
+- Command-line tools on Node.js, Python, Go — Claude Code, npm, pip, git over
+  HTTPS, curl: they usually ignore the system proxy but do read the environment
+  variables. Only programs started **after** connecting pick the variables
+  up — restart a terminal that was already open.
+- Any program where you can set a proxy by hand: SOCKS5 `127.0.0.1:1080` or
+  HTTP `127.0.0.1:1081` (Telegram, torrent clients, download managers).
+
+**Bypasses the proxy (goes direct, as if the program were not running):**
+
+- Programs that connect with their own protocol rather than HTTP: Remote
+  Desktop (RDP), SSH and FTP clients, IMAP/SMTP mail, network shares (SMB),
+  most online games and the game part of game launchers.
+- All UDP: voice and video calls, game traffic, QUIC. A proxy (HTTP CONNECT,
+  SOCKS) only carries TCP connections. Browsers fall back from QUIC to TCP on
+  their own; calls and games do not.
+- `ping` and `tracert` — ICMP has no notion of a proxy.
+- Windows services and anything running as SYSTEM: the system proxy is a
+  per-user setting, and they have their own (Windows Update uses the WinHTTP
+  proxy — `netsh winhttp`).
+- WSL 2, Docker and virtual machines: they have their own virtual network and
+  do not use the host proxy unless configured separately.
+- UWP apps from the Microsoft Store: by default Windows does not let them
+  reach `127.0.0.1`, i.e. the local proxy.
+- DNS lookups made by applications that resolve names on their own before
+  talking to the proxy. The connection itself goes through the server, but the
+  name was resolved outside it — such connections are marked in the log.
+
+**The local network goes direct on purpose**, in both editions: `192.168.x.x`,
+`10.x.x.x`, dotless names and the `.local`/`.lan`/`.home` suffixes, otherwise
+your home services would stop opening. If you need the opposite — the server's
+own internal network — tick «Локальную сеть тоже вести через сервер» in the
+settings.
+
+**When you need the VPN.** If the program you care about is on the "bypasses"
+list — RDP, a game, calls, WSL, a service — use
+[`ssh_tunnel_vpn.exe`](#vpn-mode). It creates a virtual network adapter, so the
+traffic of every program goes through the server, DNS included, whether or not
+the program knows about proxies. SSH itself only carries TCP, so in VPN mode
+UDP (calls, games, QUIC) goes through a relay on the server if one is
+installed; without it UDP is dropped and browsers switch to TCP. Details in
+[VPN.md](docs/VPN.md).
 
 ---
 

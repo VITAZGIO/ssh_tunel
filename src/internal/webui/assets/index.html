@@ -303,7 +303,8 @@
 
   #log{font-family:var(--mono);font-size:11.5px;background:var(--card);
        border:1px solid var(--line);border-radius:11px;
-       height:calc(100vh - 130px);overflow-y:auto;padding:7px 0}
+       height:calc(100vh - 130px);overflow-y:auto;padding:7px 0;
+       overflow-anchor:none}
   #log::-webkit-scrollbar{width:8px}
   #log::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
   .l{display:flex;gap:8px;padding:2px 11px;white-space:nowrap}
@@ -2325,12 +2326,20 @@ function addMsg(e){
   d.textContent = new Date(e.time).toLocaleTimeString('ru-RU') + '  ' + e.text;
   push(d);
 }
+// Вниз прокручиваем, только если пользователь и так внизу: отмотал вверх
+// почитать — новые строки не должны выдёргивать его обратно.
 function push(el){
   const atBottom = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 40;
   logEl.appendChild(el);
   lastLine = el;
-  while(logEl.childElementCount > 600) logEl.removeChild(logEl.firstChild);
+  let cut = 0;
+  while(logEl.childElementCount > 600){
+    cut += logEl.firstChild.offsetHeight;
+    logEl.removeChild(logEl.firstChild);
+  }
+  // Срезанные сверху строки сдвинули бы читаемое место — возвращаем его.
   if(atBottom) logEl.scrollTop = logEl.scrollHeight;
+  else if(cut) logEl.scrollTop = Math.max(0, logEl.scrollTop - cut);
 }
 $('clear').onclick = () => { logEl.innerHTML = ''; lastKey = null; };
 
