@@ -52,6 +52,7 @@ object Flags {
     fun draw(canvas: Canvas, paint: Paint, code: String, w: Float, h: Float) {
         paint.style = Paint.Style.FILL
         when (code) {
+            "RU" -> bands(canvas, paint, w, h, horizontal = true, "#FFFFFF", "#0039A6", "#D52B1E")
             "NL" -> bands(canvas, paint, w, h, horizontal = true, "#AE1C28", "#FFFFFF", "#21468B")
             "DE" -> bands(canvas, paint, w, h, horizontal = true, "#000000", "#DD0000", "#FFCE00")
             "FR" -> bands(canvas, paint, w, h, horizontal = false, "#0055A4", "#FFFFFF", "#EF4135")

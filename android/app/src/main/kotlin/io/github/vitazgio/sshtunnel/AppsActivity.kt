@@ -51,6 +51,7 @@ class AppsActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         Look.apply(this)
         setContentView(R.layout.activity_apps)
+        Look.backdrop(this)
         settings = Settings(this)
 
         // Отступы под полосу часов и вырез камеры: с Android 15 окно занимает

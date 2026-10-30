@@ -48,6 +48,7 @@ class MeshActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         Look.apply(this)
         setContentView(R.layout.activity_mesh)
+        Look.backdrop(this)
         settings = Settings(this)
 
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(

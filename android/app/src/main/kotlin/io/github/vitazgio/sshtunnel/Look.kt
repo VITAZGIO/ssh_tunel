@@ -15,6 +15,7 @@ import android.os.Looper
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.View
+import android.view.ViewGroup
 import androidx.core.content.ContextCompat
 import kotlin.random.Random
 
@@ -33,6 +34,21 @@ object Look {
                 else -> R.style.AppTheme
             }
         )
+    }
+
+    /**
+     * Фон «код» / «автор» на отдельных экранах (пользователь, сеть устройств,
+     * программы, реклама): подкладывает BackdropView под разметку экрана.
+     * Вызывать после setContentView.
+     */
+    fun backdrop(activity: Activity) {
+        val content = activity.findViewById<ViewGroup>(android.R.id.content) ?: return
+        val root = content.getChildAt(0) ?: return
+        content.background = root.background
+        root.background = null
+        val v = BackdropView(activity)
+        v.mode = Settings(activity).background
+        content.addView(v, 0, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
     }
 
     private val ATTR = mapOf(
@@ -113,7 +129,7 @@ class BackdropView @JvmOverloads constructor(ctx: Context, attrs: AttributeSet? 
             invalidate()
         }
 
-    private val glyphs = "ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ0123456789"
+    private val glyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
     private val fs = 14f * resources.displayMetrics.density
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Typeface.MONOSPACE
