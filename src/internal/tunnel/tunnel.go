@@ -146,6 +146,7 @@ var ErrNotConnected = errors.New("нет живого SSH-соединения �
 type link struct {
 	mu     sync.RWMutex
 	client *ssh.Client
+	wire   *wireConn // TCP под client: когда от сервера последний раз шли данные
 }
 
 func (l *link) get() *ssh.Client {
@@ -154,10 +155,21 @@ func (l *link) get() *ssh.Client {
 	return l.client
 }
 
-func (l *link) set(c *ssh.Client) {
+// busy — от сервера по этому слоту недавно шли данные.
+func (l *link) busy(d time.Duration) bool {
+	l.mu.RLock()
+	w := l.wire
+	l.mu.RUnlock()
+	return w.readWithin(d)
+}
+
+func (l *link) set(c *ssh.Client) { l.setWire(c, nil) }
+
+func (l *link) setWire(c *ssh.Client, w *wireConn) {
 	l.mu.Lock()
 	old := l.client
 	l.client = c
+	l.wire = w
 	l.mu.Unlock()
 	if old != nil && old != c {
 		old.Close()
@@ -407,7 +419,7 @@ func (t *Tunnel) startPool() error {
 
 	// Первое соединение поднимаем синхронно: если сервер недоступен или ключ
 	// не подходит, пользователь должен узнать об этом сразу, а не из лога.
-	first, err := t.dial()
+	first, wire, err := t.dialFirst(ctx)
 	if err != nil {
 		t.reportDialErr(events.StateError, err)
 		t.poolCancel()
@@ -422,7 +434,7 @@ func (t *Tunnel) startPool() error {
 	for i := range links {
 		links[i] = &link{}
 	}
-	links[0].set(first)
+	links[0].setWire(first, wire)
 	t.mu.Lock()
 	t.links = links
 	t.mu.Unlock()
@@ -1013,7 +1025,7 @@ func (t *Tunnel) dialTimeout() time.Duration {
 	if d > 0 {
 		return d
 	}
-	return 15 * time.Second
+	return defaultDialTimeout
 }
 
 // keepAliveEvery — пауза между проверками связи.
@@ -1074,52 +1086,75 @@ func (t *Tunnel) clientConfig() *ssh.ClientConfig {
 	}
 }
 
-func (t *Tunnel) dial() (*ssh.Client, error) {
+func (t *Tunnel) dial(ctx context.Context) (*ssh.Client, *wireConn, error) {
 	addr := net.JoinHostPort(t.cfg.Host, fmt.Sprint(t.cfg.SSHPort))
-	client, err := t.dialSSH(addr)
+	client, wire, err := t.dialSSHWire(ctx, addr)
 	if err != nil {
 		var changed *hostkey.ErrChanged
 		if errors.As(err, &changed) {
-			return nil, changed // отдельный понятный текст, см. hostkey — не трогаем
+			return nil, nil, changed // отдельный понятный текст, см. hostkey — не трогаем
 		}
 		wrapped := fmt.Errorf("не удалось подключиться к %s: %w", addr, err)
-		return nil, classifyConnError(wrapped)
+		return nil, nil, classifyConnError(wrapped)
 	}
-	return client, nil
+	return client, wire, nil
+}
+
+// firstDialAttempts и firstDialBudget — сколько раз пробовать первое
+// соединение и сколько времени на это не жалеть. На слабой сети первая попытка
+// нередко обрывается посреди рукопожатия (EOF, сброс), а вторая через секунду
+// проходит; сообщать человеку «ошибка» после первой же — значит заставлять его
+// жать кнопку самому. Но и бесконечно держать кнопку «Подключение…» нельзя.
+const (
+	firstDialAttempts = 3
+	firstDialBudget   = 60 * time.Second
+)
+
+// dialFirst — первое соединение пула с повтором на временных сбоях (см.
+// isTransientDialErr). Отказ по ключу, смена ключа сервера, закрытый порт
+// возвращаются сразу: повтор их не вылечит.
+func (t *Tunnel) dialFirst(ctx context.Context) (*ssh.Client, *wireConn, error) {
+	start := time.Now()
+	pause := time.Second
+	for attempt := 1; ; attempt++ {
+		c, w, err := t.dial(ctx)
+		if err == nil {
+			return c, w, nil
+		}
+		if ctx.Err() != nil || attempt >= firstDialAttempts ||
+			time.Since(start) > firstDialBudget || !isTransientDialErr(err) {
+			return nil, nil, err
+		}
+		t.bus.Warnf("Подключение не удалось (%v) — пробую ещё раз", err)
+		select {
+		case <-ctx.Done():
+			return nil, nil, err
+		case <-time.After(jitter(pause)):
+		}
+		pause *= 2
+	}
 }
 
 // dialSSH — то же, что ssh.Dial, но соединение открывается своим диалером.
 // Иначе некуда вставить пометку сокета, без которой на Android соединение с
 // сервером ушло бы в собственный туннель.
 func (t *Tunnel) dialSSH(addr string) (*ssh.Client, error) {
+	c, _, err := t.dialSSHWire(context.Background(), addr)
+	return c, err
+}
+
+func (t *Tunnel) dialSSHWire(ctx context.Context, addr string) (*ssh.Client, *wireConn, error) {
 	cfg := t.clientConfig()
-	conn, err := t.directDialer(cfg.Timeout).Dial(sshNetwork(t.cfg.IPVersion), addr)
+	conn, err := t.directDialer(cfg.Timeout).DialContext(ctx, sshNetwork(t.cfg.IPVersion), addr)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	// У рукопожатия своего срока нет: Timeout в настройках ограничивает только
-	// установку TCP-соединения. Сервер, который соединение принял и замолчал —
-	// а именно так выглядит фильтрация у провайдера и мобильный интернет на
-	// одном делении, — подвесил бы этот вызов навсегда. Вместе с ним повисает и
-	// остановка туннеля, которая ждёт эту горутину: на телефоне это выглядит
-	// как намертво зависшая кнопка.
-	if err := conn.SetDeadline(time.Now().Add(cfg.Timeout)); err != nil {
-		conn.Close()
-		return nil, err
-	}
-	c, chans, reqs, err := ssh.NewClientConn(conn, addr, cfg)
-	if err != nil {
-		conn.Close()
-		return nil, err
-	}
-	// Срок снимаем: дальше по этому соединению идут переносы данных без всякого
-	// ограничения по времени, и общий дедлайн оборвал бы их через пятнадцать
-	// секунд после подключения.
-	if err := conn.SetDeadline(time.Time{}); err != nil {
-		c.Close()
-		return nil, err
-	}
-	return ssh.NewClient(c, chans, reqs), nil
+	// Срок на рукопожатие обязателен: сервер, который соединение принял и
+	// замолчал — так выглядит фильтрация у провайдера и мобильный интернет на
+	// одном делении, — иначе подвесил бы этот вызов навсегда, а с ним и
+	// остановку туннеля. Но срок считается от последнего байта, а не от начала:
+	// медленный, но отвечающий сервер дождётся входа (см. handshake.go).
+	return sshHandshakeWire(ctx, conn, addr, cfg, cfg.Timeout)
 }
 
 // directDialer — диалер для соединений, которые программа открывает сама.
@@ -1135,10 +1170,31 @@ func (t *Tunnel) directDialer(timeout time.Duration) *net.Dialer {
 // Без keepalive обрыв связи (заснул ноутбук, моргнул Wi-Fi, NAT выкинул сессию)
 // раньше не замечался вообще: программа продолжала принимать соединения и
 // молча их ломать, а выглядело это как "интернет пропал".
+//
+// На слабой сети важно и обратное — не хоронить живое соединение. Ответ на
+// keepalive может опоздать: он стоит в той же очереди TCP, что и закачка, а
+// потерянный пакет перепосылается секундами. Раньше одного опоздания хватало,
+// чтобы закрыть соединение со всеми закачками и полезть в новое рукопожатие —
+// на той же плохой сети, где оно и обрывалось («handshake failed: EOF»).
+// Теперь мёртвым считается только соединение, которое не ответило
+// keepaliveMisses раз подряд и по которому всё это время не пришло ни байта.
 func (t *Tunnel) keepLinkAlive(ctx context.Context, l *link, idx int) {
 	defer t.wg.Done()
 
+	// Остальные слоты поднимаются не разом, а вразнобой: несколько рукопожатий
+	// одновременно на узком канале мешают друг другу.
+	if idx > 0 && l.get() == nil {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(jitter(time.Duration(idx) * 700 * time.Millisecond)):
+		}
+	}
+
 	backoff := time.Second
+	misses := 0
+	var pending chan error     // ответ на keepalive, который ещё не пришёл
+	var pendingFor *ssh.Client // соединение, которому он отправлен
 	for {
 		if ctx.Err() != nil {
 			return
@@ -1147,7 +1203,19 @@ func (t *Tunnel) keepLinkAlive(ctx context.Context, l *link, idx int) {
 
 		client := l.get()
 		if client == nil {
-			c, err := t.dial()
+			// Пока основной слот не поднят, остальные не стучатся: если сервер
+			// недоступен, один слот выяснит это не хуже четырёх, а не будет
+			// четырёх параллельных рукопожатий на и без того плохой сети.
+			if idx > 0 && !t.primaryUp() {
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(time.Second):
+				case <-kickCh:
+				}
+				continue
+			}
+			c, w, err := t.dial(ctx)
 			if err != nil {
 				if ctx.Err() != nil {
 					return
@@ -1158,7 +1226,7 @@ func (t *Tunnel) keepLinkAlive(ctx context.Context, l *link, idx int) {
 				select {
 				case <-ctx.Done():
 					return
-				case <-time.After(backoff):
+				case <-time.After(jitter(backoff)):
 				case <-kickCh:
 					// Сеть точно сменилась — прежняя пауза уже не про
 					// текущие условия, начинаем заново с минимальной.
@@ -1169,8 +1237,9 @@ func (t *Tunnel) keepLinkAlive(ctx context.Context, l *link, idx int) {
 				}
 				continue
 			}
-			l.set(c)
+			l.setWire(c, w)
 			backoff = time.Second
+			misses = 0
 			if t.State() == events.StateReconnecting {
 				t.setState(events.StateConnected, fmt.Sprintf("%s:%d", t.cfg.Host, t.cfg.SSHPort))
 				t.bus.Infof("Связь с сервером восстановлена")
@@ -1181,10 +1250,14 @@ func (t *Tunnel) keepLinkAlive(ctx context.Context, l *link, idx int) {
 		// Ждём либо остановки, либо момента следующей проверки, либо сигнала
 		// пересобрать пул немедленно (Kick уже пометил этот слот оборванным —
 		// следующий круг цикла сразу уйдёт на переподключение).
+		wait := t.keepAliveEvery()
+		if misses > 0 {
+			wait = keepaliveRetry // после опоздания переспрашиваем быстрее
+		}
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(t.keepAliveEvery()):
+		case <-time.After(wait):
 		case <-kickCh:
 		}
 
@@ -1197,24 +1270,63 @@ func (t *Tunnel) keepLinkAlive(ctx context.Context, l *link, idx int) {
 		if client != l.get() {
 			continue // соединение уже заменили, проверять нечего
 		}
-		done := make(chan error, 1)
-		go func() {
-			_, _, err := client.SendRequest("keepalive@openssh.com", true, nil)
-			done <- err
-		}()
+		if pendingFor != client {
+			pending, pendingFor = nil, nil
+			misses = 0
+		}
+		// Опоздавший ответ ещё в пути — новый запрос не шлём, ждём тот же:
+		// иначе на медленной сети запросы копились бы в очереди.
+		if pending == nil {
+			pending, pendingFor = make(chan error, 1), client
+			go func(c *ssh.Client, ch chan error) {
+				_, _, err := c.SendRequest("keepalive@openssh.com", true, nil)
+				ch <- err
+			}(client, pending)
+		}
 		select {
-		case err := <-done:
+		case err := <-pending:
+			pending, pendingFor = nil, nil
 			if err != nil {
 				t.bus.Warnf("SSH-соединение #%d оборвалось (%v) — переподключаюсь", idx+1, err)
 				l.set(nil)
+				continue
 			}
-		case <-time.After(15 * time.Second):
+			misses = 0
+		case <-time.After(keepaliveReply):
+			if l.busy(keepaliveReply) {
+				// Ответ застрял за данными, но данные-то идут — соединение живо.
+				misses = 0
+				continue
+			}
+			misses++
+			if misses < keepaliveMisses {
+				continue
+			}
 			t.bus.Warnf("SSH-соединение #%d не отвечает — переподключаюсь", idx+1)
+			pending, pendingFor = nil, nil
+			misses = 0
 			l.set(nil)
 		case <-ctx.Done():
 			return
 		}
 	}
+}
+
+// Проверка связи: сколько ждать ответа на keepalive, сколько раз подряд он
+// может не прийти, прежде чем соединение признают мёртвым, и как скоро
+// переспрашивать после опоздания. Итого мёртвое соединение замечается
+// примерно за минуту, а живое, но медленное, не рвётся. Переменные, а не
+// константы, — чтобы тесты могли сжать минуту до долей секунды.
+var (
+	keepaliveReply  = 10 * time.Second
+	keepaliveMisses = 3
+	keepaliveRetry  = 3 * time.Second
+)
+
+// primaryUp — основной (первый) слот пула сейчас подключён.
+func (t *Tunnel) primaryUp() bool {
+	links := t.snapLinks()
+	return len(links) > 0 && links[0].get() != nil
 }
 
 // dialWait — сколько ждать живого соединения, если в этот момент весь пул

@@ -190,7 +190,8 @@ KbdInteractiveAuthentication no
 PubkeyAuthentication yes
 PermitEmptyPasswords no
 MaxAuthTries 3
-LoginGraceTime 30
+# 60, не 30: на слабом мобильном интернете вход идёт дольше 30 с (клиент ждёт до 50 с)
+LoginGraceTime 60
 X11Forwarding no
 ClientAliveInterval 60
 ClientAliveCountMax 3

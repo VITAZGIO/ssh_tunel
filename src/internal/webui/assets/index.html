@@ -1085,17 +1085,17 @@
       <div class="field">
         <div class="lbl-row"><label for="connectTimeoutSec" data-i18n="adv_timeout">Ждать подключения, сек</label>
           <button class="qmark" id="toHelpBtn" title="Подробнее">?</button></div>
-        <input type="number" id="connectTimeoutSec" min="3" max="120" placeholder="15">
+        <input type="number" id="connectTimeoutSec" min="3" max="120" placeholder="20">
       </div>
     </div>
     <div class="help" id="kaHelp" hidden><p data-i18n="adv_keepalive_help">Раз в столько секунд программа
       спрашивает сервер «ты тут?». Не ответил — соединение пересобирается. Меньше — обрыв замечается быстрее,
       и роутер не выкидывает тихую сессию из своей таблицы; больше — меньше служебного трафика на мобильном интернете.
       По умолчанию 20, разумно от 10 до 60.</p></div>
-    <div class="help" id="toHelp" hidden><p data-i18n="adv_timeout_help">Сколько ждать, пока сервер примет
-      соединение и пройдёт рукопожатие SSH. На медленном мобильном интернете или через спутник стоит увеличить
-      до 30–40, на хорошем канале можно уменьшить — тогда переход на запасной сервер случится быстрее.
-      По умолчанию 15.</p></div>
+    <div class="help" id="toHelp" hidden><p data-i18n="adv_timeout_help">Сколько ждать ответа сервера при
+      подключении. Пока сервер отвечает, хоть и медленно, вход ждёт до 50 с. На очень плохом интернете или через
+      спутник стоит увеличить до 30–40, на хорошем канале можно уменьшить — тогда переход на запасной сервер
+      случится быстрее. По умолчанию 20.</p></div>
 
     <div class="two">
       <div class="field">
@@ -1322,6 +1322,7 @@ const I18N = {
     conn_err_auth:'Сервер не принял ключ. Устройство могли заморозить или удалить в панели, либо ключ не тот.',
     conn_err_no_response:'Сервер не отвечает: проверь адрес и порт.',
     conn_err_refused:'Порт закрыт или SSH на сервере не запущен.',
+    conn_err_dropped:'Связь оборвалась во время подключения: слабая сеть или провайдер мешает SSH. Пробую снова.',
     conn_err_other_prefix:'Ответ сервера: ',
     down:'Приём', up:'Отдача', connections:'Соединений', channels:'Каналов SSH',
     speedtest:'Тест скорости',
@@ -1347,6 +1348,8 @@ const I18N = {
     sc_key_host_key_changed:'ключ сервера изменился — возможна подмена, подробности: {detail}',
     sc_key_timeout:'сервер не ответил вовремя', sc_key_refused:'сервер отказал в соединении',
     sc_key_unreachable:'сервер недоступен по сети', sc_key_error:'{detail}',
+    sc_key_dropped:'связь оборвалась во время входа — слабая сеть или провайдер мешает SSH',
+    sc_port_dropped:'соединение сброшено — слабая сеть или провайдер мешает SSH',
     sc_forward_ok:'{detail}', sc_forward_forward_failed:'не удалось открыть тестовое соединение: {detail}',
     sc_dns_tunnel_ok:'отвечает', sc_dns_tunnel_no_answer:'нет ответа от DNS через туннель: {detail}',
     sc_sites_ok:'{detail}', sc_sites_all_failed:'ни один сайт не открылся',
@@ -1383,9 +1386,9 @@ const I18N = {
     adv_keepalive_help:'Раз в столько секунд программа спрашивает сервер «ты тут?». Не ответил — соединение '+
       'пересобирается. Меньше — обрыв замечается быстрее, и роутер не выкидывает тихую сессию из своей таблицы; '+
       'больше — меньше служебного трафика на мобильном интернете. По умолчанию 20, разумно от 10 до 60.',
-    adv_timeout_help:'Сколько ждать, пока сервер примет соединение и пройдёт рукопожатие SSH. На медленном '+
-      'мобильном интернете стоит увеличить до 30–40, на хорошем канале можно уменьшить — тогда переход на '+
-      'запасной сервер случится быстрее. По умолчанию 15.',
+    adv_timeout_help:'Сколько ждать ответа сервера при подключении. Пока сервер отвечает, хоть и медленно, '+
+      'вход ждёт до 50 с. На очень плохом интернете стоит увеличить до 30–40, на хорошем канале можно уменьшить — '+
+      'тогда переход на запасной сервер случится быстрее. По умолчанию 20.',
     adv_cipher:'Шифр', adv_cipher_auto:'Автоматически', adv_ip:'Протокол до сервера',
     adv_ip_any:'IPv4 или IPv6', adv_ip4:'Только IPv4', adv_ip6:'Только IPv6',
     adv_cipher_help:'Каким шифром защищать трафик. AES-GCM — быстрее всего на компьютерах и телефонах последних '+
@@ -1561,6 +1564,7 @@ const I18N = {
     conn_err_auth:'The server did not accept the key. The device may have been frozen or removed in the panel, or the key is wrong.',
     conn_err_no_response:'The server is not responding: check the address and port.',
     conn_err_refused:'The port is closed, or SSH is not running on the server.',
+    conn_err_dropped:'The connection dropped while connecting: weak network or the provider interferes with SSH. Retrying.',
     conn_err_other_prefix:'Server response: ',
     down:'Down', up:'Up', connections:'Connections', channels:'SSH channels',
     speedtest:'Speed test',
@@ -1586,6 +1590,8 @@ const I18N = {
     sc_key_host_key_changed:'the server key changed — possible spoofing, details: {detail}',
     sc_key_timeout:"the server didn't answer in time", sc_key_refused:'the server refused the connection',
     sc_key_unreachable:'the server is unreachable', sc_key_error:'{detail}',
+    sc_key_dropped:'the connection dropped during login — weak network or the provider interferes with SSH',
+    sc_port_dropped:'the connection was reset — weak network or the provider interferes with SSH',
     sc_forward_ok:'{detail}', sc_forward_forward_failed:"couldn't open a test connection: {detail}",
     sc_dns_tunnel_ok:'responds', sc_dns_tunnel_no_answer:'no answer from DNS through the tunnel: {detail}',
     sc_sites_ok:'{detail}', sc_sites_all_failed:'no site opened',
@@ -1622,9 +1628,9 @@ const I18N = {
     adv_keepalive_help:'Every this many seconds the app asks the server "are you there?". No answer — the '+
       'connection is rebuilt. Lower — drops are noticed sooner and the router does not evict an idle session; '+
       'higher — less service traffic on mobile internet. Default 20, sensible from 10 to 60.',
-    adv_timeout_help:'How long to wait for the server to accept the connection and finish the SSH handshake. On '+
-      'slow mobile internet raise it to 30–40; on a good link lower it so that failover to a backup server is '+
-      'faster. Default 15.',
+    adv_timeout_help:'How long to wait for the server to answer while connecting. As long as the server keeps '+
+      'answering, even slowly, login waits up to 50 s. On very poor internet raise it to 30–40; on a good link '+
+      'lower it so that failover to a backup server is faster. Default 20.',
     adv_cipher:'Cipher', adv_cipher_auto:'Automatic', adv_ip:'Protocol to the server',
     adv_ip_any:'IPv4 or IPv6', adv_ip4:'IPv4 only', adv_ip6:'IPv6 only',
     adv_cipher_help:'Which cipher protects the traffic. AES-GCM is fastest on computers and phones of recent '+
@@ -2342,7 +2348,7 @@ $('clear').onclick = () => { logEl.innerHTML = ''; lastKey = null; };
 // отдельная защита, её текст не трогаем) — показываем detail как есть.
 function connErrorText(kind, detail){
   if(!kind || kind === 'hostkey_changed') return detail;
-  const known = ['auth', 'no_response', 'refused'];
+  const known = ['auth', 'no_response', 'refused', 'dropped'];
   if(known.includes(kind)) return tr('conn_err_' + kind);
   return tr('conn_err_other_prefix') + detail;
 }

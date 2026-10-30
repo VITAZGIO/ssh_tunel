@@ -62,7 +62,9 @@ type CheckStep struct {
 type SelfCheckOptions struct {
 	Config
 
-	// DialTimeout на каждый сетевой шаг. Ноль — 10 секунд.
+	// DialTimeout на каждый сетевой шаг. Ноль — как у самого туннеля
+	// (defaultDialTimeout): проверка не должна быть строже подключения, иначе
+	// на медленной сети она ругается на то, что туннель переживает.
 	DialTimeout time.Duration
 
 	// ProbeAddr — куда сервер должен пробросить тестовое соединение (шаг 4).
@@ -79,7 +81,7 @@ type SelfCheckOptions struct {
 
 func (o *SelfCheckOptions) setDefaults() {
 	if o.DialTimeout <= 0 {
-		o.DialTimeout = 10 * time.Second
+		o.DialTimeout = defaultDialTimeout
 	}
 	if o.ProbeAddr == "" {
 		o.ProbeAddr = "1.1.1.1:443"
@@ -138,22 +140,34 @@ func RunSelfCheck(ctx context.Context, opt SelfCheckOptions) []CheckStep {
 	}
 	appendStep(&steps, CheckStep{Name: StepDNS, OK: true, Code: "resolved", Detail: strings.Join(resolved, ", ")})
 
-	// 2. Порт SSH отвечает.
+	// 2–3. Порт SSH отвечает, ключ принят сервером. На слабой сети первая
+	// попытка нередко обрывается посреди рукопожатия, а вторая проходит —
+	// как и у самого туннеля (dialFirst), одну неудачу такого рода прощаем.
 	addr := net.JoinHostPort(opt.Host, strconv.Itoa(opt.SSHPort))
 	dialer := &net.Dialer{Timeout: opt.DialTimeout, Control: opt.ProtectSocket}
-	start := time.Now()
-	conn, err := dialer.DialContext(ctx, sshNetwork(opt.IPVersion), addr)
-	if err != nil {
-		if appendStep(&steps, CheckStep{Name: StepPort, Code: classifyDialCode(err), Detail: err.Error()}) {
+	var client *ssh.Client
+	for attempt := 1; ; attempt++ {
+		retry := attempt < 2
+		start := time.Now()
+		conn, err := dialer.DialContext(ctx, sshNetwork(opt.IPVersion), addr)
+		if err != nil {
+			if retry && isTransientDialErr(err) && ctx.Err() == nil {
+				continue
+			}
+			appendStep(&steps, CheckStep{Name: StepPort, Code: classifyDialCode(err), Detail: err.Error()})
 			return steps
 		}
-	}
-	portMs := time.Since(start).Milliseconds()
-	appendStep(&steps, CheckStep{Name: StepPort, OK: true, Code: "responded", Detail: fmt.Sprintf("%dms", portMs)})
+		portMs := time.Since(start).Milliseconds()
 
-	// 3. Ключ принят сервером.
-	client, err := sshHandshake(conn, addr, opt)
-	if err != nil {
+		client, err = sshHandshake(ctx, conn, addr, opt)
+		if err == nil {
+			appendStep(&steps, CheckStep{Name: StepPort, OK: true, Code: "responded", Detail: fmt.Sprintf("%dms", portMs)})
+			break
+		}
+		if retry && isTransientDialErr(err) && ctx.Err() == nil {
+			continue
+		}
+		appendStep(&steps, CheckStep{Name: StepPort, OK: true, Code: "responded", Detail: fmt.Sprintf("%dms", portMs)})
 		var changed *hostkey.ErrChanged
 		code := classifyDialCode(err)
 		if errors.As(err, &changed) {
@@ -242,7 +256,7 @@ func RunSelfCheck(ctx context.Context, opt SelfCheckOptions) []CheckStep {
 	return steps
 }
 
-func sshHandshake(conn net.Conn, addr string, opt SelfCheckOptions) (*ssh.Client, error) {
+func sshHandshake(ctx context.Context, conn net.Conn, addr string, opt SelfCheckOptions) (*ssh.Client, error) {
 	key, err := os.ReadFile(opt.KeyPath)
 	if err != nil {
 		conn.Close()
@@ -260,20 +274,9 @@ func sshHandshake(conn net.Conn, addr string, opt SelfCheckOptions) (*ssh.Client
 		Timeout:         opt.DialTimeout,
 		Config:          ssh.Config{Ciphers: sshCiphers(opt.Cipher)},
 	}
-	if err := conn.SetDeadline(time.Now().Add(opt.DialTimeout)); err != nil {
-		conn.Close()
-		return nil, err
-	}
-	sshConn, chans, reqs, err := ssh.NewClientConn(conn, addr, cfg)
-	if err != nil {
-		conn.Close()
-		return nil, err
-	}
-	if err := conn.SetDeadline(time.Time{}); err != nil {
-		sshConn.Close()
-		return nil, err
-	}
-	return ssh.NewClient(sshConn, chans, reqs), nil
+	// Те же сроки «тишина/потолок», что и у туннеля (handshake.go).
+	client, _, err := sshHandshakeWire(ctx, conn, addr, cfg, opt.DialTimeout)
+	return client, err
 }
 
 // dialThroughClient — client.Dial с ограничением по времени: сам метод его не

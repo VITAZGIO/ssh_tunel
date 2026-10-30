@@ -11,6 +11,7 @@
     <!-- Типовые ошибки подключения (ТЗ-13) — код причины разбирается один раз
          в общем коде на Go (internal/tunnel.ConnErrorKind), здесь только текст. -->
     <string name="conn_err_auth">Сервер не принял ключ. Устройство могли заморозить или удалить в панели, либо ключ не тот.</string>
+    <string name="conn_err_dropped">Связь оборвалась во время подключения: слабая сеть или провайдер мешает SSH. Пробую снова.</string>
     <string name="conn_err_no_response">Сервер не отвечает: проверь адрес и порт.</string>
     <string name="conn_err_refused">Порт закрыт или SSH на сервере не запущен.</string>
     <string name="conn_err_other_prefix">Ответ сервера: %1$s</string>
@@ -93,6 +94,8 @@
     <string name="sc_key_timeout">сервер не ответил вовремя</string>
     <string name="sc_key_refused">сервер отказал в соединении</string>
     <string name="sc_key_unreachable">сервер недоступен по сети</string>
+    <string name="sc_key_dropped">связь оборвалась во время входа — слабая сеть или провайдер мешает SSH</string>
+    <string name="sc_port_dropped">соединение сброшено — слабая сеть или провайдер мешает SSH</string>
     <string name="sc_forward_forward_failed">не удалось открыть тестовое соединение: %1$s</string>
     <string name="sc_dns_tunnel_ok">отвечает</string>
     <string name="sc_dns_tunnel_no_answer">нет ответа от DNS через туннель: %1$s</string>

@@ -30,6 +30,9 @@ const (
 	// ConnErrorRefused — на порт пришёл явный отказ (RST): порт закрыт, или
 	// там ничего не слушает.
 	ConnErrorRefused ConnErrorKind = "refused"
+	// ConnErrorDropped — соединение оборвали посреди рукопожатия (EOF, сброс):
+	// так выглядит слабая или фильтруемая сеть. Программа сама пробует снова.
+	ConnErrorDropped ConnErrorKind = "dropped"
 	// ConnErrorOther — что-то ещё в самом обмене по SSH. Экран показывает
 	// текст как есть, но с пометкой, что это ответ сервера, а не сбой самой
 	// программы.
@@ -65,6 +68,9 @@ func classifyConnError(err error) *ConnError {
 	case isRefused(err):
 		return &ConnError{Kind: ConnErrorRefused, Err: err,
 			Message: "Порт закрыт или SSH на сервере не запущен."}
+	case isDropped(err):
+		return &ConnError{Kind: ConnErrorDropped, Err: err, Message: "Связь оборвалась во время подключения: " +
+			"слабая сеть или провайдер мешает SSH. Пробую снова."}
 	case isNoResponse(err):
 		return &ConnError{Kind: ConnErrorNoResponse, Err: err,
 			Message: "Сервер не отвечает: проверь адрес и порт."}
