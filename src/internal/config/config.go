@@ -155,6 +155,22 @@ type Config struct {
 	// программа подключается сразу, как было до появления этой настройки.
 	AutoConnect *bool `json:"autoConnect,omitempty"`
 
+	// StartMode — что делать с туннелем при запуске программы (три кнопки в
+	// настройках): "on" — включать, "off" — не включать, "last" — как было
+	// при закрытии (см. LastRunning). Пусто — конфиг старой версии, тогда
+	// решают прежние галочки AutoStart (Windows) и AutoConnect (Linux).
+	StartMode string `json:"startMode,omitempty"`
+	// LastRunning — был ли туннель включён после последнего включения или
+	// выключения руками. Остановка при выходе из программы его не меняет,
+	// иначе «как при закрытии» всегда означало бы «выключен».
+	LastRunning bool `json:"lastRunning,omitempty"`
+
+	// Theme — оформление: "" (оригинал), "dark", "light", "console".
+	Theme string `json:"theme,omitempty"`
+	// Background — фон главного экрана: "" (ровный цвет), "code" (падающие
+	// символы), "author" (сетка логотипов).
+	Background string `json:"background,omitempty"`
+
 	// Language — язык интерфейса панели: "ru" или "en".
 	Language string `json:"language"`
 	// ShowServerPicker — показывать ли на главном экране виджет с текущим
@@ -175,6 +191,28 @@ type Config struct {
 // настройки в старых конфигах (см. комментарий у поля).
 func (c Config) AutoConnectEnabled() bool {
 	return c.AutoConnect == nil || *c.AutoConnect
+}
+
+// Режимы StartMode.
+const (
+	StartOn   = "on"
+	StartOff  = "off"
+	StartLast = "last"
+)
+
+// ConnectOnStart — поднимать ли туннель при запуске программы. legacy —
+// ответ прежней галочки этой платформы; он действует, пока режим не выбран
+// явно.
+func (c Config) ConnectOnStart(legacy bool) bool {
+	switch c.StartMode {
+	case StartOn:
+		return true
+	case StartOff:
+		return false
+	case StartLast:
+		return c.LastRunning
+	}
+	return legacy
 }
 
 // Active — сервер, который сейчас используется для подключения. Если

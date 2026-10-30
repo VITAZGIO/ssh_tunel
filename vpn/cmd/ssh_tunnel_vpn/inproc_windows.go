@@ -92,8 +92,9 @@ func (b *inprocBoot) Set(enable bool) error {
 	}
 	// Служба нужна, чтобы при включении компьютера всё поднялось само, —
 	// значит, и подключаться ей надо сразу.
+	// Режим, выбранный явно (три кнопки «при старте»), не трогаем.
 	cfg := b.a.Config()
-	if !cfg.AutoStart {
+	if cfg.StartMode == "" && !cfg.AutoStart {
 		cfg.AutoStart = true
 		if _, err := b.a.SetConfig(cfg); err != nil {
 			return err

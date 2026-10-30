@@ -356,11 +356,13 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, resp)
 		return
 	}
+	s.app.RememberRunning()
 	writeJSON(w, map[string]bool{"ok": true})
 }
 
 func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 	s.app.Stop()
+	s.app.RememberRunning()
 	writeJSON(w, map[string]bool{"ok": true})
 }
 
@@ -392,6 +394,7 @@ func (s *Server) handleMode(w http.ResponseWriter, r *http.Request, set func(boo
 		writeJSON(w, resp)
 		return
 	}
+	s.app.RememberRunning()
 	writeJSON(w, map[string]any{"ok": true, "modes": s.app.Modes()})
 }
 
@@ -435,10 +438,14 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 	// «не трогай», а не «выключи». Пустая структура молча гасила системный
 	// прокси и переменные среды — туннель работал, но трафик шёл мимо него.
 	cfg := s.app.Config()
+	last := cfg.LastRunning
 	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
 		writeJSON(w, map[string]string{"error": "не разобрал настройки: " + err.Error()})
 		return
 	}
+	// Состояние туннеля ведёт сама программа (RememberRunning), а страница
+	// могла прислать устаревшую копию.
+	cfg.LastRunning = last
 	note, err := s.app.SetConfig(cfg)
 	if err != nil {
 		writeJSON(w, map[string]string{"error": err.Error()})

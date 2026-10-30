@@ -26,6 +26,11 @@ type bootState struct {
 	// поднимается при включении компьютера, ещё до входа в систему.
 	Service  bool   `json:"service,omitempty"`
 	UnitPath string `json:"unitPath,omitempty"`
+	// Problem — почему автозапуск на деле не сработает, хотя запись есть:
+	// "other" — в автозагрузке другая копия программы, "missing" — записан
+	// файл, которого уже нет, "taskmgr" — выключен в Диспетчере задач.
+	// Страница по этому коду показывает, что сделать.
+	Problem string `json:"problem,omitempty"`
 }
 
 // BootControl — свой способ автозапуска вместо обычного для этой системы.
@@ -53,6 +58,7 @@ func currentBootState() bootState {
 		Enabled:   platformBootEnabled(),
 		Linger:    platformBootLinger(),
 		UnitPath:  platformUnitPath(),
+		Problem:   platformBootProblem(),
 	}
 }
 

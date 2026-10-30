@@ -8,4 +8,5 @@ func platformBootSupported() bool                                        { retur
 func platformBootEnabled() bool                                          { return false }
 func platformBootLinger() bool                                           { return false }
 func platformUnitPath() string                                           { return "" }
+func platformBootProblem() string                                        { return "" }
 func platformSetBoot(enable bool, password string, flags []string) error { return nil }

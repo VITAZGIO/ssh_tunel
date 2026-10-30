@@ -162,7 +162,7 @@ func Run(o Options) {
 	// спрашиваем — консоль всегда поднимает туннель сразу, как и раньше.
 	if p.Host == "" {
 		fmt.Println("\nСервер ещё не задан — открой веб-интерфейс и добавь его: «Импорт» файла из программы на компьютере или вручную.")
-	} else if !*web || cfg.AutoConnectEnabled() {
+	} else if !*web || cfg.ConnectOnStart(cfg.AutoConnectEnabled()) {
 		fmt.Printf("\nПодключаюсь к %s:%d...\n", p.Host, p.SSHPort)
 		if err := a.Start(); err != nil {
 			// С веб-интерфейсом выходить нельзя: настройки правятся как раз
