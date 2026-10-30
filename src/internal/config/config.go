@@ -171,6 +171,16 @@ type Config struct {
 	// символы), "author" (сетка логотипов).
 	Background string `json:"background,omitempty"`
 
+	// AdBlockEnabled — блокировать рекламу и слежку по DNS. Работает только в
+	// режиме VPN (ssh_tunnel_vpn): там DNS всей системы идёт через адаптер.
+	// В режиме прокси имена разрешают сами программы — перехватывать нечего.
+	// AdBlockSources — откуда брать списки (ссылки или файлы, по одному на
+	// строку), AdBlockAllowlist — имена, которые не блокируются никогда.
+	// Сам список лежит рядом с настройками, в adblock.list.
+	AdBlockEnabled   bool   `json:"adBlockEnabled,omitempty"`
+	AdBlockSources   string `json:"adBlockSources,omitempty"`
+	AdBlockAllowlist string `json:"adBlockAllowlist,omitempty"`
+
 	// Language — язык интерфейса панели: "ru" или "en".
 	Language string `json:"language"`
 	// ShowServerPicker — показывать ли на главном экране виджет с текущим

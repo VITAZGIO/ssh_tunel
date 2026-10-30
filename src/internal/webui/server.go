@@ -209,6 +209,7 @@ func (s *Server) Serve() error {
 	mux.HandleFunc("/api/mesh", s.guard(s.handleMesh))
 	mux.HandleFunc("/api/lanaddrs", s.guard(s.handleLANAddrs))
 	mux.HandleFunc("/api/serverusers", s.guard(s.handleServerUsers))
+	mux.HandleFunc("/api/adblock/update", s.guard(s.handleAdBlockUpdate))
 
 	srv := &http.Server{
 		Handler:           mux,
@@ -325,6 +326,9 @@ type statusResp struct {
 	// Modes — две кнопки главного экрана: обход блокировок и сеть
 	// устройств (см. app.Modes).
 	Modes app.Modes `json:"modes"`
+	// AdBlock — есть ли блокировка рекламы (только VPN-версия): без неё
+	// страница прячет этот раздел настроек.
+	AdBlock bool `json:"adBlock"`
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -341,7 +345,25 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		EffectiveProfile: s.app.EffectiveProfileID(),
 		Version:          updater.Version,
 		Modes:            s.app.Modes(),
+		AdBlock:          s.app.AdBlockAvailable(),
 	})
+}
+
+// handleAdBlockUpdate — кнопка «Обновить списки»: скачать и сразу применить.
+func (s *Server) handleAdBlockUpdate(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Sources string `json:"sources"`
+	}
+	if r.Method != http.MethodPost || json.NewDecoder(r.Body).Decode(&req) != nil {
+		writeJSON(w, map[string]string{"error": "нужен POST со списком источников"})
+		return
+	}
+	n, err := s.app.UpdateAdBlockLists(req.Sources)
+	if err != nil {
+		writeJSON(w, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, map[string]int{"count": n})
 }
 
 func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {

@@ -41,6 +41,10 @@ type Layer struct {
 	// meshOnly — обход блокировок выключен: в адаптер идёт только сеть
 	// устройств, интернет — как без VPN (см. SetBypass).
 	meshOnly bool
+
+	// block — блокировка рекламы (см. adblock.go). Один и тот же объект на
+	// всё время жизни: настройки меняют его содержимое, а не указатель.
+	block *core.BlockList
 }
 
 // SetBypass переключает «весь трафик» и «только сеть устройств» (реализует
@@ -70,7 +74,7 @@ func (l *Layer) SetBypass(on bool) {
 
 // New готовит слой. Адаптер появится только при подключении.
 func New(bus *events.Bus) *Layer {
-	return &Layer{bus: bus, sys: newSys(bus)}
+	return &Layer{bus: bus, sys: newSys(bus), block: core.NewBlockList(nil, nil)}
 }
 
 // Prepare вызывается перед созданием каждого туннеля.
@@ -188,6 +192,8 @@ func (l *Layer) startStack(dev core.Device) error {
 	dns := &core.DNS{
 		Pool:  pool,
 		Stats: stats,
+		// Реклама и слежка — отказом в имени, раньше всего остального.
+		Block: l.block,
 		// Имена сети устройств («ноутбук.mesh») — настоящими адресами
 		// устройств: они и так ведут в сеть устройств через туннель.
 		Static: func(name string) ([]net.IP, bool) {
