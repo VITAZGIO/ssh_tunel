@@ -50,6 +50,7 @@ class MainActivity : AppCompatActivity() {
         const val SERVERS = 4
         const val APP = 5
         const val KEY_PAGE = "page"
+        const val KEY_SCROLL = "scroll"
     }
 
     private lateinit var settings: Settings
@@ -364,12 +365,15 @@ class MainActivity : AppCompatActivity() {
             flipper.displayedChild = page
             flipper.inAnimation = inA
             flipper.outAnimation = outA
+            val y = savedInstanceState.getInt(KEY_SCROLL, 0)
+            (flipper.currentView as? ScrollView)?.let { sv -> sv.post { sv.scrollTo(0, y) } }
         }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putInt(KEY_PAGE, flipper.displayedChild)
+        outState.putInt(KEY_SCROLL, (flipper.currentView as? ScrollView)?.scrollY ?: 0)
     }
 
     /**
@@ -520,6 +524,28 @@ class MainActivity : AppCompatActivity() {
             mainScroll.smoothScrollTo(0, devPage.top)
         }
         findViewById<View>(R.id.devUp).setOnClickListener { mainScroll.smoothScrollTo(0, 0) }
+        // Листается пальцем как две страницы: отпустил между главной и списком
+        // устройств — доезжает до той, куда вёл палец. Внутри списка — как обычно.
+        // Начало жеста запоминаем по первому событию: DOWN сюда может не прийти,
+        // если его забрала кнопка, а прокрутку ScrollView перехватил позже.
+        var startY = -1
+        mainScroll.setOnTouchListener { _, e ->
+            when (e.actionMasked) {
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                    val from = startY
+                    startY = -1
+                    mainScroll.post {
+                        val y = mainScroll.scrollY
+                        val top = devPage.top
+                        if (from >= 0 && devPage.visibility == View.VISIBLE && y in 1 until top) {
+                            mainScroll.smoothScrollTo(0, if (y > from) top else 0)
+                        }
+                    }
+                }
+                else -> if (startY < 0) startY = mainScroll.scrollY
+            }
+            false
+        }
         renderActions(false)
     }
 
@@ -576,33 +602,48 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Строка устройства: слева имя крупно, справа домен и под ним IP мельче,
+     * по высоте — по центру имени. Так на узком экране видно всё целиком.
+     */
     private fun devRow(peer: JSONObject, index: Int): View {
         val domain = peer.optString("host") + ".mesh"
         val on = peer.optBoolean("online")
         val row = LinearLayout(this)
         row.orientation = LinearLayout.HORIZONTAL
-        row.setPadding(dp(8), dp(11), dp(8), dp(11))
+        row.gravity = Gravity.CENTER_VERTICAL
+        row.setPadding(dp(10), dp(10), dp(10), dp(10))
         row.setBackgroundColor(if (index % 2 == 0) tc(R.color.card) else 0)
         if (devHit == domain) row.setBackgroundColor(0x2216402B)
         row.isClickable = true
-        row.isFocusable = true
-        fun cell(text: String, weight: Float, color: Int, end: Boolean = false) {
+        val dim = tc(R.color.dim)
+        val name = TextView(this)
+        name.text = peer.optString("name") + if (peer.optBoolean("self")) " " + getString(R.string.mesh_this) else ""
+        name.setTextColor(if (on) tc(R.color.text) else dim)
+        name.textSize = 16f
+        name.maxLines = 2
+        name.ellipsize = android.text.TextUtils.TruncateAt.END
+        name.setPadding(0, 0, dp(12), 0)
+        name.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        row.addView(name)
+        val right = LinearLayout(this)
+        right.orientation = LinearLayout.VERTICAL
+        right.gravity = Gravity.END
+        right.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.2f)
+        fun small(text: String, size: Float, color: Int) {
             val tv = TextView(this)
             tv.text = text
             tv.setTextColor(color)
-            tv.textSize = 12.5f
+            tv.textSize = size
             tv.typeface = android.graphics.Typeface.MONOSPACE
             tv.maxLines = 1
-            tv.ellipsize = android.text.TextUtils.TruncateAt.END
-            if (end) tv.gravity = Gravity.END else tv.setPadding(0, 0, dp(10), 0)
-            tv.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, weight)
-            row.addView(tv)
+            tv.ellipsize = android.text.TextUtils.TruncateAt.MIDDLE
+            tv.gravity = Gravity.END
+            right.addView(tv)
         }
-        val dim = tc(R.color.dim)
-        val name = peer.optString("name") + if (peer.optBoolean("self")) " " + getString(R.string.mesh_this) else ""
-        cell(name, 1f, if (on) tc(R.color.text) else dim)
-        cell(domain, 1.3f, if (devHit == domain) tc(R.color.ok) else if (on) tc(R.color.accent) else dim)
-        cell(peer.optString("ip"), 0.9f, dim, end = true)
+        small(domain, 13f, if (devHit == domain) tc(R.color.ok) else if (on) tc(R.color.accent) else dim)
+        small(peer.optString("ip"), 11.5f, dim)
+        row.addView(right)
         row.setOnClickListener {
             val cm = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
             cm?.setPrimaryClip(ClipData.newPlainText(domain, domain))

@@ -285,4 +285,5 @@
     <string name="bg_code">Code</string>
     <string name="bg_author">Author</string>
     <string name="source_code">Code</string>
+    <string name="dev_domain_ip">Domain · IP</string>
 </resources>

@@ -98,6 +98,9 @@ class TunnelService : VpnService(), Callbacks {
          * надолго не хочется.
          */
         private const val DRAIN_SECONDS = 20
+
+        /** Сколько ждать остановки ядра, прежде чем закрыться без неё. */
+        private const val STOP_WAIT_MS = 4000L
     }
 
     private var fd: ParcelFileDescriptor? = null
@@ -287,6 +290,10 @@ class TunnelService : VpnService(), Callbacks {
                     !prof.meshDirectOff,
                 )
                 tunnel.startCore()
+                // «Выключить» нажали, пока подключались: дальше не идём —
+                // иначе интерфейс VPN поднимется уже после остановки и
+                // останется висеть без туннеля.
+                if (stopping) { tunnel.stop(); return@Thread }
 
                 // Сначала спрашиваем сервер, умеет ли он IPv6, и только потом
                 // создаём интерфейс. Объявить телефону шестую версию и не суметь
@@ -299,13 +306,19 @@ class TunnelService : VpnService(), Callbacks {
                     else "сервер без IPv6 — приложения пойдут по IPv4"
                 )
 
+                if (stopping) { tunnel.stop(); return@Thread }
                 val iface = buildInterface(settings, hasIPv6)
+                if (stopping) {
+                    try { iface.close() } catch (e: Exception) {}
+                    tunnel.stop()
+                    return@Thread
+                }
                 fd = iface
                 // detachFd, а не getFd: дальше дескриптором распоряжается Go и
                 // закрывает его сам. Иначе его закрыли бы дважды.
                 tunnel.startStack(iface.detachFd().toLong(), MTU.toLong())
 
-                ticker.post(poll)
+                ticker.post { if (!stopping) ticker.post(poll) }
             } catch (e: Exception) {
                 // Нажали «стоп», не дождавшись подключения, — это не ошибка, и
                 // красной надписи здесь быть не должно.
@@ -550,18 +563,27 @@ class TunnelService : VpnService(), Callbacks {
         if (stopping) return
         stopping = true
 
+        // Остановка ядра на плохой сети может затянуться (рвутся мёртвые
+        // соединения). Ждём её не дольше STOP_WAIT_MS, дальше закрываем
+        // интерфейс и завершаемся всё равно: ядро уже отвязано (core = nil) и
+        // новому запуску не помешает. Иначе кнопка «висела» до перезапуска.
         Thread {
-            try {
-                tunnel.stop()
-            } catch (e: Exception) {
-                Log.w(TAG, "остановка: ${e.message}")
+            val core = Thread {
+                try {
+                    tunnel.stop()
+                } catch (e: Exception) {
+                    Log.w(TAG, "остановка: ${e.message}")
+                }
             }
+            core.start()
+            core.join(STOP_WAIT_MS)
+            if (core.isAlive) Log.w(TAG, "остановка ядра затянулась — закрываем без неё")
             try {
                 iface?.close()
             } catch (e: Exception) {
                 // Дескриптор уже отдан в Go и закрыт там — это нормально.
             }
-            stopSelf()
+            ticker.post { stopSelf() }
         }.start()
     }
 
@@ -593,8 +615,12 @@ class TunnelService : VpnService(), Callbacks {
      */
     override fun protect(fd: Long): Boolean = protect(fd.toInt())
 
-    override fun onState(state: String, detail: String, errorKind: String) =
+    override fun onState(state: String, detail: String, errorKind: String) {
+        // После «Выключить» ядро ещё может прислать «переподключение» —
+        // для человека туннель уже выключен, кнопку обратно не красим.
+        if (stopping || draining) return
         report(state, connErrorText(errorKind, detail))
+    }
 
     override fun onLog(line: String) {
         synchronized(log) {

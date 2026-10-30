@@ -442,8 +442,7 @@
                     android:paddingBottom="6dp"
                     android:background="@drawable/bg_row">
                     <TextView style="@style/DevHead" android:layout_weight="1" android:text="@string/dev_name" />
-                    <TextView style="@style/DevHead" android:layout_weight="1.3" android:text="@string/dev_domain" />
-                    <TextView style="@style/DevHead" android:layout_weight="0.9" android:gravity="end" android:text="@string/ip_col" />
+                    <TextView style="@style/DevHead" android:layout_weight="1.2" android:gravity="end" android:text="@string/dev_domain_ip" />
                 </LinearLayout>
 
                 <LinearLayout
@@ -933,6 +932,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
+                        android:layout_marginBottom="14dp"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
                         android:background="@drawable/bg_card"
