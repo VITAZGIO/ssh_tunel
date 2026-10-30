@@ -6,7 +6,7 @@ Debian, Fedora, Arch и даже на Alpine с musl.
 
 ```bash
 # скачать и сделать исполняемым
-curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
+curl -LO https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel_linux
 chmod +x ssh_tunnel_linux
 
 # задать сервер один раз
@@ -23,7 +23,7 @@ chmod +x ssh_tunnel_linux
 ```
 
 Сборка под ARM и контрольные суммы — на
-[странице релиза](https://github.com/VITAZGIO/ssh_tunel/releases/latest).
+[странице релиза](https://github.com/VITAZGIO/ssh_tunnel/releases/latest).
 
 ---
 
@@ -52,7 +52,7 @@ B=ssh_tunnel_linux        # или: B=ssh_tunnel_vpn_linux
 F=$B; [ "$(uname -m)" = aarch64 ] && F=${B}_arm64
 # через /tmp: работающую программу поверх не записать («Text file busy»),
 # а install ставит новый файл на её место — так блок годится и для обновления
-curl -fL -o /tmp/$B https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
+curl -fL -o /tmp/$B https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/$F
 sudo install -m 755 /tmp/$B /usr/local/bin/$B && rm -f /tmp/$B
 
 printf '%s\n' '[Unit]' 'Description=ssh_tunnel' 'After=network-online.target' 'Wants=network-online.target' '' \
@@ -116,7 +116,7 @@ sudo ufw status 2>/dev/null | grep -q 47821 && sudo ufw delete allow from 192.16
 ```bash
 sudo apt update && sudo apt install -y curl
 
-curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
+curl -LO https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel_linux
 chmod +x ssh_tunnel_linux
 sudo install -m 755 ssh_tunnel_linux /usr/local/bin/ssh_tunnel_linux
 
@@ -147,7 +147,7 @@ Proxmox — это Debian, но работают там обычно под `roo
 ```bash
 apt update && apt install -y curl
 
-curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
+curl -LO https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel_linux
 chmod +x ssh_tunnel_linux
 install -m 755 ssh_tunnel_linux /usr/local/bin/ssh_tunnel_linux
 
@@ -191,7 +191,7 @@ Proxmox, — `ufw` в нём не участвует.
 ```bash
 sudo dnf install -y curl
 
-curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
+curl -LO https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel_linux
 chmod +x ssh_tunnel_linux
 sudo install -m 755 ssh_tunnel_linux /usr/local/bin/ssh_tunnel_linux
 
@@ -216,7 +216,7 @@ SELinux программе не мешает: она не лезет ни в с�
 ```bash
 sudo pacman -S --needed curl
 
-curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
+curl -LO https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel_linux
 chmod +x ssh_tunnel_linux
 sudo install -m 755 ssh_tunnel_linux /usr/local/bin/ssh_tunnel_linux
 
@@ -234,7 +234,7 @@ Firewall по умолчанию не стоит вовсе — если пос�
 ```bash
 sudo zypper install -y curl
 
-curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
+curl -LO https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel_linux
 chmod +x ssh_tunnel_linux
 sudo install -m 755 ssh_tunnel_linux /usr/local/bin/ssh_tunnel_linux
 
@@ -259,7 +259,7 @@ sudo firewall-cmd --permanent --add-port=47821/tcp && sudo firewall-cmd --reload
 ```sh
 apk add curl
 
-curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
+curl -LO https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel_linux
 chmod +x ssh_tunnel_linux
 install -m 755 ssh_tunnel_linux /usr/local/bin/ssh_tunnel_linux
 

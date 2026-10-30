@@ -190,7 +190,7 @@ $S apt update && $S apt install -y curl
 
 # скачать (на Raspberry Pi и других ARM возьмётся сборка _arm64) и поставить
 F=ssh_tunnel_vpn_linux; [ "$(uname -m)" = aarch64 ] && F=${F}_arm64
-curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
+curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/$F
 $S install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
 
 # запустить с панелью: http://АДРЕС_ЭТОЙ_МАШИНЫ:47821 (Ctrl+C — выключить)
@@ -219,7 +219,7 @@ Proxmox — это Debian, но работают там под `root`, поэт�
 apt update && apt install -y curl
 
 F=ssh_tunnel_vpn_linux; [ "$(uname -m)" = aarch64 ] && F=${F}_arm64
-curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
+curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/$F
 install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
 
 # запустить с панелью: http://АДРЕС_ХОСТА:47821 (Ctrl+C — выключить)
@@ -254,7 +254,7 @@ S=sudo; [ "$(id -u)" = 0 ] && S=   # под root (Proxmox и т.п.) sudo не �
 $S dnf install -y curl
 
 F=ssh_tunnel_vpn_linux; [ "$(uname -m)" = aarch64 ] && F=${F}_arm64
-curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
+curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/$F
 $S install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
 
 # запустить с панелью: http://АДРЕС_ЭТОЙ_МАШИНЫ:47821 (Ctrl+C — выключить)
@@ -277,7 +277,7 @@ S=sudo; [ "$(id -u)" = 0 ] && S=   # под root (Proxmox и т.п.) sudo не �
 $S pacman -S --needed curl
 
 F=ssh_tunnel_vpn_linux; [ "$(uname -m)" = aarch64 ] && F=${F}_arm64
-curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
+curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/$F
 $S install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
 
 # запустить с панелью: http://АДРЕС_ЭТОЙ_МАШИНЫ:47821 (Ctrl+C — выключить)
@@ -296,7 +296,7 @@ S=sudo; [ "$(id -u)" = 0 ] && S=   # под root (Proxmox и т.п.) sudo не �
 $S zypper install -y curl
 
 F=ssh_tunnel_vpn_linux; [ "$(uname -m)" = aarch64 ] && F=${F}_arm64
-curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
+curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/$F
 $S install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
 
 # запустить с панелью: http://АДРЕС_ЭТОЙ_МАШИНЫ:47821 (Ctrl+C — выключить)
@@ -322,7 +322,7 @@ apk add curl
 modprobe tun   # устройство TUN; на большинстве ядер уже есть
 
 F=ssh_tunnel_vpn_linux; [ "$(uname -m)" = aarch64 ] && F=${F}_arm64
-curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$F
+curl -fL -o /tmp/ssh_tunnel_vpn_linux https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/$F
 install -m 755 /tmp/ssh_tunnel_vpn_linux /usr/local/bin/ssh_tunnel_vpn_linux && rm -f /tmp/ssh_tunnel_vpn_linux
 
 cat > /etc/init.d/ssh_tunnel_vpn <<'EOF'

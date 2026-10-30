@@ -23,7 +23,7 @@
 Единственный источник — публичный GitHub Releases API репозитория:
 
 ```
-GET https://api.github.com/repos/vitazgio/ssh_tunel/releases/latest
+GET https://api.github.com/repos/vitazgio/ssh_tunnel/releases/latest
 Accept: application/vnd.github+json
 User-Agent: ssh_tunnel/<версия> (<платформа>)
 ```

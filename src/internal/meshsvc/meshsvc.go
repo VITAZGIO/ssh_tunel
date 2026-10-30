@@ -83,9 +83,9 @@ var releaseTag = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$`
 // downloadURL — откуда качать meshd для этой версии ($BIN подставит скрипт).
 func downloadURL(version string) string {
 	if releaseTag.MatchString(version) {
-		return "https://github.com/VITAZGIO/ssh_tunel/releases/download/" + version + "/$BIN"
+		return "https://github.com/VITAZGIO/ssh_tunnel/releases/download/" + version + "/$BIN"
 	}
-	return "https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/$BIN"
+	return "https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/$BIN"
 }
 
 // InstallScript — установка или обновление meshd версии version (версия

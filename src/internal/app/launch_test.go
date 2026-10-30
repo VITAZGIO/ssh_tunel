@@ -115,3 +115,41 @@ func TestStartOnLaunchYieldsToUser(t *testing.T) {
 		t.Fatal("автозапуск включил туннель после «Отключить»")
 	}
 }
+
+// «Только сеть» при запуске: туннель поднимается без обхода блокировок —
+// домашний сервер виден в сети устройств, а его интернет идёт напрямую.
+func TestStartOnLaunchMeshOnly(t *testing.T) {
+	layer := &fakeNetLayer{}
+	a := meshVPNApp(t, layer, true)
+	cfg := a.Config()
+	cfg.StartMode = config.StartMesh
+	a.mu.Lock()
+	a.cfg = cfg
+	a.mu.Unlock()
+
+	a.StartOnLaunchWithin(time.Second)
+	if !a.Running() {
+		t.Fatal("туннель не поднялся")
+	}
+	if on, _ := layer.lastBypass(); on {
+		t.Fatal("адаптер поднят в режиме «весь трафик», а выбрано «только сеть»")
+	}
+	wantModes(t, a, false, true)
+}
+
+// «Только сеть» без сети устройств у сервера — не подключаемся вовсе, а не
+// пускаем весь трафик через сервер.
+func TestStartOnLaunchMeshOnlyWithoutMesh(t *testing.T) {
+	layer := &fakeNetLayer{}
+	a := meshVPNApp(t, layer, false)
+	cfg := a.Config()
+	cfg.StartMode = config.StartMesh
+	a.mu.Lock()
+	a.cfg = cfg
+	a.mu.Unlock()
+
+	a.StartOnLaunchWithin(time.Second)
+	if a.Running() {
+		t.Fatal("туннель поднят целиком, хотя просили только сеть устройств")
+	}
+}

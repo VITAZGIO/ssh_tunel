@@ -155,8 +155,9 @@ type Config struct {
 	// программа подключается сразу, как было до появления этой настройки.
 	AutoConnect *bool `json:"autoConnect,omitempty"`
 
-	// StartMode — что делать с туннелем при запуске программы (три кнопки в
-	// настройках): "on" — включать, "off" — не включать, "last" — как было
+	// StartMode — что делать с туннелем при запуске программы (кнопки в
+	// настройках): "on" — включать, "mesh" — включать только сеть устройств
+	// (обход блокировок выключен), "off" — не включать, "last" — как было
 	// при закрытии (см. LastRunning). Пусто — конфиг старой версии, тогда
 	// решают прежние галочки AutoStart (Windows) и AutoConnect (Linux).
 	StartMode string `json:"startMode,omitempty"`
@@ -206,6 +207,7 @@ func (c Config) AutoConnectEnabled() bool {
 // Режимы StartMode.
 const (
 	StartOn   = "on"
+	StartMesh = "mesh"
 	StartOff  = "off"
 	StartLast = "last"
 )
@@ -215,7 +217,7 @@ const (
 // явно.
 func (c Config) ConnectOnStart(legacy bool) bool {
 	switch c.StartMode {
-	case StartOn:
+	case StartOn, StartMesh:
 		return true
 	case StartOff:
 		return false

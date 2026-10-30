@@ -6,7 +6,7 @@ Debian, Fedora, Arch, and even on Alpine with musl.
 
 ```bash
 # download and make executable
-curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
+curl -LO https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel_linux
 chmod +x ssh_tunnel_linux
 
 # set the server once
@@ -23,7 +23,7 @@ chmod +x ssh_tunnel_linux
 ```
 
 The ARM build and the checksums are on the
-[release page](https://github.com/VITAZGIO/ssh_tunel/releases/latest).
+[release page](https://github.com/VITAZGIO/ssh_tunnel/releases/latest).
 
 ---
 
@@ -39,7 +39,7 @@ your system:
 ```bash
 sudo apt update && sudo apt install -y curl
 
-curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
+curl -LO https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel_linux
 chmod +x ssh_tunnel_linux
 sudo install -m 755 ssh_tunnel_linux /usr/local/bin/ssh_tunnel_linux
 
@@ -71,7 +71,7 @@ the autostart checkbox in the panel will not help here — it targets
 ```bash
 apt update && apt install -y curl
 
-curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
+curl -LO https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel_linux
 chmod +x ssh_tunnel_linux
 install -m 755 ssh_tunnel_linux /usr/local/bin/ssh_tunnel_linux
 
@@ -112,7 +112,7 @@ UI — `ufw` plays no part in it.
 ```bash
 sudo dnf install -y curl
 
-curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
+curl -LO https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel_linux
 chmod +x ssh_tunnel_linux
 sudo install -m 755 ssh_tunnel_linux /usr/local/bin/ssh_tunnel_linux
 
@@ -137,7 +137,7 @@ nor other people's ports — everything of its own stays in the user's home.
 ```bash
 sudo pacman -S --needed curl
 
-curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
+curl -LO https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel_linux
 chmod +x ssh_tunnel_linux
 sudo install -m 755 ssh_tunnel_linux /usr/local/bin/ssh_tunnel_linux
 
@@ -155,7 +155,7 @@ there. Everything else is as on Ubuntu, same systemd.
 ```bash
 sudo zypper install -y curl
 
-curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
+curl -LO https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel_linux
 chmod +x ssh_tunnel_linux
 sudo install -m 755 ssh_tunnel_linux /usr/local/bin/ssh_tunnel_linux
 
@@ -180,7 +180,7 @@ differently, and the checkbox in the panel will not do it.
 ```sh
 apk add curl
 
-curl -LO https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
+curl -LO https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel_linux
 chmod +x ssh_tunnel_linux
 install -m 755 ssh_tunnel_linux /usr/local/bin/ssh_tunnel_linux
 

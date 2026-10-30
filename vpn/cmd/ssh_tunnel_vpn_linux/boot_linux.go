@@ -88,7 +88,7 @@ func vpnUnitText(exe string, flags []string, env string) string {
 # «Запускать при старте системы»; снять галочку — служба выключится.
 [Unit]
 Description=ssh_tunnel VPN — весь трафик через собственный сервер
-Documentation=https://github.com/VITAZGIO/ssh_tunel
+Documentation=https://github.com/VITAZGIO/ssh_tunnel
 After=network-online.target systemd-resolved.service
 Wants=network-online.target
 

@@ -100,7 +100,7 @@ func unitText(exe string, flags []string) string {
 # программа его не перезапишет.
 [Unit]
 Description=ssh_tunnel — SSH-туннель до собственного сервера
-Documentation=https://github.com/VITAZGIO/ssh_tunel
+Documentation=https://github.com/VITAZGIO/ssh_tunnel
 After=network-online.target
 Wants=network-online.target
 

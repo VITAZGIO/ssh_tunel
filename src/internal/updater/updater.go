@@ -32,7 +32,7 @@ var Version = "dev"
 
 // releasesURL — публичная ручка GitHub: последний НЕ черновой и не
 // предрелизный выпуск репозитория.
-const releasesURL = "https://api.github.com/repos/VITAZGIO/ssh_tunel/releases/latest"
+const releasesURL = "https://api.github.com/repos/VITAZGIO/ssh_tunnel/releases/latest"
 
 // releasesURLFor — тот же адрес, но переменной: тесты подставляют сюда свой
 // httptest-сервер, чтобы не ходить в настоящую сеть и не тратить лимит

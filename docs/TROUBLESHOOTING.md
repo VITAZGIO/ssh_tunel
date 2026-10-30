@@ -339,7 +339,7 @@ Defender придираются по умолчанию — это не приз
 (из-за которой потом ругается SmartScreen) файл тоже не получает:
 
 ```powershell
-curl.exe -fL --ssl-no-revoke -o "$env:USERPROFILE\Desktop\ssh_tunnel.exe" https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe
+curl.exe -fL --ssl-no-revoke -o "$env:USERPROFILE\Desktop\ssh_tunnel.exe" https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel.exe
 Get-FileHash "$env:USERPROFILE\Desktop\ssh_tunnel.exe" -Algorithm SHA256
 ```
 
@@ -366,7 +366,7 @@ Get-FileHash "$env:USERPROFILE\Desktop\ssh_tunnel.exe" -Algorithm SHA256
 ```powershell
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $ProgressPreference = 'SilentlyContinue'
-Invoke-WebRequest -Uri https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe -OutFile "$env:USERPROFILE\Desktop\ssh_tunnel.exe"
+Invoke-WebRequest -Uri https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel.exe -OutFile "$env:USERPROFILE\Desktop\ssh_tunnel.exe"
 ```
 
 Обе первые строки нужны, это не украшательство:

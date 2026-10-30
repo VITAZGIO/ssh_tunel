@@ -56,7 +56,7 @@ through an SSH tunnel, or add a domain and nginx/Caddy later (see "Domain
 and TLS" below):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/VITAZGIO/ssh_tunel/main/packaging/panel/install.sh \
+curl -fsSL https://raw.githubusercontent.com/VITAZGIO/ssh_tunnel/main/packaging/panel/install.sh \
   | sudo bash -s -- --lan --ssh-host=THIS_SERVERS_ADDRESS
 ```
 
@@ -65,7 +65,7 @@ record pointing at this server — then the panel gets its own Let's Encrypt
 certificate and is reachable over HTTPS right away:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/VITAZGIO/ssh_tunel/main/packaging/panel/install.sh \
+curl -fsSL https://raw.githubusercontent.com/VITAZGIO/ssh_tunnel/main/packaging/panel/install.sh \
   | sudo bash -s -- --domain=panel.example.com
 ```
 
@@ -81,7 +81,7 @@ it without an open port — a third option, without `--lan` and without
 `--domain` (this is the default mode, see "Domain and TLS" below):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/VITAZGIO/ssh_tunel/main/packaging/panel/install.sh \
+curl -fsSL https://raw.githubusercontent.com/VITAZGIO/ssh_tunnel/main/packaging/panel/install.sh \
   | sudo bash -s -- --ssh-host=THIS_SERVERS_ADDRESS
 ```
 

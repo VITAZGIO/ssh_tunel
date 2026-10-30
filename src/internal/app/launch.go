@@ -1,8 +1,10 @@
 package app
 
 import (
+	"errors"
 	"time"
 
+	"sshtunnel/internal/config"
 	"sshtunnel/internal/tunnel"
 )
 
@@ -34,14 +36,14 @@ func (a *App) StartOnLaunch() { a.StartOnLaunchWithin(launchRetryFor) }
 func (a *App) StartOnLaunchWithin(limit time.Duration) {
 	deadline := time.Now().Add(limit)
 	for attempt := 1; ; attempt++ {
-		err := a.Start()
+		err := a.StartLaunchMode()
 		if err == nil || a.Running() {
 			if attempt > 1 {
 				a.Bus.Infof("Автозапуск: подключились с %d-й попытки", attempt)
 			}
 			return
 		}
-		if tunnel.IsAuthError(err) || (limit > 0 && time.Now().After(deadline)) {
+		if tunnel.IsAuthError(err) || errors.Is(err, errNoMesh) || (limit > 0 && time.Now().After(deadline)) {
 			a.Bus.Errorf("Автозапуск не удался: %v", err)
 			return
 		}
@@ -60,4 +62,16 @@ func (a *App) StartOnLaunchWithin(limit time.Duration) {
 			return
 		}
 	}
+}
+
+// StartLaunchMode включает туннель так, как выбрано в «Туннель при запуске
+// программы»: целиком или только сеть устройств. Второе нужно домашним
+// серверам — их видно с других устройств, а свой интернет идёт напрямую.
+// Без сети устройств у сервера «только сеть» не подключает ничего: пустить
+// весь трафик через VPS вместо этого было бы ровно тем, чего не просили.
+func (a *App) StartLaunchMode() error {
+	if a.Config().StartMode == config.StartMesh {
+		return a.SetMesh(true)
+	}
+	return a.Start()
 }

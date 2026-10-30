@@ -1,12 +1,12 @@
 # Сюда попадают собранные файлы
 
 Папка намеренно пустая: готовые сборки лежат не в репозитории, а на
-[странице релизов](https://github.com/VITAZGIO/ssh_tunel/releases) — иначе
+[странице релизов](https://github.com/VITAZGIO/ssh_tunnel/releases) — иначе
 каждая пересборка добавляла бы к истории десятки мегабайт.
 
 ## Скачать готовое
 
-[Последний релиз](https://github.com/VITAZGIO/ssh_tunel/releases/latest):
+[Последний релиз](https://github.com/VITAZGIO/ssh_tunnel/releases/latest):
 
 | Файл | Для чего |
 |---|---|
@@ -19,8 +19,8 @@
 Ссылки, которые всегда ведут на свежую версию:
 
 ```
-https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel.exe
-https://github.com/VITAZGIO/ssh_tunel/releases/latest/download/ssh_tunnel_linux
+https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel.exe
+https://github.com/VITAZGIO/ssh_tunnel/releases/latest/download/ssh_tunnel_linux
 ```
 
 Архив с exe нужен не для экономии места (он почти ничего не экономит), а ради
