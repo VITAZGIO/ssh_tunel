@@ -1459,9 +1459,9 @@ const I18N = {
       'адреса, а также сети mesh-VPN уже учтены — сюда вписывают только то, что в них не попало: '+
       'например, корпоративный VPN со своим диапазоном адресов или отдельный сайт.</p>'+
       '<p>Через запятую, в любом виде: сеть (<code>10.8.0.0/16</code> или <code>10.8.*</code>), '+
-      'отдельный адрес, домен целиком (<code>vitazgio.ru</code>) или его поддомены '+
-      '(<code>.vitazgio.ru</code> и <code>*.vitazgio.ru</code> — это одно и то же: сам домен сюда не '+
-      'входит, только поддомены; чтобы обойти и сам домен, и поддомены, впиши оба варианта).</p>'+
+      'отдельный адрес, домен (<code>vitazgio.ru</code> — вместе со всеми поддоменами, '+
+      'например <code>sync.home.vitazgio.ru</code>) или только поддомены (<code>.vitazgio.ru</code> '+
+      'или <code>*.vitazgio.ru</code>). Можно вставить и ссылку из браузера — возьмётся имя.</p>'+
       '<p>Не знаешь, что вписать — нажми «Проверить сеть»: программа посмотрит адаптеры этого '+
       'компьютера и скажет, сломается что-нибудь или нет.</p>',
     verbose:'Подробный журнал', connect_on_launch:'Подключаться сразу при запуске',
@@ -1700,9 +1700,9 @@ const I18N = {
       'addresses, as well as mesh-VPN networks, are already covered — list here only what they miss: '+
       'a corporate VPN with its own address range, or a single site.</p>'+
       '<p>Comma-separated, in any form: a network (<code>10.8.0.0/16</code> or <code>10.8.*</code>), '+
-      'a single address, a whole domain (<code>vitazgio.ru</code>), or its subdomains '+
-      '(<code>.vitazgio.ru</code> and <code>*.vitazgio.ru</code> mean the same thing: subdomains only, '+
-      'not the domain itself — to bypass both the domain and its subdomains, add both entries).</p>'+
+      'a single address, a domain (<code>vitazgio.ru</code> — together with all its subdomains, '+
+      'e.g. <code>sync.home.vitazgio.ru</code>) or subdomains only (<code>.vitazgio.ru</code> '+
+      'or <code>*.vitazgio.ru</code>). A link pasted from the browser works too — the name is used.</p>'+
       '<p>Not sure what to enter — click "Scan network": the program will look at this computer\'s '+
       'adapters and tell you if anything would break.</p>',
     verbose:'Verbose log', connect_on_launch:'Connect immediately on launch',

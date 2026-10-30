@@ -40,7 +40,7 @@ func TestWinProxyOverrideKeepsLocalOut(t *testing.T) {
 func TestWinExtraDropsCIDR(t *testing.T) {
 	got := winExtra([]string{"10.8.0.0/16", "corp.example", ".corp.local", "  "})
 
-	want := []string{"corp.example", "*.corp.local"}
+	want := []string{"corp.example", "*.corp.example", "*.corp.local"}
 	if len(got) != len(want) {
 		t.Fatalf("получилось %v, ожидалось %v", got, want)
 	}

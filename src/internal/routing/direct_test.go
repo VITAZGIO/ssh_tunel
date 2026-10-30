@@ -1,6 +1,9 @@
 package routing
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestDirectListMatches(t *testing.T) {
 	d := NewDirectList([]string{
@@ -42,17 +45,17 @@ func TestDirectListMatches(t *testing.T) {
 	}
 }
 
-// Домены: точное имя, поддомены через ".имя" и через "*.имя" — это одна и та
-// же запись, и она не должна перехватывать сам домен без отдельной строки.
+// Домены: имя с поддоменами, только поддомены через ".имя" и через "*.имя" —
+// последние две одна и та же запись, и она не перехватывает сам домен.
 func TestDirectListDomainPatterns(t *testing.T) {
 	d := NewDirectList([]string{
-		"vitazgio.ru",     // точное имя
+		"vitazgio.ru",     // имя и его поддомены
 		".sub.example.ru", // поддомены через точку
 		"*.wild.example",  // та же запись через звёздочку
 	})
 
 	in := []string{
-		"vitazgio.ru:443", "VITAZGIO.RU",
+		"vitazgio.ru:443", "VITAZGIO.RU", "sync.home.vitazgio.ru:443",
 		"a.sub.example.ru", "a.b.sub.example.ru:22",
 		"a.wild.example", "a.b.wild.example:443",
 	}
@@ -131,5 +134,39 @@ func TestMeshVPNIsLocalByDefault(t *testing.T) {
 		if IsLocalHost(h) {
 			t.Errorf("IsLocalHost(%q) = true, ожидалось false", h)
 		}
+	}
+}
+
+// Адрес, вставленный из строки браузера, — тоже правило: раньше
+// "https://vitazgio.ru/" не совпадало ни с чем, и список молча не работал.
+func TestDirectListCleansPastedURLs(t *testing.T) {
+	cases := map[string]string{
+		"https://vitazgio.ru/":               "vitazgio.ru",
+		"  HTTP://Home.Vitazgio.ru:8443/a?b": "home.vitazgio.ru",
+		"vitazgio.ru/cloud":                  "vitazgio.ru",
+		"vitazgio.ru:443":                    "vitazgio.ru",
+		"vitazgio.ru.":                       "vitazgio.ru",
+		"*.vitazgio.ru":                      "*.vitazgio.ru",
+		"10.8.0.0/16":                        "10.8.0.0/16",
+		"2001:db8::/32":                      "2001:db8::/32",
+		"[2001:db8::1]:443":                  "2001:db8::1",
+		"2001:db8::1":                        "2001:db8::1",
+		"203.0.113.7:22":                     "203.0.113.7",
+	}
+	for in, want := range cases {
+		if got := CleanEntry(in); got != want {
+			t.Errorf("CleanEntry(%q) = %q, ожидалось %q", in, got, want)
+		}
+	}
+
+	d := NewDirectList([]string{"https://vitazgio.ru/", "home.vitazgio.ru:8443", "*.corp.example"})
+	for _, target := range []string{"vitazgio.ru:443", "home.vitazgio.ru:443", "a.corp.example:443"} {
+		if !d.Match(target) {
+			t.Errorf("Match(%q) = false", target)
+		}
+	}
+	got := strings.Join(d.Names(), ",")
+	if got != "vitazgio.ru,home.vitazgio.ru" {
+		t.Errorf("Names() = %q", got)
 	}
 }

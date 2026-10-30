@@ -181,12 +181,20 @@ func (t *Tunnel) localDirect(target string) bool {
 
 // listedDirect — цель попала в пользовательский список «всегда напрямую».
 // Это про чужие сети, о которых программа знать не может: mesh-VPN, рабочий
-// VPN, самодельный WireGuard.
+// VPN, самодельный WireGuard, — и про свои сайты.
+//
+// Пришёл голый адрес, а в списке имя — сверяем имя, под которым этот адрес
+// известен (см. LearnDirect и directnames.go). Имя сверяется с текущим
+// списком: убрали его из настроек — адрес снова идёт через сервер.
 func (t *Tunnel) listedDirect(target string) bool {
 	t.mu.RLock()
 	d := t.cfg.Direct
 	t.mu.RUnlock()
-	return d.Match(target)
+	if d.Match(target) {
+		return true
+	}
+	name, ok := t.learnedName(target)
+	return ok && d.Match(name)
 }
 
 func eventConn(proc string, pid int, target, proto string, byIP, direct bool, err error) events.Event {
