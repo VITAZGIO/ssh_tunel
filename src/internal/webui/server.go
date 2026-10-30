@@ -520,7 +520,7 @@ func (s *Server) handleScanNet(w http.ResponseWriter, r *http.Request) {
 // сервера. Не требует поднятого туннеля — соединение для проверки отдельное,
 // поэтому экран работает и объясняет причину, даже когда всё выключено.
 func (s *Server) handleSelfCheck(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 180*time.Second)
 	defer cancel()
 	steps := s.app.SelfCheck(ctx)
 	writeJSON(w, map[string]any{"steps": steps})

@@ -11,6 +11,7 @@
     <!-- Common connection errors (ТЗ-13) — the reason code is classified once
          in the shared Go code (internal/tunnel.ConnErrorKind), text only here. -->
     <string name="conn_err_auth">The server did not accept the key. The device may have been frozen or removed in the panel, or the key is wrong.</string>
+    <string name="conn_err_dropped">The connection dropped while connecting: weak network or the provider interferes with SSH. Retrying.</string>
     <string name="conn_err_no_response">The server is not responding: check the address and port.</string>
     <string name="conn_err_refused">The port is closed, or SSH is not running on the server.</string>
     <string name="conn_err_other_prefix">Server response: %1$s</string>
@@ -154,6 +155,8 @@
     <string name="sc_key_refused">the server refused the connection</string>
     <string name="sc_key_timeout">the server didn\'t answer in time</string>
     <string name="sc_key_unreachable">the server is unreachable</string>
+    <string name="sc_key_dropped">the connection dropped during login — weak network or the provider interferes with SSH</string>
+    <string name="sc_port_dropped">the connection was reset — weak network or the provider interferes with SSH</string>
     <string name="sc_forward_forward_failed">couldn\'t open a test connection: %1$s</string>
     <string name="sc_dns_tunnel_ok">answers</string>
     <string name="sc_dns_tunnel_no_answer">no answer from DNS through the tunnel: %1$s</string>

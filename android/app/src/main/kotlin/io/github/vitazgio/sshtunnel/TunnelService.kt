@@ -631,6 +631,7 @@ class TunnelService : VpnService(), Callbacks {
         "auth" -> getString(R.string.conn_err_auth)
         "no_response" -> getString(R.string.conn_err_no_response)
         "refused" -> getString(R.string.conn_err_refused)
+        "dropped" -> getString(R.string.conn_err_dropped)
         "other" -> getString(R.string.conn_err_other_prefix, detail)
         else -> detail
     }

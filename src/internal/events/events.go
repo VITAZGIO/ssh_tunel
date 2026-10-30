@@ -53,7 +53,7 @@ type Event struct {
 	State  string `json:"state,omitempty"`
 	Detail string `json:"detail,omitempty"`
 	// ErrorKind — стабильный код причины для state=="error"/"reconnecting"
-	// (internal/tunnel.ConnErrorKind: "auth", "no_response", "refused",
+	// (internal/tunnel.ConnErrorKind: "auth", "no_response", "refused", "dropped",
 	// "hostkey_changed", "other"). Пустая строка — переход состояния не
 	// связан с ошибкой подключения (обычное "connecting"/"connected").
 	// Detail при этом остаётся русским текстом того же события — для

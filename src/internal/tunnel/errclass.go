@@ -44,6 +44,8 @@ func classifyDialCode(err error) string {
 	switch {
 	case IsAuthError(err):
 		return "auth_failed"
+	case isDropped(err):
+		return "dropped"
 	case strings.Contains(msg, "timeout"), strings.Contains(msg, "timed out"):
 		return "timeout"
 	case strings.Contains(msg, "connection refused"):

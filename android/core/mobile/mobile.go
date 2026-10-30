@@ -39,7 +39,7 @@ type Callbacks interface {
 	// OnState сообщает о смене состояния, чтобы экран показал её человеку.
 	//
 	// errorKind — стабильный код причины отказа подключения (ТЗ-13,
-	// tunnel.ConnErrorKind: "auth", "no_response", "refused", "other"),
+	// tunnel.ConnErrorKind: "auth", "no_response", "refused", "dropped", "other"),
 	// заполнен только при state=="error"/"reconnecting" и только если
 	// причина распознана. Экран переводит по нему текст через свой словарь
 	// строк вместо показа сырого detail — разбор самой ошибки один раз
@@ -587,7 +587,7 @@ func (t *Tunnel) SelfCheck() string {
 		return `{"error":"сначала нужно задать настройки"}`
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
 	defer cancel()
 	steps := tunnel.RunSelfCheck(ctx, tunnel.SelfCheckOptions{Config: cfg})
 
