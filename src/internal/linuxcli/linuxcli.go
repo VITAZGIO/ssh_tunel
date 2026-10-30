@@ -164,7 +164,7 @@ func Run(o Options) {
 		fmt.Println("\nСервер ещё не задан — открой веб-интерфейс и добавь его: «Импорт» файла из программы на компьютере или вручную.")
 	} else if !*web || cfg.ConnectOnStart(cfg.AutoConnectEnabled()) {
 		fmt.Printf("\nПодключаюсь к %s:%d...\n", p.Host, p.SSHPort)
-		if err := a.Start(); err != nil {
+		if err := a.StartLaunchMode(); err != nil {
 			// С веб-интерфейсом выходить нельзя: настройки правятся как раз
 			// через него, и человек остался бы без единственного способа
 			// починить.

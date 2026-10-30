@@ -877,9 +877,10 @@
         <span class="hint" id="bootStatus" style="display:block;margin:4px 0 0"></span>
       </div>
     <div class="lbl2"><span data-i18n="start_mode">Туннель при запуске программы</span>
-      <span class="infoq" onclick="event.preventDefault();event.stopPropagation();toggleInfoq(this)">?<span class="tip" data-i18n="start_mode_note">«Как при закрытии» — включит туннель, если он был включён, когда программу закрыли или выключили компьютер.</span></span></div>
+      <span class="infoq" onclick="event.preventDefault();event.stopPropagation();toggleInfoq(this)">?<span class="tip" data-i18n="start_mode_note">«Как при закрытии» — включит туннель, если он был включён, когда программу закрыли или выключили компьютер. «Только сеть» — поднимет только сеть устройств: машину видно с других устройств, а её интернет идёт напрямую, без сервера.</span></span></div>
     <div class="seg" id="startModeSeg">
       <button type="button" data-v="on" data-i18n="start_on">Включать</button>
+      <button type="button" data-v="mesh" data-i18n="start_mesh">Только сеть</button>
       <button type="button" data-v="last" data-i18n="start_last">Как при закрытии</button>
       <button type="button" data-v="off" data-i18n="start_off">Не включать</button>
     </div>
@@ -1769,8 +1770,9 @@ const I18N = {
     adv_fine:'Тонкая настройка соединения', sect_traffic:'Трафик', sect_launch:'Запуск',
     start_mode:'Туннель при запуске программы',
     start_mode_note:'«Как при закрытии» — включит туннель, если он был включён, когда программу '+
-      'закрыли или выключили компьютер.',
-    start_on:'Включать', start_last:'Как при закрытии', start_off:'Не включать',
+      'закрыли или выключили компьютер. «Только сеть» — поднимет только сеть устройств: машину видно с '+
+      'других устройств, а её интернет идёт напрямую, без сервера.',
+    start_on:'Включать', start_mesh:'Только сеть', start_last:'Как при закрытии', start_off:'Не включать',
     sect_look:'Оформление', theme:'Тема', theme_orig:'Оригинал', theme_dark:'Тёмная',
     theme_light:'Светлая', theme_console:'Консоль', background:'Фон', bg_color:'Цвет',
     bg_code:'Код', bg_author:'Автор', author:'Автор', source_code:'Код',
@@ -2040,8 +2042,9 @@ const I18N = {
     adv_fine:'Connection fine-tuning', sect_traffic:'Traffic', sect_launch:'Launch',
     start_mode:'Tunnel when the app starts',
     start_mode_note:'“As on exit” turns the tunnel on if it was on when the app was closed or the '+
-      'computer was shut down.',
-    start_on:'Turn on', start_last:'As on exit', start_off:'Keep off',
+      'computer was shut down. “Devices only” brings up just the device network: other devices can reach '+
+      'this machine, while its own internet goes direct, not through the server.',
+    start_on:'Turn on', start_mesh:'Devices only', start_last:'As on exit', start_off:'Keep off',
     sect_look:'Look', theme:'Theme', theme_orig:'Original', theme_dark:'Dark',
     theme_light:'Light', theme_console:'Console', background:'Background', bg_color:'Color',
     bg_code:'Code', bg_author:'Author', author:'Author', source_code:'Code',
