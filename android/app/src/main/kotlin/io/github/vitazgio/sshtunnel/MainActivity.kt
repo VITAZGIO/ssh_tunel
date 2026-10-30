@@ -49,6 +49,7 @@ class MainActivity : AppCompatActivity() {
         const val SETTINGS = 3
         const val SERVERS = 4
         const val APP = 5
+        const val KEY_PAGE = "page"
     }
 
     private lateinit var settings: Settings
@@ -315,9 +316,23 @@ class MainActivity : AppCompatActivity() {
         }
         findViewById<View>(R.id.btnLog).setOnClickListener {
             flipper.displayedChild = if (flipper.displayedChild == LOG) MAIN else LOG
+            if (flipper.displayedChild == LOG) {
+                // Журнал открывается на последней строке и дальше следит за новыми.
+                logFollow = true
+                logScroll.post { logScroll.fullScroll(View.FOCUS_DOWN) }
+            }
         }
+        logScroll.setOnScrollChangeListener { _, _, y, _, _ ->
+            if (logScroll.isShown) logFollow = y + logScroll.height >= logView.height - dp(24)
+        }
+        // Значок настроек: с главной (и журнала) — в настройки, из корня
+        // настроек — на главную, из подэкрана — в корень настроек.
         findViewById<View>(R.id.btnSettings).setOnClickListener {
-            if (flipper.displayedChild >= SETTINGS) flipper.displayedChild = MAIN else openSettings()
+            flipper.displayedChild = when (flipper.displayedChild) {
+                SERVERS, APP -> SETTINGS
+                SETTINGS -> MAIN
+                else -> SETTINGS
+            }
         }
 
         applyInsets()
@@ -340,6 +355,21 @@ class MainActivity : AppCompatActivity() {
 
         askNotificationPermission()
         if (savedInstanceState == null) applyStartMode()
+        else savedInstanceState.getInt(KEY_PAGE, MAIN).let { page ->
+            // Смена темы или языка пересоздаёт экран — остаёмся там же, без анимации.
+            val inA = flipper.inAnimation
+            val outA = flipper.outAnimation
+            flipper.inAnimation = null
+            flipper.outAnimation = null
+            flipper.displayedChild = page
+            flipper.inAnimation = inA
+            flipper.outAnimation = outA
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putInt(KEY_PAGE, flipper.displayedChild)
     }
 
     /**
@@ -401,19 +431,35 @@ class MainActivity : AppCompatActivity() {
         AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(lang))
     }
 
-    /** Маленькая кнопка «Рус/Eng» справа от заголовка настроек. */
+    /**
+     * Кнопка языка справа от заголовка настроек: нажатие раскрывает список
+     * языков с флагами. После выбора экран пересоздаётся, но остаётся в
+     * настройках (см. onSaveInstanceState).
+     */
     private fun setupLangBtn() {
         val btn = findViewById<View>(R.id.langBtn)
-        fun render() {
-            val ru = settings.language != "en"
-            findViewById<FlagView>(R.id.langFlag).code = if (ru) "RU" else "GB"
-            findViewById<TextView>(R.id.langName).text = if (ru) "Рус" else "Eng"
-        }
-        render()
+        val langs = listOf(Triple("ru", "RU", "Русский"), Triple("en", "GB", "English"))
+        val cur = langs.firstOrNull { it.first == settings.language } ?: langs[0]
+        findViewById<FlagView>(R.id.langFlag).code = cur.second
+        findViewById<TextView>(R.id.langName).text = if (cur.first == "en") "Eng" else "Рус"
         btn.setOnClickListener {
-            settings.language = if (settings.language == "en") "ru" else "en"
-            render()
-            applyLanguage(settings.language)
+            val list = LinearLayout(this)
+            list.orientation = LinearLayout.VERTICAL
+            val popup = PopupWindow(list, dp(170), ViewGroup.LayoutParams.WRAP_CONTENT, true)
+            for ((code, flag, label) in langs) {
+                val row = cityRow(FlagViewIcon(flag), label) {
+                    popup.dismiss()
+                    if (code != settings.language) {
+                        settings.language = code
+                        applyLanguage(code)
+                    }
+                }
+                if (code == cur.first) row.setBackgroundResource(R.drawable.bg_seg_on)
+                list.addView(row)
+            }
+            popup.setBackgroundDrawable(ContextCompat.getDrawable(this, R.drawable.bg_card))
+            popup.elevation = 12f
+            popup.showAsDropDown(btn, btn.width - dp(170), 4)
         }
     }
 
@@ -471,8 +517,7 @@ class MainActivity : AppCompatActivity() {
             ShapeBg(ShapeBg.Kind.HEX, 0xFF16402B.toInt(), dp(20).toFloat())
         tintHex(findViewById(R.id.devUpIcon), findViewById(R.id.devUpCap), true)
         devHex.setOnClickListener {
-            devPage.visibility = View.VISIBLE
-            mainScroll.post { mainScroll.smoothScrollTo(0, devPage.top) }
+            mainScroll.smoothScrollTo(0, devPage.top)
         }
         findViewById<View>(R.id.devUp).setOnClickListener { mainScroll.smoothScrollTo(0, 0) }
         renderActions(false)
@@ -495,7 +540,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.toSelfCheck).setPadding(if (devices) dp(22) else 0, 0, 0, 0)
         devGap.layoutParams = devGap.layoutParams.also { it.width = dp(if (devices) 80 else 8) }
         devHex.visibility = if (devices) View.VISIBLE else View.GONE
-        if (!devices) devPage.visibility = View.GONE
+        // Список устройств всегда под главной, если сеть устройств есть, —
+        // до него можно долистать пальцем, не только шестиугольником.
+        devPage.visibility = if (devices) View.VISIBLE else View.GONE
     }
 
     /** Список устройств под главным экраном; нажатие копирует домен. */
@@ -547,7 +594,7 @@ class MainActivity : AppCompatActivity() {
             tv.typeface = android.graphics.Typeface.MONOSPACE
             tv.maxLines = 1
             tv.ellipsize = android.text.TextUtils.TruncateAt.END
-            if (end) tv.gravity = Gravity.END
+            if (end) tv.gravity = Gravity.END else tv.setPadding(0, 0, dp(10), 0)
             tv.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, weight)
             row.addView(tv)
         }
@@ -1507,11 +1554,15 @@ class MainActivity : AppCompatActivity() {
     // строк срезано сверху, чтобы не сдвинуть место, которое сейчас читают.
     private var shownLog: List<String> = emptyList()
 
+    // Следить ли за новыми строками. Помним отдельно: пока журнал скрыт, его
+    // высота нулевая и по прокрутке не понять, был ли человек внизу.
+    private var logFollow = true
+
     // Вниз прокручиваем, только если пользователь и так внизу: отмотал вверх
     // почитать — новые строки не должны выдёргивать его обратно.
     private fun showLog(lines: List<String>) {
         if (lines == shownLog) return
-        val atBottom = logScroll.scrollY + logScroll.height >= logView.height - dp(24)
+        val atBottom = logFollow
         // Якорь — первая видимая строка: её смещение в тексте и сдвиг в пикселях.
         var anchor = -1
         var shift = 0

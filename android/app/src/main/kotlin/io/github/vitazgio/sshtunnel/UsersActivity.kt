@@ -38,6 +38,7 @@ class UsersActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         Look.apply(this)
         setContentView(R.layout.activity_users)
+        Look.backdrop(this)
 
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(
             findViewById(R.id.root)

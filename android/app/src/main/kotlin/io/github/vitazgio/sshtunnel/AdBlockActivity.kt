@@ -45,6 +45,7 @@ class AdBlockActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         Look.apply(this)
         setContentView(R.layout.activity_adblock)
+        Look.backdrop(this)
         settings = Settings(this)
 
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(

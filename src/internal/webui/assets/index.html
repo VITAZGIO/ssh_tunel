@@ -50,9 +50,10 @@
 
   .view{flex:1;overflow-y:auto;padding:0 16px 16px;display:none}
   .view.on{display:block}
-  /* Главный экран не прокручивается: кнопка со статусом занимают всё
-     свободное место, плитки прижаты к низу окна. */
-  #viewMain.on{display:flex;flex-direction:column;overflow:hidden}
+  /* Первая «страница» главного — ровно в окно; ниже список устройств, до
+     него можно долистать колесом или пальцем. Полосу прокрутки не показываем. */
+  #viewMain.on{display:flex;flex-direction:column;overflow-y:auto;scrollbar-width:none}
+  #viewMain::-webkit-scrollbar{display:none}
   .view::-webkit-scrollbar{width:8px}
   .view::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
 
@@ -465,6 +466,14 @@
   .langBtn{display:flex;align-items:center;gap:6px;height:26px;padding:0 8px;border:1px solid var(--line);
            background:transparent;color:var(--text);font:inherit;font-size:12px;font-weight:600;cursor:pointer}
   .langBtn:hover{border-color:var(--accent)}
+  .langSw{position:relative}
+  .langMenu{position:absolute;right:0;top:30px;z-index:20;min-width:150px;background:var(--card);
+            border:1px solid var(--line);box-shadow:0 6px 18px rgba(0,0,0,.35)}
+  .langMenu[hidden]{display:none}
+  .langMenu button{display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;border:0;
+                   background:transparent;color:var(--text);font:inherit;font-size:12.5px;cursor:pointer;text-align:left}
+  .langMenu button:hover,.langMenu button.on{background:var(--card2)}
+  .langMenu svg{width:18px;height:auto;display:block}
   .langBtn svg{width:16px;height:auto;display:block}
   .navlist{border-top:1px solid var(--line);margin-bottom:24px}
   .nav{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:transparent;border:0;
@@ -670,7 +679,8 @@
       <button class="ico" id="backFromSettings" title="Назад" data-i18n-title="back"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
       <span class="t" data-i18n="settings">Настройки</span>
       <span class="langSw"><span class="lk">Язык / Language</span>
-        <button type="button" class="langBtn" id="langBtn"><span id="langFlag"></span><span id="langName">Рус</span></button></span>
+        <button type="button" class="langBtn" id="langBtn"><span id="langFlag"></span><span id="langName">Рус</span></button>
+        <span class="langMenu" id="langMenu" hidden></span></span>
       <select id="language" hidden><option value="ru">Русский</option><option value="en">English</option></select>
     </div>
 
@@ -2480,8 +2490,8 @@ function scrollMainTo(top){
   $('viewMain').scrollTo({top, behavior: reduce ? 'auto' : 'smooth'});
 }
 
-// Шестерёнка работает переключателем: из настроек она возвращает на главную,
-// чтобы не искать кнопку «назад».
+// Шестерёнка: из корня настроек — на главную, из подэкрана настроек — в
+// корень настроек, отовсюду ещё — в настройки.
 $('btnSettings').onclick = () =>
   show(current === 'viewSettings' ? 'viewMain' : 'viewSettings');
 $('toServers').onclick = () => show('viewServers');
@@ -3261,8 +3271,9 @@ async function pollMesh(){
   const enabled = !!p.meshEnabled;
   $('devWrap').hidden = !enabled;
   $('actions').classList.toggle('noDev', !enabled);
+  // Список устройств всегда под главной, если сеть устройств включена.
+  $('devPage').hidden = !enabled;
   if(!enabled){
-    $('devPage').hidden = true;
     if(current !== 'viewMesh') return;
   }
   let st;
@@ -4063,7 +4074,7 @@ function stopMatrix(){
 function startMatrix(c){
   const ctx = c.getContext('2d');
   const fs = 14;
-  const glyphs = 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ0123456789';
+  const glyphs = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let cols = [], w = 0, h = 0;
   const size = () => {
     w = c.width = c.clientWidth; h = c.height = c.clientHeight;
@@ -4116,11 +4127,31 @@ function renderLangBtn(){
   $('langFlag').innerHTML = flagSVG(ru ? 'RU' : 'GB');
   $('langName').textContent = ru ? 'Рус' : 'Eng';
 }
-$('langBtn').onclick = () => {
-  $('language').value = LANG === 'en' ? 'ru' : 'en';
-  $('language').dispatchEvent(new Event('change'));
-  renderLangBtn();
+// Нажатие раскрывает список языков с флагами; выбор остаётся в настройках.
+const LANGS = [['ru','RU','Русский'], ['en','GB','English']];
+$('langBtn').onclick = e => {
+  e.stopPropagation();
+  const m = $('langMenu');
+  if(!m.hidden){ m.hidden = true; return; }
+  m.innerHTML = '';
+  for(const [code, flag, label] of LANGS){
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = code === LANG ? 'on' : '';
+    b.innerHTML = flagSVG(flag);
+    b.append(label);
+    b.onclick = () => {
+      m.hidden = true;
+      if(code === LANG) return;
+      $('language').value = code;
+      $('language').dispatchEvent(new Event('change'));
+      renderLangBtn();
+    };
+    m.appendChild(b);
+  }
+  m.hidden = false;
 };
+document.addEventListener('click', () => { $('langMenu').hidden = true; });
 
 // applyDoc — центральная точка «пришли свежие настройки, разложи их по
 // экрану». keepEditing=false используется после удаления сервера: править
