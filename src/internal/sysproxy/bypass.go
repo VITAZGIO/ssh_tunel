@@ -2,6 +2,7 @@ package sysproxy
 
 import (
 	"fmt"
+	"net"
 	"strings"
 )
 
@@ -75,8 +76,21 @@ func winExtra(extra []string) []string {
 			e = "*" + e // ".corp.local" -> "*.corp.local"
 		}
 		out = append(out, e)
+		if isPlainName(e) {
+			out = append(out, "*."+e) // имя — вместе с поддоменами, как в ядре
+		}
 	}
 	return out
+}
+
+// isPlainName — запись-имя без шаблона: "home.vitazgio.ru", но не "10.8.*",
+// не "*.corp.local" и не адрес. Такое имя ядро считает вместе с поддоменами
+// (см. routing.DirectList), и списки обхода прокси должны говорить то же.
+func isPlainName(e string) bool {
+	if e == "" || strings.ContainsAny(e, "*:/") || net.ParseIP(e) != nil {
+		return false
+	}
+	return strings.Trim(e, "0123456789.") != ""
 }
 
 // winProxyOverride — значение для ProxyOverride в реестре.
@@ -106,7 +120,12 @@ func gnomeIgnoreHosts(bypassLocal bool, extra ...string) string {
 		parts = append(parts, cgnatNet)
 		parts = append(parts, localSuffixes...)
 	}
-	parts = append(parts, extra...)
+	for _, e := range extra {
+		parts = append(parts, e)
+		if isPlainName(e) {
+			parts = append(parts, "*."+e)
+		}
+	}
 	quoted := make([]string, len(parts))
 	for i, p := range parts {
 		quoted[i] = "'" + p + "'"

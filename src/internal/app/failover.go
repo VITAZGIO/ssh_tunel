@@ -23,6 +23,7 @@ import (
 
 	"sshtunnel/internal/config"
 	"sshtunnel/internal/events"
+	"sshtunnel/internal/routing"
 	"sshtunnel/internal/mesh"
 	"sshtunnel/internal/tunnel"
 	"sshtunnel/internal/updater"
@@ -231,7 +232,7 @@ func (a *App) enableSysProxy(cfg config.Config, p config.Profile, httpAddr, sock
 	if off {
 		return
 	}
-	if err := a.sys.Enable(httpAddr, socksAddr, cfg.SetEnvVars, !p.LocalViaTunnel, p.DirectHosts); err != nil {
+	if err := a.sys.Enable(httpAddr, socksAddr, cfg.SetEnvVars, !p.LocalViaTunnel, routing.CleanEntries(p.DirectHosts)); err != nil {
 		a.Bus.Warnf("Не удалось включить системный прокси: %v. Туннель работает, но приложения надо настроить вручную.", err)
 		return
 	}

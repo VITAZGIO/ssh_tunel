@@ -3,9 +3,11 @@ package tunnel
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -974,5 +976,57 @@ func TestStopReturnsWhileConnectionHangs(t *testing.T) {
 		}
 	case <-time.After(stopGrace + 5*time.Second):
 		t.Fatal("остановка не вернулась — приложение на телефоне в этот момент висит")
+	}
+}
+
+// Браузер с «безопасным DNS» (DoH) или с адресом в кеше приходит голым
+// адресом, и наш DNS имени не видит. Имена из списка разрешаются заранее, и
+// такой адрес всё равно идёт напрямую — и из стека VPN, и через прокси.
+func TestDirectNameResolvedAheadSkipsTunnel(t *testing.T) {
+	tun, _, _, srv := startTunnel(t, 1)
+	target := echoServer(t)
+	// Иначе 127.0.0.1 ушёл бы напрямую и без правила — как локальный.
+	tun.SetLocalViaTunnel(true)
+	host, _, _ := net.SplitHostPort(target.String())
+
+	orig := lookupIP
+	t.Cleanup(func() { lookupIP = orig })
+	lookupIP = func(_ context.Context, _ *net.Resolver, name string) ([]net.IP, error) {
+		if name == "vitazgio.example" {
+			return []net.IP{net.ParseIP(host), net.ParseIP("198.18.0.5")}, nil
+		}
+		return nil, errors.New("нет такого имени")
+	}
+
+	// Адрес из строки браузера — тоже правило.
+	tun.SetDirect(routing.NewDirectList([]string{"https://vitazgio.example/"}))
+	tun.resolveDirectNames(context.Background())
+
+	for name, dial := range map[string]func() (net.Conn, bool, error){
+		"VPN":    func() (net.Conn, bool, error) { return tun.dialForTun(target.String(), false) },
+		"прокси": func() (net.Conn, bool, error) { return tun.dialFor("chrome.exe", target.String()) },
+	} {
+		before := srv.channels.Load()
+		conn, direct, err := dial()
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		conn.Close()
+		if !direct || srv.channels.Load() != before {
+			t.Errorf("%s: адрес имени из списка ушёл в туннель", name)
+		}
+	}
+
+	// Подставной адрес VPN не запоминается никогда, посторонний — не напрямую.
+	for _, a := range []string{"198.18.0.5:443", "203.0.113.8:443"} {
+		if tun.listedDirect(a) {
+			t.Errorf("%s выпущен мимо туннеля", a)
+		}
+	}
+
+	// Убрали имя из списка — его адрес снова через сервер.
+	tun.SetDirect(routing.NewDirectList(nil))
+	if tun.listedDirect(target.String()) {
+		t.Error("адрес имени, убранного из списка, всё ещё идёт напрямую")
 	}
 }

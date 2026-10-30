@@ -47,7 +47,7 @@
     <string name="tile_conns">CONNECTIONS</string>
     <string name="tile_links">SSH CHANNELS</string>
     <string name="pool_hint">SSH channels</string>
-    <string name="direct_note">Addresses and networks that don\'t need the tunnel. The local network already goes direct.</string>
+    <string name="direct_note">Addresses and networks that don\'t need the tunnel. The local network already goes direct. A domain (vitazgio.ru) includes all its subdomains; .vitazgio.ru or *.vitazgio.ru — subdomains only.</string>
     <string name="need_settings">Fill in the server address, user and key</string>
     <string name="saved">Saved</string>
     <string name="back">Back</string>

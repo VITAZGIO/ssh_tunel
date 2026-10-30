@@ -3,6 +3,7 @@ package routing
 import (
 	"fmt"
 	"net"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -23,9 +24,15 @@ import (
 //	100.64.0.0/10      сеть в записи CIDR
 //	25.*, 10.8.*       то же самое шаблоном (превращается в /8, /16, /24)
 //	100.104.1.5        одиночный адрес
-//	nas.mydomain.com   конкретное имя
-//	.netbird.cloud     любое имя с таким окончанием
+//	home.vitazgio.ru   имя и все его поддомены (sync.home.vitazgio.ru)
+//	.netbird.cloud     только поддомены, без самого имени
 //	*.corp.local       то же самое, привычной записью
+//	https://site.ru/   ссылка из браузера — берётся имя (см. CleanEntry)
+//
+// Имя покрывает и поддомены: человек вписывает свой домен и ждёт, что
+// откроются все сайты на нём. Домашние сервисы живут как раз так —
+// https://<имя>.home.vitazgio.ru, — и правило «только само имя» их не
+// касалось: они уходили через сервер и не открывались.
 
 // DirectList потокобезопасен: список правится в настройках, не останавливая
 // туннель.
@@ -51,8 +58,7 @@ func (d *DirectList) Set(entries []string) {
 		suffixes []string
 	)
 	for _, raw := range entries {
-		e := strings.ToLower(strings.TrimSpace(raw))
-		e = strings.Trim(e, "[]")
+		e := CleanEntry(raw)
 		if e == "" {
 			continue
 		}
@@ -72,12 +78,70 @@ func (d *DirectList) Set(entries []string) {
 			suffixes = append(suffixes, e)
 			continue
 		}
-		names = append(names, strings.TrimSuffix(e, "."))
+		e = strings.TrimSuffix(e, ".")
+		names = append(names, e)
+		suffixes = append(suffixes, "."+e)
 	}
 
 	d.mu.Lock()
 	d.ips, d.nets, d.names, d.suffixes = ips, nets, names, suffixes
 	d.mu.Unlock()
+}
+
+// CleanEntry приводит запись к виду, который понимают правила. Человек
+// часто вставляет адрес из строки браузера — "https://vitazgio.ru/" или
+// "home.vitazgio.ru:8443": такая запись не совпала бы ни с одним
+// соединением, и правило молча не работало бы. Схему, путь и порт у имени
+// отбрасываем; сети в записи CIDR и адреса IPv6 не трогаем.
+func CleanEntry(raw string) string {
+	e := strings.ToLower(strings.TrimSpace(raw))
+	if _, rest, ok := strings.Cut(e, "://"); ok {
+		e = rest
+		// После схемы идёт адрес из ссылки: всё от первого '/' — путь.
+		if i := strings.IndexAny(e, "/?#"); i >= 0 {
+			e = e[:i]
+		}
+	}
+	if e == "" || parseNet(e) != nil {
+		return e
+	}
+	if h, _, err := net.SplitHostPort(e); err == nil {
+		e = h
+	}
+	e = strings.Trim(e, "[]")
+	if net.ParseIP(e) != nil {
+		return e
+	}
+	// Имя: путь без схемы ("vitazgio.ru/cloud") и точка в конце.
+	if i := strings.IndexAny(e, "/?#"); i >= 0 {
+		e = e[:i]
+	}
+	return strings.TrimSuffix(e, ".")
+}
+
+// CleanEntries — CleanEntry для всего списка, без пустых записей. Нужен там,
+// где список уходит из программы как есть: в исключения системного прокси.
+func CleanEntries(entries []string) []string {
+	out := make([]string, 0, len(entries))
+	for _, e := range entries {
+		if e = CleanEntry(e); e != "" {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// Names — точные имена из списка: их можно разрешить заранее. Адреса под
+// ними нужны там, где соединение приходит уже с адресом, а не с именем (см.
+// tunnel). Записи вида ".corp.local" сюда не входят: поддомены заранее не
+// перечислить.
+func (d *DirectList) Names() []string {
+	if d == nil {
+		return nil
+	}
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return slices.Clone(d.names)
 }
 
 // Empty — список пуст, проверять нечего.

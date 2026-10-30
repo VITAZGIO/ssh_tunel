@@ -228,9 +228,10 @@ type Tunnel struct {
 	// сети устройств, а всё остальное идёт напрямую (см. SetBypass).
 	bypassOff atomic.Bool
 
-	// learned — адреса, выданные телефоном для имён из «всегда напрямую»
-	// (см. LearnDirect). Нужно только на Android.
+	// learned — адреса имён из «всегда напрямую» (см. LearnDirect): выданные
+	// нашим DNS и разрешённые заранее (см. directnames.go).
 	learned learnedDirect
+	dnames  directNames
 }
 
 type stats struct {
@@ -282,6 +283,7 @@ func (t *Tunnel) SetDirect(d *routing.DirectList) {
 	t.mu.Lock()
 	t.cfg.Direct = d
 	t.mu.Unlock()
+	t.kickDirectNames()
 }
 
 // currentKick отдаёт текущий канал сигнала «пересобрать пул» — создаёт его
@@ -364,6 +366,8 @@ func (t *Tunnel) Start() error {
 		t.Stop()
 		return err
 	}
+
+	go t.keepDirectResolved(t.ctx)
 
 	t.setState(events.StateConnected, fmt.Sprintf("%s:%d", t.cfg.Host, t.cfg.SSHPort))
 	return nil
