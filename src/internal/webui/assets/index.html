@@ -958,6 +958,34 @@
          и упоминает домены, а не только сети. -->
     <div class="help" id="directHelp" hidden></div>
 
+    <!-- Только в VPN-версии: в режиме прокси DNS разрешают сами программы. -->
+    <div id="adBlockBox" hidden>
+      <div class="sect" data-i18n="adblock_title">Блокировка рекламы</div>
+      <div class="chk-row">
+        <label class="chk"><input type="checkbox" id="adBlockEnabled">
+          <span class="lbl" data-i18n="adblock_on">Блокировать рекламу и слежку</span></label>
+        <button class="qmark" id="adBlockHelpBtn" title="Подробнее">?</button>
+      </div>
+      <div class="help" id="adBlockHelp" hidden><p data-i18n="adblock_help">Как на телефоне: запрос
+        имени из списка получает отказ, и реклама не грузится ни в одной программе. Списки — ссылки или
+        файлы в формате hosts, по одному на строку. Скачиваются только кнопкой «Обновить списки» и дальше
+        работают без сети.</p></div>
+      <div class="field">
+        <label for="adBlockSources" data-i18n="adblock_sources">Списки</label>
+        <textarea id="adBlockSources" rows="2" spellcheck="false"
+          placeholder="https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"></textarea>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:7px">
+          <button class="btn" id="adBlockUpdate" style="font-size:12.5px;padding:6px 12px"
+            data-i18n="adblock_update">Обновить списки</button>
+          <span class="hint" id="adBlockNote" style="margin:0"></span>
+        </div>
+      </div>
+      <div class="field">
+        <label for="adBlockAllowlist" data-i18n="adblock_allow">Не блокировать</label>
+        <textarea id="adBlockAllowlist" rows="2" spellcheck="false" placeholder="example.com"></textarea>
+      </div>
+    </div>
+
     <div class="appFoot">
       <div class="upd">
       <p class="note" style="margin:0 0 9px">
@@ -1678,6 +1706,12 @@ const I18N = {
       '(быстрый HTTP/3) не проходят через туннель. Эта галочка включает проброс через отдельный '+
       'ретранслятор на сервере — ставится один раз, в мастере настройки VPS (кнопка «Настроить сервер по '+
       'SSH» в этом же меню). Пока он не установлен, галочка ничего не меняет: UDP по-прежнему не проходит.',
+    adblock_title:'Блокировка рекламы', adblock_on:'Блокировать рекламу и слежку',
+    adblock_sources:'Списки', adblock_update:'Обновить списки', adblock_allow:'Не блокировать',
+    adblock_loading:'скачиваю…', adblock_count:'загружено имён: {n}',
+    adblock_help:'Как на телефоне: запрос имени из списка получает отказ, и реклама не грузится ни в одной '+
+      'программе. Списки — ссылки или файлы в формате hosts, по одному на строку. Скачиваются только кнопкой '+
+      '«Обновить списки» и дальше работают без сети.',
     direct_label:'Всегда напрямую', scan_net:'Проверить сеть',
     direct_ph:'10.8.0.0/16, 172.30.*, .corp.local, vitazgio.ru',
     direct_help_html:'<p>Сети и домены, которые не надо вести через сервер. Домашние и офисные '+
@@ -1944,6 +1978,12 @@ const I18N = {
       "don't get through the tunnel. This checkbox turns on forwarding through a separate relay on the "+
       'server — set up once, in the VPS setup wizard ("Set up the server over SSH" button in this same '+
       "menu). Until it's installed, this checkbox changes nothing: UDP still doesn't get through.",
+    adblock_title:'Ad blocking', adblock_on:'Block ads and trackers',
+    adblock_sources:'Lists', adblock_update:'Update lists', adblock_allow:'Never block',
+    adblock_loading:'downloading…', adblock_count:'names loaded: {n}',
+    adblock_help:'Same as on the phone: a lookup of a listed name is refused, so ads don\'t load in any '+
+      'program. Lists are links or files in hosts format, one per line. They are downloaded only by the '+
+      '"Update lists" button and then work offline.',
     direct_label:'Always direct', scan_net:'Scan network',
     direct_ph:'10.8.0.0/16, 172.30.*, .corp.local, vitazgio.ru',
     direct_help_html:'<p>Networks and domains that shouldn\'t go through the server. Home and office '+
@@ -2094,7 +2134,7 @@ $('language').addEventListener('change', () => {
 const FIELDS = ['host','user','keyPath','sshPort','socksPort','httpPort','poolSize','meshName','meshKey',
                 'keepAliveSec','connectTimeoutSec','cipher','ipVersion'];
 const PROFILE_CHECKS = ['localViaTunnel', 'udpRelayEnabled', 'meshEnabled', 'meshIncoming', 'shareLan'];
-const CHECKS = ['verbose'];
+const CHECKS = ['verbose', 'adBlockEnabled'];
 
 /* Правила фильтра живут отдельно от полей формы: они правятся на своём
    экране и сохраняются своей кнопкой. */
@@ -3154,6 +3194,15 @@ toggleHelp('keyHelpBtn', 'keyHelp', renderSetupCmd);
 toggleHelp('localHelpBtn', 'localHelp');
 toggleHelp('udpRelayHelpBtn', 'udpRelayHelp');
 toggleHelp('directHelpBtn', 'directHelp');
+toggleHelp('adBlockHelpBtn', 'adBlockHelp');
+
+/* Скачать списки и сразу применить. Источники берём из поля, даже если
+   «Сохранить» ещё не нажали, — человек ждёт, что кнопка возьмёт то, что видит. */
+$('adBlockUpdate').onclick = async () => {
+  $('adBlockNote').textContent = tr('adblock_loading');
+  const r = await api('/api/adblock/update', {sources: $('adBlockSources').value});
+  $('adBlockNote').textContent = r.error ? r.error : tr('adblock_count').replace('{n}', r.count);
+};
 toggleHelp('kaHelpBtn', 'kaHelp');
 toggleHelp('toHelpBtn', 'toHelp');
 toggleHelp('cipherHelpBtn', 'cipherHelp');
@@ -3394,7 +3443,7 @@ function splitEntries(v){
 }
 
 [...FIELDS, ...PROFILE_CHECKS, ...CHECKS, 'directHosts', 'autoConnect',
- 'customCityName', 'showServerPicker'].forEach(f => {
+ 'customCityName', 'showServerPicker', 'adBlockSources', 'adBlockAllowlist'].forEach(f => {
   const el = $(f);
   if(el) el.addEventListener('input', () => { formDirty = true; });
 });
@@ -3912,6 +3961,8 @@ $('save').onclick = async () => {
 
   const doc = shareTraffic(docWithProfile(p), p);
   CHECKS.forEach(f => doc[f] = $(f).checked);
+  doc.adBlockSources = $('adBlockSources').value.trim();
+  doc.adBlockAllowlist = $('adBlockAllowlist').value.trim();
   // Прежние галочки ставим по выбранному режиму — их читают старые версии,
   // а новые смотрят на startMode.
   doc.startMode = startMode;
@@ -4013,6 +4064,8 @@ function renderIssuedByPanel(p){
 
 function fillGeneralForm(c){
   CHECKS.forEach(f => { if($(f)) $(f).checked = !!c[f]; });
+  $('adBlockSources').value = c.adBlockSources || '';
+  $('adBlockAllowlist').value = c.adBlockAllowlist || '';
   $('autoStart').checked = !!c.autoStart;
   // Пока настройку не сохраняли явно (autoConnect === undefined), в силе
   // старое поведение — программа подключается сама, поэтому и галочка стоит.
@@ -4182,6 +4235,7 @@ async function refresh(){
   let detail = st.state === 'connected' ? active.host : '';
   if(detail && usingBackup) detail += ' (' + tr('backup_server_note') + ')';
   if(st.modes) netModes = st.modes;
+  $('adBlockBox').hidden = !st.adBlock;
   setState(st.state, detail);
   // Пока пользователь правит форму, обновление с сервера её не трогает —
   // иначе набранный, но ещё не сохранённый адрес затирался бы.

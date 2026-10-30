@@ -823,42 +823,11 @@ func splitNonEmpty(text string) []string {
 // себе: список не должен меняться без ведома человека, а обновление по
 // расписанию — это ещё и сетевой запрос, который на телефоне не бесплатен.
 func UpdateBlockLists(sourcesText string, cachePath string) string {
-	sources := routing.SplitEntries(sourcesText)
-	if len(sources) == 0 {
-		return `{"error":"не указан ни один список"}`
+	n, err := core.UpdateBlockListFile(routing.SplitEntries(sourcesText), cachePath)
+	if err != nil {
+		return fmt.Sprintf(`{"error":%q}`, err.Error())
 	}
-
-	seen := make(map[string]struct{})
-	var names []string
-	var lastErr error
-	fetchedAny := false
-	for _, src := range sources {
-		list, err := core.FetchBlockListSource(src)
-		if err != nil {
-			lastErr = fmt.Errorf("%s: %w", src, err)
-			continue
-		}
-		fetchedAny = true
-		for _, n := range list {
-			n = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(n), "."))
-			if n == "" {
-				continue
-			}
-			if _, dup := seen[n]; dup {
-				continue
-			}
-			seen[n] = struct{}{}
-			names = append(names, n)
-		}
-	}
-	if !fetchedAny {
-		return fmt.Sprintf(`{"error":%q}`, lastErr.Error())
-	}
-
-	if err := os.WriteFile(cachePath, []byte(strings.Join(names, "\n")), 0o600); err != nil {
-		return fmt.Sprintf(`{"error":%q}`, "не удалось сохранить список: "+err.Error())
-	}
-	return fmt.Sprintf(`{"count":%d}`, len(names))
+	return fmt.Sprintf(`{"count":%d}`, n)
 }
 
 // FakeNet отдаёт подсеть подставных адресов.

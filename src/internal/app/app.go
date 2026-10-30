@@ -98,8 +98,12 @@ type NetLayer interface {
 // SetNetLayer включает режим VPN. Вызывать до первого Start.
 func (a *App) SetNetLayer(n NetLayer) {
 	a.mu.Lock()
-	defer a.mu.Unlock()
 	a.net = n
+	cfg := a.cfg
+	a.mu.Unlock()
+	if ab, ok := n.(AdBlocker); ok {
+		ab.SetAdBlock(cfg)
+	}
 }
 
 func New(cfg config.Config) *App {
@@ -172,6 +176,9 @@ func (a *App) SetConfig(cfg config.Config) (string, error) {
 
 	if err := cfg.Save(); err != nil {
 		return "", err
+	}
+	if ab := a.adBlocker(); ab != nil {
+		ab.SetAdBlock(cfg)
 	}
 
 	if running && connectionSettingsChanged(old, cfg) {

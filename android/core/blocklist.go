@@ -161,3 +161,53 @@ func FetchBlockListSource(source string) ([]string, error) {
 	defer f.Close()
 	return ParseBlockListText(f), nil
 }
+
+// UpdateBlockListFile загружает все списки из sources, объединяет их без
+// повторов и сохраняет в cachePath — чтобы дальше блокировка работала и без
+// сети. Возвращает число имён. Недоступный список пропускается; ошибка — только
+// если не загрузился ни один или файл не записался. Общая для телефона и ПК.
+func UpdateBlockListFile(sources []string, cachePath string) (int, error) {
+	if len(sources) == 0 {
+		return 0, fmt.Errorf("не указан ни один список")
+	}
+	seen := make(map[string]struct{})
+	var names []string
+	var lastErr error
+	fetchedAny := false
+	for _, src := range sources {
+		list, err := FetchBlockListSource(src)
+		if err != nil {
+			lastErr = fmt.Errorf("%s: %w", src, err)
+			continue
+		}
+		fetchedAny = true
+		for _, n := range list {
+			n = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(n), "."))
+			if n == "" {
+				continue
+			}
+			if _, dup := seen[n]; dup {
+				continue
+			}
+			seen[n] = struct{}{}
+			names = append(names, n)
+		}
+	}
+	if !fetchedAny {
+		return 0, lastErr
+	}
+	if err := os.WriteFile(cachePath, []byte(strings.Join(names, "\n")), 0o600); err != nil {
+		return 0, fmt.Errorf("не удалось сохранить список: %w", err)
+	}
+	return len(names), nil
+}
+
+// LoadBlockListFile читает список, сохранённый UpdateBlockListFile. Нет файла —
+// пустой список: блокировка включена, но пока ничего не блокирует.
+func LoadBlockListFile(cachePath string) []string {
+	data, err := os.ReadFile(cachePath)
+	if err != nil {
+		return nil
+	}
+	return strings.Split(strings.TrimSpace(string(data)), "\n")
+}
