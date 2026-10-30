@@ -14,8 +14,6 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.AdapterView
-import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.EditText
@@ -23,7 +21,6 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.ScrollView
-import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import android.widget.ViewFlipper
@@ -50,6 +47,8 @@ class MainActivity : AppCompatActivity() {
         const val SELFCHECK = 1
         const val LOG = 2
         const val SETTINGS = 3
+        const val SERVERS = 4
+        const val APP = 5
     }
 
     private lateinit var settings: Settings
@@ -65,7 +64,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var logScroll: ScrollView
     private lateinit var keyStateView: TextView
     private lateinit var appsSummary: TextView
-    private lateinit var speedButton: Button
+    private lateinit var speedButton: TextView
 
     private lateinit var pingView: TextView
     private lateinit var rowSpeed: View
@@ -84,30 +83,38 @@ class MainActivity : AppCompatActivity() {
     private lateinit var localCheck: CheckBox
     private lateinit var localCheckInfo: View
 
-    private lateinit var languageSpinner: Spinner
     private lateinit var profileTabs: LinearLayout
-    private lateinit var profileTabsScroll: android.widget.HorizontalScrollView
     private lateinit var removeProfileBtn: View
     private lateinit var exportProfileClipBtn: View
-    private lateinit var pasteConfigBtn: Button
-    private lateinit var scanConfigBtn: Button
+    private lateinit var pasteConfigBtn: View
+    private lateinit var scanConfigBtn: View
     private lateinit var importNote: TextView
     private lateinit var cityBtn: View
     private lateinit var cityFlagView: FlagView
     private lateinit var cityLabelView: TextView
     private lateinit var customCityName: EditText
-    private lateinit var selectServerBtn: Button
+    private lateinit var selectServerBtn: View
 
     private lateinit var bundleNote: TextView
     private lateinit var updateNote: TextView
     private lateinit var updateDownloadBtn: View
 
-    private lateinit var serverPanelHeader: View
-    private lateinit var serverPanelChevron: View
-    private lateinit var serverPanelBody: View
-    private lateinit var generalPanelHeader: View
-    private lateinit var generalPanelChevron: View
-    private lateinit var generalPanelBody: View
+    private lateinit var serverPanelBody: LinearLayout
+
+    /** Раскрыты ли настройки правленого сервера под его строкой. */
+    private var srvOpen = false
+
+    // Главный экран: прокрутка к списку устройств и фигурные кнопки.
+    private lateinit var mainScroll: ScrollView
+    private lateinit var mainPage: View
+    private lateinit var devPage: View
+    private lateinit var devHex: View
+    private lateinit var devGap: View
+    private lateinit var devRows: LinearLayout
+    private lateinit var linkBars: TextView
+    private lateinit var backdrop: BackdropView
+    private val hexBg by lazy { ShapeBg(ShapeBg.Kind.HEX, tc(R.color.card2), dp(20).toFloat()) }
+    private var devHit = ""
 
     /** id профиля, который сейчас показан в форме — не обязательно активного. */
     private var editingProfileId: String = ""
@@ -165,6 +172,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         settings = Settings(this)
         applyLanguage(settings.language)
+        Look.apply(this)
         setContentView(R.layout.activity_main)
 
         flipper = findViewById(R.id.flipper)
@@ -179,6 +187,14 @@ class MainActivity : AppCompatActivity() {
         keyStateView = findViewById(R.id.keyState)
         appsSummary = findViewById(R.id.appsSummary)
         speedButton = findViewById(R.id.speedtest)
+        mainScroll = findViewById(R.id.mainScroll)
+        mainPage = findViewById(R.id.mainPage)
+        devPage = findViewById(R.id.devPage)
+        devHex = findViewById(R.id.devHex)
+        devGap = findViewById(R.id.devGap)
+        devRows = findViewById(R.id.devRows)
+        linkBars = findViewById(R.id.linkBars)
+        backdrop = findViewById(R.id.backdrop)
 
         pingView = findViewById(R.id.ping)
         rowSpeed = findViewById(R.id.rowSpeed)
@@ -197,9 +213,7 @@ class MainActivity : AppCompatActivity() {
         localCheck = findViewById(R.id.localViaTunnel)
         localCheckInfo = findViewById(R.id.localViaTunnelInfo)
 
-        languageSpinner = findViewById(R.id.languageSpinner)
         profileTabs = findViewById(R.id.profileTabs)
-        profileTabsScroll = findViewById(R.id.profileTabsScroll)
         removeProfileBtn = findViewById(R.id.removeProfileBtn)
         exportProfileClipBtn = findViewById(R.id.exportProfileClipBtn)
         pasteConfigBtn = findViewById(R.id.pasteConfigBtn)
@@ -223,13 +237,11 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.authorSite).setOnClickListener {
             openLink("https://vitazgio.ru")
         }
+        findViewById<View>(R.id.codeLink).setOnClickListener {
+            openLink("https://github.com/VITAZGIO/ssh_tunnel")
+        }
 
-        serverPanelHeader = findViewById(R.id.serverPanelHeader)
-        serverPanelChevron = findViewById(R.id.serverPanelChevron)
         serverPanelBody = findViewById(R.id.serverPanelBody)
-        generalPanelHeader = findViewById(R.id.generalPanelHeader)
-        generalPanelChevron = findViewById(R.id.generalPanelChevron)
-        generalPanelBody = findViewById(R.id.generalPanelBody)
 
         adBlockRow = findViewById(R.id.adBlockRow)
         adBlockSummary = findViewById(R.id.adBlockSummary)
@@ -237,6 +249,9 @@ class MainActivity : AppCompatActivity() {
         meshRow = findViewById(R.id.meshRow)
         meshSummary = findViewById(R.id.meshSummary)
         meshRow.setOnClickListener { startActivity(Intent(this, MeshActivity::class.java)) }
+        findViewById<View>(R.id.usersRow).setOnClickListener {
+            startActivity(Intent(this, UsersActivity::class.java))
+        }
         udpRelayEnabledCheck = findViewById(R.id.udpRelayEnabled)
         showServerPickerCheck = findViewById(R.id.showServerPicker)
 
@@ -250,15 +265,25 @@ class MainActivity : AppCompatActivity() {
         renderSelfCheckSteps(null)
 
         editingProfileId = settings.activeProfileId.ifBlank { settings.active().id }
-        setupLanguageSpinner()
-        setupPanels()
+        setupLangBtn()
+        setupSegs()
+        setupMainScreen()
         renderProfileTabs()
         loadProfileIntoForm(settings.active())
         loadAppSettings()
 
         power.setOnClickListener { onToggle() }
         speedButton.setOnClickListener { runSpeedTest() }
-        findViewById<Button>(R.id.save).setOnClickListener { saveSettings() }
+        for (id in listOf(R.id.save, R.id.saveServers, R.id.saveApp)) {
+            findViewById<Button>(id).setOnClickListener { saveSettings() }
+        }
+        findViewById<View>(R.id.toServers).setOnClickListener { flipper.displayedChild = SERVERS }
+        findViewById<View>(R.id.toApp).setOnClickListener { flipper.displayedChild = APP }
+        findViewById<View>(R.id.backFromServers).setOnClickListener { flipper.displayedChild = SETTINGS }
+        findViewById<View>(R.id.backFromApp).setOnClickListener { flipper.displayedChild = SETTINGS }
+        findViewById<View>(R.id.addServerBtn).setOnClickListener { onAddProfile() }
+        bindInfo(R.id.xferInfo, R.string.xfer_note)
+        bindInfo(R.id.startModeInfo, R.string.start_mode_note)
         selfCheckStartButton.setOnClickListener { runSelfCheck() }
         findViewById<View>(R.id.toSelfCheck).setOnClickListener {
             flipper.displayedChild = SELFCHECK
@@ -281,15 +306,18 @@ class MainActivity : AppCompatActivity() {
         bindInfo(R.id.poolInfo, R.string.pool_note)
         bindInfo(R.id.directInfo, R.string.direct_note)
 
-        // Шапка одна на все экраны: логотип всегда возвращает на главную,
-        // значки открывают своё, а повторное нажатие на уже открытый экран
-        // возвращает на главную — как переключатель.
-        findViewById<View>(R.id.btnHome).setOnClickListener { flipper.displayedChild = MAIN }
+        // Шапка одна на все экраны: логотип всегда возвращает на главную (а на
+        // главной — прокручивает от списка устройств наверх), значки открывают
+        // своё, а повторное нажатие на уже открытый экран возвращает на главную.
+        findViewById<View>(R.id.btnHome).setOnClickListener {
+            if (flipper.displayedChild == MAIN) mainScroll.smoothScrollTo(0, 0)
+            else flipper.displayedChild = MAIN
+        }
         findViewById<View>(R.id.btnLog).setOnClickListener {
             flipper.displayedChild = if (flipper.displayedChild == LOG) MAIN else LOG
         }
         findViewById<View>(R.id.btnSettings).setOnClickListener {
-            if (flipper.displayedChild == SETTINGS) flipper.displayedChild = MAIN else openSettings()
+            if (flipper.displayedChild >= SETTINGS) flipper.displayedChild = MAIN else openSettings()
         }
 
         applyInsets()
@@ -299,7 +327,9 @@ class MainActivity : AppCompatActivity() {
         onBackPressedDispatcher.addCallback(this,
             object : androidx.activity.OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
-                    if (flipper.displayedChild != MAIN) {
+                    if (flipper.displayedChild == SERVERS || flipper.displayedChild == APP) {
+                        flipper.displayedChild = SETTINGS
+                    } else if (flipper.displayedChild != MAIN) {
                         flipper.displayedChild = MAIN
                     } else {
                         isEnabled = false
@@ -309,6 +339,23 @@ class MainActivity : AppCompatActivity() {
             })
 
         askNotificationPermission()
+        if (savedInstanceState == null) applyStartMode()
+    }
+
+    /**
+     * Три кнопки «Туннель при открытии приложения»: включать, как было после
+     * последнего включения/выключения руками, не включать. Включение без
+     * разрешения на VPN не сработает — его спросит система при первом нажатии.
+     */
+    private fun applyStartMode() {
+        val want = when (settings.startMode) {
+            "on" -> true
+            "last" -> settings.lastRunning
+            else -> false
+        }
+        if (want && TunnelService.state == "stopped" && settings.ready() && VpnService.prepare(this) == null) {
+            start()
+        }
     }
 
     /**
@@ -354,104 +401,262 @@ class MainActivity : AppCompatActivity() {
         AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(lang))
     }
 
-    private fun setupLanguageSpinner() {
-        val labels = listOf(getString(R.string.lang_ru), getString(R.string.lang_en))
-        val codes = listOf("ru", "en")
-        languageSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, labels).also {
-            it.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+    /** Маленькая кнопка «Рус/Eng» справа от заголовка настроек. */
+    private fun setupLangBtn() {
+        val btn = findViewById<View>(R.id.langBtn)
+        fun render() {
+            val ru = settings.language != "en"
+            findViewById<FlagView>(R.id.langFlag).code = if (ru) "RU" else "GB"
+            findViewById<TextView>(R.id.langName).text = if (ru) "Рус" else "Eng"
         }
-        languageSpinner.setSelection(codes.indexOf(settings.language).coerceAtLeast(0))
-        languageSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, pos: Int, id: Long) {
-                val lang = codes[pos]
-                if (lang != settings.language) {
-                    settings.language = lang
-                    applyLanguage(lang)
-                }
-            }
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        render()
+        btn.setOnClickListener {
+            settings.language = if (settings.language == "en") "ru" else "en"
+            render()
+            applyLanguage(settings.language)
         }
     }
 
-    // ---------------------------------------------------------------------
-    // Сворачиваемые блоки настроек
-    // ---------------------------------------------------------------------
+    /** Ряды вариантов: режим запуска, тема, фон. */
+    private fun setupSegs() {
+        bindSeg(R.id.startModeSeg, { settings.startMode }) { settings.startMode = it }
+        bindSeg(R.id.themeSeg, { settings.theme }) {
+            if (it != settings.theme) {
+                settings.theme = it
+                recreate()
+            }
+        }
+        bindSeg(R.id.bgSeg, { settings.background }) {
+            settings.background = it
+            backdrop.mode = it
+        }
+        backdrop.mode = settings.background
+    }
+
+    private fun bindSeg(id: Int, get: () -> String, set: (String) -> Unit) {
+        val box = findViewById<LinearLayout>(id)
+        fun render() {
+            val v = get()
+            for (k in 0 until box.childCount) {
+                val c = box.getChildAt(k)
+                if ((c.tag?.toString() ?: "") == v) c.setBackgroundResource(R.drawable.bg_seg_on)
+                else c.setBackgroundResource(0)
+            }
+        }
+        for (k in 0 until box.childCount) {
+            val c = box.getChildAt(k)
+            c.setOnClickListener {
+                set(c.tag?.toString() ?: "")
+                render()
+            }
+        }
+        render()
+    }
 
     /**
-     * Оба блока свёрнуты при каждом запуске приложения. Настройки открывают
-     * чаще всего ради одной вкладки сервера или одной галочки, а не ради
-     * всего списка полей; выбор намеренно не запоминается между запусками —
-     * иначе, развернув блок один раз, человек получал бы простыню полей
-     * каждый следующий раз.
+     * Главный экран: первая «страница» ровно в высоту экрана, под ней список
+     * устройств. Шестиугольник «Устройства» между кнопками виден, только когда
+     * у сервера включена сеть устройств; у соседних кнопок тогда срезан угол.
      */
-    private fun setupPanels() {
-        serverPanelHeader.setOnClickListener { togglePanel(isServer = true) }
-        generalPanelHeader.setOnClickListener { togglePanel(isServer = false) }
-        applyPanelState(serverPanelBody, serverPanelChevron, false)
-        applyPanelState(generalPanelBody, generalPanelChevron, false)
+    private fun setupMainScreen() {
+        mainScroll.viewTreeObserver.addOnGlobalLayoutListener {
+            val h = mainScroll.height
+            if (h > 0 && mainPage.layoutParams.height != h) {
+                mainPage.layoutParams = mainPage.layoutParams.also { it.height = h }
+                devPage.minimumHeight = h
+            }
+        }
+        devHex.background = hexBg
+        findViewById<View>(R.id.devUp).background =
+            ShapeBg(ShapeBg.Kind.HEX, 0xFF16402B.toInt(), dp(20).toFloat())
+        tintHex(findViewById(R.id.devUpIcon), findViewById(R.id.devUpCap), true)
+        devHex.setOnClickListener {
+            devPage.visibility = View.VISIBLE
+            mainScroll.post { mainScroll.smoothScrollTo(0, devPage.top) }
+        }
+        findViewById<View>(R.id.devUp).setOnClickListener { mainScroll.smoothScrollTo(0, 0) }
+        renderActions(false)
+    }
+
+    private fun tintHex(icon: ImageView, cap: TextView, on: Boolean) {
+        val c = if (on) 0xFF7BE3A8.toInt() else tc(R.color.dim)
+        icon.setColorFilter(c)
+        cap.setTextColor(c)
+    }
+
+    /** Кнопки под сведениями: с сетью устройств — вырезы под шестиугольник. */
+    private fun renderActions(devices: Boolean) {
+        val card = tc(R.color.card2)
+        val depth = dp(20).toFloat()
+        speedButton.background = ShapeBg(if (devices) ShapeBg.Kind.NOTCH_RIGHT else ShapeBg.Kind.RECT, card, depth)
+        findViewById<View>(R.id.toSelfCheck).background =
+            ShapeBg(if (devices) ShapeBg.Kind.NOTCH_LEFT else ShapeBg.Kind.RECT, card, depth)
+        speedButton.setPadding(0, 0, if (devices) dp(22) else 0, 0)
+        findViewById<View>(R.id.toSelfCheck).setPadding(if (devices) dp(22) else 0, 0, 0, 0)
+        devGap.layoutParams = devGap.layoutParams.also { it.width = dp(if (devices) 80 else 8) }
+        devHex.visibility = if (devices) View.VISIBLE else View.GONE
+        if (!devices) devPage.visibility = View.GONE
+    }
+
+    /** Список устройств под главным экраном; нажатие копирует домен. */
+    private fun renderDevices() {
+        val p = settings.active()
+        val devices = p.meshEnabled && p.meshKey.isNotBlank()
+        if (devices != (devHex.visibility == View.VISIBLE)) renderActions(devices)
+        if (!devices) return
+        val o = try { JSONObject(TunnelService.meshStatus()) } catch (e: Exception) { JSONObject() }
+        val online = o.optString("state") == "online"
+        hexBg.setColor(if (online) 0xFF16402B.toInt() else tc(R.color.card2))
+        tintHex(findViewById(R.id.devHexIcon), findViewById(R.id.devHexCap), online)
+        if (devPage.visibility != View.VISIBLE) return
+
+        val peers = o.optJSONArray("peers")
+        val n = peers?.length() ?: 0
+        var up = 0
+        devRows.removeAllViews()
+        for (i in 0 until n) {
+            val peer = peers!!.getJSONObject(i)
+            if (peer.optBoolean("online")) up++
+            devRows.addView(devRow(peer, i))
+        }
+        findViewById<TextView>(R.id.devCount).text = if (n > 0) "$up / $n" else ""
+        if (n == 0) {
+            val empty = TextView(this)
+            empty.text = getString(R.string.mesh_no_peers)
+            empty.setTextColor(tc(R.color.dim))
+            empty.setPadding(dp(8), dp(12), dp(8), dp(12))
+            devRows.addView(empty)
+        }
+    }
+
+    private fun devRow(peer: JSONObject, index: Int): View {
+        val domain = peer.optString("host") + ".mesh"
+        val on = peer.optBoolean("online")
+        val row = LinearLayout(this)
+        row.orientation = LinearLayout.HORIZONTAL
+        row.setPadding(dp(8), dp(11), dp(8), dp(11))
+        row.setBackgroundColor(if (index % 2 == 0) tc(R.color.card) else 0)
+        if (devHit == domain) row.setBackgroundColor(0x2216402B)
+        row.isClickable = true
+        row.isFocusable = true
+        fun cell(text: String, weight: Float, color: Int, end: Boolean = false) {
+            val tv = TextView(this)
+            tv.text = text
+            tv.setTextColor(color)
+            tv.textSize = 12.5f
+            tv.typeface = android.graphics.Typeface.MONOSPACE
+            tv.maxLines = 1
+            tv.ellipsize = android.text.TextUtils.TruncateAt.END
+            if (end) tv.gravity = Gravity.END
+            tv.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, weight)
+            row.addView(tv)
+        }
+        val dim = tc(R.color.dim)
+        val name = peer.optString("name") + if (peer.optBoolean("self")) " " + getString(R.string.mesh_this) else ""
+        cell(name, 1f, if (on) tc(R.color.text) else dim)
+        cell(domain, 1.3f, if (devHit == domain) tc(R.color.ok) else if (on) tc(R.color.accent) else dim)
+        cell(peer.optString("ip"), 0.9f, dim, end = true)
+        row.setOnClickListener {
+            val cm = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            cm?.setPrimaryClip(ClipData.newPlainText(domain, domain))
+            devHit = domain
+            findViewById<TextView>(R.id.devNote).text = getString(R.string.copied_domain, domain)
+            renderDevices()
+            row.postDelayed({
+                if (devHit == domain) {
+                    devHit = ""
+                    findViewById<TextView>(R.id.devNote).text = ""
+                    renderDevices()
+                }
+            }, 2500)
+        }
+        return row
     }
 
     private fun openSettings() {
         flipper.displayedChild = SETTINGS
     }
 
-    private fun togglePanel(isServer: Boolean) {
-        val body = if (isServer) serverPanelBody else generalPanelBody
-        val chevron = if (isServer) serverPanelChevron else generalPanelChevron
-        applyPanelState(body, chevron, body.visibility != View.VISIBLE)
-    }
-
-    private fun applyPanelState(body: View, chevron: View, expanded: Boolean) {
-        body.visibility = if (expanded) View.VISIBLE else View.GONE
-        chevron.rotation = if (expanded) 90f else 0f
-    }
-
     // ---------------------------------------------------------------------
     // Вкладки серверов
     // ---------------------------------------------------------------------
 
+    /**
+     * Список серверов, как на компьютере: кружок выбирает сервер для
+     * подключения, карандаш раскрывает его настройки прямо под строкой.
+     */
     private fun renderProfileTabs() {
+        (serverPanelBody.parent as? ViewGroup)?.removeView(serverPanelBody)
         profileTabs.removeAllViews()
         val active = settings.activeProfileId
         for (p in settings.profiles) {
-            val tab = LinearLayout(this)
-            tab.orientation = LinearLayout.HORIZONTAL
-            tab.gravity = Gravity.CENTER_VERTICAL
-            tab.setPadding(dp(14), dp(8), dp(14), dp(8))
-            tab.setBackgroundResource(if (p.id == editingProfileId) R.drawable.bg_button_primary else R.drawable.bg_button)
+            val open = srvOpen && p.id == editingProfileId
+            val row = LinearLayout(this)
+            row.orientation = LinearLayout.HORIZONTAL
+            row.gravity = Gravity.CENTER_VERTICAL
+            row.setPadding(dp(2), dp(9), dp(2), dp(9))
+            if (!open) row.setBackgroundResource(R.drawable.bg_row)
+
+            val rad = TextView(this)
+            rad.text = if (p.id == active) "◉" else "○"
+            rad.textSize = 18f
+            rad.setTextColor(if (p.id == active) tc(R.color.accent) else tc(R.color.dim))
+            rad.setPadding(dp(4), 0, dp(10), 0)
+            rad.contentDescription = getString(R.string.select_this_server)
+            rad.setOnClickListener { switchActiveProfile(p.id) }
+            row.addView(rad)
 
             val flag = FlagView(this)
             flag.code = p.flag
-            val flagLp = LinearLayout.LayoutParams(dp(18), dp(13))
-            flagLp.gravity = Gravity.CENTER_VERTICAL
-            flag.layoutParams = flagLp
-            tab.addView(flag)
+            flag.layoutParams = LinearLayout.LayoutParams(dp(22), dp(15))
+            row.addView(flag)
 
-            val label = TextView(this)
-            label.text = (if (p.id == active) "● " else "") + p.name
-            label.setTextColor(ContextCompat.getColor(this, R.color.text))
-            label.textSize = 12.5f
-            val labelLp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-            labelLp.marginStart = dp(6)
-            label.layoutParams = labelLp
-            tab.addView(label)
+            val col = LinearLayout(this)
+            col.orientation = LinearLayout.VERTICAL
+            col.layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                .also { it.marginStart = dp(9) }
+            val name = TextView(this)
+            name.text = p.name
+            name.textSize = 14f
+            name.setTypeface(name.typeface, android.graphics.Typeface.BOLD)
+            name.setTextColor(tc(R.color.text))
+            col.addView(name)
+            val host = TextView(this)
+            host.text = p.host.ifBlank { "—" }
+            host.textSize = 11.5f
+            host.typeface = android.graphics.Typeface.MONOSPACE
+            host.setTextColor(tc(R.color.dim))
+            host.maxLines = 1
+            host.ellipsize = android.text.TextUtils.TruncateAt.END
+            col.addView(host)
+            col.setOnClickListener { toggleEdit(p.id) }
+            row.addView(col)
 
-            val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-            lp.marginEnd = dp(6)
-            tab.layoutParams = lp
-            tab.setOnClickListener { onTabClicked(p.id) }
-            profileTabs.addView(tab)
+            val pen = ImageView(this)
+            pen.setImageResource(R.drawable.ic_pen)
+            pen.setPadding(dp(8), dp(8), dp(8), dp(8))
+            pen.layoutParams = LinearLayout.LayoutParams(dp(36), dp(36))
+            pen.contentDescription = getString(R.string.edit)
+            if (open) pen.setColorFilter(tc(R.color.accent))
+            pen.setOnClickListener { toggleEdit(p.id) }
+            row.addView(pen)
+
+            profileTabs.addView(row)
+            if (open) {
+                profileTabs.addView(serverPanelBody)
+                serverPanelBody.visibility = View.VISIBLE
+            }
         }
+        if (!srvOpen) {
+            profileTabs.addView(serverPanelBody)
+            serverPanelBody.visibility = View.GONE
+        }
+        selectServerBtn.visibility = if (editingProfileId == active) View.GONE else View.VISIBLE
+        removeProfileBtn.visibility = if (settings.profiles.size > 1) View.VISIBLE else View.GONE
 
-        val plus = TextView(this)
-        plus.text = "+"
-        plus.setTextColor(ContextCompat.getColor(this, R.color.dim))
-        plus.textSize = 16f
-        plus.setPadding(dp(14), dp(8), dp(14), dp(8))
-        plus.setBackgroundResource(R.drawable.bg_button)
-        plus.contentDescription = getString(R.string.add_server)
-        plus.setOnClickListener { onAddProfile() }
-        profileTabs.addView(plus)
+        val a = settings.active()
+        findViewById<TextView>(R.id.serversSummary).text =
+            if (settings.profiles.size > 1) getString(R.string.servers_total, a.name, settings.profiles.size) else a.name
 
         renderHomePicker()
     }
@@ -515,10 +720,16 @@ class MainActivity : AppCompatActivity() {
         refresh()
     }
 
-    private fun onTabClicked(id: String) {
-        if (id == editingProfileId) return
+    private fun toggleEdit(id: String) {
+        if (id == editingProfileId) {
+            srvOpen = !srvOpen
+            if (!srvOpen) saveCurrentFormInto(id)
+            renderProfileTabs()
+            return
+        }
         saveCurrentFormInto(editingProfileId)
         editingProfileId = id
+        srvOpen = true
         val p = settings.profiles.find { it.id == id } ?: settings.active()
         loadProfileIntoForm(p)
         renderProfileTabs()
@@ -528,6 +739,7 @@ class MainActivity : AppCompatActivity() {
         saveCurrentFormInto(editingProfileId)
         val p = settings.addProfile("", "")
         editingProfileId = p.id
+        srvOpen = true
         loadProfileIntoForm(p)
         renderProfileTabs()
     }
@@ -636,7 +848,7 @@ class MainActivity : AppCompatActivity() {
         row.addView(flag)
         val text = TextView(this)
         text.text = label
-        text.setTextColor(ContextCompat.getColor(this, R.color.text))
+        text.setTextColor(tc(R.color.text))
         text.textSize = 13.5f
         val lp = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         lp.marginStart = dp(10)
@@ -768,6 +980,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun saveSettings() {
         saveCurrentFormInto(editingProfileId)
+        settings.profiles.find { it.id == editingProfileId }?.let { settings.shareTraffic(it) }
         saveAppSettings()
         renderProfileTabs()
         loadProfileIntoForm(settings.profiles.find { it.id == editingProfileId } ?: settings.active())
@@ -792,7 +1005,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun onScanConfig() {
         saveCurrentFormInto(editingProfileId)
-        scanSourceProfileId = editingProfileId
+        scanSourceProfileId = ""
         val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
             PackageManager.PERMISSION_GRANTED
         if (granted) launchScanner() else cameraPermission.launch(Manifest.permission.CAMERA)
@@ -886,12 +1099,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         editingProfileId = p.id
-        renderProfileTabs()
+        // Новый сервер сразу раскрыт под своей строкой — видно, что он добавился.
+        srvOpen = true
         loadProfileIntoForm(p)
+        renderProfileTabs()
         importNote.text = getString(if (keyIncluded) R.string.import_ok else R.string.import_ok_no_key, p.name)
-        // Прокрутить к новой вкладке — она в конце списка, легко потерять
-        // из вида и решить, что «ничего не добавилось».
-        profileTabsScroll.post { profileTabsScroll.fullScroll(View.FOCUS_RIGHT) }
         refresh()
     }
 
@@ -1047,7 +1259,7 @@ class MainActivity : AppCompatActivity() {
     private fun showTip(anchor: View, text: String) {
         val tv = TextView(this)
         tv.text = text
-        tv.setTextColor(ContextCompat.getColor(this, R.color.text))
+        tv.setTextColor(tc(R.color.text))
         tv.textSize = 12.5f
         tv.setPadding(dp(12), dp(10), dp(12), dp(10))
         val popup = PopupWindow(tv, dp(240), ViewGroup.LayoutParams.WRAP_CONTENT, true)
@@ -1058,9 +1270,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun onToggle() {
         if (TunnelService.state != "stopped") {
+            settings.lastRunning = false
             startService(Intent(this, TunnelService::class.java).setAction(TunnelService.ACTION_STOP))
             return
         }
+        settings.lastRunning = true
         if (!settings.ready()) {
             Toast.makeText(this, R.string.need_settings, Toast.LENGTH_LONG).show()
             openSettings()
@@ -1114,8 +1328,8 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, err, Toast.LENGTH_LONG).show()
             return
         }
-        tileDown.text = "%.1f".format(o.optDouble("downMbps", 0.0))
-        tileUp.text = "%.1f".format(o.optDouble("upMbps", 0.0))
+        tileDown.text = getString(R.string.speed_mbps, o.optDouble("downMbps", 0.0))
+        tileUp.text = getString(R.string.speed_mbps, o.optDouble("upMbps", 0.0))
         rowSpeed.visibility = View.VISIBLE
         rowSpeed.removeCallbacks(hideSpeed)
         rowSpeed.postDelayed(hideSpeed, 10_000)
@@ -1180,11 +1394,11 @@ class MainActivity : AppCompatActivity() {
             val markView = TextView(this)
             markView.text = mark
             markView.minEms = 2
-            markView.setTextColor(ContextCompat.getColor(this, colorRes))
+            markView.setTextColor(tc(colorRes))
 
             val textView = TextView(this)
             textView.text = if (why.isNotBlank()) "$label — $why" else label
-            textView.setTextColor(ContextCompat.getColor(this, R.color.text))
+            textView.setTextColor(tc(R.color.text))
             textView.textSize = 13.5f
 
             row.addView(markView)
@@ -1226,8 +1440,7 @@ class MainActivity : AppCompatActivity() {
         }
         pingView.text = "$ms мс"
         pingView.setTextColor(
-            ContextCompat.getColor(
-                this,
+            tc(
                 when {
                     ms < 100 -> R.color.ok
                     ms < 250 -> R.color.warn
@@ -1267,7 +1480,7 @@ class MainActivity : AppCompatActivity() {
             else -> { bg = R.drawable.bg_power_off; tint = R.color.dim }
         }
         power.setBackgroundResource(bg)
-        val color = ContextCompat.getColor(this, tint)
+        val color = tc(tint)
         powerIcon.setColorFilter(color)
         powerCap.setTextColor(color)
         powerCap.setText(if (state == "stopped") R.string.start else R.string.stop)
@@ -1285,6 +1498,7 @@ class MainActivity : AppCompatActivity() {
         appsSummary.text = appsSummaryText(settings.active())
 
         showStats(state)
+        renderDevices()
 
         showLog(synchronized(TunnelService.log) { TunnelService.log.toList() })
     }
@@ -1348,6 +1562,7 @@ class MainActivity : AppCompatActivity() {
         val running = state != "stopped"
         tileConns.text = if (running) o.optLong("total").toString() else "—"
         tileLinks.text = if (running) "${o.optInt("healthy")} / ${o.optInt("links")}" else "—"
+        renderLinkBars(if (running) o.optInt("healthy") else 0, if (running) o.optInt("links") else 0)
         // Сессия — с текущего подключения (её считает ядро и обнуляет при
         // каждом новом старте), «всего» — копится на телефоне между сеансами,
         // см. Settings.adBlockTotal и TunnelService.poll. Сама строка блокировки
@@ -1369,6 +1584,21 @@ class MainActivity : AppCompatActivity() {
             rowSpeed.visibility = View.INVISIBLE
             rowSpeed.removeCallbacks(hideSpeed)
         }
+    }
+
+    /** Каналы SSH ещё и столбиками: живые зелёные, упавшие серые. */
+    private fun renderLinkBars(healthy: Int, total: Int) {
+        val n = total.coerceIn(0, 16)
+        val sb = android.text.SpannableStringBuilder()
+        for (k in 0 until n) {
+            val start = sb.length
+            sb.append("▮")
+            sb.setSpan(
+                android.text.style.ForegroundColorSpan(if (k < healthy) tc(R.color.ok) else tc(R.color.line)),
+                start, sb.length, android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+        }
+        linkBars.text = sb
     }
 }
 

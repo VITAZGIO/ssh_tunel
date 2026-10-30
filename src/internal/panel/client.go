@@ -99,6 +99,16 @@ type Client struct {
 	// панель не читает системные логи авторизации.
 	Sessions   int       `json:"sessions"`
 	LastSeenAt time.Time `json:"lastSeenAt,omitempty"`
+
+	// Groups — группы прав доступа в сети устройств (access.go).
+	Groups []string `json:"groups,omitempty"`
+
+	// CanCreate — клиенту разрешено заводить новых клиентов из программы
+	// (selfservice.go) по своему паролю CreatorHash (bcrypt). Ставится
+	// только в панели. CreatedBy — id клиента, который завёл этого.
+	CanCreate   bool   `json:"canCreate,omitempty"`
+	CreatorHash string `json:"creatorHash,omitempty"`
+	CreatedBy   string `json:"createdBy,omitempty"`
 }
 
 // ClientStore — клиенты панели одним JSON-файлом, рядом с users.json.

@@ -43,10 +43,10 @@
     <string name="log">Журнал</string>
     <string name="log_hint">Куда ходят приложения. Имя вместо адреса означает, что его разрешил сервер, а не телефон.</string>
     <string name="tab_settings">Настройки</string>
-    <string name="tile_down">ПРИЁМ, МБИТ/С</string>
-    <string name="tile_up">ОТДАЧА, МБИТ/С</string>
-    <string name="tile_conns">СОЕДИНЕНИЙ</string>
-    <string name="tile_links">КАНАЛОВ SSH</string>
+    <string name="tile_down">Приём</string>
+    <string name="tile_up">Отдача</string>
+    <string name="tile_conns">Соединений</string>
+    <string name="tile_links">Каналов SSH</string>
     <string name="pool_hint">каналов SSH</string>
     <string name="direct_note">Адреса, сети и домены, которым туннель не нужен. Локальная сеть и так идёт напрямую. Домен — vitazgio.ru, вместе со всеми поддоменами; только поддомены — .vitazgio.ru или *.vitazgio.ru.</string>
     <string name="always_on_hint">Хочешь, чтобы туннель поднимался сам при включении телефона и не выключался ни при каких обстоятельствах — в системных настройках: Настройки → Сеть и интернет → VPN → шестерёнка рядом с этим приложением → «Всегда включённый VPN». Там же — «Блокировать соединения без VPN»: если он включён, при обрыве туннеля весь трафик останавливается, а не идёт в обход, — это делает сама система, приложение в это не вмешивается.</string>
@@ -224,4 +224,67 @@
     <string name="nat_udp_blocked">UDP до сервера не проходит</string>
     <string name="mesh_state_stopped">Туннель выключен</string>
     <string name="mesh_cancel">Отмена</string>
+    <string name="users_title">Новый пользователь</string>
+    <string name="users_summary">Завести пользователя на сервере</string>
+    <string name="users_intro">Новый пользователь на сервере, к которому ты подключён. Работает, если в панели сервера этому устройству включено «Может создавать пользователей». Новый получает твои группы доступа и сам создавать не может.</string>
+    <string name="users_name">Имя</string>
+    <string name="users_name_hint">Ноутбук Маши</string>
+    <string name="users_type">Устройство</string>
+    <string name="users_pass">Пароль создателя</string>
+    <string name="users_create">Создать</string>
+    <string name="users_checking">Спрашиваю сервер…</string>
+    <string name="users_can">Ты на сервере как «%1$s» — создавать можно.</string>
+    <string name="users_cannot">Ты на сервере как «%1$s» — создавать нельзя: включается в панели сервера.</string>
+    <string name="users_need_name">Впиши имя</string>
+    <string name="users_creating">Создаю…</string>
+    <string name="users_created">Создан «%1$s»</string>
+    <string name="users_done">Готово. Отдай настройки этому устройству: скопируй или отправь.</string>
+    <string name="users_copy">Скопировать</string>
+    <string name="users_share">Отправить</string>
+    <string name="users_copied">Настройки скопированы</string>
+
+    <!-- Новый интерфейс: главная, три экрана настроек, темы. -->
+    <string name="to_top">Наверх</string>
+    <string name="dev_name">Имя</string>
+    <string name="dev_domain">Домен</string>
+    <string name="copied_domain">Скопировано: %1$s</string>
+    <string name="mesh_no_peers">Других устройств пока нет</string>
+    <string name="speed_mbps">%1$.1f Мбит/с</string>
+    <string name="servers_title">Выбор сервера</string>
+    <string name="servers_total">%1$s · всего %2$d</string>
+    <string name="app_title">Настройки приложения</string>
+    <string name="app_sub">Программы, сеть устройств, запуск, оформление</string>
+    <string name="xfer_title">Перенос настроек</string>
+    <string name="via_clip">через буфер</string>
+    <string name="import_short">Импорт</string>
+    <string name="export_short">Экспорт</string>
+    <string name="xfer_note">Все серверы с ключами, выбор приложений, DNS и белый список рекламы — одной строкой через буфер обмена. Списки блокировки не переносятся. Этот текст — такой же секрет, как ключ.</string>
+    <string name="paste_server">Вставить</string>
+    <string name="scan_short">QR-код</string>
+    <string name="new_server">Новый</string>
+    <string name="to_clip">В буфер</string>
+    <string name="remove_short">Удалить</string>
+    <string name="edit">Править</string>
+    <string name="sect_traffic">Трафик</string>
+    <string name="sect_launch">Запуск</string>
+    <string name="sect_look">Оформление</string>
+    <string name="sect_more">Дополнительно</string>
+    <string name="start_mode">Туннель при открытии приложения</string>
+    <string name="start_mode_note">«Как при закрытии» — включит туннель, если он был включён, когда его в последний раз включали или выключали. Чтобы VPN поднимался сам при включении телефона, включи «Постоянный VPN» в настройках Android (см. «?» ниже).</string>
+    <string name="start_on">Включать</string>
+    <string name="start_last">Как при закрытии</string>
+    <string name="start_off">Не включать</string>
+    <string name="theme">Тема</string>
+    <string name="theme_orig">Оригинал</string>
+    <string name="theme_dark">Тёмная</string>
+    <string name="theme_light">Светлая</string>
+    <string name="theme_console">Консоль</string>
+    <string name="background">Фон</string>
+    <string name="bg_color">Цвет</string>
+    <string name="bg_code">Код</string>
+    <string name="bg_author">Автор</string>
+    <string name="source_code">Код</string>
+    <string name="lang_switch" translatable="false">Язык / Language</string>
+    <string name="author_name" translatable="false">Vitaz Gio</string>
+    <string name="ip_col" translatable="false">IP</string>
 </resources>

@@ -295,6 +295,24 @@ func (a *App) Running() bool {
 	return a.running
 }
 
+// RememberRunning запоминает, включён ли сейчас туннель, — для режима запуска
+// «как при закрытии» (config.StartLast). Зовётся только на действия человека
+// (кнопка, значок в трее): остановка при выходе из программы сюда не попадает.
+func (a *App) RememberRunning() {
+	a.mu.Lock()
+	on := a.running
+	if a.cfg.LastRunning == on {
+		a.mu.Unlock()
+		return
+	}
+	a.cfg.LastRunning = on
+	cfg := a.cfg
+	a.mu.Unlock()
+	if err := cfg.Save(); err != nil {
+		a.Bus.Errorf("не удалось запомнить состояние туннеля: %v", err)
+	}
+}
+
 // RecoverStaleProxy чинит настройки, оставшиеся от аварийно завершённого
 // прошлого запуска. Вызывать при старте, до всего остального.
 func (a *App) RecoverStaleProxy() {

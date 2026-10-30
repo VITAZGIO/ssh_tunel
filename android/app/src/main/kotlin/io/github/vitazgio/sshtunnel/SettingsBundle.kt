@@ -56,6 +56,9 @@ object SettingsBundle {
             .put("active", active)
             .put("language", settings.language)
             .put("showServerPicker", settings.showServerPicker)
+            .put("startMode", settings.startMode)
+            .put("theme", settings.theme)
+            .put("background", settings.background)
             .put("mobile", mobileSection)
             .toString(2)
     }
@@ -111,6 +114,9 @@ object SettingsBundle {
 
         root.optString("language").takeIf { it.isNotBlank() }?.let { settings.language = it }
         settings.showServerPicker = root.optBoolean("showServerPicker", settings.showServerPicker)
+        root.optString("startMode").takeIf { it.isNotBlank() }?.let { settings.startMode = it }
+        if (root.has("theme")) settings.theme = root.optString("theme")
+        if (root.has("background")) settings.background = root.optString("background")
         root.optJSONObject("mobile")?.let { m ->
             settings.adBlockEnabled = m.optBoolean("adBlockEnabled", settings.adBlockEnabled)
             settings.adBlockSources = m.optString("adBlockSources", settings.adBlockSources)

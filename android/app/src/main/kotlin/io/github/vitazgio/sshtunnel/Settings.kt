@@ -153,6 +153,22 @@ class Settings(context: Context) {
         saveAll(list, activeProfileId.ifBlank { p.id })
     }
 
+    /**
+     * Программы через сервер, локальная сеть и «всегда напрямую» — общие для
+     * всех серверов, как в «Настройках приложения» на компьютере: копируются
+     * из [from] во все остальные.
+     */
+    fun shareTraffic(from: Profile) {
+        val list = profiles
+        for (p in list) {
+            p.directHosts = from.directHosts
+            p.localViaTunnel = from.localViaTunnel
+            p.filterMode = from.filterMode
+            p.filterApps = from.filterApps.toMutableSet()
+        }
+        saveAll(list, activeProfileId.ifBlank { from.id })
+    }
+
     private fun saveAll(list: List<Profile>, active: String) {
         prefs.edit()
             .putString("profiles", encodeProfiles(list))
@@ -355,11 +371,11 @@ class Settings(context: Context) {
 
     var filterMode: String
         get() = active().filterMode
-        set(v) { val p = active(); p.filterMode = v; saveProfile(p) }
+        set(v) { val p = active(); p.filterMode = v; saveProfile(p); shareTraffic(p) }
 
     var filterApps: Set<String>
         get() = active().filterApps
-        set(v) { val p = active(); p.filterApps = v.toMutableSet(); saveProfile(p) }
+        set(v) { val p = active(); p.filterApps = v.toMutableSet(); saveProfile(p); shareTraffic(p) }
 
     val keyFile: File get() = keyFile(active().id)
 
@@ -396,5 +412,32 @@ class Settings(context: Context) {
     var language: String
         get() = prefs.getString("language", "ru") ?: "ru"
         set(v) = prefs.edit().putString("language", v).apply()
+
+    // ---------------------------------------------------------------------
+    // Оформление и запуск — как в «Настройках приложения» на компьютере.
+    // ---------------------------------------------------------------------
+
+    /** "" — оригинал, "dark", "light", "console". */
+    var theme: String
+        get() = prefs.getString("theme", "") ?: ""
+        set(v) = prefs.edit().putString("theme", v).apply()
+
+    /** Фон главного экрана: "" — ровный цвет, "code", "author". */
+    var background: String
+        get() = prefs.getString("background", "") ?: ""
+        set(v) = prefs.edit().putString("background", v).apply()
+
+    /**
+     * Туннель при открытии приложения: "on" — включать, "last" — как было
+     * после последнего включения/выключения руками (lastRunning), "off" — нет.
+     * По умолчанию "off": раньше приложение само не подключалось.
+     */
+    var startMode: String
+        get() = prefs.getString("startMode", "off") ?: "off"
+        set(v) = prefs.edit().putString("startMode", v).apply()
+
+    var lastRunning: Boolean
+        get() = prefs.getBoolean("lastRunning", false)
+        set(v) = prefs.edit().putBoolean("lastRunning", v).apply()
 
 }

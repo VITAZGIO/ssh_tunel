@@ -44,6 +44,11 @@ class TunnelService : VpnService(), Callbacks {
         fun speedTest(): String =
             current?.tunnel?.speedTest() ?: """{"error":"туннель выключен"}"""
 
+        /** Создание пользователя на сервере для UsersActivity (JSON, см. mobile.ServerUsers). */
+        fun serverUsers(op: String, name: String, type: String, pass: String): String =
+            current?.tunnel?.serverUsers(op, name, type, pass)
+                ?: """{"error":"туннель выключен"}"""
+
         /** Состояние сети устройств для MeshActivity (JSON, см. mobile.MeshStatusJSON). */
         fun meshStatus(): String =
             current?.tunnel?.meshStatusJSON() ?: """{"state":"stopped"}"""

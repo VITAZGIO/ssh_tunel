@@ -27,6 +27,9 @@ func (s *Server) handleSettingsExport(w http.ResponseWriter, r *http.Request) {
 		Verbose:          cfg.Verbose,
 		AutoStart:        cfg.AutoStart,
 		AutoConnect:      cfg.AutoConnect,
+		StartMode:        cfg.StartMode,
+		Theme:            cfg.Theme,
+		Background:       cfg.Background,
 		ShowServerPicker: cfg.ShowServerPicker,
 		AutoPickFastest:  cfg.AutoPickFastest,
 		SysProxy:         cfg.SysProxy,
@@ -96,6 +99,9 @@ func (s *Server) handleSettingsImport(w http.ResponseWriter, r *http.Request) {
 	cfg.Verbose = b.Verbose
 	cfg.AutoStart = b.AutoStart
 	cfg.AutoConnect = b.AutoConnect
+	cfg.StartMode = b.StartMode
+	cfg.Theme = b.Theme
+	cfg.Background = b.Background
 	cfg.ShowServerPicker = b.ShowServerPicker
 	cfg.AutoPickFastest = b.AutoPickFastest
 	cfg.SysProxy = b.SysProxy

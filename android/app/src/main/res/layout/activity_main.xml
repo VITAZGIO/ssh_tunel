@@ -8,12 +8,22 @@
     под камеру и с часами поверх окна фиксированное значение либо мало, либо
     выглядит дырой.
 -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@color/bg">
+    android:background="?attr/c_bg">
+
+    <!-- Фон «код» / «автор» — под всем экраном, нажатия пропускает. -->
+    <io.github.vitazgio.sshtunnel.BackdropView
+        android:id="@+id/backdrop"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -61,13 +71,29 @@
         android:layout_weight="1">
 
         <!-- ================= главный ================= -->
-        <LinearLayout
+        <!-- Две «страницы» одна под другой: первая ровно в высоту экрана
+             (её высоту ставит код), ниже — список устройств. Туда и обратно
+             прокручивает шестиугольник «Устройства» / «Наверх» или логотип. -->
+        <ScrollView
+            android:id="@+id/mainScroll"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:paddingBottom="16dp">
+            android:scrollbars="none"
+            android:overScrollMode="never">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/mainPage"
+                android:layout_width="match_parent"
+                android:layout_height="600dp"
+                android:orientation="vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="16dp">
 
             <TextView
                 android:id="@+id/error"
@@ -76,15 +102,9 @@
                 android:background="@drawable/bg_error"
                 android:padding="10dp"
                 android:textSize="12.5sp"
-                android:textColor="@color/err"
+                android:textColor="?attr/c_err"
                 android:visibility="gone" />
 
-            <!-- Круглая кнопка ровно по центру свободного места, а надписи под
-                 ней — уже поверх нижней половины. Раньше кнопка и надписи шли
-                 одной колонкой между двумя распорками, и центр приходился на
-                 середину всей этой колонки: сама кнопка из-за текста под ней
-                 всегда оказывалась выше середины экрана, а подбор весов
-                 распорок на глаз каждый раз промахивался. -->
             <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
@@ -154,7 +174,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp"
                             android:textSize="13sp"
-                            android:textColor="@color/text" />
+                            android:textColor="?attr/c_text" />
 
                         <ImageView
                             android:layout_width="wrap_content"
@@ -173,7 +193,7 @@
                         android:gravity="center"
                         android:textSize="18sp"
                         android:textStyle="bold"
-                        android:textColor="@color/text"
+                        android:textColor="?attr/c_text"
                         android:text="@string/state_stopped" />
 
                     <TextView
@@ -183,7 +203,7 @@
                         android:layout_marginTop="2dp"
                         android:gravity="center"
                         android:textSize="12.5sp"
-                        android:textColor="@color/dim" />
+                        android:textColor="?attr/c_dim" />
 
                     <!-- Задержка до сервера: важно не точное число, а «нормально
                          это или нет», поэтому цветом. -->
@@ -198,70 +218,251 @@
                 </LinearLayout>
             </RelativeLayout>
 
-            <!-- Приём и отдача появляются после замера скорости и через десять
-                 секунд исчезают: сразу после теста цифры интересны, а через
-                 минуту они уже неправда — связь меняется.
-                 Скрываются они с сохранением места: если убирать совсем, при
-                 каждом появлении и исчезновении вся середина экрана прыгает. -->
-            <LinearLayout
-                android:id="@+id/rowSpeed"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="14dp"
-                android:orientation="horizontal"
-                android:visibility="invisible">
 
-                <LinearLayout style="@style/Tile">
-                    <TextView style="@style/TileKey" android:text="@string/tile_down" />
-                    <TextView android:id="@+id/tileDown" style="@style/TileValue" />
+                <!-- Сведения — текстом, без плиток: это не кнопки. Строка
+                     скорости после теста появляется над строкой соединений,
+                     место под неё занято всегда (INVISIBLE), чтобы кнопка
+                     питания не прыгала. -->
+                <LinearLayout
+                    android:id="@+id/rowSpeed"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:orientation="horizontal"
+                    android:visibility="invisible">
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="horizontal"
+                        android:gravity="bottom">
+                        <TextView style="@style/StatKey" android:text="@string/tile_down" />
+                        <View
+                            android:layout_width="0dp"
+                            android:layout_height="3dp"
+                            android:layout_weight="1"
+                            android:layout_marginStart="6dp"
+                            android:layout_marginEnd="6dp"
+                            android:layout_marginBottom="5dp"
+                            android:layerType="software"
+                            android:background="@drawable/bg_dots" />
+                        <TextView android:id="@+id/tileDown" style="@style/StatValue" />
+                    </LinearLayout>
+                    <Space android:layout_width="20dp" android:layout_height="1dp" />
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="horizontal"
+                        android:gravity="bottom">
+                        <TextView style="@style/StatKey" android:text="@string/tile_up" />
+                        <View
+                            android:layout_width="0dp"
+                            android:layout_height="3dp"
+                            android:layout_weight="1"
+                            android:layout_marginStart="6dp"
+                            android:layout_marginEnd="6dp"
+                            android:layout_marginBottom="5dp"
+                            android:layerType="software"
+                            android:background="@drawable/bg_dots" />
+                        <TextView android:id="@+id/tileUp" style="@style/StatValue" />
+                    </LinearLayout>
                 </LinearLayout>
 
-                <Space android:layout_width="14dp" android:layout_height="1dp" />
-
-                <LinearLayout style="@style/Tile">
-                    <TextView style="@style/TileKey" android:text="@string/tile_up" />
-                    <TextView android:id="@+id/tileUp" style="@style/TileValue" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="horizontal"
+                        android:gravity="bottom">
+                        <TextView style="@style/StatKey" android:text="@string/tile_conns" />
+                        <View
+                            android:layout_width="0dp"
+                            android:layout_height="3dp"
+                            android:layout_weight="1"
+                            android:layout_marginStart="6dp"
+                            android:layout_marginEnd="6dp"
+                            android:layout_marginBottom="5dp"
+                            android:layerType="software"
+                            android:background="@drawable/bg_dots" />
+                        <TextView android:id="@+id/tileConns" style="@style/StatValue" />
+                    </LinearLayout>
+                    <Space android:layout_width="20dp" android:layout_height="1dp" />
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="horizontal"
+                        android:gravity="bottom">
+                        <TextView style="@style/StatKey" android:text="@string/tile_links" />
+                        <View
+                            android:layout_width="0dp"
+                            android:layout_height="3dp"
+                            android:layout_weight="1"
+                            android:layout_marginStart="6dp"
+                            android:layout_marginEnd="6dp"
+                            android:layout_marginBottom="5dp"
+                            android:layerType="software"
+                            android:background="@drawable/bg_dots" />
+                        <TextView
+                            android:id="@+id/linkBars"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="5dp"
+                            android:textSize="11sp"
+                            android:letterSpacing="-0.1" />
+                        <TextView android:id="@+id/tileLinks" style="@style/StatValue" />
+                    </LinearLayout>
                 </LinearLayout>
+
+                <!-- Кнопки. При сети устройств между ними встаёт шестиугольник,
+                     а у соседей срезан угол под него (фон рисует ShapeBg). -->
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginTop="14dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:orientation="horizontal">
+                        <TextView
+                            android:id="@+id/speedtest"
+                            style="@style/ActButton"
+                            android:text="@string/speedtest" />
+                        <Space
+                            android:id="@+id/devGap"
+                            android:layout_width="8dp"
+                            android:layout_height="1dp" />
+                        <TextView
+                            android:id="@+id/toSelfCheck"
+                            style="@style/ActButton"
+                            android:text="@string/selfcheck_open" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/devHex"
+                        android:layout_width="104dp"
+                        android:layout_height="match_parent"
+                        android:layout_gravity="center"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:visibility="gone"
+                        android:contentDescription="@string/mesh_devices">
+                        <ImageView
+                            android:id="@+id/devHexIcon"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:src="@drawable/ic_devices"
+                            android:contentDescription="@null" />
+                        <TextView
+                            android:id="@+id/devHexCap"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textSize="10.5sp"
+                            android:textStyle="bold"
+                            android:text="@string/mesh_devices" />
+                    </LinearLayout>
+                </FrameLayout>
             </LinearLayout>
 
+            <!-- Список устройств: имя, домен, адрес. Нажатие копирует домен. -->
             <LinearLayout
+                android:id="@+id/devPage"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:orientation="vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="16dp"
+                android:visibility="gone">
 
-                <LinearLayout style="@style/Tile">
-                    <TextView style="@style/TileKey" android:text="@string/tile_conns" />
-                    <TextView android:id="@+id/tileConns" style="@style/TileValue" />
+                <LinearLayout
+                    android:id="@+id/devUp"
+                    android:layout_width="104dp"
+                    android:layout_height="52dp"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="6dp"
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:contentDescription="@string/to_top">
+                    <ImageView
+                        android:id="@+id/devUpIcon"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:src="@drawable/ic_up"
+                        android:contentDescription="@null" />
+                    <TextView
+                        android:id="@+id/devUpCap"
+                        android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textSize="10.5sp"
+                            android:textStyle="bold"
+                        android:text="@string/to_top" />
                 </LinearLayout>
 
-                <Space android:layout_width="14dp" android:layout_height="1dp" />
-
-                <LinearLayout style="@style/Tile">
-                    <TextView style="@style/TileKey" android:text="@string/tile_links" />
-                    <TextView android:id="@+id/tileLinks" style="@style/TileValue" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:layout_marginBottom="8dp"
+                    android:orientation="horizontal">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        android:textAllCaps="true"
+                        android:letterSpacing="0.06"
+                        android:textColor="?attr/c_text"
+                        android:text="@string/mesh_devices" />
+                    <TextView
+                        android:id="@+id/devCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:textSize="12sp"
+                        android:textColor="?attr/c_dim" />
                 </LinearLayout>
-            </LinearLayout>
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:orientation="horizontal">
-                <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/speedtest"
-                    style="@style/SecondaryButton"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:text="@string/speedtest" />
-                <Space android:layout_width="10dp" android:layout_height="1dp" />
-                <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/toSelfCheck"
-                    style="@style/SecondaryButton"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:text="@string/selfcheck_open" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingBottom="6dp"
+                    android:background="@drawable/bg_row">
+                    <TextView style="@style/DevHead" android:layout_weight="1" android:text="@string/dev_name" />
+                    <TextView style="@style/DevHead" android:layout_weight="1.3" android:text="@string/dev_domain" />
+                    <TextView style="@style/DevHead" android:layout_weight="0.9" android:gravity="end" android:text="@string/ip_col" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/devRows"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+                <TextView
+                    android:id="@+id/devNote"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center"
+                    android:textSize="12sp"
+                    android:textColor="?attr/c_ok" />
             </LinearLayout>
-        </LinearLayout>
+            </LinearLayout>
+        </ScrollView>
 
         <!-- ================= самопроверка ================= -->
         <LinearLayout
@@ -279,7 +480,7 @@
                 android:layout_height="wrap_content"
                 android:paddingBottom="10dp"
                 android:textSize="11.5sp"
-                android:textColor="@color/dim"
+                android:textColor="?attr/c_dim"
                 android:text="@string/selfcheck_intro" />
 
             <ScrollView
@@ -316,7 +517,7 @@
                 android:layout_height="wrap_content"
                 android:paddingBottom="8dp"
                 android:textSize="11.5sp"
-                android:textColor="@color/dim"
+                android:textColor="?attr/c_dim"
                 android:text="@string/log_hint" />
 
             <ScrollView
@@ -331,16 +532,15 @@
                     android:layout_height="wrap_content"
                     android:fontFamily="monospace"
                     android:textSize="12sp"
-                    android:textColor="@color/text"
+                    android:textColor="?attr/c_text"
                     android:lineSpacingExtra="2dp" />
             </ScrollView>
         </LinearLayout>
 
-        <!-- ================= настройки ================= -->
+        <!-- ================= настройки: корень ================= -->
         <ScrollView
             android:layout_width="match_parent"
             android:layout_height="match_parent">
-
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -348,36 +548,217 @@
                 android:paddingStart="16dp"
                 android:paddingEnd="16dp"
                 android:paddingBottom="24dp">
-
-                <TextView style="@style/Head" android:text="@string/tab_settings" />
-
-                <TextView style="@style/FieldLabel" android:text="@string/language_label" />
-                <Spinner
-                    android:id="@+id/languageSpinner"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="14dp"
-                    android:background="@drawable/bg_field"
-                    android:popupBackground="@drawable/bg_card"
-                    android:spinnerMode="dropdown" />
-
-                <!-- Вкладки серверов, как в браузере — кнопка «+» дорисовывается
-                     последней в этой же прокручиваемой ленте (renderProfileTabs). -->
-                <HorizontalScrollView
-                    android:id="@+id/profileTabsScroll"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:scrollbars="none">
-                    <LinearLayout
-                        android:id="@+id/profileTabs"
+                <LinearLayout style="@style/HeadRow">
+                    <TextView
+                        style="@style/HeadTitle"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_marginStart="0dp"
+                        android:text="@string/tab_settings" />
+                    <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal" />
-                </HorizontalScrollView>
+                        android:layout_marginEnd="7dp"
+                        android:textSize="11sp"
+                        android:textColor="?attr/c_dim"
+                        android:text="@string/lang_switch" />
+                    <LinearLayout
+                        android:id="@+id/langBtn"
+                        android:layout_width="wrap_content"
+                        android:layout_height="28dp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        android:background="@drawable/bg_outline"
+                        android:clickable="true"
+                        android:focusable="true">
+                        <io.github.vitazgio.sshtunnel.FlagView
+                            android:id="@+id/langFlag"
+                            android:layout_width="16dp"
+                            android:layout_height="11dp" />
+                        <TextView
+                            android:id="@+id/langName"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:textSize="12sp"
+                            android:textStyle="bold"
+                            android:textColor="?attr/c_text" />
+                    </LinearLayout>
+                </LinearLayout>
 
+                <View style="@style/Hairline" />
+                <LinearLayout
+                    android:id="@+id/toServers"
+                    style="@style/NavRow">
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView style="@style/NavTitle" android:text="@string/servers_title" />
+                        <TextView style="@style/NavSub" android:id="@+id/serversSummary" />
+                    </LinearLayout>
+                    <ImageView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:src="@drawable/ic_chevron"
+                        android:contentDescription="@string/servers_title" />
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/toApp"
+                    style="@style/NavRow">
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView style="@style/NavTitle" android:text="@string/app_title" />
+                        <TextView style="@style/NavSub" android:text="@string/app_sub" />
+                    </LinearLayout>
+                    <ImageView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:src="@drawable/ic_chevron"
+                        android:contentDescription="@string/app_title" />
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/usersRow"
+                    style="@style/NavRow">
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView style="@style/NavTitle" android:text="@string/users_title" />
+                        <TextView style="@style/NavSub" android:text="@string/users_summary" />
+                    </LinearLayout>
+                    <ImageView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:src="@drawable/ic_chevron"
+                        android:contentDescription="@string/users_title" />
+                </LinearLayout>
 
-                <!-- Выбор города и флага для подписи вкладки — не точка выхода,
-                     сервер всё равно только свой, по адресу ниже. -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp"
+                    android:layout_marginBottom="8dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+                    <TextView style="@style/SectTitle" android:layout_marginTop="0dp" android:text="@string/xfer_title" />
+                    <TextView
+                        android:id="@+id/xferInfo"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:layout_marginStart="6dp"
+                        android:background="@drawable/bg_infoq"
+                        android:gravity="center"
+                        android:textSize="9sp"
+                        android:textStyle="bold"
+                        android:textColor="?attr/c_dim"
+                        android:text="?"
+                        android:clickable="true"
+                        android:focusable="true" />
+                    <Space android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="11.5sp"
+                        android:textColor="?attr/c_dim"
+                        android:text="@string/via_clip" />
+                </LinearLayout>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="42dp"
+                    android:orientation="horizontal"
+                    android:background="@drawable/bg_outline"
+                    android:showDividers="middle"
+                    android:divider="@drawable/bg_seg_div">
+                    <TextView android:id="@+id/bundleImportBtn" style="@style/SegItem" android:text="@string/import_short" />
+                    <TextView android:id="@+id/bundleExportBtn" style="@style/SegItem" android:text="@string/export_short" />
+                </LinearLayout>
+                <TextView
+                    android:id="@+id/bundleNote"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textSize="12sp"
+                    android:textColor="?attr/c_dim" />
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/save"
+                    style="@style/PrimaryButton"
+                    android:layout_marginTop="22dp"
+                    android:text="@string/save" />
+            </LinearLayout>
+        </ScrollView>
+
+        <!-- ================= выбор сервера ================= -->
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="24dp">
+                <LinearLayout style="@style/HeadRow">
+                    <ImageView
+                        android:id="@+id/backFromServers"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:padding="6dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:background="?android:attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_back"
+                        android:contentDescription="@string/back" />
+                    <TextView style="@style/HeadTitle" android:text="@string/servers_title" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="38dp"
+                    android:layout_marginBottom="10dp"
+                    android:orientation="horizontal"
+                    android:background="@drawable/bg_outline"
+                    android:showDividers="middle"
+                    android:divider="@drawable/bg_seg_div">
+                    <TextView android:id="@+id/pasteConfigBtn" style="@style/SegItem" android:text="@string/paste_server" />
+                    <TextView android:id="@+id/scanConfigBtn" style="@style/SegItem" android:text="@string/scan_short" />
+                    <TextView android:id="@+id/addServerBtn" style="@style/SegItem" android:text="@string/new_server" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/importNote"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:textSize="12sp"
+                    android:textColor="?attr/c_dim" />
+
+                <View style="@style/Hairline" />
+                <!-- Строки серверов дорисовывает код (renderProfileTabs); блок
+                     правки переезжает под строку, у которой нажали карандаш. -->
+                <LinearLayout
+                    android:id="@+id/profileTabs"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+                <LinearLayout
+                    android:id="@+id/serverPanelBody"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="12dp"
+                    android:background="?attr/c_card"
+                    android:visibility="gone">
                 <LinearLayout
                     android:id="@+id/cityBtn"
                     android:layout_width="match_parent"
@@ -402,7 +783,7 @@
                         android:layout_weight="1"
                         android:layout_marginStart="10dp"
                         android:textSize="14sp"
-                        android:textColor="@color/text" />
+                        android:textColor="?attr/c_text" />
 
                     <ImageView
                         android:layout_width="wrap_content"
@@ -415,136 +796,7 @@
                 <EditText android:id="@+id/customCityName" style="@style/Field"
                     android:layout_marginTop="8dp"
                     android:inputType="text" android:hint="@string/custom_flag_name"
-                    android:textColorHint="@color/dim" android:autofillHints="" />
-
-                <!-- Четыре действия над серверами одной сеткой 2×2: слева то,
-                     что добавляет новый сервер (из буфера, по QR-коду), справа
-                     то, что делает с текущим (отдать настройки, удалить).
-                     Высота у всех четырёх задана явно — иначе кнопка с текстом
-                     в две строки оказывается выше соседки по ряду. -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:orientation="horizontal">
-
-                    <androidx.appcompat.widget.AppCompatButton
-                        android:id="@+id/pasteConfigBtn"
-                        style="@style/SecondaryButton"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="56dp"
-                        android:maxLines="2"
-                        android:textSize="12.5sp"
-                        android:text="@string/paste_config" />
-
-                    <Space android:layout_width="8dp" android:layout_height="1dp" />
-
-                    <androidx.appcompat.widget.AppCompatButton
-                        android:id="@+id/exportProfileClipBtn"
-                        style="@style/SecondaryButton"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="56dp"
-                        android:maxLines="2"
-                        android:textSize="12.5sp"
-                        android:text="@string/export_server_clip" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:layout_marginBottom="14dp"
-                    android:orientation="horizontal">
-
-                    <androidx.appcompat.widget.AppCompatButton
-                        android:id="@+id/scanConfigBtn"
-                        style="@style/SecondaryButton"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="56dp"
-                        android:maxLines="2"
-                        android:textSize="12.5sp"
-                        android:drawableEnd="@drawable/ic_qr"
-                        android:drawablePadding="6dp"
-                        android:text="@string/scan_config" />
-
-                    <Space android:layout_width="8dp" android:layout_height="1dp" />
-
-                    <androidx.appcompat.widget.AppCompatButton
-                        android:id="@+id/removeProfileBtn"
-                        style="@style/DangerButton"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="56dp"
-                        android:maxLines="2"
-                        android:textSize="12.5sp"
-                        android:text="@string/remove_server" />
-                </LinearLayout>
-
-                <!-- Сканирование заменяет сервер, с чьей вкладки его начали:
-                     об этом надо предупредить до нажатия, а не после. -->
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="8dp"
-                    android:textSize="12sp"
-                    android:textColor="@color/dim"
-                    android:text="@string/scan_replaces_note" />
-
-                <!-- Ответ на «Вставить из буфера»/«Сканировать QR-код» — сразу
-                     под ними, а не выше по экрану. -->
-                <TextView
-                    android:id="@+id/importNote"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="8dp"
-                    android:textSize="12sp"
-                    android:textColor="@color/dim" />
-
-                <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/selectServerBtn"
-                    style="@style/SecondaryButton"
-                    android:layout_marginTop="4dp"
-                    android:layout_marginBottom="14dp"
-                    android:text="@string/select_this_server" />
-
-                <!-- Настройки сервера (сворачиваемый блок) -->
-                <LinearLayout
-                    android:id="@+id/serverPanelHeader"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:paddingTop="6dp"
-                    android:paddingBottom="6dp"
-                    android:clickable="true"
-                    android:focusable="true">
-
-                    <ImageView
-                        android:id="@+id/serverPanelChevron"
-                        android:layout_width="10dp"
-                        android:layout_height="10dp"
-                        android:src="@drawable/ic_chevron"
-                        android:rotation="90"
-                        android:contentDescription="@null" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
-                        android:textSize="14sp"
-                        android:textStyle="bold"
-                        android:textColor="@color/text"
-                        android:text="@string/server_settings" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/serverPanelBody"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
+                    android:textColorHint="?attr/c_dim" android:autofillHints="" />
 
                     <TextView
                         android:id="@+id/issuedByPanel"
@@ -552,7 +804,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginBottom="10dp"
                         android:textSize="12.5sp"
-                        android:textColor="@color/accent"
+                        android:textColor="?attr/c_accent"
                         android:clickable="true"
                         android:focusable="true"
                         android:visibility="gone"
@@ -573,12 +825,12 @@
                         android:layout_height="wrap_content"
                         android:paddingBottom="4dp"
                         android:textSize="12sp"
-                        android:textColor="@color/dim"
+                        android:textColor="?attr/c_dim"
                         android:text="@string/key_missing" />
                     <EditText android:id="@+id/key" style="@style/Field"
                         android:inputType="textMultiLine" android:minLines="3"
                         android:gravity="top" android:hint="@string/key_hint"
-                        android:textColorHint="@color/dim" android:autofillHints="" />
+                        android:textColorHint="?attr/c_dim" android:autofillHints="" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -617,7 +869,7 @@
                                     android:gravity="center"
                                     android:textSize="9sp"
                                     android:textStyle="bold"
-                                    android:textColor="@color/dim"
+                                    android:textColor="?attr/c_dim"
                                     android:text="?"
                                     android:clickable="true"
                                     android:focusable="true" />
@@ -627,6 +879,55 @@
                         </LinearLayout>
                     </LinearLayout>
 
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+                        <TextView android:id="@+id/exportProfileClipBtn" style="@style/OutlineButton" android:text="@string/to_clip" />
+                        <TextView android:id="@+id/selectServerBtn" style="@style/OutlineButton"
+                            android:layout_marginStart="8dp" android:text="@string/select_this_server" />
+                        <Space android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
+                        <TextView android:id="@+id/removeProfileBtn" style="@style/OutlineButton"
+                            android:textColor="?attr/c_err" android:text="@string/remove_short" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/saveServers"
+                    style="@style/PrimaryButton"
+                    android:layout_marginTop="22dp"
+                    android:text="@string/save" />
+            </LinearLayout>
+        </ScrollView>
+
+        <!-- ================= настройки приложения ================= -->
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="24dp">
+                <LinearLayout style="@style/HeadRow">
+                    <ImageView
+                        android:id="@+id/backFromApp"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:padding="6dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:background="?android:attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_back"
+                        android:contentDescription="@string/back" />
+                    <TextView style="@style/HeadTitle" android:text="@string/app_title" />
+                </LinearLayout>
+
+                <TextView style="@style/SectTitle" android:text="@string/sect_traffic" />
                     <LinearLayout
                         android:id="@+id/apps"
                         android:layout_width="match_parent"
@@ -649,7 +950,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:textSize="14sp"
-                                android:textColor="@color/text"
+                                android:textColor="?attr/c_text"
                                 android:text="@string/apps_row" />
 
                             <TextView
@@ -657,7 +958,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:textSize="12sp"
-                                android:textColor="@color/dim"
+                                android:textColor="?attr/c_dim"
                                 android:text="@string/mode_all" />
                         </LinearLayout>
 
@@ -666,167 +967,6 @@
                             android:layout_height="wrap_content"
                             android:src="@drawable/ic_chevron"
                             android:contentDescription="@string/apps_row" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:gravity="center_vertical">
-
-                        <CheckBox
-                            android:id="@+id/localViaTunnel"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:textColor="@color/text"
-                            android:text="@string/local_via_tunnel" />
-
-                        <TextView
-                            android:id="@+id/localViaTunnelInfo"
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:background="@drawable/bg_infoq"
-                            android:gravity="center"
-                            android:textSize="9sp"
-                            android:textStyle="bold"
-                            android:textColor="@color/dim"
-                            android:text="?"
-                            android:clickable="true"
-                            android:focusable="true" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:gravity="center_vertical">
-                        <TextView style="@style/FieldLabel"
-                            android:layout_width="0dp" android:layout_weight="1"
-                            android:layout_marginTop="0dp"
-                            android:text="@string/direct" />
-                        <TextView
-                            android:id="@+id/directInfo"
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:background="@drawable/bg_infoq"
-                            android:gravity="center"
-                            android:textSize="9sp"
-                            android:textStyle="bold"
-                            android:textColor="@color/dim"
-                            android:text="?"
-                            android:clickable="true"
-                            android:focusable="true" />
-                    </LinearLayout>
-                    <EditText android:id="@+id/direct" style="@style/Field"
-                        android:inputType="textMultiLine" android:minLines="2"
-                        android:gravity="top" android:hint="@string/direct_hint"
-                        android:textColorHint="@color/dim" android:autofillHints="" />
-                </LinearLayout>
-
-                <!-- Общие настройки приложения (сворачиваемый блок) -->
-                <LinearLayout
-                    android:id="@+id/generalPanelHeader"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginTop="14dp"
-                    android:paddingTop="6dp"
-                    android:paddingBottom="6dp"
-                    android:clickable="true"
-                    android:focusable="true">
-
-                    <ImageView
-                        android:id="@+id/generalPanelChevron"
-                        android:layout_width="10dp"
-                        android:layout_height="10dp"
-                        android:src="@drawable/ic_chevron"
-                        android:rotation="90"
-                        android:contentDescription="@null" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
-                        android:textSize="14sp"
-                        android:textStyle="bold"
-                        android:textColor="@color/text"
-                        android:text="@string/general_settings" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/generalPanelBody"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
-
-                    <!-- Настройка самой системы Android, не конкретного сервера —
-                         поэтому здесь, в общих настройках, а не среди полей сервера. -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="14dp"
-                        android:gravity="center_vertical">
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_weight="1"
-                            android:layout_height="wrap_content"
-                            android:textSize="12sp"
-                            android:textColor="@color/dim"
-                            android:text="@string/always_on_label" />
-                        <TextView
-                            android:id="@+id/alwaysOnInfo"
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:background="@drawable/bg_infoq"
-                            android:gravity="center"
-                            android:textSize="9sp"
-                            android:textStyle="bold"
-                            android:textColor="@color/dim"
-                            android:text="?"
-                            android:clickable="true"
-                            android:focusable="true" />
-                    </LinearLayout>
-
-                    <LinearLayout
-                        android:id="@+id/adBlockRow"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginBottom="14dp"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:background="@drawable/bg_card"
-                        android:padding="12dp"
-                        android:clickable="true"
-                        android:focusable="true">
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:textSize="14sp"
-                                android:textColor="@color/text"
-                                android:text="@string/ad_block_title" />
-
-                            <TextView
-                                android:id="@+id/adBlockSummary"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:textSize="12sp"
-                                android:textColor="@color/dim" />
-                        </LinearLayout>
-
-                        <ImageView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:src="@drawable/ic_chevron"
-                            android:contentDescription="@string/ad_block_title" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -851,7 +991,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:textSize="14sp"
-                                android:textColor="@color/text"
+                                android:textColor="?attr/c_text"
                                 android:text="@string/mesh_title" />
 
                             <TextView
@@ -859,7 +999,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:textSize="12sp"
-                                android:textColor="@color/dim" />
+                                android:textColor="?attr/c_dim" />
                         </LinearLayout>
 
                         <ImageView
@@ -870,6 +1010,169 @@
                     </LinearLayout>
 
                     <LinearLayout
+                        android:id="@+id/adBlockRow"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="14dp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:background="@drawable/bg_card"
+                        android:padding="12dp"
+                        android:clickable="true"
+                        android:focusable="true">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textSize="14sp"
+                                android:textColor="?attr/c_text"
+                                android:text="@string/ad_block_title" />
+
+                            <TextView
+                                android:id="@+id/adBlockSummary"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textSize="12sp"
+                                android:textColor="?attr/c_dim" />
+                        </LinearLayout>
+
+                        <ImageView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:src="@drawable/ic_chevron"
+                            android:contentDescription="@string/ad_block_title" />
+                    </LinearLayout>
+
+                <TextView style="@style/SectTitle" android:text="@string/sect_launch" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="13sp"
+                        android:textColor="?attr/c_text"
+                        android:text="@string/start_mode" />
+                    <TextView
+                        android:id="@+id/startModeInfo"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:layout_marginStart="6dp"
+                        android:background="@drawable/bg_infoq"
+                        android:gravity="center"
+                        android:textSize="9sp"
+                        android:textStyle="bold"
+                        android:textColor="?attr/c_dim"
+                        android:text="?"
+                        android:clickable="true"
+                        android:focusable="true" />
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/startModeSeg"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:orientation="horizontal"
+                    android:background="@drawable/bg_outline"
+                    android:showDividers="middle"
+                    android:divider="@drawable/bg_seg_div">
+                    <TextView style="@style/SegItem" android:tag="on" android:text="@string/start_on" />
+                    <TextView style="@style/SegItem" android:tag="last" android:text="@string/start_last" />
+                    <TextView style="@style/SegItem" android:tag="off" android:text="@string/start_off" />
+                </LinearLayout>
+                <Space android:layout_width="1dp" android:layout_height="12dp" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="14dp"
+                        android:gravity="center_vertical">
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:textSize="12sp"
+                            android:textColor="?attr/c_dim"
+                            android:text="@string/always_on_label" />
+                        <TextView
+                            android:id="@+id/alwaysOnInfo"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:background="@drawable/bg_infoq"
+                            android:gravity="center"
+                            android:textSize="9sp"
+                            android:textStyle="bold"
+                            android:textColor="?attr/c_dim"
+                            android:text="?"
+                            android:clickable="true"
+                            android:focusable="true" />
+                    </LinearLayout>
+
+                <TextView style="@style/SectTitle" android:text="@string/sect_look" />
+                <TextView style="@style/FieldLabel" android:text="@string/theme" />
+                <LinearLayout
+                    android:id="@+id/themeSeg"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:orientation="horizontal"
+                    android:background="@drawable/bg_outline"
+                    android:showDividers="middle"
+                    android:divider="@drawable/bg_seg_div">
+                    <TextView style="@style/SegItem" android:tag="" android:text="@string/theme_orig" />
+                    <TextView style="@style/SegItem" android:tag="dark" android:text="@string/theme_dark" />
+                    <TextView style="@style/SegItem" android:tag="light" android:text="@string/theme_light" />
+                    <TextView style="@style/SegItem" android:tag="console" android:text="@string/theme_console" />
+                </LinearLayout>
+                <TextView style="@style/FieldLabel" android:layout_marginTop="10dp" android:text="@string/background" />
+                <LinearLayout
+                    android:id="@+id/bgSeg"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:orientation="horizontal"
+                    android:background="@drawable/bg_outline"
+                    android:showDividers="middle"
+                    android:divider="@drawable/bg_seg_div">
+                    <TextView style="@style/SegItem" android:tag="" android:text="@string/bg_color" />
+                    <TextView style="@style/SegItem" android:tag="code" android:text="@string/bg_code" />
+                    <TextView style="@style/SegItem" android:tag="author" android:text="@string/bg_author" />
+                </LinearLayout>
+
+                <TextView style="@style/SectTitle" android:text="@string/sect_more" />
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:gravity="center_vertical">
+
+                        <CheckBox
+                            android:id="@+id/localViaTunnel"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:textColor="?attr/c_text"
+                            android:text="@string/local_via_tunnel" />
+
+                        <TextView
+                            android:id="@+id/localViaTunnelInfo"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:background="@drawable/bg_infoq"
+                            android:gravity="center"
+                            android:textSize="9sp"
+                            android:textStyle="bold"
+                            android:textColor="?attr/c_dim"
+                            android:text="?"
+                            android:clickable="true"
+                            android:focusable="true" />
+                    </LinearLayout>
+                    <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:gravity="center_vertical">
@@ -878,7 +1181,7 @@
                             android:layout_width="0dp"
                             android:layout_weight="1"
                             android:layout_height="wrap_content"
-                            android:textColor="@color/text"
+                            android:textColor="?attr/c_text"
                             android:text="@string/udp_relay_enabled" />
                         <TextView
                             android:id="@+id/udpRelayInfo"
@@ -888,91 +1191,46 @@
                             android:gravity="center"
                             android:textSize="9sp"
                             android:textStyle="bold"
-                            android:textColor="@color/dim"
+                            android:textColor="?attr/c_dim"
                             android:text="?"
                             android:clickable="true"
                             android:focusable="true" />
                     </LinearLayout>
-
                     <CheckBox
                         android:id="@+id/showServerPicker"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:textColor="@color/text"
+                        android:textColor="?attr/c_text"
                         android:text="@string/show_picker" />
-
-                    <!-- Перенос всех настроек разом на другой телефон или
-                         компьютер: серверы с ключами, выбор приложений, DNS и
-                         белый список рекламы. Сами списки блокировки не
-                         переносятся — в них десятки тысяч строк, ни в одно
-                         сообщение это не влезет. -->
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="18dp"
-                        android:textSize="14sp"
-                        android:textStyle="bold"
-                        android:textColor="@color/text"
-                        android:text="@string/all_settings" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:layout_marginBottom="8dp"
-                        android:textSize="12sp"
-                        android:textColor="@color/dim"
-                        android:text="@string/all_settings_note" />
-
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal">
-
-                        <androidx.appcompat.widget.AppCompatButton
-                            android:id="@+id/bundleImportBtn"
-                            style="@style/SecondaryButton"
-                            android:layout_width="0dp"
-                            android:layout_weight="1"
-                            android:layout_height="56dp"
-                            android:maxLines="2"
-                            android:textSize="12.5sp"
-                            android:text="@string/import_settings" />
-
-                        <Space android:layout_width="8dp" android:layout_height="1dp" />
-
-                        <androidx.appcompat.widget.AppCompatButton
-                            android:id="@+id/bundleExportBtn"
-                            style="@style/SecondaryButton"
-                            android:layout_width="0dp"
-                            android:layout_weight="1"
-                            android:layout_height="56dp"
-                            android:maxLines="2"
-                            android:textSize="12.5sp"
-                            android:text="@string/export_settings" />
+                        android:layout_marginTop="8dp"
+                        android:gravity="center_vertical">
+                        <TextView style="@style/FieldLabel"
+                            android:layout_width="0dp" android:layout_weight="1"
+                            android:layout_marginTop="0dp"
+                            android:text="@string/direct" />
+                        <TextView
+                            android:id="@+id/directInfo"
+                            android:layout_width="16dp"
+                            android:layout_height="16dp"
+                            android:background="@drawable/bg_infoq"
+                            android:gravity="center"
+                            android:textSize="9sp"
+                            android:textStyle="bold"
+                            android:textColor="?attr/c_dim"
+                            android:text="?"
+                            android:clickable="true"
+                            android:focusable="true" />
                     </LinearLayout>
+                    <EditText android:id="@+id/direct" style="@style/Field"
+                        android:inputType="textMultiLine" android:minLines="2"
+                        android:gravity="top" android:hint="@string/direct_hint"
+                        android:textColorHint="?attr/c_dim" android:autofillHints="" />
 
-                    <TextView
-                        android:id="@+id/bundleNote"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="6dp"
-                        android:textSize="12sp"
-                        android:textColor="@color/dim" />
-
-                    <!-- Обновление: приложение не ставится само (Android не даст
-                         без отдельного разрешения на установку пакетов), поэтому
-                         кнопка скачивает APK в «Загрузки», а ставит его человек. -->
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="18dp"
-                        android:textSize="14sp"
-                        android:textStyle="bold"
-                        android:textColor="@color/text"
-                        android:text="@string/update_title" />
-
+                <View style="@style/Hairline" android:layout_marginTop="22dp" />
                     <TextView
                         android:id="@+id/versionLine"
                         android:layout_width="match_parent"
@@ -980,7 +1238,7 @@
                         android:layout_marginTop="4dp"
                         android:layout_marginBottom="8dp"
                         android:textSize="12sp"
-                        android:textColor="@color/dim" />
+                        android:textColor="?attr/c_dim" />
 
                     <androidx.appcompat.widget.AppCompatButton
                         android:id="@+id/updateCheckBtn"
@@ -993,7 +1251,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
                         android:textSize="12sp"
-                        android:textColor="@color/dim" />
+                        android:textColor="?attr/c_dim" />
 
                     <androidx.appcompat.widget.AppCompatButton
                         android:id="@+id/updateDownloadBtn"
@@ -1002,56 +1260,54 @@
                         android:visibility="gone"
                         android:text="@string/update_download" />
 
-                    <!-- Автор: логотип и ссылка на сайт — в самом низу общих
-                         настроек, чтобы не мешать тому, ради чего сюда заходят. -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+                    <ImageView
+                        android:layout_width="40dp"
+                        android:layout_height="34dp"
+                        android:src="@drawable/ic_logo"
+                        android:contentDescription="@string/author_label" />
                     <LinearLayout
-                        android:layout_width="match_parent"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="22dp"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
-
-                        <ImageView
-                            android:layout_width="34dp"
-                            android:layout_height="34dp"
-                            android:src="@drawable/ic_logo"
-                            android:contentDescription="@string/author_label" />
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:orientation="vertical">
+                        <TextView
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="10dp"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:textSize="12sp"
-                                android:textColor="@color/dim"
-                                android:text="@string/author_label" />
-
-                            <TextView
-                                android:id="@+id/authorSite"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:textSize="14sp"
-                                android:textColor="@color/accent"
-                                android:clickable="true"
-                                android:focusable="true"
-                                android:text="@string/author_site" />
-                        </LinearLayout>
+                            android:textSize="12sp"
+                            android:textColor="?attr/c_dim"
+                            android:text="@string/author_label" />
+                        <TextView
+                            android:id="@+id/authorSite"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textSize="15sp"
+                            android:textStyle="bold"
+                            android:textColor="?attr/c_text"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:text="@string/author_name" />
                     </LinearLayout>
+                    <TextView
+                        android:id="@+id/codeLink"
+                        style="@style/OutlineButton"
+                        android:textColor="?attr/c_accent"
+                        android:text="@string/source_code" />
                 </LinearLayout>
 
-                <!-- Сохраняет и сервер, и общие настройки разом — поэтому
-                     кнопка внизу, после обоих блоков, а не между ними. -->
                 <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/save"
+                    android:id="@+id/saveApp"
                     style="@style/PrimaryButton"
-                    android:layout_marginTop="18dp"
+                    android:layout_marginTop="22dp"
                     android:text="@string/save" />
             </LinearLayout>
         </ScrollView>
     </ViewFlipper>
-</LinearLayout>
+  </LinearLayout>
+</FrameLayout>

@@ -45,6 +45,7 @@ import (
 	"sshtunnel/internal/events"
 	"sshtunnel/internal/filedialog"
 	"sshtunnel/internal/procinfo"
+	"sshtunnel/internal/serverusers"
 	"sshtunnel/internal/sysproxy"
 	"sshtunnel/internal/tunnel"
 	"sshtunnel/internal/updater"
@@ -207,6 +208,7 @@ func (s *Server) Serve() error {
 	mux.HandleFunc("/api/update/download", s.guard(s.handleUpdateDownload))
 	mux.HandleFunc("/api/mesh", s.guard(s.handleMesh))
 	mux.HandleFunc("/api/lanaddrs", s.guard(s.handleLANAddrs))
+	mux.HandleFunc("/api/serverusers", s.guard(s.handleServerUsers))
 
 	srv := &http.Server{
 		Handler:           mux,
@@ -356,11 +358,13 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, resp)
 		return
 	}
+	s.app.RememberRunning()
 	writeJSON(w, map[string]bool{"ok": true})
 }
 
 func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 	s.app.Stop()
+	s.app.RememberRunning()
 	writeJSON(w, map[string]bool{"ok": true})
 }
 
@@ -392,6 +396,7 @@ func (s *Server) handleMode(w http.ResponseWriter, r *http.Request, set func(boo
 		writeJSON(w, resp)
 		return
 	}
+	s.app.RememberRunning()
 	writeJSON(w, map[string]any{"ok": true, "modes": s.app.Modes()})
 }
 
@@ -435,10 +440,14 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 	// «не трогай», а не «выключи». Пустая структура молча гасила системный
 	// прокси и переменные среды — туннель работал, но трафик шёл мимо него.
 	cfg := s.app.Config()
+	last := cfg.LastRunning
 	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
 		writeJSON(w, map[string]string{"error": "не разобрал настройки: " + err.Error()})
 		return
 	}
+	// Состояние туннеля ведёт сама программа (RememberRunning), а страница
+	// могла прислать устаревшую копию.
+	cfg.LastRunning = last
 	note, err := s.app.SetConfig(cfg)
 	if err != nil {
 		writeJSON(w, map[string]string{"error": err.Error()})
@@ -800,4 +809,29 @@ func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	json.NewEncoder(w).Encode(v)
+}
+
+// handleServerUsers — создание пользователя на текущем сервере из мастера
+// настройки: op "whoami" (можно ли) или "create" (имя, тип, пароль).
+func (s *Server) handleServerUsers(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Op         string `json:"op"`
+		Name       string `json:"name"`
+		DeviceType string `json:"deviceType"`
+		Password   string `json:"password"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&req); err != nil {
+		writeJSON(w, map[string]string{"error": "неверный запрос"})
+		return
+	}
+	var body any
+	if req.Op == "create" {
+		body = serverusers.CreateBody(req.Name, req.DeviceType, req.Password)
+	}
+	out, err := s.app.ServerUsers(req.Op, body)
+	if err != nil {
+		writeJSON(w, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, out)
 }

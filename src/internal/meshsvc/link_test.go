@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -21,7 +22,7 @@ var buildMeshdOnce = sync.OnceValues(func() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	bin := filepath.Join(dir, "meshd")
+	bin := filepath.Join(dir, "meshd"+exeSuffix())
 	out, err := exec.Command("go", "build", "-o", bin, "../../cmd/meshd").CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("сборка meshd: %v: %s", err, out)
@@ -149,4 +150,12 @@ func TestAdminНеЗапущен(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), ErrNotRunning.Error()) {
 		t.Fatalf("ожидалось %v, получено %v", ErrNotRunning, err)
 	}
+}
+
+// exeSuffix — на Windows собранной программе нужно расширение .exe.
+func exeSuffix() string {
+	if runtime.GOOS == "windows" {
+		return ".exe"
+	}
+	return ""
 }

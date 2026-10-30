@@ -37,7 +37,7 @@ func newEngine() (*engine, error) {
 // (limit; 0 — сколько угодно).
 func (e *engine) autoConnect(delay, limit time.Duration) {
 	cfg := e.a.Config()
-	if !cfg.AutoStart || cfg.Active().Host == "" {
+	if !cfg.ConnectOnStart(cfg.AutoStart) || cfg.Active().Host == "" {
 		return
 	}
 	go func() {

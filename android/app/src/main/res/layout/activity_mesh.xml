@@ -6,7 +6,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/bg"
+    android:background="?attr/c_bg"
     android:padding="16dp">
 
     <LinearLayout style="@style/HeadRow">
@@ -33,7 +33,7 @@
                 android:layout_height="wrap_content"
                 android:paddingBottom="10dp"
                 android:textSize="13sp"
-                android:textColor="@color/text"
+                android:textColor="?attr/c_text"
                 android:text="@string/mesh_intro" />
 
             <TextView
@@ -42,24 +42,24 @@
                 android:layout_height="wrap_content"
                 android:paddingBottom="6dp"
                 android:textSize="12.5sp"
-                android:textColor="@color/dim" />
+                android:textColor="?attr/c_dim" />
 
             <CheckBox
                 android:id="@+id/meshEnabled"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="@color/text"
+                android:textColor="?attr/c_text"
                 android:text="@string/mesh_enable" />
 
             <TextView style="@style/FieldLabel" android:text="@string/mesh_name" />
             <EditText android:id="@+id/meshName" style="@style/Field"
                 android:inputType="text" android:maxLength="64"
-                android:textColorHint="@color/dim" android:autofillHints="" />
+                android:textColorHint="?attr/c_dim" android:autofillHints="" />
 
             <TextView style="@style/FieldLabel" android:text="@string/mesh_key" />
             <EditText android:id="@+id/meshKey" style="@style/Field"
                 android:inputType="textNoSuggestions" android:typeface="monospace"
-                android:textSize="12sp" android:textColorHint="@color/dim" android:autofillHints="" />
+                android:textSize="12sp" android:textColorHint="?attr/c_dim" android:autofillHints="" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -98,7 +98,7 @@
                 android:layout_height="wrap_content"
                 android:paddingTop="6dp"
                 android:textSize="12sp"
-                android:textColor="@color/dim"
+                android:textColor="?attr/c_dim"
                 android:text="@string/mesh_key_hint" />
 
             <CheckBox
@@ -106,21 +106,21 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:textColor="@color/text"
+                android:textColor="?attr/c_text"
                 android:text="@string/mesh_incoming" />
 
             <CheckBox
                 android:id="@+id/meshDirect"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="@color/text"
+                android:textColor="?attr/c_text"
                 android:text="@string/mesh_direct" />
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:textSize="12sp"
-                android:textColor="@color/dim"
+                android:textColor="?attr/c_dim"
                 android:text="@string/mesh_direct_hint" />
 
             <TextView
@@ -129,7 +129,7 @@
                 android:layout_height="wrap_content"
                 android:paddingTop="4dp"
                 android:textSize="12sp"
-                android:textColor="@color/dim"
+                android:textColor="?attr/c_dim"
                 android:text="@string/mesh_reconnect_note" />
 
             <TextView
@@ -138,7 +138,7 @@
                 android:layout_marginTop="16dp"
                 android:textSize="12sp"
                 android:textStyle="bold"
-                android:textColor="@color/dim"
+                android:textColor="?attr/c_dim"
                 android:text="@string/mesh_devices" />
 
             <TextView
@@ -148,7 +148,7 @@
                 android:paddingTop="4dp"
                 android:paddingBottom="8dp"
                 android:textSize="12.5sp"
-                android:textColor="@color/dim" />
+                android:textColor="?attr/c_dim" />
 
             <LinearLayout
                 android:id="@+id/meshPeers"

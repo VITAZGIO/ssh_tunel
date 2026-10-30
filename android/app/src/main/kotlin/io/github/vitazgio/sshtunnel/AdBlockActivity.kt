@@ -43,6 +43,7 @@ class AdBlockActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Look.apply(this)
         setContentView(R.layout.activity_adblock)
         settings = Settings(this)
 
@@ -102,9 +103,9 @@ class AdBlockActivity : AppCompatActivity() {
         // Цвет фона один поверх другого мог быть недостаточно заметен —
         // жирный белый текст на активной вкладке убирает всякую путаницу,
         // какой список сейчас открыт.
-        tabBlockBtn.setTextColor(ContextCompat.getColor(this, if (block) android.R.color.white else R.color.text))
+        tabBlockBtn.setTextColor(tc(if (block) android.R.color.white else R.color.text))
         tabBlockBtn.setTypeface(null, if (block) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
-        tabAllowBtn.setTextColor(ContextCompat.getColor(this, if (block) R.color.text else android.R.color.white))
+        tabAllowBtn.setTextColor(tc(if (block) R.color.text else android.R.color.white))
         tabAllowBtn.setTypeface(null, if (block) android.graphics.Typeface.NORMAL else android.graphics.Typeface.BOLD)
         if (block) {
             tabLabel.setText(R.string.ad_block_sources)
@@ -179,7 +180,7 @@ class AdBlockActivity : AppCompatActivity() {
     private fun showTip(anchor: View, text: String) {
         val tv = TextView(this)
         tv.text = text
-        tv.setTextColor(ContextCompat.getColor(this, R.color.text))
+        tv.setTextColor(tc(R.color.text))
         tv.textSize = 12.5f
         tv.setPadding(dp(12), dp(10), dp(12), dp(10))
         val popup = PopupWindow(tv, dp(240), ViewGroup.LayoutParams.WRAP_CONTENT, true)

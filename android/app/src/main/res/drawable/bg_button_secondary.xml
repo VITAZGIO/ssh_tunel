@@ -9,6 +9,6 @@
     они рисуются кодом из TextView, там подмены на MaterialButton не было.
 -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="@color/accent_muted" />
+    <solid android:color="?attr/c_accent_muted" />
     <corners android:radius="9dp" />
 </shape>

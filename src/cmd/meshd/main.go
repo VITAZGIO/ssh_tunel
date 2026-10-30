@@ -61,6 +61,7 @@ import (
 	"net/http"
 	"net/netip"
 	"os"
+	"os/user"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -169,10 +170,15 @@ type device struct {
 	// Name — как устройство назвало себя само; Alias — как его переименовали
 	// в панели. Показывается Alias, если он есть: иначе переименование
 	// жило бы до первого переподключения устройства.
-	Name      string    `json:"name"`
-	Alias     string    `json:"alias,omitempty"`
-	Host      string    `json:"host"`
-	IP        string    `json:"ip"`
+	Name  string `json:"name"`
+	Alias string `json:"alias,omitempty"`
+	Host  string `json:"host"`
+	IP    string `json:"ip"`
+	// User — SSH-пользователь сервера, через которого пришло последнее
+	// управляющее соединение (см. connUser). Его, а не id устройства,
+	// проверяют правила доступа: id устройство называет само, а
+	// пользователя не подделать без его ключа.
+	User      string    `json:"user,omitempty"`
 	FirstSeen time.Time `json:"firstSeen,omitempty"`
 	LastSeen  time.Time `json:"lastSeen"`
 	Platform  string    `json:"platform,omitempty"`
@@ -292,10 +298,15 @@ type server struct {
 	relayRecs map[string]*relayRecord
 	// stunPorts — порты проверки NAT (UDP), если она включена.
 	stunPorts []int
-	path      string
-	saveMu    sync.Mutex
-	dirty     chan struct{}
-	started   time.Time
+	// policy — права доступа устройств (см. «права доступа»). Хранятся в
+	// policy.json, задаёт панель.
+	policy policy
+	// connUser узнаёт SSH-пользователя соединения; в тестах подменяется.
+	connUser func(net.Conn) string
+	path     string
+	saveMu   sync.Mutex
+	dirty    chan struct{}
+	started  time.Time
 }
 
 func newServer(path string) *server {
@@ -307,10 +318,12 @@ func newServer(path string) *server {
 		path:   path,
 
 		relayRecs: map[string]*relayRecord{},
+		connUser:  procConnUser,
 		dirty:     make(chan struct{}, 1),
 		started:   time.Now(),
 	}
 	s.load()
+	s.loadPolicy()
 	return s
 }
 
@@ -406,10 +419,14 @@ func (s *server) save() {
 	os.Rename(tmp, s.path)
 }
 
-// peersLocked — список устройств сети для рассылки. Под s.mu.
-func (s *server) peersLocked(n *network) []peer {
+// peersLocked — список устройств сети для устройства me: только те, с
+// кем ему разрешено общаться хоть в одну сторону (и оно само). Под s.mu.
+func (s *server) peersLocked(n *network, me *device) []peer {
 	out := make([]peer, 0, len(n.Devices)+len(s.relayRecs)+1)
 	for _, d := range n.Devices {
+		if d != me && !s.policy.visible(me.User, d.User) {
+			continue
+		}
 		p := peer{Name: d.displayName(), Host: d.Host, IP: d.IP, Online: d.ctrl != nil,
 			Platform: d.Platform, Via: d.Via}
 		if !d.LastSeen.IsZero() {
@@ -417,7 +434,9 @@ func (s *server) peersLocked(n *network) []peer {
 		}
 		out = append(out, p)
 	}
-	out = append(out, s.serverPeersLocked(n)...)
+	if s.policy.visible(me.User, serversGroup) {
+		out = append(out, s.serverPeersLocked(n)...)
+	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Host < out[j].Host })
 	return out
 }
@@ -425,10 +444,9 @@ func (s *server) peersLocked(n *network) []peer {
 // broadcastLocked рассылает всем подключённым устройствам сети свежий
 // список. Под s.mu.
 func (s *server) broadcastLocked(n *network) {
-	peers := s.peersLocked(n)
 	for _, d := range n.Devices {
 		if d.ctrl != nil {
-			d.ctrl.send(msg{Op: "peers", Peers: peers})
+			d.ctrl.send(msg{Op: "peers", Peers: s.peersLocked(n, d)})
 		}
 	}
 }
@@ -628,6 +646,7 @@ func (s *server) control(conn net.Conn, m msg) {
 	if len([]rune(name)) > 64 {
 		name = string([]rune(name)[:64])
 	}
+	user := s.connUser(conn)
 	c := newCtrlConn(conn)
 	defer c.close()
 
@@ -665,6 +684,7 @@ func (s *server) control(conn net.Conn, m msg) {
 	}
 	now := time.Now()
 	d.Name = name
+	d.User = user
 	d.Host = s.uniqueHostLocked(n, m.Device, d.displayName())
 	if d.FirstSeen.IsZero() {
 		d.FirstSeen = now
@@ -683,7 +703,7 @@ func (s *server) control(conn net.Conn, m msg) {
 	d.connectedAt = now
 	d.link = linkStats{}
 	d.ctrl = c
-	c.send(msg{Op: "welcome", V: protoVersion, IP: d.IP, Host: d.Host, Peers: s.peersLocked(n), Stun: s.stunPorts})
+	c.send(msg{Op: "welcome", V: protoVersion, IP: d.IP, Host: d.Host, Peers: s.peersLocked(n, d), Stun: s.stunPorts})
 	s.broadcastLocked(n)
 	s.mu.Unlock()
 	s.markDirty()
@@ -882,7 +902,21 @@ func (s *server) dial(conn net.Conn, m msg) {
 		return
 	}
 	from := n.Devices[m.Device]
+	user := s.connUser(conn)
+	if user != from.User {
+		// Чужой id устройства: права считаются по тому, кто звонит на
+		// самом деле, а адрес вызывающего — по устройству. Не сходится —
+		// не пускаем, иначе можно звонить от имени чужого устройства.
+		s.mu.Unlock()
+		fail("это устройство подключено под другим пользователем")
+		return
+	}
 	if ip, ok := s.serverTargetLocked(n, m.To); ok {
+		if !s.policy.allowed(user, serversGroup, m.Port) {
+			s.mu.Unlock()
+			fail(deniedText)
+			return
+		}
 		s.dialServer(conn, from, ip, m.Port, fail) // отпускает s.mu
 		return
 	}
@@ -893,9 +927,14 @@ func (s *server) dial(conn net.Conn, m msg) {
 			break
 		}
 	}
-	if target == nil {
+	if target == nil || !s.policy.visible(user, target.User) {
 		s.mu.Unlock()
 		fail("нет такого устройства в сети")
+		return
+	}
+	if !s.policy.allowed(user, target.User, m.Port) {
+		s.mu.Unlock()
+		fail(deniedText)
 		return
 	}
 	if target.ctrl == nil {
@@ -1027,6 +1066,7 @@ type adminDevice struct {
 	Display     string       `json:"display"`
 	Host        string       `json:"host"`
 	IP          string       `json:"ip"`
+	User        string       `json:"user,omitempty"`
 	Online      bool         `json:"online"`
 	Platform    string       `json:"platform,omitempty"`
 	OS          string       `json:"os,omitempty"`
@@ -1107,7 +1147,7 @@ func (s *server) adminState() adminState {
 		for _, d := range n.Devices {
 			ad := adminDevice{
 				ID: d.ID, Name: d.Name, Alias: d.Alias, Display: d.displayName(),
-				Host: d.Host, IP: d.IP, Online: d.ctrl != nil,
+				Host: d.Host, IP: d.IP, User: d.User, Online: d.ctrl != nil,
 				Platform: d.Platform, OS: d.OS, App: d.App, Mode: d.Mode, Via: d.Via,
 				Hostname: d.Hostname, FirstSeen: unixOrZero(d.FirstSeen), LastSeen: unixOrZero(d.LastSeen),
 				Sessions:  d.Sessions,
@@ -1244,6 +1284,25 @@ func (s *server) adminHandler() http.Handler {
 		q, err := decode(r)
 		if err == nil {
 			s.forgetRelay(q.Device)
+		}
+		reply(w, map[string]bool{"ok": true}, err)
+	})
+	mux.HandleFunc("/v1/policy", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			s.mu.Lock()
+			p := s.policy
+			s.mu.Unlock()
+			reply(w, p, nil)
+			return
+		}
+		if r.Method != http.MethodPost {
+			reply(w, nil, errors.New("нужен POST"))
+			return
+		}
+		var p policy
+		err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&p)
+		if err == nil {
+			err = s.setPolicy(p)
 		}
 		reply(w, map[string]bool{"ok": true}, err)
 	})
@@ -1664,6 +1723,13 @@ func (s *server) p2pMessage(n *network, d *device, c *ctrlConn, in msg) {
 	if target == nil || target.ctrl == nil || target == d || len(in.Call) > 64 || len(in.FP) > 128 {
 		return
 	}
+	// По прямому соединению устройства ходят друг к другу на любые порты и в
+	// обе стороны, и сервер этого уже не видит. Поэтому сводим их напрямую,
+	// только если правила и так разрешают всё в обе стороны; иначе
+	// соединения идут через сервер, где правила проверяются.
+	if !s.policy.allowed(d.User, target.User, 0) || !s.policy.allowed(target.User, d.User, 0) {
+		return
+	}
 	var cands []string
 	for _, a := range in.Cands {
 		if ap, err := netip.ParseAddrPort(a); err == nil && len(cands) < 16 {
@@ -1698,7 +1764,7 @@ func (s *server) echoMessage(n *network, d *device, c *ctrlConn, in msg) {
 	if in.Op == "echo" {
 		for _, p := range s.serverPeersLocked(n) {
 			if p.IP == in.To {
-				if p.Online {
+				if p.Online && s.policy.visible(d.User, serversGroup) {
 					c.send(msg{Op: "echoreply", From: in.To, Call: in.Call})
 				}
 				return
@@ -1706,7 +1772,7 @@ func (s *server) echoMessage(n *network, d *device, c *ctrlConn, in msg) {
 		}
 	}
 	for _, t := range n.Devices {
-		if t.IP == in.To && t != d && t.ctrl != nil {
+		if t.IP == in.To && t != d && t.ctrl != nil && s.policy.visible(d.User, t.User) {
 			t.ctrl.send(msg{Op: in.Op, From: d.IP, Call: in.Call})
 			return
 		}
@@ -1897,6 +1963,240 @@ func randomID() string {
 	var b [12]byte
 	rand.Read(b[:])
 	return hex.EncodeToString(b[:])
+}
+
+// ---------- права доступа ----------
+//
+// Как группы и политики в NetBird. Панель кладёт каждого SSH-пользователя
+// сервера (клиента туннеля) в группы и задаёт правила «группа → группа,
+// порты». Устройство получает права своего пользователя: его не подделать,
+// в отличие от id устройства, который оно называет само.
+//
+// Особые группы: "*" — все устройства и серверы сети, "@servers" — серверы.
+// Пользователь, которого нет в политике (в том числе устройства, пришедшие
+// через побочный сервер под meshlink), состоит только в "*".
+//
+// Пока политика выключена, разрешено всё — как было до прав доступа.
+
+const (
+	allGroup     = "*"
+	serversGroup = "@servers" // и группа серверов, и «пользователь» сервера
+	deniedText   = "нет доступа: правила сети устройств не разрешают это соединение"
+	maxRules     = 256
+	maxGroups    = 64
+)
+
+type policyRule struct {
+	From  string `json:"from"`
+	To    string `json:"to"`
+	Ports string `json:"ports,omitempty"` // "22,80,8000-8100"; пусто — все
+}
+
+type policy struct {
+	Enabled bool                `json:"enabled"`
+	Users   map[string][]string `json:"users,omitempty"` // пользователь → группы
+	Rules   []policyRule        `json:"rules,omitempty"`
+}
+
+func (p policy) member(user, group string) bool {
+	if group == allGroup {
+		return true
+	}
+	if user == serversGroup {
+		return group == serversGroup
+	}
+	for _, g := range p.Users[user] {
+		if g == group {
+			return true
+		}
+	}
+	return false
+}
+
+// allowed — может ли устройство пользователя from открыть соединение к
+// устройству пользователя to на порт port. port 0 — «на любой порт»:
+// подходит только правило без ограничения портов.
+func (p policy) allowed(from, to string, port int) bool {
+	if !p.Enabled {
+		return true
+	}
+	if from == serversGroup {
+		return false
+	}
+	for _, r := range p.Rules {
+		if !p.member(from, r.From) || !p.member(to, r.To) {
+			continue
+		}
+		if r.Ports == "" || (port > 0 && portAllowed(r.Ports, port)) {
+			return true
+		}
+	}
+	return false
+}
+
+// visible — видят ли устройства друг друга в списке: да, если хоть в одну
+// сторону разрешено хоть что-то.
+func (p policy) visible(a, b string) bool {
+	if !p.Enabled {
+		return true
+	}
+	for _, r := range p.Rules {
+		if (p.member(a, r.From) && p.member(b, r.To)) || (p.member(b, r.From) && p.member(a, r.To)) {
+			return true
+		}
+	}
+	return false
+}
+
+func validGroup(g string) error {
+	if g == "" || len(g) > 64 {
+		return errors.New("пустое или слишком длинное имя группы")
+	}
+	for _, r := range g {
+		if unicode.IsControl(r) {
+			return errors.New("недопустимый символ в имени группы")
+		}
+	}
+	return nil
+}
+
+func (p policy) validate() error {
+	if len(p.Rules) > maxRules {
+		return errors.New("слишком много правил")
+	}
+	for _, r := range p.Rules {
+		if err := validGroup(r.From); err != nil {
+			return err
+		}
+		if err := validGroup(r.To); err != nil {
+			return err
+		}
+		if r.From == serversGroup {
+			return errors.New("серверы сами соединения не открывают — их можно указать только как цель")
+		}
+		if err := validPorts(r.Ports); err != nil {
+			return err
+		}
+	}
+	for u, gs := range p.Users {
+		if u == "" || len(u) > 64 || len(gs) > maxGroups {
+			return errors.New("неверный пользователь в политике")
+		}
+		for _, g := range gs {
+			if err := validGroup(g); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (s *server) policyPath() string {
+	if s.path == "" {
+		return ""
+	}
+	return filepath.Join(filepath.Dir(s.path), "policy.json")
+}
+
+// loadPolicy читает политику при старте. Файл есть, но не читается —
+// закрываем всё, а не открываем: испорченные права не должны означать
+// «можно всё».
+func (s *server) loadPolicy() {
+	path := s.policyPath()
+	if path == "" {
+		return
+	}
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return
+	}
+	var p policy
+	if err == nil {
+		err = json.Unmarshal(data, &p)
+	}
+	if err == nil {
+		err = p.validate()
+	}
+	if err != nil {
+		log.Printf("права доступа: %s не читается (%v) — все соединения между устройствами закрыты", path, err)
+		p = policy{Enabled: true}
+	}
+	s.policy = p
+}
+
+// setPolicy — новая политика от панели. Сохраняется на диск и сразу
+// рассылается: каждое устройство получает свой список видимых. Уже идущие
+// соединения не рвутся; прямые (p2p) живут, пока не оборвутся сами, —
+// поэтому при сужении прав панель советует переподключить устройство.
+func (s *server) setPolicy(p policy) error {
+	if err := p.validate(); err != nil {
+		return err
+	}
+	if path := s.policyPath(); path != "" {
+		data, _ := json.MarshalIndent(p, "", "  ")
+		tmp := path + ".tmp"
+		if err := os.WriteFile(tmp, data, 0o600); err != nil {
+			return err
+		}
+		if err := os.Rename(tmp, path); err != nil {
+			return err
+		}
+	}
+	s.mu.Lock()
+	s.policy = p
+	s.broadcastAllLocked()
+	s.mu.Unlock()
+	return nil
+}
+
+// procConnUser — SSH-пользователь, чей процесс sshd открыл это соединение.
+// Устройства приходят к meshd через проброс SSH: соединение с 127.0.0.1
+// открывает процесс sshd, работающий от имени пользователя туннеля, и ядро
+// записывает этого пользователя владельцем сокета (колонка uid в
+// /proc/net/tcp — она видна всем, root не нужен). Не нашли — "".
+func procConnUser(conn net.Conn) string {
+	ra, ok := conn.RemoteAddr().(*net.TCPAddr)
+	la, ok2 := conn.LocalAddr().(*net.TCPAddr)
+	if !ok || !ok2 {
+		return ""
+	}
+	data, err := os.ReadFile("/proc/net/tcp")
+	if err != nil {
+		return ""
+	}
+	uid, ok := socketUID(string(data), ra, la)
+	if !ok {
+		return ""
+	}
+	u, err := user.LookupId(uid)
+	if err != nil {
+		return ""
+	}
+	return u.Username
+}
+
+// socketUID ищет в /proc/net/tcp сокет с локальным адресом local и
+// удалённым remote (с той стороны соединения они наоборот) и возвращает его uid.
+func socketUID(table string, local, remote *net.TCPAddr) (string, bool) {
+	hexAddr := func(a *net.TCPAddr) string {
+		ip := a.IP.To4()
+		if ip == nil {
+			return ""
+		}
+		return strings.ToUpper(hex.EncodeToString([]byte{ip[3], ip[2], ip[1], ip[0]})) + ":" +
+			strings.ToUpper(hex.EncodeToString([]byte{byte(a.Port >> 8), byte(a.Port)}))
+	}
+	l, r := hexAddr(local), hexAddr(remote)
+	if l == "" || r == "" {
+		return "", false
+	}
+	for _, line := range strings.Split(table, "\n") {
+		f := strings.Fields(line)
+		if len(f) > 7 && f[1] == l && f[2] == r {
+			return f[7], true
+		}
+	}
+	return "", false
 }
 
 func main() {

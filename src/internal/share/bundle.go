@@ -32,6 +32,9 @@ type Bundle struct {
 	Verbose          bool   `json:"verbose"`
 	AutoStart        bool   `json:"autoStart"`
 	AutoConnect      *bool  `json:"autoConnect,omitempty"`
+	StartMode        string `json:"startMode,omitempty"`
+	Theme            string `json:"theme,omitempty"`
+	Background       string `json:"background,omitempty"`
 	ShowServerPicker bool   `json:"showServerPicker"`
 	AutoPickFastest  bool   `json:"autoPickFastest"`
 	SysProxy         bool   `json:"sysProxy"`

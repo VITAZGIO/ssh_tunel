@@ -69,7 +69,7 @@ func main() {
 
 	go showStateInTray(a)
 
-	if cfg.AutoStart && cfg.Active().Host != "" {
+	if cfg.ConnectOnStart(cfg.AutoStart) && cfg.Active().Host != "" {
 		go func() {
 			time.Sleep(300 * time.Millisecond) // дать окну подписаться на события
 			// При старте вместе с системой сети может ещё не быть —
@@ -101,6 +101,7 @@ func main() {
 		DataPath: config.Dir(),
 		Running:  a.Running,
 		Toggle: func() {
+			defer a.RememberRunning()
 			if a.Running() {
 				a.Stop()
 				return

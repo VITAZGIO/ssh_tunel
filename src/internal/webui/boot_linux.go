@@ -28,6 +28,10 @@ func platformBootEnabled() bool {
 
 func platformBootLinger() bool { return lingerOn() }
 
+// platformBootProblem — на Linux недоделанный автозапуск видно по Linger,
+// отдельный код причины не нужен.
+func platformBootProblem() string { return "" }
+
 func platformUnitPath() string {
 	p, err := unitPath()
 	if err != nil {

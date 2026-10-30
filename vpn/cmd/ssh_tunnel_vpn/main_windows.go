@@ -118,7 +118,7 @@ func migrateOldAutostart() bool {
 	}
 	// Служба нужна, чтобы всё поднималось само, — значит, и подключаться ей
 	// надо сразу.
-	if cfg := config.Load(); !cfg.AutoStart {
+	if cfg := config.Load(); cfg.StartMode == "" && !cfg.AutoStart {
 		cfg.AutoStart = true
 		_ = cfg.Save()
 	}

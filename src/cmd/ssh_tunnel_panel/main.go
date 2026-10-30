@@ -32,7 +32,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"golang.org/x/crypto/acme/autocert"
@@ -58,6 +60,8 @@ func main() {
 	sshHost := flag.String("ssh-host", "", "адрес, на который клиентам подключаться по SSH "+
 		"(это адрес сервера, не панели) — по умолчанию совпадает с -domain, если он задан")
 	sshPort := flag.Int("ssh-port", 22, "SSH-порт сервера — тот, что попадает в конфиг клиента")
+	selfAddr := flag.String("self-service", panel.SelfServiceAddr, "вход для создания пользователей из "+
+		"программы клиента (только через туннель; пусто — выключен)")
 	publicURL := flag.String("public-url", "", "адрес самой панели, каким его увидит клиент "+
 		"(например https://panel.example.com/) — по умолчанию собирается из -domain; "+
 		"попадает в конфиг клиента, чтобы его программа могла показать, чем сервер выдан")
@@ -134,6 +138,10 @@ func main() {
 		WithSettings(settings).
 		WithMesh(mesh)
 	handler := srv.Handler()
+	go srv.SyncAccess()
+	if *selfAddr != "" {
+		go serveSelfService(srv, *selfAddr)
+	}
 
 	if *domain != "" {
 		if err := serveWithAutocert(handler, *domain, filepath.Join(*dataDir, "certs")); err != nil {
@@ -235,4 +243,26 @@ func defaultDataDir() string {
 func fatal(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, "Ошибка: "+format+"\n", args...)
 	os.Exit(1)
+}
+
+// serveSelfService — вход для создания пользователей из программы клиента
+// (panel/selfservice.go). Брандмауэр туннеля пускает клиентов на 127.0.0.1
+// только на свои порты ssh_tunnel — открываем там и этот.
+func serveSelfService(srv *panel.Server, addr string) {
+	if runtime.GOOS == "linux" {
+		if out, err := exec.Command("sh", "-c", meshsvc.FirewallExemption).CombinedOutput(); err != nil {
+			log.Printf("создание пользователей: брандмауэр туннеля не обновлён: %v %s", err, out)
+		}
+	}
+	s := &http.Server{
+		Addr:              addr,
+		Handler:           srv.SelfServiceHandler(),
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+	}
+	log.Printf("создание пользователей из программы: http://%s/", addr)
+	if err := s.ListenAndServe(); err != nil {
+		log.Printf("создание пользователей недоступно: %v", err)
+	}
 }

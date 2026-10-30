@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -26,7 +27,7 @@ var buildMeshdOnce = sync.OnceValues(func() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	bin := filepath.Join(dir, "meshd")
+	bin := filepath.Join(dir, "meshd"+exeSuffix())
 	cmd := exec.Command("go", "build", "-o", bin, "../../cmd/meshd")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -320,4 +321,12 @@ func TestMatch(t *testing.T) {
 			t.Errorf("Match(%q) = %v, ожидалось %v", target, got, want)
 		}
 	}
+}
+
+// exeSuffix — на Windows собранной программе нужно расширение .exe.
+func exeSuffix() string {
+	if runtime.GOOS == "windows" {
+		return ".exe"
+	}
+	return ""
 }

@@ -20,6 +20,9 @@ type Settings struct {
 	MaxDevices int `json:"maxDevices,omitempty"`
 
 	Mesh MeshSettings `json:"mesh"`
+
+	// Access — права доступа устройств в сети устройств (access.go).
+	Access AccessSettings `json:"access"`
 }
 
 // Роли сервера в сети устройств.
