@@ -29,6 +29,18 @@ class TunnelService : VpnService(), Callbacks {
     companion object {
         const val ACTION_START = "io.github.vitazgio.sshtunnel.START"
         const val ACTION_STOP = "io.github.vitazgio.sshtunnel.STOP"
+        /**
+         * Две кнопки главного экрана, как на компьютере: EXTRA_BYPASS — обход
+         * блокировок (сайты через сервер), EXTRA_MESH — сеть устройств.
+         * Туннель держится, пока нужна хотя бы одна; обе выключены — остановка.
+         */
+        const val ACTION_MODES = "io.github.vitazgio.sshtunnel.MODES"
+        const val EXTRA_BYPASS = "bypass"
+        const val EXTRA_MESH = "mesh"
+
+        /** Что включено сейчас (или с чем поднимается туннель). */
+        @Volatile var bypassOn: Boolean = true
+        @Volatile var meshOn: Boolean = true
 
         /** Состояние и журнал для экрана: служба живёт отдельно от него. */
         @Volatile var state: String = "stopped"
@@ -227,6 +239,35 @@ class TunnelService : VpnService(), Callbacks {
             if (draining) finishDrain() else stopTunnel()
             return START_NOT_STICKY
         }
+        if (intent?.action == ACTION_MODES) {
+            val bypass = intent.getBooleanExtra(EXTRA_BYPASS, true)
+            val mesh = intent.getBooleanExtra(EXTRA_MESH, true)
+            val running = state != "stopped" && state != "error" && !draining
+            if (!bypass && !(mesh && Settings(this).meshConfigured())) {
+                if (running) stopTunnel()
+                return START_NOT_STICKY
+            }
+            bypassOn = bypass
+            meshOn = mesh
+            if (running) {
+                tunnel.setModes(bypass, mesh)
+                onLog(
+                    when {
+                        bypass && mesh -> "обход блокировок и сеть устройств включены"
+                        bypass -> "сеть устройств выключена — обход блокировок работает"
+                        else -> "обход блокировок выключен — сайты идут напрямую, сеть устройств работает"
+                    }
+                )
+                onUpdate?.invoke()
+                return START_STICKY
+            }
+            // Выключенный туннель — поднимаем с выбранными режимами, как и
+            // обычное включение (в том числе возврат из слива).
+        } else if (intent?.action == ACTION_START) {
+            // Большая кнопка и запуск системой (always-on) включают всё.
+            bypassOn = true
+            meshOn = true
+        }
         // Включили обратно, пока шёл слив: интерфейс VPN никуда не девался,
         // поэтому достаточно поднять пул. Сокеты приложений при этом не
         // рвутся вовсе — ни браузер, ни мессенджер ничего не заметят и
@@ -280,6 +321,8 @@ class TunnelService : VpnService(), Callbacks {
                     settings.adBlockAllowlist,
                     settings.udpRelayEnabled,
                 )
+                tunnel.setTunnelHosts(settings.tunnelHosts)
+                tunnel.setModes(bypassOn, meshOn)
                 val prof = settings.active()
                 tunnel.configureMesh(
                     prof.meshEnabled && prof.meshKey.isNotBlank(),
@@ -542,6 +585,8 @@ class TunnelService : VpnService(), Callbacks {
         Thread {
             try {
                 tunnel.updateRouting(settings.directHosts, settings.localViaTunnel)
+                tunnel.setTunnelHosts(settings.tunnelHosts)
+                tunnel.setModes(bypassOn, meshOn)
                 tunnel.resume()
                 ticker.post(poll)
             } catch (e: Exception) {

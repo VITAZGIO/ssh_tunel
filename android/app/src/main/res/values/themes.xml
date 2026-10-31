@@ -297,6 +297,59 @@
         <item name="android:textColor">?attr/c_dim</item>
     </style>
 
+    <!-- Заголовок раскрывающейся группы в «Настройках приложения». -->
+    <style name="GroupHead">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingTop">13dp</item>
+        <item name="android:paddingBottom">13dp</item>
+        <item name="android:paddingStart">2dp</item>
+        <item name="android:paddingEnd">2dp</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:background">?android:attr/selectableItemBackground</item>
+    </style>
+
+    <style name="GroupTitle">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">?attr/c_text</item>
+    </style>
+
+    <style name="GroupSub">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">1dp</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textColor">?attr/c_dim</item>
+    </style>
+
+    <!-- Маленький переключатель «буфер / файл» у переноса настроек. -->
+    <style name="XferSeg">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">26dp</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:background">@drawable/bg_outline</item>
+        <item name="android:showDividers">middle</item>
+        <item name="android:divider">@drawable/bg_seg_div</item>
+    </style>
+
+    <style name="XferSegItem">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:gravity">center</item>
+        <item name="android:paddingStart">10dp</item>
+        <item name="android:paddingEnd">10dp</item>
+        <item name="android:textSize">11.5sp</item>
+        <item name="android:textColor">?attr/c_text</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+    </style>
+
     <style name="SectTitle">
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>

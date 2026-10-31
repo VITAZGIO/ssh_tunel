@@ -40,3 +40,12 @@ func (a *App) UpdateAdBlockLists(sources string) (int, error) {
 	ab.SetAdBlock(a.Config())
 	return n, nil
 }
+
+// AdBlocked — сколько запросов имён заблокировано с подключения; 0, если
+// блокировки в этой версии нет.
+func (a *App) AdBlocked() int {
+	if c, ok := a.adBlocker().(interface{ AdBlocked() int }); ok {
+		return c.AdBlocked()
+	}
+	return 0
+}

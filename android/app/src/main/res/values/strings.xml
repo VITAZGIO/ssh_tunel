@@ -31,7 +31,7 @@
     <string name="key_saved">Ключ сохранён</string>
 
     <string name="direct">Всегда напрямую</string>
-    <string name="direct_hint">10.8.0.0/16, 172.30.*, .corp.local, vitazgio.ru</string>
+    <string name="direct_hint">intranet.example.com\n.corp.example\n10.8.0.0/16</string>
     <string name="local_via_tunnel">Локальную сеть тоже вести через сервер</string>
 
     <string name="apps_title">Приложения</string>
@@ -48,7 +48,7 @@
     <string name="tile_conns">Соединений</string>
     <string name="tile_links">Каналов SSH</string>
     <string name="pool_hint">каналов SSH</string>
-    <string name="direct_note">Адреса, сети и домены, которым туннель не нужен. Локальная сеть и так идёт напрямую. Домен — vitazgio.ru, вместе со всеми поддоменами; только поддомены — .vitazgio.ru или *.vitazgio.ru.</string>
+    <string name="direct_note">Адреса, сети и домены, которым туннель не нужен. Локальная сеть и так идёт напрямую. Домен — example.com, вместе со всеми поддоменами; только поддомены — .example.com или *.example.com. По одному в строке или через запятую.</string>
     <string name="always_on_hint">Хочешь, чтобы туннель поднимался сам при включении телефона и не выключался ни при каких обстоятельствах — в системных настройках: Настройки → Сеть и интернет → VPN → шестерёнка рядом с этим приложением → «Всегда включённый VPN». Там же — «Блокировать соединения без VPN»: если он включён, при обрыве туннеля весь трафик останавливается, а не идёт в обход, — это делает сама система, приложение в это не вмешивается.</string>
     <string name="always_on_label">Автозапуск и постоянная работа VPN — в системных настройках</string>
 
@@ -258,7 +258,7 @@
     <string name="via_clip">через буфер</string>
     <string name="import_short">Импорт</string>
     <string name="export_short">Экспорт</string>
-    <string name="xfer_note">Все серверы с ключами, выбор приложений, DNS и белый список рекламы — одной строкой через буфер обмена. Списки блокировки не переносятся. Этот текст — такой же секрет, как ключ.</string>
+    <string name="xfer_note">Все серверы с ключами, выбор приложений, списки доменов, ссылки на списки рекламы и белый список — одной строкой через буфер обмена или файлом (переключатель справа). Скачанные списки блокировки не переносятся. Этот текст — такой же секрет, как ключ.</string>
     <string name="paste_server">Вставить</string>
     <string name="scan_short">QR-код</string>
     <string name="new_server">Новый</string>
@@ -270,7 +270,7 @@
     <string name="sect_look">Оформление</string>
     <string name="sect_more">Дополнительно</string>
     <string name="start_mode">Туннель при открытии приложения</string>
-    <string name="start_mode_note">«Как при закрытии» — включит туннель, если он был включён, когда его в последний раз включали или выключали. Чтобы VPN поднимался сам при включении телефона, включи «Постоянный VPN» в настройках Android (см. «?» ниже).</string>
+    <string name="start_mode_note">Обход блокировок — сайты через сервер. «Как при закрытии» — включит его, если он был включён, когда его в последний раз включали или выключали. Сеть устройств — отдельным выбором ниже. Чтобы VPN поднимался сам при включении телефона, включи «Постоянный VPN» в настройках Android (см. «?» ниже).</string>
     <string name="start_on">Включать</string>
     <string name="start_last">Как при закрытии</string>
     <string name="start_off">Не включать</string>
@@ -288,4 +288,29 @@
     <string name="author_name" translatable="false">Vitaz Gio</string>
     <string name="ip_col" translatable="false">IP</string>
     <string name="dev_domain_ip">Домен · IP</string>
+    <string name="copied">Скопировано</string>
+    <string name="saved_to_file">Файл сохранён</string>
+    <string name="file_failed">Не удалось сохранить файл</string>
+    <string name="domains_title">Исключения доменов</string>
+    <string name="domains_xfer">Перенос списков</string>
+    <string name="domains_bad">Это не похоже на списки доменов</string>
+    <string name="domains_imported">Списки загружены и сохранены</string>
+    <string name="domains_summary">напрямую: %1$d · в туннель: %2$d</string>
+    <string name="direct_sub">Мимо сервера, даже если приложение идёт через туннель</string>
+    <string name="tunnel_sub">Через сервер, даже если домен попал в «Всегда напрямую»</string>
+    <string name="tunnel_label">Всегда в туннель</string>
+    <string name="tunnel_hint">example.org\n*.example.net\n203.0.113.0/24</string>
+    <string name="tunnel_note">Сайты и сети, которые всегда идут через сервер — даже если домен попал под «Всегда напрямую». Пример: в «Всегда напрямую» стоит example.com, а shop.example.com нужен через сервер — впиши его сюда. Приложения, исключённые из VPN, в туннель не попадают вовсе — для них список не действует.</string>
+    <string name="mesh_start_mode">Сеть устройств при открытии приложения</string>
+    <string name="mesh_start_note">Отдельно от туннеля: можно поднимать только сеть устройств (телефон виден с других устройств, а интернет идёт напрямую) или только туннель без сети. «Как при закрытии» — как было, когда в последний раз включали или выключали. Работает, если у сервера включена сеть устройств.</string>
+    <string name="grp_traffic_sub">Приложения, сеть устройств, реклама, домены</string>
+    <string name="grp_look_sub">Тема и фон</string>
+    <string name="grp_launch_sub">Туннель и сеть устройств при открытии</string>
+    <string name="grp_more_sub">Локальная сеть, UDP, выбор сервера</string>
+    <string name="xfer_clip">буфер</string>
+    <string name="xfer_file">файл</string>
+    <string name="mesh_btn_on">Сеть устройств: вкл</string>
+    <string name="mesh_btn_off">Сеть устройств: выкл</string>
+    <string name="state_mesh_only">Только сеть устройств</string>
+    <string name="bundle_saved">настройки сохранены в файл, серверов — %1$d; открой его на другом устройстве</string>
 </resources>

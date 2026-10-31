@@ -1030,3 +1030,40 @@ func TestDirectNameResolvedAheadSkipsTunnel(t *testing.T) {
 		t.Error("адрес имени, убранного из списка, всё ещё идёт напрямую")
 	}
 }
+
+// «Всегда через сервер» сильнее и правил по программам, и «всегда
+// напрямую», и локальной сети: поддомен своего домена или один сайт для
+// исключённой программы всё равно идут через сервер.
+func TestTunnelListBeatsDirectRules(t *testing.T) {
+	tun, _, _, srv := startTunnel(t, 1)
+	tun.SetPolicy(routing.New(routing.ModeExcept, []string{"steam.exe"}))
+	tun.SetDirect(routing.NewDirectList([]string{"corp.invalid"}))
+	tun.SetTunneled(routing.NewDirectList([]string{"public.corp.invalid", "store.invalid"}))
+
+	cases := []struct{ proc, target string }{
+		{"chrome.exe", "public.corp.invalid:443"}, // перекрывает «всегда напрямую»
+		{"steam.exe", "store.invalid:443"},        // перекрывает исключённую программу
+	}
+	for _, c := range cases {
+		before := srv.channels.Load()
+		conn, direct, _ := tun.dialFor(c.proc, c.target)
+		if conn != nil {
+			conn.Close()
+		}
+		if direct {
+			t.Errorf("%s от %s: выпущено напрямую, а в списке «всегда через сервер»", c.target, c.proc)
+		}
+		if got := srv.channels.Load(); got != before+1 {
+			t.Errorf("%s: сервер открыл %d каналов вместо одного", c.target, got-before)
+		}
+	}
+
+	// Остальное из «всегда напрямую» по-прежнему мимо сервера.
+	conn, direct, _ := tun.dialFor("chrome.exe", "other.corp.invalid:443")
+	if conn != nil {
+		conn.Close()
+	}
+	if !direct {
+		t.Error("other.corp.invalid ушёл через сервер, хотя в «всегда через сервер» его нет")
+	}
+}

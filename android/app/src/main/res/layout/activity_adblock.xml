@@ -134,6 +134,8 @@
                     android:text="@string/adblock_copy" />
             </LinearLayout>
 
+            <!-- «Обновить список» — во всю ширину, как «Сохранить»: в
+                 короткую кнопку подпись не влезала. -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -142,21 +144,15 @@
                 android:orientation="horizontal">
                 <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/adBlockUpdate"
-                    style="@style/SecondaryButton"
-                    android:layout_width="wrap_content"
+                    style="@style/PrimaryButton"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
                     android:text="@string/ad_block_update" />
-                <TextView
-                    android:id="@+id/adBlockStatus"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="10dp"
-                    android:textSize="12.5sp"
-                    android:textColor="?attr/c_dim" />
                 <TextView
                     android:id="@+id/adBlockUpdateInfo"
                     android:layout_width="16dp"
                     android:layout_height="16dp"
-                    android:layout_marginStart="8dp"
+                    android:layout_marginStart="10dp"
                     android:background="@drawable/bg_infoq"
                     android:gravity="center"
                     android:textSize="9sp"
@@ -166,6 +162,19 @@
                     android:clickable="true"
                     android:focusable="true" />
             </LinearLayout>
+            <TextView
+                android:id="@+id/adBlockStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:textSize="12.5sp"
+                android:textColor="?attr/c_dim" />
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/saveAdBlock"
+                style="@style/PrimaryButton"
+                android:layout_marginTop="22dp"
+                android:text="@string/save" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

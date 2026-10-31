@@ -86,6 +86,11 @@ type Config struct {
 	// напрямую. nil означает «список пуст».
 	Direct *routing.DirectList
 
+	// Tunneled — обратный список «всегда через сервер»: совпавшее с ним
+	// идёт через туннель, даже если программе по правилам положено мимо или
+	// имя попало под «всегда напрямую». nil — список пуст.
+	Tunneled *routing.DirectList
+
 	// ProtectSocket вызывается для каждого сокета, который открывает сама
 	// программа: соединения с сервером и прямых соединений мимо туннеля.
 	//
@@ -287,6 +292,23 @@ func (t *Tunnel) SetDrainTimeout(d time.Duration) {
 	t.mu.Lock()
 	t.cfg.DrainTimeout = d
 	t.mu.Unlock()
+}
+
+// SetTunneled меняет список «всегда через сервер» на ходу.
+func (t *Tunnel) SetTunneled(d *routing.DirectList) {
+	t.mu.Lock()
+	t.cfg.Tunneled = d
+	t.mu.Unlock()
+}
+
+// ListedTunnel — имя или адрес из списка «всегда через сервер». Нужен DNS
+// режима VPN: такое имя не отдаётся «напрямую», даже если совпало и с
+// «всегда напрямую».
+func (t *Tunnel) ListedTunnel(target string) bool {
+	t.mu.RLock()
+	d := t.cfg.Tunneled
+	t.mu.RUnlock()
+	return d.Match(target)
 }
 
 // SetDirect меняет список «всегда напрямую» на ходу, как и правила по

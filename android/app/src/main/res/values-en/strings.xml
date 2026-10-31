@@ -31,7 +31,7 @@
     <string name="key_saved">Key saved</string>
 
     <string name="direct">Always direct</string>
-    <string name="direct_hint">10.8.0.0/16, 172.30.*, .corp.local</string>
+    <string name="direct_hint">intranet.example.com\n.corp.example\n10.8.0.0/16</string>
     <string name="local_via_tunnel">Route the local network through the server too</string>
 
     <string name="apps_title">Apps</string>
@@ -48,7 +48,7 @@
     <string name="tile_conns">Connections</string>
     <string name="tile_links">SSH channels</string>
     <string name="pool_hint">SSH channels</string>
-    <string name="direct_note">Addresses and networks that don\'t need the tunnel. The local network already goes direct. A domain (vitazgio.ru) includes all its subdomains; .vitazgio.ru or *.vitazgio.ru — subdomains only.</string>
+    <string name="direct_note">Addresses, networks and domains that don\'t need the tunnel. The local network already goes direct. A domain (example.com) includes all its subdomains; .example.com or *.example.com — subdomains only. One per line or comma-separated.</string>
     <string name="need_settings">Fill in the server address, user and key</string>
     <string name="saved">Saved</string>
     <string name="back">Back</string>
@@ -259,7 +259,7 @@
     <string name="via_clip">via clipboard</string>
     <string name="import_short">Import</string>
     <string name="export_short">Export</string>
-    <string name="xfer_note">Every server with its key, the app selection, DNS and the ad-block allow list — one line through the clipboard. Block lists stay behind. Treat this text as a secret, like the key.</string>
+    <string name="xfer_note">Every server with its key, the app selection, domain lists, ad list links and the allow list — through the clipboard or as a file (switch on the right). Downloaded block lists stay behind. Treat this text as a secret, like the key.</string>
     <string name="paste_server">Paste</string>
     <string name="scan_short">QR code</string>
     <string name="new_server">New</string>
@@ -271,7 +271,7 @@
     <string name="sect_look">Look</string>
     <string name="sect_more">More</string>
     <string name="start_mode">Tunnel when the app opens</string>
-    <string name="start_mode_note">“As on exit” turns the tunnel on if it was on when it was last switched on or off. To start the VPN when the phone boots, enable “Always-on VPN” in Android settings (see “?” below).</string>
+    <string name="start_mode_note">Unblocking — sites through the server. “As on exit” turns it on if it was on when last switched on or off. The device network has its own choice below. To start the VPN when the phone boots, enable “Always-on VPN” in Android settings (see “?” below).</string>
     <string name="start_on">Turn on</string>
     <string name="start_last">As on exit</string>
     <string name="start_off">Keep off</string>
@@ -286,4 +286,29 @@
     <string name="bg_author">Author</string>
     <string name="source_code">Code</string>
     <string name="dev_domain_ip">Domain · IP</string>
+    <string name="copied">Copied</string>
+    <string name="saved_to_file">File saved</string>
+    <string name="file_failed">Couldn\'t save the file</string>
+    <string name="domains_title">Domain exceptions</string>
+    <string name="domains_xfer">Move lists</string>
+    <string name="domains_bad">This doesn\'t look like domain lists</string>
+    <string name="domains_imported">Lists loaded and saved</string>
+    <string name="domains_summary">direct: %1$d · tunnel: %2$d</string>
+    <string name="direct_sub">Bypass the server even if the app goes through the tunnel</string>
+    <string name="tunnel_sub">Through the server even if the domain is in “Always direct”</string>
+    <string name="tunnel_label">Always via tunnel</string>
+    <string name="tunnel_hint">example.org\n*.example.net\n203.0.113.0/24</string>
+    <string name="tunnel_note">Sites and networks that always go through the server — even if the domain is in “Always direct”. Example: example.com is in “Always direct” but shop.example.com must go through the server — put it here. Apps excluded from the VPN never reach the tunnel, so the list doesn\'t apply to them.</string>
+    <string name="mesh_start_mode">Device network when the app opens</string>
+    <string name="mesh_start_note">Separate from the tunnel: bring up only the device network (the phone is reachable from your devices while its internet goes direct) or only the tunnel. “As on exit” repeats the last manual choice. Needs the device network on the server.</string>
+    <string name="grp_traffic_sub">Apps, device network, ads, domains</string>
+    <string name="grp_look_sub">Theme and background</string>
+    <string name="grp_launch_sub">Tunnel and device network on open</string>
+    <string name="grp_more_sub">Local network, UDP, server choice</string>
+    <string name="xfer_clip">clipboard</string>
+    <string name="xfer_file">file</string>
+    <string name="mesh_btn_on">Device network: on</string>
+    <string name="mesh_btn_off">Device network: off</string>
+    <string name="state_mesh_only">Device network only</string>
+    <string name="bundle_saved">settings saved to a file, %1$d server(s); open it on the other device</string>
 </resources>

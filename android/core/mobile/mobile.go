@@ -69,6 +69,12 @@ type Tunnel struct {
 	cfg    tunnel.Config
 	direct *routing.DirectList
 	block  *core.BlockList
+	// tunneled — «всегда через сервер» (см. SetTunnelHosts).
+	tunneled *routing.DirectList
+
+	// bypassOff и meshOff — две кнопки главного экрана, как на компьютере:
+	// обход блокировок и сеть устройств включаются отдельно (см. SetModes).
+	bypassOff, meshOff bool
 
 	core   *tunnel.Tunnel
 	engine *core.Engine
@@ -158,6 +164,7 @@ func (t *Tunnel) Configure(
 		KnownHostsPath:  knownHostsPath,
 		PoolSize:        poolSize,
 		Direct:          t.direct,
+		Tunneled:        t.tunneled,
 		LocalViaTunnel:  localViaTunnel,
 		ProtectSocket:   t.protect,
 		UDPRelayEnabled: udpRelayEnabled,
@@ -278,6 +285,10 @@ func (t *Tunnel) StartCore() error {
 	go t.forwardEvents(ch, unsub, stop, cb)
 
 	tun := tunnel.New(cfg, bus)
+	t.mu.Lock()
+	tun.SetBypass(!t.bypassOff)
+	tun.SetMeshPaused(t.meshOff)
+	t.mu.Unlock()
 	if err := tun.Start(); err != nil {
 		close(stop)
 		return err
@@ -357,8 +368,12 @@ func (t *Tunnel) StartStack(tunFD int, mtu int) error {
 		// переживает слив и Resume, а настройки к тому времени могли смениться.
 		Direct: func(name string) bool {
 			t.mu.Lock()
-			direct, localViaTunnel := t.direct, t.cfg.LocalViaTunnel
+			direct, localViaTunnel, tunneled := t.direct, t.cfg.LocalViaTunnel, t.tunneled
 			t.mu.Unlock()
+			// «Всегда через сервер» сильнее обоих правил ниже.
+			if tunneled.Match(name) {
+				return false
+			}
 			if !localViaTunnel && routing.IsLocalHost(name) {
 				return true
 			}
@@ -516,6 +531,42 @@ func (t *Tunnel) UpdateRouting(directHosts string, localViaTunnel bool) {
 	if tun != nil {
 		tun.SetDirect(direct)
 		tun.SetLocalViaTunnel(localViaTunnel)
+	}
+}
+
+// SetTunnelHosts задаёт список «всегда через сервер» — имена и сети, которые
+// идут через туннель, даже если совпали с «всегда напрямую» или локальной
+// сетью. Действует сразу, и на поднятом туннеле тоже. Отдельным вызовом, а не
+// параметром Configure: тот и так длинный, а список нужен и на ходу.
+//
+// Приложения, исключённые из VPN («все, кроме выбранных»), система в туннель
+// не пускает вовсе — для них список ничего не меняет.
+func (t *Tunnel) SetTunnelHosts(text string) {
+	t.mu.Lock()
+	if t.tunneled == nil {
+		t.tunneled = routing.NewDirectList(nil)
+	}
+	t.tunneled.Set(routing.SplitEntries(text))
+	t.cfg.Tunneled = t.tunneled
+	tun, list := t.core, t.tunneled
+	t.mu.Unlock()
+	if tun != nil {
+		tun.SetTunneled(list)
+	}
+}
+
+// SetModes — кнопки главного экрана: bypass — обход блокировок (сайты через
+// сервер), mesh — сеть устройств. Выключенный обход при включённой сети
+// оставляет туннель ради неё, а трафик приложений идёт напрямую. Действует
+// сразу; заданное до StartCore применяется при подключении.
+func (t *Tunnel) SetModes(bypass, mesh bool) {
+	t.mu.Lock()
+	t.bypassOff, t.meshOff = !bypass, !mesh
+	tun := t.core
+	t.mu.Unlock()
+	if tun != nil {
+		tun.SetBypass(bypass)
+		tun.SetMeshPaused(!mesh)
 	}
 }
 

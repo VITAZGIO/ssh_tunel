@@ -45,6 +45,9 @@ type Layer struct {
 	// block — блокировка рекламы (см. adblock.go). Один и тот же объект на
 	// всё время жизни: настройки меняют его содержимое, а не указатель.
 	block *core.BlockList
+	// stats — счётчики стека поднятого адаптера (под mu); из них берётся
+	// число заблокированных имён.
+	stats *core.Stats
 }
 
 // SetBypass переключает «весь трафик» и «только сеть устройств» (реализует
@@ -187,6 +190,7 @@ func (l *Layer) startStack(dev core.Device) error {
 		return err
 	}
 	stats := &core.Stats{}
+	l.stats = stats // startStack зовётся под l.mu (bringUp)
 	resolver := l.resolver()
 
 	dns := &core.DNS{
@@ -206,7 +210,12 @@ func (l *Layer) startStack(dev core.Device) error {
 		// Мимо туннеля — те же имена, что и в режиме прокси: локальная
 		// сеть и список «всегда напрямую».
 		Direct: func(name string) bool {
-			if t := l.current.Load(); t != nil && !t.LocalViaTunnel() && routing.IsLocalHost(name) {
+			t := l.current.Load()
+			// «Всегда через сервер» сильнее обоих правил ниже.
+			if t != nil && t.ListedTunnel(name) {
+				return false
+			}
+			if t != nil && !t.LocalViaTunnel() && routing.IsLocalHost(name) {
 				return true
 			}
 			l.mu.Lock()

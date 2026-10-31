@@ -40,7 +40,14 @@ object SettingsBundle {
                 p.localViaTunnel, key.isNotBlank(), key, p.panel, p.deviceName,
                 if (p.meshEnabled) p.meshKey else "",
             )
-            servers.put(JSONObject(doc))
+            // «Всегда в туннель» и UDP — поля того же документа сервера, что
+            // пишет компьютер (share.Doc); ядро их не знает, дописываем сами.
+            val o = JSONObject(doc)
+            if (p.tunnelHosts.isNotBlank()) {
+                o.put("tunnelHosts", JSONArray(p.tunnelHosts.split(Regex("[\\s,;]+")).filter { it.isNotBlank() }))
+            }
+            if (settings.udpRelayEnabled) o.put("udpRelayEnabled", true)
+            servers.put(o)
             if (p.id == settings.activeProfileId) active = i
         }
 
@@ -57,6 +64,12 @@ object SettingsBundle {
             .put("language", settings.language)
             .put("showServerPicker", settings.showServerPicker)
             .put("startMode", settings.startMode)
+            .put("meshStartMode", settings.meshStartMode)
+            // То же, что и в разделе mobile, — но в полях, которые читает и
+            // компьютер (share.Bundle).
+            .put("adBlockEnabled", settings.adBlockEnabled)
+            .put("adBlockSources", settings.adBlockSources)
+            .put("adBlockAllowlist", settings.adBlockAllowlist)
             .put("theme", settings.theme)
             .put("background", settings.background)
             .put("mobile", mobileSection)
@@ -92,7 +105,11 @@ object SettingsBundle {
         // человека должно остаться то, что было.
         val parsed = ArrayList<Pair<Settings.Profile, String>>()
         for (i in 0 until servers.length()) {
-            val doc = mobile.Mobile.parseConfig(servers.getJSONObject(i).toString())
+            val raw = servers.getJSONObject(i)
+            val doc = mobile.Mobile.parseConfig(raw.toString())
+            val tunnelHosts = raw.optJSONArray("tunnelHosts")?.let { a ->
+                (0 until a.length()).joinToString("\n") { a.optString(it) }
+            }.orEmpty()
             val p = Settings.Profile(
                 id = "", name = doc.getName(), flag = doc.getFlag(), host = doc.getHost(),
                 sshPort = doc.getSshPort().toInt().let { if (it > 0) it else 22 },
@@ -105,6 +122,7 @@ object SettingsBundle {
                     .map { it.trim() }.filter { it.isNotBlank() }.toMutableSet(),
                 panel = doc.getPanel(), deviceName = doc.getDeviceName(),
                 meshEnabled = doc.getMeshKey().isNotBlank(), meshKey = doc.getMeshKey(),
+                tunnelHosts = tunnelHosts,
             )
             val key = if (doc.getKeyIncluded()) doc.getKeyContents() else ""
             parsed.add(p to key)
@@ -114,7 +132,22 @@ object SettingsBundle {
 
         root.optString("language").takeIf { it.isNotBlank() }?.let { settings.language = it }
         settings.showServerPicker = root.optBoolean("showServerPicker", settings.showServerPicker)
-        root.optString("startMode").takeIf { it.isNotBlank() }?.let { settings.startMode = it }
+        root.optString("startMode").takeIf { it.isNotBlank() }?.let {
+            // Прежний «Только сеть» с компьютера — туннель нет, сеть да.
+            if (it == "mesh") {
+                settings.startMode = "off"
+                settings.meshStartMode = "on"
+            } else {
+                settings.startMode = it
+            }
+        }
+        root.optString("meshStartMode").takeIf { it.isNotBlank() }?.let { settings.meshStartMode = it }
+        if (root.has("adBlockEnabled")) settings.adBlockEnabled = root.optBoolean("adBlockEnabled")
+        if (root.has("adBlockSources")) settings.adBlockSources = root.optString("adBlockSources")
+        if (root.has("adBlockAllowlist")) settings.adBlockAllowlist = root.optString("adBlockAllowlist")
+        if (servers.length() > 0 && servers.getJSONObject(0).has("udpRelayEnabled")) {
+            settings.udpRelayEnabled = servers.getJSONObject(0).optBoolean("udpRelayEnabled")
+        }
         if (root.has("theme")) settings.theme = root.optString("theme")
         if (root.has("background")) settings.background = root.optString("background")
         root.optJSONObject("mobile")?.let { m ->

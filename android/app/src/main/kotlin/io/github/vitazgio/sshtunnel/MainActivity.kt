@@ -81,7 +81,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var poolEdit: EditText
     private lateinit var userEdit: EditText
     private lateinit var keyEdit: EditText
-    private lateinit var directEdit: EditText
     private lateinit var localCheck: CheckBox
     private lateinit var localCheckInfo: View
 
@@ -128,6 +127,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var adBlockSummary: TextView
     private lateinit var meshRow: View
     private lateinit var meshSummary: TextView
+    private lateinit var domainsSummary: TextView
+    private lateinit var meshBtn: View
     private lateinit var udpRelayEnabledCheck: CheckBox
     private lateinit var showServerPickerCheck: CheckBox
 
@@ -141,8 +142,29 @@ class MainActivity : AppCompatActivity() {
     private val vpnPermission = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == RESULT_OK) start()
+        if (result.resultCode == RESULT_OK) startWith(pendingBypass, pendingMesh)
     }
+
+    // С какими режимами включать после разрешения на VPN: большая кнопка —
+    // всё, кнопка «Сеть устройств» — только сеть.
+    private var pendingBypass = true
+    private var pendingMesh = true
+
+    private val bundleSaveFile = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        val text = pendingBundle
+        pendingBundle = ""
+        if (uri != null && text.isNotEmpty()) {
+            bundleNote.text = if (Xfer.write(this, uri, text)) getString(R.string.bundle_saved, settings.profiles.size)
+            else getString(R.string.file_failed)
+        }
+    }
+    private var pendingBundle = ""
+
+    private val bundleOpenFile = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri -> if (uri != null) confirmBundle(Xfer.read(this, uri)) }
 
     private val notificationPermission = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
@@ -211,7 +233,6 @@ class MainActivity : AppCompatActivity() {
         poolEdit = findViewById(R.id.pool)
         userEdit = findViewById(R.id.user)
         keyEdit = findViewById(R.id.key)
-        directEdit = findViewById(R.id.direct)
         localCheck = findViewById(R.id.localViaTunnel)
         localCheckInfo = findViewById(R.id.localViaTunnelInfo)
 
@@ -234,7 +255,7 @@ class MainActivity : AppCompatActivity() {
             getString(R.string.version_line, BuildConfig.VERSION_NAME)
         findViewById<View>(R.id.bundleExportBtn).setOnClickListener { onBundleExport() }
         findViewById<View>(R.id.bundleImportBtn).setOnClickListener { onBundleImport() }
-        findViewById<View>(R.id.updateCheckBtn).setOnClickListener { onCheckUpdates(it as Button) }
+        findViewById<View>(R.id.updateCheckBtn).setOnClickListener { onCheckUpdates(it) }
         updateDownloadBtn.setOnClickListener { onDownloadUpdate() }
         findViewById<View>(R.id.authorSite).setOnClickListener {
             openLink("https://vitazgio.ru")
@@ -251,6 +272,14 @@ class MainActivity : AppCompatActivity() {
         meshRow = findViewById(R.id.meshRow)
         meshSummary = findViewById(R.id.meshSummary)
         meshRow.setOnClickListener { startActivity(Intent(this, MeshActivity::class.java)) }
+        domainsSummary = findViewById(R.id.domainsSummary)
+        findViewById<View>(R.id.domainsRow).setOnClickListener {
+            startActivity(Intent(this, DomainsActivity::class.java))
+        }
+        meshBtn = findViewById(R.id.meshBtn)
+        meshBtn.setOnClickListener { onMeshButton() }
+        setupGroups()
+        Xfer.bindModeSeg(findViewById(R.id.xferModeSeg), settings)
         findViewById<View>(R.id.usersRow).setOnClickListener {
             startActivity(Intent(this, UsersActivity::class.java))
         }
@@ -280,7 +309,11 @@ class MainActivity : AppCompatActivity() {
             findViewById<Button>(id).setOnClickListener { saveSettings() }
         }
         findViewById<View>(R.id.toServers).setOnClickListener { flipper.displayedChild = SERVERS }
-        findViewById<View>(R.id.toApp).setOnClickListener { flipper.displayedChild = APP }
+        findViewById<View>(R.id.toApp).setOnClickListener {
+            // Из корня настроек — все группы свёрнуты, видно оглавление.
+            collapseGroups()
+            flipper.displayedChild = APP
+        }
         findViewById<View>(R.id.backFromServers).setOnClickListener { flipper.displayedChild = SETTINGS }
         findViewById<View>(R.id.backFromApp).setOnClickListener { flipper.displayedChild = SETTINGS }
         findViewById<View>(R.id.addServerBtn).setOnClickListener { onAddProfile() }
@@ -306,7 +339,7 @@ class MainActivity : AppCompatActivity() {
         bindInfo(R.id.alwaysOnInfo, R.string.always_on_hint)
         bindInfo(R.id.udpRelayInfo, R.string.udp_relay_note)
         bindInfo(R.id.poolInfo, R.string.pool_note)
-        bindInfo(R.id.directInfo, R.string.direct_note)
+        bindInfo(R.id.meshStartInfo, R.string.mesh_start_note)
 
         // Шапка одна на все экраны: логотип всегда возвращает на главную (а на
         // главной — прокручивает от списка устройств наверх), значки открывают
@@ -382,13 +415,17 @@ class MainActivity : AppCompatActivity() {
      * разрешения на VPN не сработает — его спросит система при первом нажатии.
      */
     private fun applyStartMode() {
-        val want = when (settings.startMode) {
+        fun wanted(mode: String, last: Boolean) = when (mode) {
             "on" -> true
-            "last" -> settings.lastRunning
+            "last" -> last
             else -> false
         }
-        if (want && TunnelService.state == "stopped" && settings.ready() && VpnService.prepare(this) == null) {
-            start()
+        val bypass = wanted(settings.startMode, settings.lastRunning)
+        val mesh = settings.meshConfigured() && wanted(settings.meshStartEffective, settings.lastMesh)
+        if ((bypass || mesh) && TunnelService.state == "stopped" && settings.ready() &&
+            VpnService.prepare(this) == null
+        ) {
+            startWith(bypass, mesh)
         }
     }
 
@@ -417,6 +454,7 @@ class MainActivity : AppCompatActivity() {
         TunnelService.onUpdate = { runOnUiThread { refresh() } }
         renderAdBlockSummary()
         renderMeshSummary()
+        renderDomainsSummary()
         refresh()
     }
 
@@ -470,6 +508,7 @@ class MainActivity : AppCompatActivity() {
     /** Ряды вариантов: режим запуска, тема, фон. */
     private fun setupSegs() {
         bindSeg(R.id.startModeSeg, { settings.startMode }) { settings.startMode = it }
+        bindSeg(R.id.meshStartSeg, { settings.meshStartEffective }) { settings.meshStartMode = it }
         bindSeg(R.id.themeSeg, { settings.theme }) {
             if (it != settings.theme) {
                 settings.theme = it
@@ -513,7 +552,7 @@ class MainActivity : AppCompatActivity() {
             val h = mainScroll.height
             if (h > 0 && mainPage.layoutParams.height != h) {
                 mainPage.layoutParams = mainPage.layoutParams.also { it.height = h }
-                devPage.minimumHeight = h
+                devPage.layoutParams = devPage.layoutParams.also { it.height = h }
             }
         }
         devHex.background = hexBg
@@ -524,28 +563,7 @@ class MainActivity : AppCompatActivity() {
             mainScroll.smoothScrollTo(0, devPage.top)
         }
         findViewById<View>(R.id.devUp).setOnClickListener { mainScroll.smoothScrollTo(0, 0) }
-        // Листается пальцем как две страницы: отпустил между главной и списком
-        // устройств — доезжает до той, куда вёл палец. Внутри списка — как обычно.
-        // Начало жеста запоминаем по первому событию: DOWN сюда может не прийти,
-        // если его забрала кнопка, а прокрутку ScrollView перехватил позже.
-        var startY = -1
-        mainScroll.setOnTouchListener { _, e ->
-            when (e.actionMasked) {
-                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
-                    val from = startY
-                    startY = -1
-                    mainScroll.post {
-                        val y = mainScroll.scrollY
-                        val top = devPage.top
-                        if (from >= 0 && devPage.visibility == View.VISIBLE && y in 1 until top) {
-                            mainScroll.smoothScrollTo(0, if (y > from) top else 0)
-                        }
-                    }
-                }
-                else -> if (startY < 0) startY = mainScroll.scrollY
-            }
-            false
-        }
+        // Пальцем главная не листается (LockedScrollView) — только кнопками.
         renderActions(false)
     }
 
@@ -553,6 +571,22 @@ class MainActivity : AppCompatActivity() {
         val c = if (on) 0xFF7BE3A8.toInt() else tc(R.color.dim)
         icon.setColorFilter(c)
         cap.setTextColor(c)
+    }
+
+    /**
+     * Кнопка «Сеть устройств» под большой — как на компьютере. Есть, только
+     * когда у сервера включена сеть устройств: иначе включать нечего.
+     */
+    private fun renderMeshButton(running: Boolean) {
+        meshBtn.visibility = if (settings.meshConfigured()) View.VISIBLE else View.GONE
+        val on = running && TunnelService.meshOn
+        meshBtn.setBackgroundResource(if (on) R.drawable.bg_pill_on else R.drawable.bg_pill_off)
+        val color = tc(if (on) R.color.ok else R.color.dim)
+        findViewById<ImageView>(R.id.meshBtnDot).setColorFilter(if (on) color else tc(R.color.line))
+        findViewById<TextView>(R.id.meshBtnCap).apply {
+            setTextColor(color)
+            setText(if (on) R.string.mesh_btn_on else R.string.mesh_btn_off)
+        }
     }
 
     /** Кнопки под сведениями: с сетью устройств — вырезы под шестиугольник. */
@@ -801,7 +835,7 @@ class MainActivity : AppCompatActivity() {
             // отпускает интерфейс VPN), поэтому запуск на новом сервере —
             // следующим сообщением, а не сразу: иначе она получила бы START
             // раньше, чем закончила STOP.
-            power.postDelayed({ if (settings.ready()) start() }, 900)
+            power.postDelayed({ if (settings.ready()) startWith(true, true) }, 900)
         } else {
             Toast.makeText(this, R.string.server_switched, Toast.LENGTH_SHORT).show()
         }
@@ -991,7 +1025,6 @@ class MainActivity : AppCompatActivity() {
         poolEdit.setText(p.poolSize.toString())
         userEdit.setText(p.user)
         keyEdit.setText("")
-        directEdit.setText(p.directHosts)
         localCheck.isChecked = p.localViaTunnel
         keyStateView.setText(if (settings.keyFile(p.id).let { it.exists() && it.length() > 0 }) R.string.key_saved else R.string.key_missing)
         appsSummary.text = appsSummaryText(p)
@@ -1019,7 +1052,6 @@ class MainActivity : AppCompatActivity() {
         p.sshPort = portEdit.text.toString().toIntOrNull() ?: 22
         p.poolSize = poolEdit.text.toString().toIntOrNull() ?: 4
         p.user = userEdit.text.toString().trim()
-        p.directHosts = directEdit.text.toString()
         p.localViaTunnel = localCheck.isChecked
         settings.saveProfile(p)
 
@@ -1047,6 +1079,13 @@ class MainActivity : AppCompatActivity() {
         } else {
             getString(R.string.ad_block_off)
         }
+    }
+
+    /** Сводка исключений доменов: сколько записей в каждом списке. */
+    private fun renderDomainsSummary() {
+        fun count(t: String) = t.split(Regex("[\\s,;]+")).count { it.isNotBlank() }
+        val p = settings.active()
+        domainsSummary.text = getString(R.string.domains_summary, count(p.directHosts), count(p.tunnelHosts))
     }
 
     /** Сводка сети устройств — про активный сервер: сеть живёт на нём. */
@@ -1207,8 +1246,12 @@ class MainActivity : AppCompatActivity() {
             bundleNote.text = e.message ?: getString(R.string.bundle_bad)
             return
         }
-        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-        cm?.setPrimaryClip(ClipData.newPlainText(getString(R.string.export_settings), text))
+        if (Xfer.toFile(settings)) {
+            pendingBundle = text
+            bundleSaveFile.launch("ssh_tunnel-settings.json")
+            return
+        }
+        Xfer.copy(this, getString(R.string.export_settings), text)
         bundleNote.text = getString(R.string.bundle_copied, settings.profiles.size)
     }
 
@@ -1217,9 +1260,14 @@ class MainActivity : AppCompatActivity() {
      * подтверждение, как и при удалении сервера.
      */
     private fun onBundleImport() {
-        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-        val text = cm?.primaryClip?.takeIf { it.itemCount > 0 }
-            ?.getItemAt(0)?.coerceToText(this)?.toString().orEmpty()
+        if (Xfer.toFile(settings)) {
+            bundleOpenFile.launch(arrayOf("application/json", "text/plain", "*/*"))
+            return
+        }
+        confirmBundle(Xfer.paste(this))
+    }
+
+    private fun confirmBundle(text: String) {
         if (text.isBlank()) {
             bundleNote.text = getString(R.string.paste_failed)
             return
@@ -1256,7 +1304,7 @@ class MainActivity : AppCompatActivity() {
      * Проверка обновлений. Сеть — в отдельном потоке: в основном Android
      * запрещает сетевые вызовы, и приложение просто упало бы.
      */
-    private fun onCheckUpdates(btn: Button) {
+    private fun onCheckUpdates(btn: View) {
         btn.isEnabled = false
         updateNote.text = getString(R.string.update_checking)
         updateDownloadBtn.visibility = View.GONE
@@ -1356,13 +1404,59 @@ class MainActivity : AppCompatActivity() {
         popup.showAsDropDown(anchor, 0, 4)
     }
 
+    /**
+     * Большая кнопка — обход блокировок. При включённой сети устройств она
+     * выключает только обход, а сеть остаётся (как на компьютере); без сети —
+     * обычное «Отключить».
+     */
     private fun onToggle() {
+        val running = TunnelService.state != "stopped" && TunnelService.state != "error"
+        val meshUp = running && settings.meshConfigured() && TunnelService.meshOn
+        if (running && TunnelService.bypassOn) {
+            settings.lastRunning = false
+            settings.lastMesh = meshUp
+            if (meshUp) sendModes(false, true)
+            else startService(Intent(this, TunnelService::class.java).setAction(TunnelService.ACTION_STOP))
+            return
+        }
+        if (running) {
+            // Работает только сеть — включаем обход поверх неё.
+            settings.lastRunning = true
+            settings.lastMesh = meshUp
+            sendModes(true, meshUp)
+            return
+        }
         if (TunnelService.state != "stopped") {
+            // Ошибка подключения: кнопка, как и раньше, гасит службу.
             settings.lastRunning = false
             startService(Intent(this, TunnelService::class.java).setAction(TunnelService.ACTION_STOP))
             return
         }
         settings.lastRunning = true
+        settings.lastMesh = settings.meshConfigured()
+        launchWith(true, true)
+    }
+
+    /** Кнопка «Сеть устройств» под большой: сеть включается отдельно от обхода. */
+    private fun onMeshButton() {
+        val running = TunnelService.state != "stopped" && TunnelService.state != "error"
+        if (!running) {
+            settings.lastRunning = false
+            settings.lastMesh = true
+            launchWith(false, true)
+            return
+        }
+        val mesh = !TunnelService.meshOn
+        settings.lastMesh = mesh
+        settings.lastRunning = TunnelService.bypassOn
+        if (!mesh && !TunnelService.bypassOn) {
+            startService(Intent(this, TunnelService::class.java).setAction(TunnelService.ACTION_STOP))
+        } else {
+            sendModes(TunnelService.bypassOn, mesh)
+        }
+    }
+
+    private fun launchWith(bypass: Boolean, mesh: Boolean) {
         if (!settings.ready()) {
             Toast.makeText(this, R.string.need_settings, Toast.LENGTH_LONG).show()
             openSettings()
@@ -1370,12 +1464,61 @@ class MainActivity : AppCompatActivity() {
         }
         // Разрешение на VPN-подключение спрашивает сама система; без её
         // подтверждения служба не запустится.
+        pendingBypass = bypass
+        pendingMesh = mesh
         val intent = VpnService.prepare(this)
-        if (intent != null) vpnPermission.launch(intent) else start()
+        if (intent != null) vpnPermission.launch(intent) else startWith(bypass, mesh)
     }
 
-    private fun start() {
-        startService(Intent(this, TunnelService::class.java).setAction(TunnelService.ACTION_START))
+    private fun sendModes(bypass: Boolean, mesh: Boolean) {
+        startService(
+            Intent(this, TunnelService::class.java).setAction(TunnelService.ACTION_MODES)
+                .putExtra(TunnelService.EXTRA_BYPASS, bypass)
+                .putExtra(TunnelService.EXTRA_MESH, mesh)
+        )
+        refresh()
+    }
+
+    private fun startWith(bypass: Boolean, mesh: Boolean) {
+        if (bypass && mesh) {
+            startService(Intent(this, TunnelService::class.java).setAction(TunnelService.ACTION_START))
+        } else {
+            sendModes(bypass, mesh)
+        }
+    }
+
+    // ---------------------------------------------------------------------
+    // Группы «Настроек приложения»: заголовок раскрывает и сворачивает.
+    // ---------------------------------------------------------------------
+
+    private val groups = listOf(
+        Triple(R.id.grpTrafficHead, R.id.grpTrafficBody, R.id.grpTrafficChev),
+        Triple(R.id.grpLookHead, R.id.grpLookBody, R.id.grpLookChev),
+        Triple(R.id.grpLaunchHead, R.id.grpLaunchBody, R.id.grpLaunchChev),
+        Triple(R.id.grpMoreHead, R.id.grpMoreBody, R.id.grpMoreChev),
+    )
+
+    private fun setupGroups() {
+        for ((head, body, chev) in groups) {
+            findViewById<View>(head).setOnClickListener {
+                val b = findViewById<View>(body)
+                val open = b.visibility != View.VISIBLE
+                android.transition.TransitionManager.beginDelayedTransition(
+                    b.parent as android.view.ViewGroup,
+                    android.transition.AutoTransition().setDuration(220)
+                )
+                b.visibility = if (open) View.VISIBLE else View.GONE
+                findViewById<View>(chev).animate().rotation(if (open) 90f else 0f).setDuration(220).start()
+            }
+        }
+    }
+
+    private fun collapseGroups() {
+        for ((_, body, chev) in groups) {
+            findViewById<View>(body).visibility = View.GONE
+            findViewById<View>(chev).rotation = 0f
+        }
+        (flipper.getChildAt(APP) as? ScrollView)?.scrollTo(0, 0)
     }
 
     /** Тест скорости идёт секунд двадцать, поэтому в отдельном потоке. */
@@ -1572,6 +1715,18 @@ class MainActivity : AppCompatActivity() {
         powerIcon.setColorFilter(color)
         powerCap.setTextColor(color)
         powerCap.setText(if (state == "stopped") R.string.start else R.string.stop)
+
+        // Туннель держится только ради сети устройств — большая кнопка
+        // выглядит выключенной: обход блокировок и правда выключен.
+        val running = state != "stopped" && state != "error"
+        if (state == "connected" && !TunnelService.bypassOn) {
+            power.setBackgroundResource(R.drawable.bg_power_off)
+            powerIcon.setColorFilter(tc(R.color.dim))
+            powerCap.setTextColor(tc(R.color.dim))
+            powerCap.setText(R.string.start)
+            stateView.setText(R.string.state_mesh_only)
+        }
+        renderMeshButton(running)
 
         if (state == "error" && TunnelService.detail.isNotBlank()) {
             errorView.text = TunnelService.detail

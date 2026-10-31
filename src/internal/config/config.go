@@ -52,6 +52,12 @@ type Profile struct {
 	// сети: mesh-VPN, рабочий VPN, самодельный WireGuard.
 	DirectHosts []string `json:"directHosts"`
 
+	// TunnelHosts — обратный список: имена и сети, которые всегда идут через
+	// сервер, даже если программа по правилам ходит напрямую или имя попало
+	// под «всегда напрямую» (например, поддомен своего домена). Совпадение
+	// здесь сильнее обоих правил.
+	TunnelHosts []string `json:"tunnelHosts,omitempty"`
+
 	// LocalViaTunnel — вести ли локальную сеть (192.168.x.x, домашние имена)
 	// через сервер. По умолчанию false: такие адреса идут напрямую, иначе
 	// домашние сервисы становятся недоступны при включённом туннеле.
@@ -166,6 +172,15 @@ type Config struct {
 	// иначе «как при закрытии» всегда означало бы «выключен».
 	LastRunning bool `json:"lastRunning,omitempty"`
 
+	// MeshStartMode — то же для сети устройств, отдельно от обхода
+	// блокировок: "on", "last" (см. LastMesh) или "off". Туннель
+	// поднимается, если нужен хоть кому-то из двух. Пусто — сеть
+	// повторяет выбор туннеля, как было до появления настройки.
+	MeshStartMode string `json:"meshStartMode,omitempty"`
+	// LastMesh — была ли включена сеть устройств при последнем действии
+	// человека (для MeshStartMode "last").
+	LastMesh bool `json:"lastMesh,omitempty"`
+
 	// Theme — оформление: "" (оригинал), "dark", "light", "console".
 	Theme string `json:"theme,omitempty"`
 	// Background — фон главного экрана: "" (ровный цвет), "code" (падающие
@@ -212,19 +227,41 @@ const (
 	StartLast = "last"
 )
 
-// ConnectOnStart — поднимать ли туннель при запуске программы. legacy —
-// ответ прежней галочки этой платформы; он действует, пока режим не выбран
-// явно.
+// ConnectOnStart — поднимать ли туннель при запуске программы: ради обхода
+// блокировок или ради сети устройств. legacy — ответ прежней галочки этой
+// платформы; он действует, пока режим не выбран явно.
 func (c Config) ConnectOnStart(legacy bool) bool {
+	return c.BypassOnStart(legacy) || c.MeshOnStart(legacy)
+}
+
+// BypassOnStart — включать ли при запуске обход блокировок.
+func (c Config) BypassOnStart(legacy bool) bool {
 	switch c.StartMode {
-	case StartOn, StartMesh:
+	case StartOn:
 		return true
-	case StartOff:
+	case StartOff, StartMesh:
 		return false
 	case StartLast:
 		return c.LastRunning
 	}
 	return legacy
+}
+
+// MeshOnStart — включать ли при запуске сеть устройств. Сама настройка
+// сети у сервера здесь не проверяется — это дело того, кто подключает.
+func (c Config) MeshOnStart(legacy bool) bool {
+	switch c.MeshStartMode {
+	case StartOn:
+		return true
+	case StartOff:
+		return false
+	case StartLast:
+		return c.LastMesh
+	}
+	if c.StartMode == StartMesh {
+		return true
+	}
+	return c.BypassOnStart(legacy)
 }
 
 // Active — сервер, который сейчас используется для подключения. Если
@@ -560,6 +597,16 @@ func (c *Config) normalize() {
 	}
 	if c.Language != "en" {
 		c.Language = "ru"
+	}
+	// Прежний режим «Только сеть» — теперь это два отдельных выбора:
+	// туннель не включать, сеть устройств включать.
+	if c.StartMode == StartMesh {
+		c.StartMode, c.MeshStartMode = StartOff, StartOn
+	}
+	switch c.MeshStartMode {
+	case "", StartOn, StartOff, StartLast:
+	default:
+		c.MeshStartMode = ""
 	}
 	// На системах, где трогать общесистемные настройки нечем (macOS и прочее),
 	// оставлять эти галочки включёнными бессмысленно.

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"time"
 
-	"sshtunnel/internal/config"
 	"sshtunnel/internal/tunnel"
 )
 
@@ -64,14 +63,31 @@ func (a *App) StartOnLaunchWithin(limit time.Duration) {
 	}
 }
 
-// StartLaunchMode включает туннель так, как выбрано в «Туннель при запуске
-// программы»: целиком или только сеть устройств. Второе нужно домашним
-// серверам — их видно с других устройств, а свой интернет идёт напрямую.
-// Без сети устройств у сервера «только сеть» не подключает ничего: пустить
-// весь трафик через VPS вместо этого было бы ровно тем, чего не просили.
+// StartLaunchMode включает туннель так, как выбрано в настройках запуска:
+// «Туннель при запуске» (обход блокировок) и «Сеть устройств при запуске» —
+// два отдельных выбора. Только сеть нужна домашним серверам: их видно с
+// других устройств, а свой интернет идёт напрямую. Без сети устройств у
+// сервера «только сеть» не подключает ничего: пустить весь трафик через VPS
+// вместо этого было бы ровно тем, чего не просили.
+//
+// Сюда приходят, когда запускаться уже решено (config.ConnectOnStart), — у
+// конфига старого формата это решила прежняя галочка, поэтому legacy здесь
+// «да».
 func (a *App) StartLaunchMode() error {
-	if a.Config().StartMode == config.StartMesh {
+	cfg := a.Config()
+	bypass, meshOn := cfg.BypassOnStart(true), cfg.MeshOnStart(true)
+	switch {
+	case bypass:
+		a.mu.Lock()
+		a.bypassOff, a.meshOff = false, !meshOn
+		a.mu.Unlock()
+		if err := a.Start(); err != nil {
+			a.resetModes()
+			return err
+		}
+		return nil
+	case meshOn:
 		return a.SetMesh(true)
 	}
-	return a.Start()
+	return nil
 }

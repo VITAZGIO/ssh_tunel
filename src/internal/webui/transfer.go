@@ -46,6 +46,7 @@ func (s *Server) handleProfileExport(w http.ResponseWriter, r *http.Request) {
 		Name: p.Name, Flag: p.Flag, Host: p.Host, SSHPort: p.SSHPort, User: p.User,
 		SocksPort: p.SocksPort, HTTPPort: p.HTTPPort, PoolSize: p.PoolSize,
 		FilterMode: p.FilterMode, FilterApps: p.FilterApps, DirectHosts: p.DirectHosts,
+		TunnelHosts: p.TunnelHosts, UDPRelayEnabled: p.UDPRelayEnabled,
 		LocalViaTunnel: p.LocalViaTunnel,
 		Panel:          p.Panel, ClientID: p.ClientID, DeviceName: p.DeviceName,
 		MeshKey: exportMeshKey(p),
@@ -113,6 +114,7 @@ func (s *Server) handleProfileImport(w http.ResponseWriter, r *http.Request) {
 	p.SocksPort, p.HTTPPort, p.PoolSize = doc.SocksPort, doc.HTTPPort, doc.PoolSize
 	p.FilterMode, p.FilterApps = doc.FilterMode, doc.FilterApps
 	p.DirectHosts, p.LocalViaTunnel = doc.DirectHosts, doc.LocalViaTunnel
+	p.TunnelHosts, p.UDPRelayEnabled = doc.TunnelHosts, doc.UDPRelayEnabled
 	p.Panel, p.ClientID, p.DeviceName = doc.Panel, doc.ClientID, doc.DeviceName
 	importMeshKey(&p, doc.MeshKey)
 
