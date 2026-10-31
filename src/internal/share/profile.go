@@ -23,19 +23,23 @@ const CurrentFormat = 2
 
 // Doc — содержимое файла обмена настройками одного сервера.
 type Doc struct {
-	Format         int      `json:"sshTunnelExport"`
-	Name           string   `json:"name"`
-	Flag           string   `json:"flag,omitempty"`
-	Host           string   `json:"host"`
-	SSHPort        int      `json:"sshPort"`
-	User           string   `json:"user"`
-	SocksPort      int      `json:"socksPort"`
-	HTTPPort       int      `json:"httpPort"`
-	PoolSize       int      `json:"poolSize"`
-	FilterMode     string   `json:"filterMode"`
-	FilterApps     []string `json:"filterApps,omitempty"`
-	DirectHosts    []string `json:"directHosts,omitempty"`
+	Format      int      `json:"sshTunnelExport"`
+	Name        string   `json:"name"`
+	Flag        string   `json:"flag,omitempty"`
+	Host        string   `json:"host"`
+	SSHPort     int      `json:"sshPort"`
+	User        string   `json:"user"`
+	SocksPort   int      `json:"socksPort"`
+	HTTPPort    int      `json:"httpPort"`
+	PoolSize    int      `json:"poolSize"`
+	FilterMode  string   `json:"filterMode"`
+	FilterApps  []string `json:"filterApps,omitempty"`
+	DirectHosts []string `json:"directHosts,omitempty"`
+	// TunnelHosts — «всегда через сервер», обратный DirectHosts список.
+	TunnelHosts    []string `json:"tunnelHosts,omitempty"`
 	LocalViaTunnel bool     `json:"localViaTunnel"`
+	// UDPRelayEnabled — пробрасывать UDP через ретранслятор этого сервера.
+	UDPRelayEnabled bool `json:"udpRelayEnabled,omitempty"`
 	// KeyIncluded — явный флаг, а не просто «есть KeyContents или нет»: так
 	// файл без ключа (человек снял галочку при экспорте) не пытается молча
 	// сойти за файл с ключом из-за пустой строки.

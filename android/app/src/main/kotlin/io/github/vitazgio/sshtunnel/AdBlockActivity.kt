@@ -89,6 +89,11 @@ class AdBlockActivity : AppCompatActivity() {
         findViewById<View>(R.id.pasteListBtn).setOnClickListener { pasteList() }
         findViewById<View>(R.id.copyListBtn).setOnClickListener { copyList() }
         updateButton.setOnClickListener { updateBlockLists() }
+        findViewById<View>(R.id.saveAdBlock).setOnClickListener {
+            saveCurrentTab()
+            Toast.makeText(this, R.string.saved, Toast.LENGTH_SHORT).show()
+            finish()
+        }
     }
 
     override fun onPause() {

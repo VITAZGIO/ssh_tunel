@@ -153,3 +153,39 @@ func TestStartOnLaunchMeshOnlyWithoutMesh(t *testing.T) {
 		t.Fatal("туннель поднят целиком, хотя просили только сеть устройств")
 	}
 }
+
+// Туннель при запуске включать, а сеть устройств — нет: обход работает,
+// сеть на паузе.
+func TestStartOnLaunchBypassWithoutMesh(t *testing.T) {
+	layer := &fakeNetLayer{}
+	a := meshVPNApp(t, layer, true)
+	cfg := a.Config()
+	cfg.StartMode, cfg.MeshStartMode = config.StartOn, config.StartOff
+	a.mu.Lock()
+	a.cfg = cfg
+	a.mu.Unlock()
+
+	a.StartOnLaunchWithin(time.Second)
+	if !a.Running() {
+		t.Fatal("туннель не поднялся")
+	}
+	wantModes(t, a, true, false)
+}
+
+// «Как при закрытии» помнит обе кнопки по отдельности.
+func TestRememberRunningKeepsBothModes(t *testing.T) {
+	layer := &fakeNetLayer{}
+	a := meshVPNApp(t, layer, true)
+	if err := a.SetMesh(true); err != nil {
+		t.Fatal(err)
+	}
+	a.RememberRunning()
+	cfg := a.Config()
+	if cfg.LastRunning || !cfg.LastMesh {
+		t.Fatalf("запомнено обход=%v сеть=%v, а было включено только сеть", cfg.LastRunning, cfg.LastMesh)
+	}
+	cfg.StartMode, cfg.MeshStartMode = config.StartLast, config.StartLast
+	if cfg.BypassOnStart(false) || !cfg.MeshOnStart(false) {
+		t.Fatal("«как при закрытии» не повторяет запомненное")
+	}
+}

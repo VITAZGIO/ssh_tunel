@@ -28,6 +28,10 @@ func (s *Server) handleSettingsExport(w http.ResponseWriter, r *http.Request) {
 		AutoStart:        cfg.AutoStart,
 		AutoConnect:      cfg.AutoConnect,
 		StartMode:        cfg.StartMode,
+		MeshStartMode:    cfg.MeshStartMode,
+		AdBlockEnabled:   cfg.AdBlockEnabled,
+		AdBlockSources:   cfg.AdBlockSources,
+		AdBlockAllowlist: cfg.AdBlockAllowlist,
 		Theme:            cfg.Theme,
 		Background:       cfg.Background,
 		ShowServerPicker: cfg.ShowServerPicker,
@@ -100,6 +104,10 @@ func (s *Server) handleSettingsImport(w http.ResponseWriter, r *http.Request) {
 	cfg.AutoStart = b.AutoStart
 	cfg.AutoConnect = b.AutoConnect
 	cfg.StartMode = b.StartMode
+	cfg.MeshStartMode = b.MeshStartMode
+	cfg.AdBlockEnabled = b.AdBlockEnabled
+	cfg.AdBlockSources = b.AdBlockSources
+	cfg.AdBlockAllowlist = b.AdBlockAllowlist
 	cfg.Theme = b.Theme
 	cfg.Background = b.Background
 	cfg.ShowServerPicker = b.ShowServerPicker
@@ -115,8 +123,9 @@ func (s *Server) handleSettingsImport(w http.ResponseWriter, r *http.Request) {
 		p.SocksPort, p.HTTPPort, p.PoolSize = doc.SocksPort, doc.HTTPPort, doc.PoolSize
 		p.FilterMode, p.FilterApps = doc.FilterMode, doc.FilterApps
 		p.DirectHosts, p.LocalViaTunnel = doc.DirectHosts, doc.LocalViaTunnel
+		p.TunnelHosts, p.UDPRelayEnabled = doc.TunnelHosts, doc.UDPRelayEnabled
+		p.TunnelHosts, p.UDPRelayEnabled = doc.TunnelHosts, doc.UDPRelayEnabled
 		p.Panel, p.ClientID, p.DeviceName = doc.Panel, doc.ClientID, doc.DeviceName
-		importMeshKey(&p, doc.MeshKey)
 		importMeshKey(&p, doc.MeshKey)
 		if doc.KeyIncluded && strings.TrimSpace(doc.KeyContents) != "" {
 			path, err := saveImportedKey(p.ID, doc.KeyContents)

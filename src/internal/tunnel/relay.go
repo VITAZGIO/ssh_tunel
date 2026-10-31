@@ -160,7 +160,10 @@ func (t *Tunnel) dialFor(process, target string) (net.Conn, bool, error) {
 	}
 	// Слив: сервера уже нет, но слушатели живы ради уже открытых сокетов
 	// браузера — всё, что в них прилетает, ведём напрямую (см. Drain).
-	if t.viaServer() && t.useTunnel(process) && !t.localDirect(target) && !t.listedDirect(target) {
+	// «Всегда через сервер» сильнее правил по программам и «всегда
+	// напрямую».
+	if t.viaServer() && (t.ListedTunnel(target) ||
+		t.useTunnel(process) && !t.localDirect(target) && !t.listedDirect(target)) {
 		c, err := t.Dial("tcp", target)
 		return c, false, err
 	}

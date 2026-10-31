@@ -23,8 +23,8 @@ import (
 
 	"sshtunnel/internal/config"
 	"sshtunnel/internal/events"
-	"sshtunnel/internal/routing"
 	"sshtunnel/internal/mesh"
+	"sshtunnel/internal/routing"
 	"sshtunnel/internal/tunnel"
 	"sshtunnel/internal/updater"
 )
@@ -182,6 +182,7 @@ func (a *App) tunnelConfig(cfg config.Config, p config.Profile) (_ tunnel.Config
 		Verbose:         cfg.Verbose,
 		Policy:          a.policy,
 		Direct:          a.direct,
+		Tunneled:        a.tunneled,
 		LocalViaTunnel:  p.LocalViaTunnel,
 		UDPRelayEnabled: p.UDPRelayEnabled,
 		Mesh:            meshConfig(p, mode),

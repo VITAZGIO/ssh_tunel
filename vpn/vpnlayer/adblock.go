@@ -47,3 +47,16 @@ func (l *Layer) UpdateAdBlockLists(sources string) (int, error) {
 	}
 	return n, err
 }
+
+// AdBlocked — сколько запросов имён отвергнуто с подъёма адаптера (для
+// строки «Заблокировано» в настройках, как на телефоне).
+func (l *Layer) AdBlocked() int {
+	l.mu.Lock()
+	st := l.stats
+	l.mu.Unlock()
+	if st == nil {
+		return 0
+	}
+	_, _, _, _, n := st.Counts()
+	return n
+}

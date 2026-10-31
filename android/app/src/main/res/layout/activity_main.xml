@@ -74,7 +74,7 @@
         <!-- Две «страницы» одна под другой: первая ровно в высоту экрана
              (её высоту ставит код), ниже — список устройств. Туда и обратно
              прокручивает шестиугольник «Устройства» / «Наверх» или логотип. -->
-        <ScrollView
+        <io.github.vitazgio.sshtunnel.LockedScrollView
             android:id="@+id/mainScroll"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
@@ -142,6 +142,43 @@
                     android:layout_height="wrap_content"
                     android:layout_below="@id/power"
                     android:orientation="vertical">
+
+                    <!-- Сеть устройств — своей кнопкой, как на компьютере:
+                         большая включает и выключает обход блокировок, а сеть
+                         (имена .mesh, RDP) живёт отдельно. Видна, только когда
+                         у сервера включена сеть устройств. -->
+                    <LinearLayout
+                        android:id="@+id/meshBtn"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_horizontal"
+                        android:layout_marginTop="14dp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:background="@drawable/bg_pill_off"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="14dp"
+                        android:paddingTop="7dp"
+                        android:paddingBottom="7dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:visibility="gone">
+                        <ImageView
+                            android:id="@+id/meshBtnDot"
+                            android:layout_width="8dp"
+                            android:layout_height="8dp"
+                            android:src="@drawable/dot"
+                            android:importantForAccessibility="no" />
+                        <TextView
+                            android:id="@+id/meshBtnCap"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="7dp"
+                            android:textSize="12.5sp"
+                            android:textStyle="bold"
+                            android:textColor="?attr/c_dim"
+                            android:text="@string/mesh_btn_off" />
+                    </LinearLayout>
 
                     <!-- Появляется только когда серверов больше одного и включена
                          галочка «Показывать выбор сервера на главном экране» —
@@ -376,7 +413,7 @@
             <LinearLayout
                 android:id="@+id/devPage"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="600dp"
                 android:orientation="vertical"
                 android:paddingStart="16dp"
                 android:paddingEnd="16dp"
@@ -445,11 +482,21 @@
                     <TextView style="@style/DevHead" android:layout_weight="1.2" android:gravity="end" android:text="@string/dev_domain_ip" />
                 </LinearLayout>
 
+                <!-- Длинный список листается внутри себя: сама главная пальцем
+                     не листается (LockedScrollView). -->
+                <ScrollView
+                    android:id="@+id/devScroll"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:scrollbars="none"
+                    android:overScrollMode="never">
                 <LinearLayout
                     android:id="@+id/devRows"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical" />
+                </ScrollView>
 
                 <TextView
                     android:id="@+id/devNote"
@@ -461,7 +508,7 @@
                     android:textColor="?attr/c_ok" />
             </LinearLayout>
             </LinearLayout>
-        </ScrollView>
+        </io.github.vitazgio.sshtunnel.LockedScrollView>
 
         <!-- ================= самопроверка ================= -->
         <LinearLayout
@@ -662,12 +709,13 @@
                         android:clickable="true"
                         android:focusable="true" />
                     <Space android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:textSize="11.5sp"
-                        android:textColor="?attr/c_dim"
-                        android:text="@string/via_clip" />
+                    <!-- Куда переносить: буфер обмена или файл. Выбор запоминается. -->
+                    <LinearLayout
+                        android:id="@+id/xferModeSeg"
+                        style="@style/XferSeg">
+                        <TextView style="@style/XferSegItem" android:tag="clip" android:text="@string/xfer_clip" />
+                        <TextView style="@style/XferSegItem" android:tag="file" android:text="@string/xfer_file" />
+                    </LinearLayout>
                 </LinearLayout>
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -926,13 +974,38 @@
                     <TextView style="@style/HeadTitle" android:text="@string/app_title" />
                 </LinearLayout>
 
-                <TextView style="@style/SectTitle" android:text="@string/sect_traffic" />
+                <View style="@style/Hairline" />
+                <!-- Группа: заголовок раскрывает и сворачивает содержимое. -->
+                <LinearLayout
+                    android:id="@+id/grpTrafficHead"
+                    style="@style/GroupHead">
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView style="@style/GroupTitle" android:text="@string/sect_traffic" />
+                        <TextView style="@style/GroupSub" android:text="@string/grp_traffic_sub" />
+                    </LinearLayout>
+                    <ImageView
+                        android:id="@+id/grpTrafficChev"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:src="@drawable/ic_chevron"
+                        android:importantForAccessibility="no" />
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/grpTrafficBody"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingBottom="14dp"
+                    android:visibility="gone">
                     <LinearLayout
                         android:id="@+id/apps"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
-                        android:layout_marginBottom="14dp"
+                        android:layout_marginBottom="10dp"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
                         android:background="@drawable/bg_card"
@@ -973,7 +1046,7 @@
                         android:id="@+id/meshRow"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="14dp"
+                        android:layout_marginBottom="10dp"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
                         android:background="@drawable/bg_card"
@@ -1013,7 +1086,7 @@
                         android:id="@+id/adBlockRow"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="14dp"
+                        android:layout_marginBottom="10dp"
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
                         android:background="@drawable/bg_card"
@@ -1049,7 +1122,132 @@
                             android:contentDescription="@string/ad_block_title" />
                     </LinearLayout>
 
-                <TextView style="@style/SectTitle" android:text="@string/sect_launch" />
+                    <LinearLayout
+                        android:id="@+id/domainsRow"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginBottom="0dp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:background="@drawable/bg_card"
+                        android:padding="12dp"
+                        android:clickable="true"
+                        android:focusable="true">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textSize="14sp"
+                                android:textColor="?attr/c_text"
+                                android:text="@string/domains_title" />
+
+                            <TextView
+                                android:id="@+id/domainsSummary"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textSize="12sp"
+                                android:textColor="?attr/c_dim" />
+                        </LinearLayout>
+
+                        <ImageView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:src="@drawable/ic_chevron"
+                            android:contentDescription="@string/domains_title" />
+                    </LinearLayout>
+
+                </LinearLayout>
+                <View style="@style/Hairline" />
+
+                <!-- Группа: заголовок раскрывает и сворачивает содержимое. -->
+                <LinearLayout
+                    android:id="@+id/grpLookHead"
+                    style="@style/GroupHead">
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView style="@style/GroupTitle" android:text="@string/sect_look" />
+                        <TextView style="@style/GroupSub" android:text="@string/grp_look_sub" />
+                    </LinearLayout>
+                    <ImageView
+                        android:id="@+id/grpLookChev"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:src="@drawable/ic_chevron"
+                        android:importantForAccessibility="no" />
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/grpLookBody"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingBottom="14dp"
+                    android:visibility="gone">
+                <TextView style="@style/FieldLabel" android:text="@string/theme" />
+                <LinearLayout
+                    android:id="@+id/themeSeg"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:orientation="horizontal"
+                    android:background="@drawable/bg_outline"
+                    android:showDividers="middle"
+                    android:divider="@drawable/bg_seg_div">
+                    <TextView style="@style/SegItem" android:tag="" android:text="@string/theme_orig" />
+                    <TextView style="@style/SegItem" android:tag="dark" android:text="@string/theme_dark" />
+                    <TextView style="@style/SegItem" android:tag="light" android:text="@string/theme_light" />
+                    <TextView style="@style/SegItem" android:tag="console" android:text="@string/theme_console" />
+                </LinearLayout>
+                <TextView style="@style/FieldLabel" android:layout_marginTop="10dp" android:text="@string/background" />
+                <LinearLayout
+                    android:id="@+id/bgSeg"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:orientation="horizontal"
+                    android:background="@drawable/bg_outline"
+                    android:showDividers="middle"
+                    android:divider="@drawable/bg_seg_div">
+                    <TextView style="@style/SegItem" android:tag="" android:text="@string/bg_color" />
+                    <TextView style="@style/SegItem" android:tag="code" android:text="@string/bg_code" />
+                    <TextView style="@style/SegItem" android:tag="author" android:text="@string/bg_author" />
+                </LinearLayout>
+
+                </LinearLayout>
+                <View style="@style/Hairline" />
+
+                <!-- Группа: заголовок раскрывает и сворачивает содержимое. -->
+                <LinearLayout
+                    android:id="@+id/grpLaunchHead"
+                    style="@style/GroupHead">
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView style="@style/GroupTitle" android:text="@string/sect_launch" />
+                        <TextView style="@style/GroupSub" android:text="@string/grp_launch_sub" />
+                    </LinearLayout>
+                    <ImageView
+                        android:id="@+id/grpLaunchChev"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:src="@drawable/ic_chevron"
+                        android:importantForAccessibility="no" />
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/grpLaunchBody"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingBottom="14dp"
+                    android:visibility="gone">
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -1088,11 +1286,49 @@
                     <TextView style="@style/SegItem" android:tag="last" android:text="@string/start_last" />
                     <TextView style="@style/SegItem" android:tag="off" android:text="@string/start_off" />
                 </LinearLayout>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:layout_marginBottom="6dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="13sp"
+                        android:textColor="?attr/c_text"
+                        android:text="@string/mesh_start_mode" />
+                    <TextView
+                        android:id="@+id/meshStartInfo"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:layout_marginStart="6dp"
+                        android:background="@drawable/bg_infoq"
+                        android:gravity="center"
+                        android:textSize="9sp"
+                        android:textStyle="bold"
+                        android:textColor="?attr/c_dim"
+                        android:text="?"
+                        android:clickable="true"
+                        android:focusable="true" />
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/meshStartSeg"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:orientation="horizontal"
+                    android:background="@drawable/bg_outline"
+                    android:showDividers="middle"
+                    android:divider="@drawable/bg_seg_div">
+                    <TextView style="@style/SegItem" android:tag="on" android:text="@string/start_on" />
+                    <TextView style="@style/SegItem" android:tag="last" android:text="@string/start_last" />
+                    <TextView style="@style/SegItem" android:tag="off" android:text="@string/start_off" />
+                </LinearLayout>
                 <Space android:layout_width="1dp" android:layout_height="12dp" />
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginBottom="14dp"
                         android:gravity="center_vertical">
                         <TextView
                             android:layout_width="0dp"
@@ -1115,40 +1351,38 @@
                             android:focusable="true" />
                     </LinearLayout>
 
-                <TextView style="@style/SectTitle" android:text="@string/sect_look" />
-                <TextView style="@style/FieldLabel" android:text="@string/theme" />
-                <LinearLayout
-                    android:id="@+id/themeSeg"
-                    android:layout_width="match_parent"
-                    android:layout_height="40dp"
-                    android:orientation="horizontal"
-                    android:background="@drawable/bg_outline"
-                    android:showDividers="middle"
-                    android:divider="@drawable/bg_seg_div">
-                    <TextView style="@style/SegItem" android:tag="" android:text="@string/theme_orig" />
-                    <TextView style="@style/SegItem" android:tag="dark" android:text="@string/theme_dark" />
-                    <TextView style="@style/SegItem" android:tag="light" android:text="@string/theme_light" />
-                    <TextView style="@style/SegItem" android:tag="console" android:text="@string/theme_console" />
                 </LinearLayout>
-                <TextView style="@style/FieldLabel" android:layout_marginTop="10dp" android:text="@string/background" />
-                <LinearLayout
-                    android:id="@+id/bgSeg"
-                    android:layout_width="match_parent"
-                    android:layout_height="40dp"
-                    android:orientation="horizontal"
-                    android:background="@drawable/bg_outline"
-                    android:showDividers="middle"
-                    android:divider="@drawable/bg_seg_div">
-                    <TextView style="@style/SegItem" android:tag="" android:text="@string/bg_color" />
-                    <TextView style="@style/SegItem" android:tag="code" android:text="@string/bg_code" />
-                    <TextView style="@style/SegItem" android:tag="author" android:text="@string/bg_author" />
-                </LinearLayout>
+                <View style="@style/Hairline" />
 
-                <TextView style="@style/SectTitle" android:text="@string/sect_more" />
+                <!-- Группа: заголовок раскрывает и сворачивает содержимое. -->
+                <LinearLayout
+                    android:id="@+id/grpMoreHead"
+                    style="@style/GroupHead">
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+                        <TextView style="@style/GroupTitle" android:text="@string/sect_more" />
+                        <TextView style="@style/GroupSub" android:text="@string/grp_more_sub" />
+                    </LinearLayout>
+                    <ImageView
+                        android:id="@+id/grpMoreChev"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:src="@drawable/ic_chevron"
+                        android:importantForAccessibility="no" />
+                </LinearLayout>
+                <LinearLayout
+                    android:id="@+id/grpMoreBody"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingBottom="14dp"
+                    android:visibility="gone">
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="12dp"
                         android:gravity="center_vertical">
 
                         <CheckBox
@@ -1203,47 +1437,28 @@
                         android:layout_marginTop="4dp"
                         android:textColor="?attr/c_text"
                         android:text="@string/show_picker" />
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:gravity="center_vertical">
-                        <TextView style="@style/FieldLabel"
-                            android:layout_width="0dp" android:layout_weight="1"
-                            android:layout_marginTop="0dp"
-                            android:text="@string/direct" />
-                        <TextView
-                            android:id="@+id/directInfo"
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:background="@drawable/bg_infoq"
-                            android:gravity="center"
-                            android:textSize="9sp"
-                            android:textStyle="bold"
-                            android:textColor="?attr/c_dim"
-                            android:text="?"
-                            android:clickable="true"
-                            android:focusable="true" />
-                    </LinearLayout>
-                    <EditText android:id="@+id/direct" style="@style/Field"
-                        android:inputType="textMultiLine" android:minLines="2"
-                        android:gravity="top" android:hint="@string/direct_hint"
-                        android:textColorHint="?attr/c_dim" android:autofillHints="" />
+                </LinearLayout>
+                <View style="@style/Hairline" />
 
-                <View style="@style/Hairline" android:layout_marginTop="22dp" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
                     <TextView
                         android:id="@+id/versionLine"
-                        android:layout_width="match_parent"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:layout_marginBottom="8dp"
-                        android:textSize="12sp"
+                        android:layout_marginEnd="10dp"
+                        android:textSize="12.5sp"
                         android:textColor="?attr/c_dim" />
-
-                    <androidx.appcompat.widget.AppCompatButton
+                    <TextView
                         android:id="@+id/updateCheckBtn"
-                        style="@style/SecondaryButton"
+                        style="@style/OutlineButton"
                         android:text="@string/update_check" />
+                </LinearLayout>
 
                     <TextView
                         android:id="@+id/updateNote"

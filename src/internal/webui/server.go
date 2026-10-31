@@ -329,6 +329,8 @@ type statusResp struct {
 	// AdBlock — есть ли блокировка рекламы (только VPN-версия): без неё
 	// страница прячет этот раздел настроек.
 	AdBlock bool `json:"adBlock"`
+	// AdBlocked — сколько имён заблокировано с подключения.
+	AdBlocked int `json:"adBlocked"`
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -346,6 +348,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		Version:          updater.Version,
 		Modes:            s.app.Modes(),
 		AdBlock:          s.app.AdBlockAvailable(),
+		AdBlocked:        s.app.AdBlocked(),
 	})
 }
 
@@ -462,14 +465,14 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 	// «не трогай», а не «выключи». Пустая структура молча гасила системный
 	// прокси и переменные среды — туннель работал, но трафик шёл мимо него.
 	cfg := s.app.Config()
-	last := cfg.LastRunning
+	last, lastMesh := cfg.LastRunning, cfg.LastMesh
 	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
 		writeJSON(w, map[string]string{"error": "не разобрал настройки: " + err.Error()})
 		return
 	}
 	// Состояние туннеля ведёт сама программа (RememberRunning), а страница
 	// могла прислать устаревшую копию.
-	cfg.LastRunning = last
+	cfg.LastRunning, cfg.LastMesh = last, lastMesh
 	note, err := s.app.SetConfig(cfg)
 	if err != nil {
 		writeJSON(w, map[string]string{"error": err.Error()})

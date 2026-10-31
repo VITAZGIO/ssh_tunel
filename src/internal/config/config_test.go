@@ -168,3 +168,29 @@ func TestDirБезHOME(t *testing.T) {
 		t.Fatalf("папка настроек без HOME: %q", d)
 	}
 }
+
+// Прежний «Только сеть» становится двумя выборами: туннель — нет, сеть — да.
+func TestNormalizeSplitsMeshStartMode(t *testing.T) {
+	c := Default()
+	c.StartMode = StartMesh
+	c.normalize()
+	if c.StartMode != StartOff || c.MeshStartMode != StartOn {
+		t.Fatalf("StartMode=%q MeshStartMode=%q", c.StartMode, c.MeshStartMode)
+	}
+	if c.BypassOnStart(true) || !c.MeshOnStart(true) || !c.ConnectOnStart(false) {
+		t.Fatal("режим запуска «только сеть» потерялся")
+	}
+}
+
+// Сеть без своего выбора повторяет туннель — как до появления настройки.
+func TestMeshStartFollowsTunnelByDefault(t *testing.T) {
+	c := Default()
+	c.StartMode = StartOff
+	if c.MeshOnStart(true) {
+		t.Fatal("сеть включилась при выключенном туннеле")
+	}
+	c.StartMode = StartOn
+	if !c.MeshOnStart(false) {
+		t.Fatal("сеть не включилась вместе с туннелем")
+	}
+}

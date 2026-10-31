@@ -50,10 +50,6 @@
 
   .view{flex:1;overflow-y:auto;padding:0 16px 16px;display:none}
   .view.on{display:block}
-  /* Первая «страница» главного — ровно в окно; ниже список устройств, до
-     него можно долистать колесом или пальцем. Полосу прокрутки не показываем. */
-  #viewMain.on{display:flex;flex-direction:column;overflow-y:auto;scrollbar-width:none}
-  #viewMain::-webkit-scrollbar{display:none}
   .view::-webkit-scrollbar{width:8px}
   .view::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
 
@@ -113,14 +109,18 @@
   #meshBtn.on .dot{background:var(--ok);box-shadow:0 0 6px var(--ok)}
   #meshBtn:disabled{opacity:.55;cursor:default}
 
-  /* Главный экран — две «страницы» одна под другой: первая ровно в высоту
-     окна, вторая — список устройств. Полосу прокрутки не показываем:
-     переходят кнопкой «Устройства» / «Наверх». */
-  #viewMain.on{display:block;overflow-y:auto;padding-bottom:0;scrollbar-width:none}
-  #viewMain::-webkit-scrollbar{display:none}
+  /* Главный экран — две «страницы» одна под другой, каждая ровно в высоту
+     окна: первая — кнопка и сведения, вторая — список устройств. Колесом,
+     пальцем и клавишами главный не листается вовсе (overflow:hidden): между
+     страницами переходят только кнопкой «Устройства» / «Наверх» и логотипом,
+     плавной прокруткой из кода. Длинный список устройств листается внутри
+     своей таблицы. */
+  #viewMain.on{display:block;overflow:hidden;padding-bottom:0;overscroll-behavior:none}
   .mainPage{height:100%;display:flex;flex-direction:column;padding-bottom:16px}
-  .devPage{min-height:100%;padding:4px 0 16px}
+  .devPage{height:100%;padding:4px 0 16px;display:flex;flex-direction:column}
   .devPage[hidden]{display:none}
+  .devTable{flex:1;min-height:0;display:flex;flex-direction:column}
+  #devRows{flex:1;min-height:0;overflow-y:auto;touch-action:pan-y;overscroll-behavior:contain}
 
   /* Сведения: подпись, точки-заполнитель, значение. Без рамок и подложек,
      чтобы не путать с кнопками. */
@@ -149,9 +149,12 @@
   .actions:not(.noDev) .act.left{clip-path:polygon(0 0,100% 0,calc(100% - 20px) 50%,100% 100%,0 100%);padding-right:22px}
   .actions:not(.noDev) .act.right{clip-path:polygon(0 0,100% 0,100% 100%,0 100%,20px 50%);padding-left:22px}
   /* Подсветка — на обёртке: clip-path срезал бы тень у самой кнопки. */
-  .hexwrap{margin:0 -12px;position:relative;z-index:1;transition:filter .2s}
+  .hexwrap{margin:0 -12px;position:relative;z-index:1}
   .hexwrap[hidden]{display:none}
-  .hexwrap.on{filter:drop-shadow(0 0 7px rgba(47,191,113,.55))}
+  /* Включённый — тонкий зелёный контур по форме шестиугольника, без
+     размытого свечения: подложка того же контура на 1.5px шире кнопки. */
+  .hexwrap.on::before{content:"";position:absolute;inset:-1.5px;z-index:-1;background:var(--ok);
+          clip-path:polygon(20px 0,calc(100% - 20px) 0,100% 50%,calc(100% - 20px) 100%,20px 100%,0 50%)}
   .hexbtn{width:100%;height:50px;border:0;padding:0;cursor:pointer;
           background:var(--card2);color:var(--dim);font:inherit;font-size:11px;font-weight:600;
           clip-path:polygon(20px 0,calc(100% - 20px) 0,100% 50%,calc(100% - 20px) 100%,20px 100%,0 50%);
@@ -168,17 +171,21 @@
            letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
   .devHead b{color:var(--text);font-weight:600}
   .devTable{font-family:var(--mono);font-size:12.5px}
-  .devTable .th,.devRow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr) 92px;
-                        gap:8px;align-items:center}
+  /* Как на телефоне: слева крупно имя, справа домен и под ним адрес. */
+  .devTable .th,.devRow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);
+                        gap:12px;align-items:center}
   .devTable .th{font:600 10.5px "Segoe UI",-apple-system,Roboto,sans-serif;letter-spacing:.06em;
-                text-transform:uppercase;color:var(--dim);padding:0 8px 6px;border-bottom:1px solid var(--line)}
+                text-transform:uppercase;color:var(--dim);padding:0 10px 6px;border-bottom:1px solid var(--line)}
+  .devTable .th .r{text-align:right}
   .devRow{width:100%;border:0;border-bottom:1px solid var(--line);background:transparent;
-          color:var(--text);text-align:left;font:inherit;padding:10px 8px;cursor:pointer}
+          color:var(--text);text-align:left;font:inherit;padding:11px 10px;cursor:pointer}
   .devRow:nth-child(odd){background:var(--card)}
   .devRow:hover{outline:1px solid var(--accent);outline-offset:-1px}
-  .devRow span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .devRow .dm{color:var(--accent)}
-  .devRow .ip{color:var(--dim);text-align:right}
+  .devRow .nm{font:15px "Segoe UI",-apple-system,Roboto,sans-serif;overflow-wrap:anywhere}
+  .devRow .rt{display:flex;flex-direction:column;align-items:flex-end;min-width:0;text-align:right}
+  .devRow .dm,.devRow .ip{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .devRow .dm{color:var(--accent);font-size:13px}
+  .devRow .ip{color:var(--dim);font-size:11.5px;margin-top:1px}
   .devRow.off,.devRow.off .dm{color:var(--dim)}
   .devRow.hit{outline:1px solid var(--ok);outline-offset:-1px}
   .devRow.hit .dm{color:var(--ok)}
@@ -494,6 +501,60 @@
   .seg2 button:hover,.seg button:hover{background:var(--card)}
   .seg button.on{background:var(--card2);box-shadow:inset 0 -2px 0 var(--accent);font-weight:600}
   .lbl2{display:flex;align-items:center;gap:7px;font-size:13px;margin:12px 0 6px}
+  /* Настройки приложения — группы, раскрываются по нажатию на заголовок.
+     Высота анимируется через grid-template-rows (0fr → 1fr), без замеров
+     в коде. Пока группа закрыта или едет, содержимое обрезано; раскрытой —
+     нет, иначе подсказки «?» обрезались бы краем группы. */
+  .grp{border-top:1px solid var(--line)}
+  .grp:last-of-type{border-bottom:1px solid var(--line)}
+  .grpHead{width:100%;display:flex;align-items:center;gap:10px;background:transparent;border:0;
+           color:var(--text);font:inherit;font-size:14.5px;font-weight:600;padding:13px 2px;
+           cursor:pointer;text-align:left}
+  .grpHead .t{flex:1;min-width:0}
+  .grpHead .sub{display:block;font-weight:400;font-size:12px;color:var(--dim);margin-top:1px}
+  .grpHead .chev{width:16px;height:16px;flex:none;fill:none;stroke:var(--dim);stroke-width:2;
+                 stroke-linecap:round;stroke-linejoin:round;transition:transform .25s}
+  .grpHead:hover .chev{stroke:var(--accent)}
+  .grp.open .chev{transform:rotate(90deg)}
+  .grpBody{display:grid;grid-template-rows:0fr;transition:grid-template-rows .28s ease}
+  .grp.open .grpBody{grid-template-rows:1fr}
+  .grpBody>div{overflow:hidden;min-height:0}
+  .grp.open.done .grpBody>div{overflow:visible}
+  .grpIn{padding:0 2px 14px}
+  .grpIn .row-link + .row-link{margin-top:8px}
+  .grpIn .lbl2:first-child{margin-top:2px}
+  @media (prefers-reduced-motion: reduce){ .grpBody,.grpHead .chev,.slideTrack{transition:none} }
+
+  .verRow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .verRow .note{margin:0;flex:1;min-width:140px}
+  .verRow .btn{font-size:12.5px;padding:6px 12px}
+
+  /* Две кнопки в ряд поровну (вкладки рекламы, буфер обмена). */
+  .tabs2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .tabs2 .btn{width:100%;padding:10px 8px;font-size:12.5px}
+  .tabs2 .btn.on{background:linear-gradient(180deg,var(--accent-muted),var(--accent-muted-dark));
+                 border-color:transparent;color:#fff;font-weight:600}
+  .abCount{font-size:11.5px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;
+           color:var(--dim);margin:4px 0 12px}
+  .abCount b{color:var(--text)}
+  /* «Обновить список» — во всю ширину, как «Сохранить»: короткая кнопка с
+     длинной подписью не вмещалась. */
+  .wideRow{display:flex;align-items:center;gap:8px;margin-top:14px}
+  .wideRow .btn{flex:1;border-radius:10px;padding:11px 15px}
+
+  /* Исключения доменов: два списка рядом, видно один; кнопки сверху
+     сдвигают ленту вбок. */
+  .slide{overflow:hidden;margin:0 -2px;padding:0 2px}
+  .slideTrack{display:flex;width:200%;transition:transform .35s ease}
+  .slideTrack.second{transform:translateX(-50%)}
+  .slidePane{width:50%;flex:none;padding:0 2px;box-sizing:border-box}
+  .slideTrack:not(.second) .slidePane:last-child,.slideTrack.second .slidePane:first-child{visibility:hidden;transition:visibility 0s .35s}
+
+  /* Переключатель «в буфер / в файл» у переноса настроек и списков. */
+  .xmode{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+  .xmode button{border:0;background:transparent;color:var(--dim);font:inherit;font-size:11px;
+                padding:2px 9px;cursor:pointer;text-transform:none;letter-spacing:0}
+  .xmode button.on{background:var(--card2);color:var(--text);font-weight:600}
   .saveBox{margin-top:24px;padding-bottom:4px}
   /* «Сохранить» — единственная кнопка со скруглением: главное действие. */
   .saveBox .btn{width:100%;border-radius:10px;padding:11px 15px}
@@ -665,7 +726,7 @@
       </div>
       <div class="devHead"><b data-i18n="mesh_devices">Устройства</b><span id="meshMainCount"></span></div>
       <div class="devTable">
-        <div class="th"><span data-i18n="dev_name">Имя</span><span data-i18n="dev_domain">Домен</span><span>IP</span></div>
+        <div class="th"><span data-i18n="dev_name">Имя</span><span class="r" data-i18n="dev_domain_ip">Домен · IP</span></div>
         <div id="devRows"></div>
       </div>
       <div class="hint" id="devNote" style="text-align:center;margin-top:10px;min-height:16px"></div>
@@ -698,7 +759,7 @@
     <div class="xfer">
       <div class="xh"><span data-i18n="xfer_title">Перенос настроек</span>
         <span class="infoq" onclick="event.preventDefault();event.stopPropagation();toggleInfoq(this)">?<span class="tip" data-i18n="all_settings_note">Все серверы с ключами, выбор программ и галочки — одной строкой через буфер обмена. Списки блокировки рекламы не переносятся. Этот текст — такой же секрет, как ключ.</span></span>
-        <span class="xs" data-i18n="via_clip">через буфер</span></div>
+        <span class="xs xmode" data-xmode></span></div>
       <div class="seg2">
         <button type="button" id="bundleImportBtn" data-i18n="import">Импорт</button>
         <button type="button" id="bundleExportBtn" data-i18n="export">Экспорт</button>
@@ -840,23 +901,63 @@
     </div>
   </div>
 
-  <!-- НАСТРОЙКИ ПРИЛОЖЕНИЯ -->
+  <!-- НАСТРОЙКИ ПРИЛОЖЕНИЯ: группы, которые раскрываются по нажатию на
+       заголовок. При открытии экрана все свёрнуты — видно сразу всё
+       оглавление, а не простыню полей. -->
   <div class="view" id="viewApp">
     <div class="head">
       <button class="ico" id="backFromApp" title="Назад" data-i18n-title="back"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
       <span class="t" data-i18n="app_title">Настройки приложения</span>
     </div>
 
-    <div class="sect" data-i18n="sect_traffic">Трафик</div>
-    <button class="row-link" id="toFilter">
-      <span class="t"><span data-i18n="filter_title">Какие программы вести через туннель</span>
-        <div class="v" id="filterSummary">Все</div></span><span class="arr">›</span></button>
-    <button class="row-link" id="toMesh">
-      <span class="t"><span data-i18n="mesh_title">Сеть устройств</span>
-        <div class="v" id="meshSummary">Выключена</div></span><span class="arr">›</span></button>
+    <div class="grp" id="grpTraffic">
+      <button type="button" class="grpHead"><span class="t"><span data-i18n="sect_traffic">Трафик</span>
+        <span class="sub" data-i18n="grp_traffic_sub">Программы, сеть устройств, реклама, домены</span></span>
+        <svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+      <div class="grpBody"><div><div class="grpIn">
+        <button class="row-link" id="toFilter">
+          <span class="t"><span data-i18n="filter_title">Какие программы вести через туннель</span>
+            <div class="v" id="filterSummary">Все</div></span><span class="arr">›</span></button>
+        <button class="row-link" id="toMesh">
+          <span class="t"><span data-i18n="mesh_title">Сеть устройств</span>
+            <div class="v" id="meshSummary">Выключена</div></span><span class="arr">›</span></button>
+        <!-- Только в VPN-версии: в режиме прокси DNS разрешают сами программы. -->
+        <button class="row-link" id="toAdBlock" hidden>
+          <span class="t"><span data-i18n="adblock_title">Блокировка рекламы</span>
+            <div class="v" id="adBlockSummary"></div></span><span class="arr">›</span></button>
+        <button class="row-link" id="toDomains">
+          <span class="t"><span data-i18n="domains_title">Исключения доменов</span>
+            <div class="v" id="domainsSummary"></div></span><span class="arr">›</span></button>
+      </div></div></div>
+    </div>
 
-    <div class="sect" data-i18n="sect_launch">Запуск</div>
-    <span id="autoStartRow" hidden><input type="checkbox" id="autoStart"></span>
+    <div class="grp" id="grpLook">
+      <button type="button" class="grpHead"><span class="t"><span data-i18n="sect_look">Оформление</span>
+        <span class="sub" data-i18n="grp_look_sub">Тема и фон</span></span>
+        <svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+      <div class="grpBody"><div><div class="grpIn">
+        <div class="lbl2" data-i18n="theme">Тема</div>
+        <div class="seg" id="themeSeg">
+          <button type="button" data-v="" data-i18n="theme_orig">Оригинал</button>
+          <button type="button" data-v="dark" data-i18n="theme_dark">Тёмная</button>
+          <button type="button" data-v="light" data-i18n="theme_light">Светлая</button>
+          <button type="button" data-v="console" data-i18n="theme_console">Консоль</button>
+        </div>
+        <div class="lbl2" data-i18n="background">Фон</div>
+        <div class="seg" id="bgSeg">
+          <button type="button" data-v="" data-i18n="bg_color">Цвет</button>
+          <button type="button" data-v="code" data-i18n="bg_code">Код</button>
+          <button type="button" data-v="author" data-i18n="bg_author">Автор</button>
+        </div>
+      </div></div></div>
+    </div>
+
+    <div class="grp" id="grpLaunch">
+      <button type="button" class="grpHead"><span class="t"><span data-i18n="sect_launch">Запуск</span>
+        <span class="sub" data-i18n="grp_launch_sub">Автозапуск, туннель и сеть устройств при запуске</span></span>
+        <svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+      <div class="grpBody"><div><div class="grpIn">
+      <span id="autoStartRow" hidden><input type="checkbox" id="autoStart"></span>
       <div id="bootBlock" hidden>
         <label class="chk"><input type="checkbox" id="bootStart">
           <span class="lbl" data-i18n="boot_start">Запускать при старте системы</span>
@@ -876,56 +977,52 @@
         </div>
         <span class="hint" id="bootStatus" style="display:block;margin:4px 0 0"></span>
       </div>
-    <div class="lbl2"><span data-i18n="start_mode">Туннель при запуске программы</span>
-      <span class="infoq" onclick="event.preventDefault();event.stopPropagation();toggleInfoq(this)">?<span class="tip" data-i18n="start_mode_note">«Как при закрытии» — включит туннель, если он был включён, когда программу закрыли или выключили компьютер. «Только сеть» — поднимет только сеть устройств: машину видно с других устройств, а её интернет идёт напрямую, без сервера.</span></span></div>
-    <div class="seg" id="startModeSeg">
-      <button type="button" data-v="on" data-i18n="start_on">Включать</button>
-      <button type="button" data-v="mesh" data-i18n="start_mesh">Только сеть</button>
-      <button type="button" data-v="last" data-i18n="start_last">Как при закрытии</button>
-      <button type="button" data-v="off" data-i18n="start_off">Не включать</button>
+        <div class="lbl2"><span data-i18n="start_mode">Туннель при запуске программы</span>
+          <span class="infoq" onclick="event.preventDefault();event.stopPropagation();toggleInfoq(this)">?<span class="tip" data-i18n="start_mode_note"></span></span></div>
+        <div class="seg" id="startModeSeg">
+          <button type="button" data-v="on" data-i18n="start_on">Включать</button>
+          <button type="button" data-v="last" data-i18n="start_last">Как при закрытии</button>
+          <button type="button" data-v="off" data-i18n="start_off">Не включать</button>
+        </div>
+        <div class="lbl2"><span data-i18n="mesh_start_mode">Сеть устройств при запуске программы</span>
+          <span class="infoq" onclick="event.preventDefault();event.stopPropagation();toggleInfoq(this)">?<span class="tip" data-i18n="mesh_start_note"></span></span></div>
+        <div class="seg" id="meshStartSeg">
+          <button type="button" data-v="on" data-i18n="start_on">Включать</button>
+          <button type="button" data-v="last" data-i18n="start_last">Как при закрытии</button>
+          <button type="button" data-v="off" data-i18n="start_off">Не включать</button>
+        </div>
+      </div></div></div>
     </div>
 
-    <div class="sect" data-i18n="sect_look">Оформление</div>
-    <div class="lbl2" data-i18n="theme">Тема</div>
-    <div class="seg" id="themeSeg">
-      <button type="button" data-v="" data-i18n="theme_orig">Оригинал</button>
-      <button type="button" data-v="dark" data-i18n="theme_dark">Тёмная</button>
-      <button type="button" data-v="light" data-i18n="theme_light">Светлая</button>
-      <button type="button" data-v="console" data-i18n="theme_console">Консоль</button>
-    </div>
-    <div class="lbl2" data-i18n="background">Фон</div>
-    <div class="seg" id="bgSeg">
-      <button type="button" data-v="" data-i18n="bg_color">Цвет</button>
-      <button type="button" data-v="code" data-i18n="bg_code">Код</button>
-      <button type="button" data-v="author" data-i18n="bg_author">Автор</button>
-    </div>
-
-    <div class="sect" data-i18n="adv_title">Дополнительно</div>
-    <div class="chk-row">
-      <label class="chk"><input type="checkbox" id="localViaTunnel">
-        <span class="lbl" data-i18n="local_via_tunnel">Локальную сеть тоже вести через сервер</span></label>
-      <button class="qmark" id="localHelpBtn" title="Подробнее">?</button>
-    </div>
-    <div class="chk-row">
-      <label class="chk"><input type="checkbox" id="udpRelayEnabled">
-        <span class="lbl" data-i18n="udp_relay_enabled">Пробрасывать UDP (звонки, игры) через сервер</span></label>
-      <button class="qmark" id="udpRelayHelpBtn" title="Подробнее">?</button>
-    </div>
+    <div class="grp" id="grpMore">
+      <button type="button" class="grpHead"><span class="t"><span data-i18n="adv_title">Дополнительно</span>
+        <span class="sub" data-i18n="grp_more_sub">Локальная сеть, UDP, выбор сервера, журнал</span></span>
+        <svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+      <div class="grpBody"><div><div class="grpIn">
+        <div class="chk-row">
+          <label class="chk"><input type="checkbox" id="localViaTunnel">
+            <span class="lbl" data-i18n="local_via_tunnel">Локальную сеть тоже вести через сервер</span></label>
+          <button class="qmark" id="localHelpBtn" title="Подробнее">?</button>
+        </div>
+        <div class="help" id="localHelp" hidden>
+          <p>Обычно не нужно. Домашние и офисные адреса (роутер, NAS,
+            Home&nbsp;Assistant, рабочие сервисы) и так идут напрямую и остаются
+            доступны при включённом туннеле.</p>
+          <p>Включать стоит в одном случае: когда нужна внутренняя сеть <b>самого
+            сервера</b> — например, дотянуться до того, что слушает у него на
+            localhost.</p>
+        </div>
+        <div class="chk-row">
+          <label class="chk"><input type="checkbox" id="udpRelayEnabled">
+            <span class="lbl" data-i18n="udp_relay_enabled">Пробрасывать UDP (звонки, игры) через сервер</span></label>
+          <button class="qmark" id="udpRelayHelpBtn" title="Подробнее">?</button>
+        </div>
     <div class="help" id="udpRelayHelp" hidden>
       <p data-i18n="udp_relay_help">SSH умеет пробрасывать только TCP, поэтому по умолчанию видеозвонки, игры и
         QUIC (быстрый HTTP/3) не проходят через туннель. Эта галочка включает проброс через отдельный
         ретранслятор на сервере — ставится один раз, в мастере настройки VPS (кнопка «Настроить сервер по SSH»
         в этом же меню). Пока он не установлен, галочка ничего не меняет: UDP по-прежнему не проходит.</p>
     </div>
-    <div class="help" id="localHelp" hidden>
-      <p>Обычно не нужно. Домашние и офисные адреса (роутер, NAS,
-        Home&nbsp;Assistant, рабочие сервисы) и так идут напрямую и остаются
-        доступны при включённом туннеле.</p>
-      <p>Включать стоит в одном случае: когда нужна внутренняя сеть <b>самого
-        сервера</b> — например, дотянуться до того, что слушает у него на
-        localhost.</p>
-    </div>
-
       <div class="chk-row" id="autoPickRow" style="display:none">
         <label class="chk"><input type="checkbox" id="autoPickFastest">
           <span class="lbl" data-i18n="auto_pick_fastest">Подключаться к самому быстрому серверу</span>
@@ -939,66 +1036,23 @@
         <label class="chk"><input type="checkbox" id="showServerPicker">
           <span class="lbl" data-i18n="show_picker">Показывать выбор сервера на главном экране</span></label>
       </div>
-      <label class="chk"><input type="checkbox" id="verbose">
-        <span class="lbl" data-i18n="verbose">Подробный журнал</span></label>
-    <div class="field" style="margin-top:12px">
-      <div class="lbl-row">
-        <label for="directHosts" data-i18n="direct_label">Всегда напрямую</label>
-        <button class="qmark" id="directHelpBtn" title="Подробнее">?</button>
-      </div>
-      <textarea id="directHosts" rows="2" spellcheck="false"
-        data-i18n-ph="direct_ph" placeholder="10.8.0.0/16, 172.30.*, .corp.local, vitazgio.ru"></textarea>
-      <div style="display:flex;gap:8px;align-items:center;margin-top:7px">
-        <button class="btn" id="scanNet" style="font-size:12.5px;padding:6px 12px"
-          data-i18n="scan_net">Проверить сеть</button>
-        <span class="hint" id="scanNote" style="margin:0"></span>
-      </div>
-      <div class="help" id="scanResult" hidden></div>
-    </div>
-    <!-- Текст подсказки берётся из словаря (direct_help_html): он переводится
-         и упоминает домены, а не только сети. -->
-    <div class="help" id="directHelp" hidden></div>
-
-    <!-- Только в VPN-версии: в режиме прокси DNS разрешают сами программы. -->
-    <div id="adBlockBox" hidden>
-      <div class="sect" data-i18n="adblock_title">Блокировка рекламы</div>
-      <div class="chk-row">
-        <label class="chk"><input type="checkbox" id="adBlockEnabled">
-          <span class="lbl" data-i18n="adblock_on">Блокировать рекламу и слежку</span></label>
-        <button class="qmark" id="adBlockHelpBtn" title="Подробнее">?</button>
-      </div>
-      <div class="help" id="adBlockHelp" hidden><p data-i18n="adblock_help">Как на телефоне: запрос
-        имени из списка получает отказ, и реклама не грузится ни в одной программе. Списки — ссылки или
-        файлы в формате hosts, по одному на строку. Скачиваются только кнопкой «Обновить списки» и дальше
-        работают без сети.</p></div>
-      <div class="field">
-        <label for="adBlockSources" data-i18n="adblock_sources">Списки</label>
-        <textarea id="adBlockSources" rows="2" spellcheck="false"
-          placeholder="https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"></textarea>
-        <div style="display:flex;gap:8px;align-items:center;margin-top:7px">
-          <button class="btn" id="adBlockUpdate" style="font-size:12.5px;padding:6px 12px"
-            data-i18n="adblock_update">Обновить списки</button>
-          <span class="hint" id="adBlockNote" style="margin:0"></span>
-        </div>
-      </div>
-      <div class="field">
-        <label for="adBlockAllowlist" data-i18n="adblock_allow">Не блокировать</label>
-        <textarea id="adBlockAllowlist" rows="2" spellcheck="false" placeholder="example.com"></textarea>
-      </div>
+        <label class="chk"><input type="checkbox" id="verbose">
+          <span class="lbl" data-i18n="verbose">Подробный журнал</span></label>
+      </div></div></div>
     </div>
 
     <div class="appFoot">
       <div class="upd">
-      <p class="note" style="margin:0 0 9px">
-        <span data-i18n="version_installed">Установлена версия</span>
-        <b id="appVersion">—</b></p>
-      <button class="btn" id="updateCheckBtn" style="width:100%"
-        data-i18n="update_check">Проверить обновления</button>
-      <span class="hint" id="updateNote" style="display:block;margin-top:7px"></span>
-      <button class="btn" id="updateDownloadBtn" hidden style="width:100%;margin-top:8px"
-        data-i18n="update_download">Скачать в «Загрузки»</button>
-      <button class="btn" id="updateOpenBtn" hidden style="width:100%;margin-top:8px"
-        data-i18n="update_open_release">Открыть страницу релиза</button>
+        <div class="verRow">
+          <span class="note"><span data-i18n="version_installed">Установлена версия</span>
+            <b id="appVersion">—</b></span>
+          <button class="btn" id="updateCheckBtn" data-i18n="update_check">Проверить обновления</button>
+        </div>
+        <span class="hint" id="updateNote" style="display:block;margin-top:7px"></span>
+        <button class="btn" id="updateDownloadBtn" hidden style="width:100%;margin-top:8px"
+          data-i18n="update_download">Скачать в «Загрузки»</button>
+        <button class="btn" id="updateOpenBtn" hidden style="width:100%;margin-top:8px"
+          data-i18n="update_open_release">Открыть страницу релиза</button>
       </div>
       <div class="author">
         <svg viewBox="0 0 626 520" role="img" aria-label="Vitaz Gio"><path d="M0 0 137 449 180 308 86 0Z"/><path d="M159 520 221 520 246 437 354 83 379 0 293 0 190 338 146 479Z"/><path d="M468 520 524 337 437 337 406 437 264 437 239 520Z"/><path d="M554 236 394 236 368 319 442 319 529 319Z"/><path d="M373 83 601 83 626 0 398 0Z"/></svg>
@@ -1006,6 +1060,83 @@
         <a id="codeLink" href="https://github.com/VITAZGIO/ssh_tunnel" target="_blank" rel="noopener">
           <svg viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5"/></svg><span data-i18n="source_code">Код</span></a>
       </div>
+    </div>
+  </div>
+
+  <!-- БЛОКИРОВКА РЕКЛАМЫ — как на телефоне: два списка вкладками (что
+       блокировать и что не трогать), буфер обмена и обновление. -->
+  <div class="view" id="viewAdBlock">
+    <div class="head">
+      <button class="ico" id="backFromAdBlock" title="Назад" data-i18n-title="back"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <span class="t" data-i18n="adblock_title">Блокировка рекламы</span>
+    </div>
+    <label class="chk" style="border-top:0"><input type="checkbox" id="adBlockEnabled">
+      <span class="lbl" data-i18n="adblock_on">Блокировать рекламу и слежку</span></label>
+    <div class="abCount"><span data-i18n="adblock_blocked">Заблокировано</span>: <b id="adBlockCount">0</b></div>
+    <div class="tabs2" id="adBlockTabs">
+      <button type="button" class="btn" data-v="block" data-i18n="adblock_tab_block">Чёрный список</button>
+      <button type="button" class="btn" data-v="allow" data-i18n="adblock_tab_allow">Белый список</button>
+    </div>
+    <div class="lbl-row" style="margin-top:12px">
+      <label id="adBlockListLabel" class="hint" style="margin:0;font-size:12px"></label>
+      <span class="infoq" onclick="event.preventDefault();event.stopPropagation();toggleInfoq(this)">?<span class="tip" id="adBlockListTip"></span></span>
+    </div>
+    <textarea id="adBlockSources" rows="7" spellcheck="false" data-i18n-ph="adblock_sources_ph"></textarea>
+    <textarea id="adBlockAllowlist" rows="7" spellcheck="false" data-i18n-ph="adblock_allow_ph" hidden></textarea>
+    <div class="tabs2" style="margin-top:8px">
+      <button type="button" class="btn" id="adBlockPaste" data-i18n="adblock_paste">Вставить из буфера</button>
+      <button type="button" class="btn" id="adBlockCopy" data-i18n="adblock_copy">Скопировать</button>
+    </div>
+    <div class="wideRow">
+      <button class="btn primary" id="adBlockUpdate" data-i18n="adblock_update">Обновить список</button>
+      <span class="infoq" onclick="event.preventDefault();event.stopPropagation();toggleInfoq(this)">?<span class="tip" data-i18n="adblock_help"></span></span>
+    </div>
+    <span class="hint" id="adBlockNote" style="display:block;margin-top:6px"></span>
+  </div>
+
+  <!-- ИСКЛЮЧЕНИЯ ДОМЕНОВ: два списка рядом, переключаются кнопками сверху и
+       уезжают вбок. Действуют на все серверы сразу, как и выбор программ. -->
+  <div class="view" id="viewDomains">
+    <div class="head">
+      <button class="ico" id="backFromDomains" title="Назад" data-i18n-title="back"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <span class="t" data-i18n="domains_title">Исключения доменов</span>
+    </div>
+    <div class="seg" id="domTabs">
+      <button type="button" data-v="direct" data-i18n="direct_label">Всегда напрямую</button>
+      <button type="button" data-v="tunnel" data-i18n="tunnel_label">Всегда в туннель</button>
+    </div>
+    <div class="slide"><div class="slideTrack" id="domTrack">
+      <div class="slidePane">
+        <div class="lbl-row" style="margin-top:12px">
+          <span class="hint" style="margin:0;font-size:12px" data-i18n="direct_sub">Мимо сервера, даже если программа идёт через туннель</span>
+          <button class="qmark" id="directHelpBtn" title="Подробнее">?</button>
+        </div>
+        <div class="help" id="directHelp" hidden></div>
+        <textarea id="directHosts" rows="8" spellcheck="false" data-i18n-ph="direct_ph"></textarea>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:7px">
+          <button class="btn" id="scanNet" style="font-size:12.5px;padding:6px 12px"
+            data-i18n="scan_net">Проверить сеть</button>
+          <span class="hint" id="scanNote" style="margin:0"></span>
+        </div>
+        <div class="help" id="scanResult" hidden></div>
+      </div>
+      <div class="slidePane">
+        <div class="lbl-row" style="margin-top:12px">
+          <span class="hint" style="margin:0;font-size:12px" data-i18n="tunnel_sub">Через сервер, даже если программа или домен идут напрямую</span>
+          <button class="qmark" id="tunnelHelpBtn" title="Подробнее">?</button>
+        </div>
+        <div class="help" id="tunnelHelp" hidden></div>
+        <textarea id="tunnelHosts" rows="8" spellcheck="false" data-i18n-ph="tunnel_ph"></textarea>
+      </div>
+    </div></div>
+    <div class="xfer" style="margin-top:16px">
+      <div class="xh"><span data-i18n="domains_xfer">Перенос списков</span>
+        <span class="xs xmode" data-xmode></span></div>
+      <div class="seg2">
+        <button type="button" id="domImportBtn" data-i18n="import">Импорт</button>
+        <button type="button" id="domExportBtn" data-i18n="export">Экспорт</button>
+      </div>
+      <span class="hint" id="domNote" style="display:block;margin-top:6px"></span>
     </div>
   </div>
 
@@ -1683,7 +1814,7 @@ const I18N = {
       'это порт 8080 здесь (Docker, веб-панели, SSH). Выключи на устройствах, к которым ходить не нужно, — '+
       'например на телефоне.',
     copied:'скопировано', mesh_on:'Включена', mesh_off:'Выключена', mesh_this:'(это устройство)', mesh_click_copy:'Нажми, чтобы скопировать имя',
-    to_top:'Наверх', dev_name:'Имя', dev_domain:'Домен', mesh_no_peers:'Других устройств пока нет',
+    to_top:'Наверх', dev_name:'Имя', dev_domain:'Домен', dev_domain_ip:'Домен · IP', mesh_no_peers:'Других устройств пока нет',
     mesh_new_confirm:'Создать новую сеть? Это устройство уйдёт из прежней, и остальным понадобится новый ключ.',
     mesh_not_saved:'новый ключ — не забудь «Сохранить»',
     mesh_state_online:'В сети', mesh_state_connecting:'Подключаюсь', mesh_state_error:'Нет связи',
@@ -1708,20 +1839,20 @@ const I18N = {
       'ретранслятор на сервере — ставится один раз, в мастере настройки VPS (кнопка «Настроить сервер по '+
       'SSH» в этом же меню). Пока он не установлен, галочка ничего не меняет: UDP по-прежнему не проходит.',
     adblock_title:'Блокировка рекламы', adblock_on:'Блокировать рекламу и слежку',
-    adblock_sources:'Списки', adblock_update:'Обновить списки', adblock_allow:'Не блокировать',
+    adblock_sources:'Списки блокировки', adblock_update:'Обновить список', adblock_allow:'Никогда не блокировать',
     adblock_loading:'скачиваю…', adblock_count:'загружено имён: {n}',
     adblock_help:'Как на телефоне: запрос имени из списка получает отказ, и реклама не грузится ни в одной '+
       'программе. Списки — ссылки или файлы в формате hosts, по одному на строку. Скачиваются только кнопкой '+
-      '«Обновить списки» и дальше работают без сети.',
+      '«Обновить список» и дальше работают без сети.',
     direct_label:'Всегда напрямую', scan_net:'Проверить сеть',
-    direct_ph:'10.8.0.0/16, 172.30.*, .corp.local, vitazgio.ru',
+    direct_ph:'intranet.example.com\n.corp.example\n10.8.0.0/16',
     direct_help_html:'<p>Сети и домены, которые не надо вести через сервер. Домашние и офисные '+
       'адреса, а также сети mesh-VPN уже учтены — сюда вписывают только то, что в них не попало: '+
       'например, корпоративный VPN со своим диапазоном адресов или отдельный сайт.</p>'+
       '<p>Через запятую, в любом виде: сеть (<code>10.8.0.0/16</code> или <code>10.8.*</code>), '+
-      'отдельный адрес, домен (<code>vitazgio.ru</code> — вместе со всеми поддоменами, '+
-      'например <code>sync.home.vitazgio.ru</code>) или только поддомены (<code>.vitazgio.ru</code> '+
-      'или <code>*.vitazgio.ru</code>). Можно вставить и ссылку из браузера — возьмётся имя.</p>'+
+      'отдельный адрес, домен (<code>example.com</code> — вместе со всеми поддоменами, '+
+      'например <code>intranet.example.com</code>) или только поддомены (<code>.example.com</code> '+
+      'или <code>*.example.com</code>). Можно вставить и ссылку из браузера — возьмётся имя.</p>'+
       '<p>Не знаешь, что вписать — нажми «Проверить сеть»: программа посмотрит адаптеры этого '+
       'компьютера и скажет, сломается что-нибудь или нет.</p>',
     verbose:'Подробный журнал', connect_on_launch:'Подключаться сразу при запуске',
@@ -1761,7 +1892,8 @@ const I18N = {
       'скопируй его и нажми кнопку. «Экспорт всех» кладёт в буфер все серверы вместе с ключами.',
     all_settings:'Все настройки целиком',
     all_settings_note:'Все серверы с ключами, выбор программ и галочки — одной строкой через буфер '+
-      'обмена. Списки блокировки рекламы не переносятся. Этот текст — такой же секрет, как ключ.',
+      'обмена или файлом (переключатель справа). Скачанные списки рекламы не переносятся — только ссылки '+
+      'на них. Этот текст — такой же секрет, как ключ.',
     servers_title:'Выбор сервера', servers_total:'всего', app_title:'Настройки приложения',
     app_sub:'Программы, сеть устройств, запуск, оформление', xfer_title:'Перенос настроек',
     via_clip:'через буфер', import:'Импорт', export:'Экспорт', paste_server:'Вставить',
@@ -1769,10 +1901,42 @@ const I18N = {
     pool_note:'Несколько параллельных каналов заметно поднимают скорость. 4 — разумное значение.',
     adv_fine:'Тонкая настройка соединения', sect_traffic:'Трафик', sect_launch:'Запуск',
     start_mode:'Туннель при запуске программы',
-    start_mode_note:'«Как при закрытии» — включит туннель, если он был включён, когда программу '+
-      'закрыли или выключили компьютер. «Только сеть» — поднимет только сеть устройств: машину видно с '+
-      'других устройств, а её интернет идёт напрямую, без сервера.',
+    start_mode_note:'Обход блокировок — сайты через сервер. «Как при закрытии» — включит его, если он '+
+      'был включён, когда программу закрыли или выключили компьютер. Сеть устройств настраивается '+
+      'отдельно, строкой ниже.',
     start_on:'Включать', start_mesh:'Только сеть', start_last:'Как при закрытии', start_off:'Не включать',
+    grp_traffic_sub:'Программы, сеть устройств, реклама, домены', grp_look_sub:'Тема и фон',
+    grp_launch_sub:'Автозапуск, туннель и сеть устройств при запуске',
+    grp_more_sub:'Локальная сеть, UDP, выбор сервера, журнал',
+    mesh_start_mode:'Сеть устройств при запуске программы',
+    mesh_start_note:'Отдельно от туннеля: можно поднимать только сеть устройств (машину видно с других '+
+      'устройств, а её интернет идёт напрямую) или только туннель без сети. «Как при закрытии» — как было, '+
+      'когда программу закрыли. Работает, если у сервера включена сеть устройств.',
+    domains_title:'Исключения доменов', domains_summary:'напрямую: {d} · в туннель: {t}',
+    domains_xfer:'Перенос списков', domains_bad:'это не похоже на списки доменов',
+    domains_imported:'списки загружены — не забудь «Сохранить»',
+    tunnel_label:'Всегда в туннель',
+    direct_sub:'Мимо сервера, даже если программа идёт через туннель',
+    tunnel_sub:'Через сервер, даже если программа или домен идут напрямую',
+    tunnel_ph:'example.org\n*.example.net\n203.0.113.0/24',
+    tunnel_help_html:'<p>Сайты и сети, которые всегда идут через сервер — даже если программа по '+
+      'правилам ходит напрямую («все, кроме выбранных») или домен попал под «Всегда напрямую». '+
+      'Например: в «Всегда напрямую» стоит <code>example.com</code>, а <code>shop.example.com</code> '+
+      'нужен через сервер — впиши его сюда.</p><p>Формат тот же: домен со всеми поддоменами, '+
+      '<code>.example.net</code> или <code>*.example.net</code> — только поддомены, сеть или адрес. '+
+      'По одному в строке или через запятую.</p><p>На телефоне приложения, исключённые из VPN, '+
+      'в туннель не попадают вовсе — для них список не действует.</p>',
+    adblock_on_short:'Включена', adblock_off_short:'Выключена', adblock_blocked:'Заблокировано',
+    adblock_tab_block:'Чёрный список', adblock_tab_allow:'Белый список',
+    adblock_sources_ph:'ссылка https://… или путь к файлу, по одному в строке',
+    adblock_allow_ph:'example.com — по одному в строке',
+    adblock_sources_note:'Откуда брать списки блокировки: ссылки или файлы в формате hosts, по одному в '+
+      'строке. Скачиваются кнопкой «Обновить список».',
+    adblock_allow_note:'Имена, которые не блокируются никогда, даже если есть в списках: если '+
+      'блокировка сломала нужный сайт — впиши его сюда.',
+    adblock_paste:'Вставить из буфера', adblock_copy:'Скопировать',
+    xfer_clip:'буфер', xfer_file:'файл', saved_to_file:'файл сохранён в «Загрузки»',
+    bundle_saved:'настройки сохранены файлом в «Загрузки», серверов — {n}; открой его на другом устройстве.',
     sect_look:'Оформление', theme:'Тема', theme_orig:'Оригинал', theme_dark:'Тёмная',
     theme_light:'Светлая', theme_console:'Консоль', background:'Фон', bg_color:'Цвет',
     bg_code:'Код', bg_author:'Автор', author:'Автор', source_code:'Код',
@@ -1956,7 +2120,7 @@ const I18N = {
     mesh_incoming_hint:'Then another device can open what listens here: e.g. "server.mesh:8080" is port 8080 on '+
       'this device (Docker, web panels, SSH). Turn it off on devices nobody needs to reach, e.g. a phone.',
     copied:'copied', mesh_on:'On', mesh_off:'Off', mesh_this:'(this device)', mesh_click_copy:'Click to copy the name',
-    to_top:'Top', dev_name:'Name', dev_domain:'Domain', mesh_no_peers:'No other devices yet',
+    to_top:'Top', dev_name:'Name', dev_domain:'Domain', dev_domain_ip:'Domain · IP', mesh_no_peers:'No other devices yet',
     mesh_new_confirm:'Create a new network? This device will leave the old one, and the others will need the new key.',
     mesh_not_saved:'new key — remember to Save',
     mesh_state_online:'Online', mesh_state_connecting:'Connecting', mesh_state_error:'No connection',
@@ -1981,20 +2145,20 @@ const I18N = {
       'server — set up once, in the VPS setup wizard ("Set up the server over SSH" button in this same '+
       "menu). Until it's installed, this checkbox changes nothing: UDP still doesn't get through.",
     adblock_title:'Ad blocking', adblock_on:'Block ads and trackers',
-    adblock_sources:'Lists', adblock_update:'Update lists', adblock_allow:'Never block',
+    adblock_sources:'Block lists', adblock_update:'Update list', adblock_allow:'Never block',
     adblock_loading:'downloading…', adblock_count:'names loaded: {n}',
     adblock_help:'Same as on the phone: a lookup of a listed name is refused, so ads don\'t load in any '+
       'program. Lists are links or files in hosts format, one per line. They are downloaded only by the '+
-      '"Update lists" button and then work offline.',
+      '"Update list" button and then work offline.',
     direct_label:'Always direct', scan_net:'Scan network',
-    direct_ph:'10.8.0.0/16, 172.30.*, .corp.local, vitazgio.ru',
+    direct_ph:'intranet.example.com\n.corp.example\n10.8.0.0/16',
     direct_help_html:'<p>Networks and domains that shouldn\'t go through the server. Home and office '+
       'addresses, as well as mesh-VPN networks, are already covered — list here only what they miss: '+
       'a corporate VPN with its own address range, or a single site.</p>'+
       '<p>Comma-separated, in any form: a network (<code>10.8.0.0/16</code> or <code>10.8.*</code>), '+
-      'a single address, a domain (<code>vitazgio.ru</code> — together with all its subdomains, '+
-      'e.g. <code>sync.home.vitazgio.ru</code>) or subdomains only (<code>.vitazgio.ru</code> '+
-      'or <code>*.vitazgio.ru</code>). A link pasted from the browser works too — the name is used.</p>'+
+      'a single address, a domain (<code>example.com</code> — together with all its subdomains, '+
+      'e.g. <code>intranet.example.com</code>) or subdomains only (<code>.example.com</code> '+
+      'or <code>*.example.com</code>). A link pasted from the browser works too — the name is used.</p>'+
       '<p>Not sure what to enter — click "Scan network": the program will look at this computer\'s '+
       'adapters and tell you if anything would break.</p>',
     verbose:'Verbose log', connect_on_launch:'Connect immediately on launch',
@@ -2033,7 +2197,8 @@ const I18N = {
       'the button. “Export all” copies every server, keys included.',
     all_settings:'All settings at once',
     all_settings_note:'Every server with its key, the app selection and the checkboxes — one line '+
-      'through the clipboard. Ad-block lists are left out. Treat this text as a secret, like the key.',
+      'through the clipboard or as a file (switch on the right). Downloaded ad lists are left out, only '+
+      'their links travel. Treat this text as a secret, like the key.',
     servers_title:'Servers', servers_total:'total', app_title:'App settings',
     app_sub:'Apps, device network, launch, look', xfer_title:'Move settings',
     via_clip:'via clipboard', import:'Import', export:'Export', paste_server:'Paste',
@@ -2041,10 +2206,41 @@ const I18N = {
     pool_note:'Several parallel channels noticeably raise the speed. 4 is a sensible value.',
     adv_fine:'Connection fine-tuning', sect_traffic:'Traffic', sect_launch:'Launch',
     start_mode:'Tunnel when the app starts',
-    start_mode_note:'“As on exit” turns the tunnel on if it was on when the app was closed or the '+
-      'computer was shut down. “Devices only” brings up just the device network: other devices can reach '+
-      'this machine, while its own internet goes direct, not through the server.',
+    start_mode_note:'Unblocking — sites through the server. “As on exit” turns it on if it was on when '+
+      'the app was closed or the computer was shut down. The device network has its own choice below.',
     start_on:'Turn on', start_mesh:'Devices only', start_last:'As on exit', start_off:'Keep off',
+    grp_traffic_sub:'Apps, device network, ads, domains', grp_look_sub:'Theme and background',
+    grp_launch_sub:'Autostart, tunnel and device network on launch',
+    grp_more_sub:'Local network, UDP, server choice, log',
+    mesh_start_mode:'Device network when the app starts',
+    mesh_start_note:'Separate from the tunnel: you can bring up only the device network (the machine is '+
+      'reachable from your other devices while its internet goes direct) or only the tunnel without it. '+
+      '“As on exit” repeats how it was when the app was closed. Needs the device network on the server.',
+    domains_title:'Domain exceptions', domains_summary:'direct: {d} · tunnel: {t}',
+    domains_xfer:'Move lists', domains_bad:'this doesn\'t look like domain lists',
+    domains_imported:'lists loaded — don\'t forget to Save',
+    tunnel_label:'Always via tunnel',
+    direct_sub:'Bypass the server even if the app goes through the tunnel',
+    tunnel_sub:'Through the server even if the app or domain goes direct',
+    tunnel_ph:'example.org\n*.example.net\n203.0.113.0/24',
+    tunnel_help_html:'<p>Sites and networks that always go through the server — even if the app goes '+
+      'direct by the rules (“all except selected”) or the domain is in “Always direct”. For example, '+
+      '<code>example.com</code> is in “Always direct” but <code>shop.example.com</code> must go through '+
+      'the server — put it here.</p><p>Same format: a domain with all subdomains, <code>.example.net</code> '+
+      'or <code>*.example.net</code> for subdomains only, a network or an address. One per line or '+
+      'comma-separated.</p><p>On the phone, apps excluded from the VPN never reach the tunnel, so the '+
+      'list doesn\'t apply to them.</p>',
+    adblock_on_short:'On', adblock_off_short:'Off', adblock_blocked:'Blocked',
+    adblock_tab_block:'Blocklist', adblock_tab_allow:'Allowlist',
+    adblock_sources_ph:'https://… link or file path, one per line',
+    adblock_allow_ph:'example.com — one per line',
+    adblock_sources_note:'Where to get block lists: links or files in hosts format, one per line. '+
+      'Downloaded with “Update list”.',
+    adblock_allow_note:'Names that are never blocked even if listed: if blocking broke a site you need, '+
+      'put it here.',
+    adblock_paste:'Paste from clipboard', adblock_copy:'Copy',
+    xfer_clip:'clipboard', xfer_file:'file', saved_to_file:'file saved to Downloads',
+    bundle_saved:'settings saved as a file in Downloads, {n} server(s); open it on the other device.',
     sect_look:'Look', theme:'Theme', theme_orig:'Original', theme_dark:'Dark',
     theme_light:'Light', theme_console:'Console', background:'Background', bg_color:'Color',
     bg_code:'Code', bg_author:'Author', author:'Author', source_code:'Code',
@@ -2119,6 +2315,11 @@ function applyI18n(){
   document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = tr(el.dataset.i18nPh); });
   const dh = $('directHelp');
   if(dh) dh.innerHTML = tr('direct_help_html');
+  const th = $('tunnelHelp');
+  if(th) th.innerHTML = tr('tunnel_help_html');
+  if(typeof renderAdBlockTab === 'function'){ renderAdBlockTab(); renderAdBlockSummary(); }
+  if(typeof renderDomainsSummary === 'function') renderDomainsSummary();
+  if(typeof renderXmode === 'function') renderXmode();
   if(typeof renderSelfCheckSteps === 'function') renderSelfCheckSteps(lastSelfCheckSteps);
   renderModes();
   renderApps();
@@ -2491,7 +2692,8 @@ function docWithProfile(p){
 // Программы через сервер, локальная сеть, UDP и «всегда напрямую» живут в
 // «Настройках приложения» и действуют на все серверы сразу: при сохранении
 // они копируются из правленого сервера во все остальные.
-const SHARED_TRAFFIC = ['filterMode','filterApps','localViaTunnel','udpRelayEnabled','directHosts'];
+const SHARED_TRAFFIC = ['filterMode','filterApps','localViaTunnel','udpRelayEnabled','directHosts',
+                        'tunnelHosts'];
 function shareTraffic(doc, p){
   const part = {};
   SHARED_TRAFFIC.forEach(k => part[k] = p[k]);
@@ -2501,10 +2703,11 @@ function shareTraffic(doc, p){
 
 /* ---------- переключение экранов ---------- */
 const VIEWS = ['viewMain','viewSettings','viewServers','viewApp','viewFilter','viewWizard',
-               'viewVpsSetup','viewSelfCheck','viewLog','viewMesh','viewAdvanced'];
+               'viewVpsSetup','viewSelfCheck','viewLog','viewMesh','viewAdvanced',
+               'viewAdBlock','viewDomains'];
 // Экраны, на которых правят общий документ настроек: внизу у каждого —
 // одна и та же кнопка «Сохранить» (её переносит show()).
-const SETTINGS_VIEWS = ['viewSettings','viewServers','viewApp'];
+const SETTINGS_VIEWS = ['viewSettings','viewServers','viewApp','viewAdBlock','viewDomains'];
 let current = 'viewMain';
 
 function show(name){
@@ -2528,10 +2731,18 @@ $('logo').parentElement.onclick = () => {
   if(current === 'viewMain') scrollMainTo(0); else show('viewMain');
 };
 
+// Главный листается только отсюда (см. #viewMain в стилях). mainAtDev
+// помнит, на какой странице стоим: при смене размера окна высота страниц
+// меняется, и без подгонки снизу выглядывала бы соседняя.
+let mainAtDev = false;
 function scrollMainTo(top){
+  mainAtDev = top > 0;
   const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   $('viewMain').scrollTo({top, behavior: reduce ? 'auto' : 'smooth'});
 }
+window.addEventListener('resize', () => {
+  $('viewMain').scrollTop = mainAtDev && !$('devPage').hidden ? $('devPage').offsetTop : 0;
+});
 
 // Шестерёнка: из корня настроек — на главную, из подэкрана настроек — в
 // корень настроек, отовсюду ещё — в настройки.
@@ -2543,9 +2754,27 @@ $('backFromServers').onclick = () => show('viewSettings');
 // выбранного (к которому подключаемся).
 $('toApp').onclick = async () => {
   if(editingProfileId !== cfg.activeProfile) await selectEditingTab(cfg.activeProfile);
+  // Из корня настроек — всё свёрнуто; из вложенных экранов (программы, сеть,
+  // реклама, домены) возвращаются в то, что было раскрыто.
+  document.querySelectorAll('#viewApp .grp').forEach(g => g.classList.remove('open', 'done'));
+  $('viewApp').scrollTop = 0;
   show('viewApp');
 };
 $('backFromApp').onclick = () => show('viewSettings');
+document.querySelectorAll('#viewApp .grp').forEach(g => {
+  const body = g.querySelector('.grpBody');
+  g.querySelector('.grpHead').onclick = () => {
+    g.classList.remove('done');
+    g.classList.toggle('open');
+  };
+  body.addEventListener('transitionend', e => {
+    if(e.target === body && g.classList.contains('open')) g.classList.add('done');
+  });
+});
+$('toAdBlock').onclick = () => { renderAdBlockTab(); show('viewAdBlock'); };
+$('backFromAdBlock').onclick = () => show('viewApp');
+$('toDomains').onclick = () => { setDomTab(domTab, true); show('viewDomains'); };
+$('backFromDomains').onclick = () => { renderDomainsSummary(); show('viewApp'); };
 $('btnLog').onclick = () =>
   show(current === 'viewLog' ? 'viewMain' : 'viewLog');
 
@@ -3197,15 +3426,149 @@ toggleHelp('keyHelpBtn', 'keyHelp', renderSetupCmd);
 toggleHelp('localHelpBtn', 'localHelp');
 toggleHelp('udpRelayHelpBtn', 'udpRelayHelp');
 toggleHelp('directHelpBtn', 'directHelp');
-toggleHelp('adBlockHelpBtn', 'adBlockHelp');
+toggleHelp('tunnelHelpBtn', 'tunnelHelp');
 
+/* ---------- блокировка рекламы ---------- */
+/* Как на телефоне: чёрный список (откуда брать списки) и белый (что не
+   трогать никогда) — вкладками над одним полем. Оба применяются вместе. */
+let adBlockTab = 'block', adBlocked = 0;
+function renderAdBlockTab(){
+  const block = adBlockTab === 'block';
+  [...$('adBlockTabs').children].forEach(b => b.classList.toggle('on', b.dataset.v === adBlockTab));
+  $('adBlockSources').hidden = !block;
+  $('adBlockAllowlist').hidden = block;
+  $('adBlockListLabel').textContent = tr(block ? 'adblock_sources' : 'adblock_allow');
+  $('adBlockListTip').textContent = tr(block ? 'adblock_sources_note' : 'adblock_allow_note');
+}
+function renderAdBlockSummary(){
+  $('adBlockSummary').textContent = $('adBlockEnabled').checked
+    ? tr('adblock_on_short') + ' · ' + tr('adblock_blocked').toLowerCase() + ': ' + adBlocked
+    : tr('adblock_off_short');
+}
+[...$('adBlockTabs').children].forEach(b => b.onclick = () => { adBlockTab = b.dataset.v; renderAdBlockTab(); });
+$('adBlockEnabled').addEventListener('change', renderAdBlockSummary);
+function adBlockField(){ return $(adBlockTab === 'block' ? 'adBlockSources' : 'adBlockAllowlist'); }
+$('adBlockPaste').onclick = async () => {
+  const text = await readClipboard();
+  if(!text) return;
+  adBlockField().value = text.trim();
+  formDirty = true;
+};
+$('adBlockCopy').onclick = async () => {
+  const ok = await copyToClipboard(adBlockField().value);
+  $('adBlockNote').textContent = ok ? tr('copied') : tr('copy_manually');
+  setTimeout(() => $('adBlockNote').textContent = '', 3000);
+};
 /* Скачать списки и сразу применить. Источники берём из поля, даже если
    «Сохранить» ещё не нажали, — человек ждёт, что кнопка возьмёт то, что видит. */
 $('adBlockUpdate').onclick = async () => {
+  if(adBlockTab !== 'block'){ adBlockTab = 'block'; renderAdBlockTab(); }
+  if(!$('adBlockSources').value.trim()){ $('adBlockNote').textContent = tr('adblock_sources_ph'); return; }
+  $('adBlockUpdate').disabled = true;
   $('adBlockNote').textContent = tr('adblock_loading');
-  const r = await api('/api/adblock/update', {sources: $('adBlockSources').value});
-  $('adBlockNote').textContent = r.error ? r.error : tr('adblock_count').replace('{n}', r.count);
+  try {
+    const r = await api('/api/adblock/update', {sources: $('adBlockSources').value});
+    $('adBlockNote').textContent = r.error ? r.error : tr('adblock_count').replace('{n}', r.count);
+  } finally { $('adBlockUpdate').disabled = false; }
 };
+
+/* ---------- исключения доменов ---------- */
+/* Два списка: «всегда напрямую» и «всегда в туннель». Кнопки сверху
+   сдвигают ленту вбок — второй список въезжает на место первого. */
+let domTab = 'direct';
+function setDomTab(v, instant){
+  domTab = v;
+  renderSeg('domTabs', v);
+  const track = $('domTrack');
+  if(instant){ track.style.transition = 'none'; requestAnimationFrame(() => track.style.transition = ''); }
+  track.classList.toggle('second', v === 'tunnel');
+}
+[...$('domTabs').children].forEach(b => b.onclick = () => setDomTab(b.dataset.v));
+function renderDomainsSummary(){
+  const d = splitEntries($('directHosts').value).length, t = splitEntries($('tunnelHosts').value).length;
+  $('domainsSummary').textContent = tr('domains_summary').replace('{d}', d).replace('{t}', t);
+}
+$('domExportBtn').onclick = async () => {
+  const text = JSON.stringify({sshTunnelDomains: 1,
+    direct: splitEntries($('directHosts').value), tunnel: splitEntries($('tunnelHosts').value)}, null, 2);
+  const note = await exportText(text, 'ssh_tunnel-domains.json');
+  $('domNote').textContent = note;
+  setTimeout(() => $('domNote').textContent = '', 6000);
+};
+$('domImportBtn').onclick = async () => {
+  const text = await importText();
+  if(!text) return;
+  let doc = null;
+  try { doc = JSON.parse(text); } catch(e) {}
+  if(doc && doc.sshTunnelDomains){
+    $('directHosts').value = (doc.direct || []).join('\n');
+    $('tunnelHosts').value = (doc.tunnel || []).join('\n');
+  } else if(!doc && splitEntries(text).length){
+    // Просто список имён — в тот, что сейчас открыт.
+    $(domTab === 'tunnel' ? 'tunnelHosts' : 'directHosts').value = splitEntries(text).join('\n');
+  } else {
+    $('domNote').textContent = tr('domains_bad');
+    return;
+  }
+  formDirty = true;
+  renderDomainsSummary();
+  $('domNote').textContent = tr('domains_imported');
+};
+
+/* ---------- перенос: через буфер или файлом ---------- */
+/* Выбор один на программу и запоминается в этом окне: кому удобнее
+   файлами, тот не переключает каждый раз. */
+let xferMode = 'clip';
+try { if(localStorage.getItem('xferMode') === 'file') xferMode = 'file'; } catch(e) {}
+function renderXmode(){
+  document.querySelectorAll('[data-xmode]').forEach(box => {
+    box.innerHTML = '';
+    [['clip', 'xfer_clip'], ['file', 'xfer_file']].forEach(([v, k]) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = tr(k);
+      b.classList.toggle('on', xferMode === v);
+      b.onclick = () => {
+        xferMode = v;
+        try { localStorage.setItem('xferMode', v); } catch(e) {}
+        renderXmode();
+      };
+      box.appendChild(b);
+    });
+  });
+}
+renderXmode();
+function saveTextFile(name, text){
+  const blob = new Blob([text], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+function pickTextFile(){
+  return new Promise(resolve => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,.txt,application/json,text/plain';
+    input.onchange = async () => {
+      const f = input.files[0];
+      resolve(f ? await f.text() : '');
+    };
+    input.click();
+  });
+}
+// exportText отдаёт текст выбранным способом и возвращает подпись для экрана.
+async function exportText(text, fileName){
+  if(xferMode === 'file'){ saveTextFile(fileName, text); return tr('saved_to_file'); }
+  return (await copyToClipboard(text)) ? tr('copied') : tr('copy_manually');
+}
+async function importText(){
+  return xferMode === 'file' ? pickTextFile() : readClipboard();
+}
 toggleHelp('kaHelpBtn', 'kaHelp');
 toggleHelp('toHelpBtn', 'toHelp');
 toggleHelp('cipherHelpBtn', 'cipherHelp');
@@ -3214,8 +3577,8 @@ toggleHelp('lanHelpBtn', 'lanHelp');
 toggleHelp('vpnHelpBtn', 'vpnHelp');
 
 function hideKeyHelp(){
-  ['keyHelp','localHelp','directHelp','scanResult'].forEach(id => $(id).hidden = true);
-  ['keyHelpBtn','localHelpBtn','directHelpBtn'].forEach(id => $(id).classList.remove('on'));
+  ['keyHelp','localHelp','directHelp','tunnelHelp','scanResult'].forEach(id => $(id).hidden = true);
+  ['keyHelpBtn','localHelpBtn','directHelpBtn','tunnelHelpBtn'].forEach(id => $(id).classList.remove('on'));
   $('keyHelpNote').textContent = '';
   $('scanNote').textContent = '';
 }
@@ -3391,7 +3754,7 @@ function renderDevRows(peers){
     const row = document.createElement('button');
     row.className = 'devRow' + (p.online ? '' : ' off') + (devHit === dom ? ' hit' : '');
     row.title = tr('mesh_click_copy');
-    row.innerHTML = '<span class="nm"></span><span class="dm"></span><span class="ip"></span>';
+    row.innerHTML = '<span class="nm"></span><span class="rt"><span class="dm"></span><span class="ip"></span></span>';
     row.querySelector('.nm').textContent = p.name + (p.self ? ' ' + tr('mesh_this') : '');
     row.querySelector('.dm').textContent = dom;
     row.querySelector('.ip').textContent = p.ip;
@@ -3445,7 +3808,7 @@ function splitEntries(v){
   return (v || '').split(/[\s,;]+/).map(x => x.trim()).filter(Boolean);
 }
 
-[...FIELDS, ...PROFILE_CHECKS, ...CHECKS, 'directHosts', 'autoConnect',
+[...FIELDS, ...PROFILE_CHECKS, ...CHECKS, 'directHosts', 'tunnelHosts', 'autoConnect',
  'customCityName', 'showServerPicker', 'adBlockSources', 'adBlockAllowlist'].forEach(f => {
   const el = $(f);
   if(el) el.addEventListener('input', () => { formDirty = true; });
@@ -3958,6 +4321,7 @@ $('save').onclick = async () => {
   PROFILE_CHECKS.forEach(f => p[f] = $(f).checked);
   p.meshDirectOff = !$('meshDirect').checked;
   p.directHosts = splitEntries($('directHosts').value);
+  p.tunnelHosts = splitEntries($('tunnelHosts').value);
   p.filterMode = filterMode;
   p.filterApps = filterApps;
   Object.assign(p, pickedNameFlag());
@@ -3969,6 +4333,7 @@ $('save').onclick = async () => {
   // Прежние галочки ставим по выбранному режиму — их читают старые версии,
   // а новые смотрят на startMode.
   doc.startMode = startMode;
+  doc.meshStartMode = meshStartMode;
   doc.autoConnect = startMode === 'on';
   doc.autoStart = startMode === 'on';
   doc.theme = uiTheme;
@@ -3994,7 +4359,9 @@ function fillProfileForm(p){
   });
   PROFILE_CHECKS.forEach(f => { if($(f)) $(f).checked = !!p[f]; });
   $('meshDirect').checked = !p.meshDirectOff;
-  $('directHosts').value = (p.directHosts || []).join(', ');
+  $('directHosts').value = (p.directHosts || []).join('\n');
+  $('tunnelHosts').value = (p.tunnelHosts || []).join('\n');
+  renderDomainsSummary();
   if(!filterDirty){
     filterMode = p.filterMode || 'all';
     filterApps = (p.filterApps || []).map(normApp);
@@ -4079,7 +4446,13 @@ function fillGeneralForm(c){
   // Режим запуска. В конфиге прежней версии его нет — выводим из галочки
   // этой платформы, как и программа (config.ConnectOnStart).
   startMode = c.startMode || ((isWindows() ? c.autoStart : $('autoConnect').checked) ? 'on' : 'off');
+  // Прежний «Только сеть» — теперь «туннель нет, сеть да» (так же чинит и
+  // программа, config.normalize).
+  meshStartMode = c.meshStartMode || (startMode === 'mesh' ? 'on' : startMode);
+  if(startMode === 'mesh') startMode = 'off';
   renderSeg('startModeSeg', startMode);
+  renderSeg('meshStartSeg', meshStartMode);
+  renderAdBlockSummary();
   uiTheme = c.theme || '';
   uiBg = c.background || '';
   applyLook();
@@ -4091,7 +4464,7 @@ function fillGeneralForm(c){
 }
 
 /* ---------- три кнопки «при запуске», тема, фон ---------- */
-let startMode = 'on', uiTheme = '', uiBg = '';
+let startMode = 'on', meshStartMode = 'on', uiTheme = '', uiBg = '';
 function renderSeg(id, v){
   [...$(id).querySelectorAll('button')].forEach(b => b.classList.toggle('on', b.dataset.v === v));
 }
@@ -4103,6 +4476,7 @@ function bindSeg(id, set){
   });
 }
 bindSeg('startModeSeg', v => startMode = v);
+bindSeg('meshStartSeg', v => meshStartMode = v);
 // Тема и фон меняются сразу — чтобы видеть, что выбираешь; сохраняются
 // общей кнопкой.
 bindSeg('themeSeg', v => { uiTheme = v; applyLook(); });
@@ -4238,7 +4612,10 @@ async function refresh(){
   let detail = st.state === 'connected' ? active.host : '';
   if(detail && usingBackup) detail += ' (' + tr('backup_server_note') + ')';
   if(st.modes) netModes = st.modes;
-  $('adBlockBox').hidden = !st.adBlock;
+  $('toAdBlock').hidden = !st.adBlock;
+  adBlocked = st.adBlocked || 0;
+  $('adBlockCount').textContent = adBlocked;
+  renderAdBlockSummary();
   setState(st.state, detail);
   // Пока пользователь правит форму, обновление с сервера её не трогает —
   // иначе набранный, но ещё не сохранённый адрес затирался бы.
@@ -4282,8 +4659,15 @@ function initCollapsible(panelId, titleId){
 $('bundleExportBtn').onclick = async () => {
   const r = await api('/api/settings/export', {});
   if(r.error){ showError(r.error, 'setError'); return; }
-  const copied = await copyToClipboard(r.data);
-  let msg = copied ? tr('bundle_copied').replace('{n}', r.servers) : tr('copy_manually');
+  let copied, msg;
+  if(xferMode === 'file'){
+    saveTextFile('ssh_tunnel-settings.json', r.data);
+    copied = true;
+    msg = tr('bundle_saved').replace('{n}', r.servers);
+  } else {
+    copied = await copyToClipboard(r.data);
+    msg = copied ? tr('bundle_copied').replace('{n}', r.servers) : tr('copy_manually');
+  }
   if(copied && r.keysMissing) msg += ' ' + tr('bundle_keys_missing').replace('{n}', r.keysMissing);
   $('bundleNote').textContent = msg;
   setTimeout(() => $('bundleNote').textContent = '', 12000);
@@ -4293,7 +4677,7 @@ $('bundleExportBtn').onclick = async () => {
    своим давало бы список, в котором не разобраться, поэтому спрашиваем
    подтверждение — отменить это нечем. */
 $('bundleImportBtn').onclick = async () => {
-  const text = await readClipboard();
+  const text = await importText();
   if(!text) return;
   if(!(await appConfirm(tr('bundle_replace_confirm')))) return;
   const r = await api('/api/settings/import', text, true);

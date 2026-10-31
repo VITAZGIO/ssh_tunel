@@ -33,12 +33,20 @@ type Bundle struct {
 	AutoStart        bool   `json:"autoStart"`
 	AutoConnect      *bool  `json:"autoConnect,omitempty"`
 	StartMode        string `json:"startMode,omitempty"`
+	MeshStartMode    string `json:"meshStartMode,omitempty"`
 	Theme            string `json:"theme,omitempty"`
 	Background       string `json:"background,omitempty"`
 	ShowServerPicker bool   `json:"showServerPicker"`
 	AutoPickFastest  bool   `json:"autoPickFastest"`
 	SysProxy         bool   `json:"sysProxy"`
 	SetEnvVars       bool   `json:"setEnvVars"`
+
+	// Блокировка рекламы: галочка, ссылки на списки и исключения. Сам
+	// скачанный список не переносится (см. выше) — по ссылкам он
+	// скачивается заново кнопкой «Обновить список».
+	AdBlockEnabled   bool   `json:"adBlockEnabled,omitempty"`
+	AdBlockSources   string `json:"adBlockSources,omitempty"`
+	AdBlockAllowlist string `json:"adBlockAllowlist,omitempty"`
 
 	// Mobile — раздел телефона (DNS, режим блокировки рекламы, белый список,
 	// выбранные приложения). Компьютер его не понимает, но и не теряет:

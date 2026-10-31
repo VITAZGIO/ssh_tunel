@@ -60,6 +60,8 @@ type App struct {
 	// без переподключения.
 	policy *routing.Policy
 	direct *routing.DirectList
+	// tunneled — список «всегда через сервер», общий для всех туннелей.
+	tunneled *routing.DirectList
 
 	// seenApps — программы, которые уже ходили через прокси. Нужны, чтобы в
 	// настройках можно было выбрать их из списка, а не вспоминать имена.
@@ -114,6 +116,7 @@ func New(cfg config.Config) *App {
 		sys:      sysproxy.NewManager(config.Dir()),
 		policy:   routing.New(routing.Mode(active.FilterMode), active.FilterApps),
 		direct:   routing.NewDirectList(active.DirectHosts),
+		tunneled: routing.NewDirectList(active.TunnelHosts),
 		seenApps: map[string]struct{}{},
 	}
 	go a.collectSeenApps()
@@ -168,9 +171,11 @@ func (a *App) SetConfig(cfg config.Config) (string, error) {
 	active := cfg.Active()
 	a.policy.Set(routing.Mode(active.FilterMode), active.FilterApps)
 	a.direct.Set(active.DirectHosts)
+	a.tunneled.Set(active.TunnelHosts)
 	if tun != nil {
 		tun.SetPolicy(a.policy)
 		tun.SetDirect(a.direct)
+		tun.SetTunneled(a.tunneled)
 		tun.SetLocalViaTunnel(active.LocalViaTunnel)
 	}
 
@@ -302,17 +307,18 @@ func (a *App) Running() bool {
 	return a.running
 }
 
-// RememberRunning запоминает, включён ли сейчас туннель, — для режима запуска
-// «как при закрытии» (config.StartLast). Зовётся только на действия человека
-// (кнопка, значок в трее): остановка при выходе из программы сюда не попадает.
+// RememberRunning запоминает, что сейчас включено — обход блокировок и сеть
+// устройств, — для режимов запуска «как при закрытии» (config.StartLast).
+// Зовётся только на действия человека (кнопки, значок в трее): остановка при
+// выходе из программы сюда не попадает.
 func (a *App) RememberRunning() {
+	m := a.Modes()
 	a.mu.Lock()
-	on := a.running
-	if a.cfg.LastRunning == on {
+	if a.cfg.LastRunning == m.Bypass && a.cfg.LastMesh == m.Mesh {
 		a.mu.Unlock()
 		return
 	}
-	a.cfg.LastRunning = on
+	a.cfg.LastRunning, a.cfg.LastMesh = m.Bypass, m.Mesh
 	cfg := a.cfg
 	a.mu.Unlock()
 	if err := cfg.Save(); err != nil {

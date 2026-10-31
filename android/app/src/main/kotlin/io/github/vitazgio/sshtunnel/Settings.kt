@@ -49,6 +49,8 @@ class Settings(context: Context) {
         var meshIncoming: Boolean = false,
         // Не пробовать прямые соединения между устройствами.
         var meshDirectOff: Boolean = false,
+        /** «Всегда в туннель» — обратный directHosts список, общий для всех серверов. */
+        var tunnelHosts: String = "",
     )
 
     private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
@@ -162,6 +164,7 @@ class Settings(context: Context) {
         val list = profiles
         for (p in list) {
             p.directHosts = from.directHosts
+            p.tunnelHosts = from.tunnelHosts
             p.localViaTunnel = from.localViaTunnel
             p.filterMode = from.filterMode
             p.filterApps = from.filterApps.toMutableSet()
@@ -191,6 +194,7 @@ class Settings(context: Context) {
             o.put("meshEnabled", p.meshEnabled); o.put("meshKey", p.meshKey)
             o.put("meshName", p.meshName); o.put("meshIncoming", p.meshIncoming)
             o.put("meshDirectOff", p.meshDirectOff)
+            o.put("tunnelHosts", p.tunnelHosts)
             arr.put(o)
         }
         return arr.toString()
@@ -226,6 +230,7 @@ class Settings(context: Context) {
                         meshName = o.optString("meshName", ""),
                         meshIncoming = o.optBoolean("meshIncoming", false),
                         meshDirectOff = o.optBoolean("meshDirectOff", false),
+                        tunnelHosts = o.optString("tunnelHosts", ""),
                     )
                 )
             }
@@ -365,6 +370,10 @@ class Settings(context: Context) {
         get() = active().directHosts
         set(v) { val p = active(); p.directHosts = v; saveProfile(p) }
 
+    var tunnelHosts: String
+        get() = active().tunnelHosts
+        set(v) { val p = active(); p.tunnelHosts = v; saveProfile(p) }
+
     var localViaTunnel: Boolean
         get() = active().localViaTunnel
         set(v) { val p = active(); p.localViaTunnel = v; saveProfile(p) }
@@ -436,8 +445,33 @@ class Settings(context: Context) {
         get() = prefs.getString("startMode", "off") ?: "off"
         set(v) = prefs.edit().putString("startMode", v).apply()
 
+    /** Был ли включён обход блокировок при последнем действии руками. */
     var lastRunning: Boolean
         get() = prefs.getBoolean("lastRunning", false)
         set(v) = prefs.edit().putBoolean("lastRunning", v).apply()
+
+    /**
+     * Сеть устройств при открытии приложения — отдельно от туннеля, те же
+     * "on", "last" (lastMesh), "off". Пусто — повторяет выбор туннеля, как
+     * было до появления настройки.
+     */
+    var meshStartMode: String
+        get() = prefs.getString("meshStartMode", "") ?: ""
+        set(v) = prefs.edit().putString("meshStartMode", v).apply()
+
+    var lastMesh: Boolean
+        get() = prefs.getBoolean("lastMesh", false)
+        set(v) = prefs.edit().putBoolean("lastMesh", v).apply()
+
+    /** Действующий выбор для сети: пустой повторяет туннель. */
+    val meshStartEffective: String get() = meshStartMode.ifBlank { startMode }
+
+    /** Перенос настроек и списков: "clip" — буфер обмена, "file" — файлом. */
+    var xferMode: String
+        get() = prefs.getString("xferMode", "clip") ?: "clip"
+        set(v) = prefs.edit().putString("xferMode", v).apply()
+
+    /** У активного сервера есть сеть устройств. */
+    fun meshConfigured(): Boolean = active().let { it.meshEnabled && it.meshKey.isNotBlank() }
 
 }
